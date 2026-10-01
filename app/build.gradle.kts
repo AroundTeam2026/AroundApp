@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   alias(libs.plugins.androidApplication)
-  alias(libs.plugins.composeCompiler)
+  alias(libs.plugins.kotlinCompose)
   alias(libs.plugins.ktfmt)
   alias(libs.plugins.sonar)
   alias(libs.plugins.gms)
@@ -15,7 +15,7 @@ android {
 
   defaultConfig {
     applicationId = "com.github.aroundteam2026.aroundapp"
-    minSdk = 29
+    minSdk = 28
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
@@ -56,7 +56,6 @@ android {
       isReturnDefaultValues = true
     }
   }
-
 }
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
@@ -171,7 +170,7 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
       fileTree(project.layout.buildDirectory) {
         include(
             // AGP 9 compiles Kotlin with its built-in compiler, which writes here
-           "intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/**",
+            "intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/**",
             // Fallback for the AGP 8 layout
             "tmp/kotlin-classes/debug/**",
         )
