@@ -1,0 +1,7 @@
+./idea
+
+/build
+/app/build
+google-services.json
+local.properties
+firestore-debug.log
