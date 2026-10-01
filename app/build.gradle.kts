@@ -26,7 +26,7 @@ android {
 
   buildTypes {
     release {
-      isMinifyEnabled = false
+      isMinifyEnabled = true
       proguardFiles(
           getDefaultProguardFile("proguard-android-optimize.txt"),
           "proguard-rules.pro",
@@ -57,22 +57,6 @@ android {
     }
   }
 
-  // Robolectric needs to be run only in debug. But its tests are placed in the shared source set
-  // (test)
-  // The next lines transfers the src/test/* from shared to the testDebug one
-  //
-  // This prevent errors from occurring during unit tests
-  sourceSets {
-    getByName("test") {
-      java.directories.add("src/test/java")
-      resources.directories.add("src/test/resources")
-    }
-
-    getByName("testDebug") {
-      java.directories.add("src/testDebug/java")
-      resources.directories.add("src/testDebug/resources")
-    }
-  }
 }
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
@@ -87,7 +71,7 @@ sonar {
     // Each path may be absolute or relative to the project base directory.
     property(
         "sonar.junit.reportPaths",
-        "${project.layout.buildDirectory.get()}/test-results/testDebugunitTest/",
+        "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/",
     )
     // Paths to xml files with Android Lint issues. If the main flavor is changed, this file will
     // have to be changed too.
@@ -110,15 +94,19 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
 }
 
 dependencies {
-  implementation(platform(libs.firebase.bom))
-  androidTestImplementation(platform(libs.firebase.bom))
-  implementation(libs.firebase.firestore)
-  implementation(libs.firebase.auth)
+  // ------------- AndroidX core ------------------
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
   implementation(libs.androidx.lifecycle.runtime.ktx)
-  implementation(platform(libs.compose.bom))
+
+  // ------------- Firebase ------------------
+  implementation(platform(libs.firebase.bom))
+  androidTestImplementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.firestore)
+  implementation(libs.firebase.auth)
+
+  // ------------- Test basics ------------------
   testImplementation(libs.junit)
   globalTestImplementation(libs.androidx.junit)
   globalTestImplementation(libs.androidx.espresso.core)
@@ -160,6 +148,8 @@ tasks.withType<Test> {
 }
 
 tasks.register("jacocoTestReport", JacocoReport::class) {
+  group = "verification"
+  description = "Generates the JaCoCo coverage report from unit and instrumented tests."
   mustRunAfter("testDebugUnitTest", "connectedDebugAndroidTest")
 
   reports {
@@ -178,7 +168,13 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
       )
 
   val debugTree =
-      fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+      fileTree(project.layout.buildDirectory) {
+        include(
+            // AGP 9 compiles Kotlin with its built-in compiler, which writes here
+           "intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/**",
+            // Fallback for the AGP 8 layout
+            "tmp/kotlin-classes/debug/**",
+        )
         exclude(fileFilter)
       }
 
