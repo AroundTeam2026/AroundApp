@@ -1,3 +1,8 @@
+---
+name: pr-review
+description: AroundApp pull request checklist. Use when reviewing or opening a PR.
+---
+
 # PR Checklist
 
 Go through each point before approving (or opening) a pull request.
