@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           submodules: recursive
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of Sonar analysis (if we use Sonar Later)
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of Sonar analysis.
 
       # Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux.
       # Enabling it allows the Android emulator to run faster.
@@ -34,7 +34,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Setup JDK
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: "temurin"
           java-version: |
@@ -60,10 +60,10 @@ jobs:
       #
       # To avoid that, we cache the gradle folder to reuse it later.
       - name: Gradle cache
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Cache SonarQube packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
