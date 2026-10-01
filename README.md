@@ -19,3 +19,39 @@ The app uses GPS to determine the user’s location, unlock quests when they ent
 ## Offline mode
 
 In offline mode, users can still view quests they have already picked up, access recently cached nearby map data, and view their cached profile. Quest completions made while offline are stored locally and automatically synced once connectivity returns. Features that depend on live data, such as discovering new quests or viewing updated leaderboards, are temporarily unavailable; leaderboards instead display the most recently synced state together with an “as of” timestamp so users know the information may be outdated.
+
+## Getting started
+
+### Prerequisites
+
+- JDK 17
+- Android Studio
+
+### Firebase configuration
+
+The app connects to the `around-67942` Firebase project and needs a `google-services.json` file in `app/`. Download it from the [Firebase console](https://console.firebase.google.com/) for the `around-67942` project (Project settings → Your apps → Android app) and place it at `app/google-services.json`.
+
+### Firebase emulators
+
+Instrumented tests that exercise the Firestore repository run against the Firebase emulators instead of production. To run them locally, install:
+
+- Node 20+
+- JDK 21
+- [firebase-tools](https://firebase.google.com/docs/cli)
+
+### Useful commands
+
+```sh
+./gradlew check          # unit tests + lint
+./gradlew ktfmtFormat     # auto-format Kotlin sources
+./gradlew connectedCheck  # instrumented tests (needs an Android emulator and the Firebase emulators running)
+```
+
+## Design
+
+Wireframes: [Figma](https://www.figma.com/design/yC84SMe4qfm0Kgi6J7kRRj/wireframes--first-draft?node-id=0-1&t=u9vmQpgdUfN1YAHC-1)
+
+## Acknowledgements
+
+- The project skeleton comes from [swent-epfl/Android-Sample](https://github.com/swent-epfl/Android-Sample).
+- `AGENTS.md` originally comes from the bootcamp template.
