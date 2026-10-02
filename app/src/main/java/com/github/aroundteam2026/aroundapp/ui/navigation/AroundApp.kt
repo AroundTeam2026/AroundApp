@@ -53,9 +53,16 @@ enum class Tab(
   ),
 }
 
-/** The app's root: the selected tab's screen above a bottom navigation bar. */
+/**
+ * The app's root: the selected tab's screen above a bottom navigation bar.
+ *
+ * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
+ */
 @Composable
-fun AroundApp(navController: NavHostController = rememberNavController()) {
+fun AroundApp(
+    navController: NavHostController = rememberNavController(),
+    screen: @Composable (Tab) -> Unit = { PlaceholderScreen(it) },
+) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = backStackEntry?.destination?.route
 
@@ -81,7 +88,7 @@ fun AroundApp(navController: NavHostController = rememberNavController()) {
         startDestination = Tab.QUESTS.route,
         modifier = Modifier.padding(innerPadding),
     ) {
-      Tab.entries.forEach { tab -> composable(tab.route) { PlaceholderScreen(tab) } }
+      Tab.entries.forEach { tab -> composable(tab.route) { screen(tab) } }
     }
   }
 }
