@@ -112,6 +112,7 @@ dependencies {
   implementation(libs.compose.activity)
   implementation(libs.compose.viewmodel)
   implementation(libs.compose.preview)
+  implementation(libs.navigation.compose)
 
   debugImplementation(libs.compose.tooling)
   debugImplementation(libs.compose.test.manifest)
