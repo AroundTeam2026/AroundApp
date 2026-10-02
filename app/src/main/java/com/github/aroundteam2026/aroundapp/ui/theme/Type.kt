@@ -1,4 +1,4 @@
-package com.android.sample.ui.theme
+package com.github.aroundteam2026.aroundapp.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

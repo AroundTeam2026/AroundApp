@@ -1,4 +1,4 @@
-package com.android.sample
+package com.github.aroundteam2026.aroundapp
 
 import org.junit.Assert.*
 import org.junit.Test

@@ -1,4 +1,4 @@
-package com.android.sample.ui.theme
+package com.github.aroundteam2026.aroundapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

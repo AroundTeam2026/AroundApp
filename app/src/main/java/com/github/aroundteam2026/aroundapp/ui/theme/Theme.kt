@@ -1,4 +1,4 @@
-package com.android.sample.ui.theme
+package com.github.aroundteam2026.aroundapp.ui.theme
 
 import android.app.Activity
 import android.os.Build

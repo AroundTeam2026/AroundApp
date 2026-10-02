@@ -1,4 +1,4 @@
-package com.android.sample
+package com.github.aroundteam2026.aroundapp
 
 import kotlin.math.sqrt
 

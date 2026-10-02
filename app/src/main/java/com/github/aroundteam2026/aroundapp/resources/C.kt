@@ -1,5 +1,4 @@
-package com.android.sample.resources
-
+package com.github.aroundteam2026.aroundapp.resources
 // Like R, but C
 object C {
   object Tag {

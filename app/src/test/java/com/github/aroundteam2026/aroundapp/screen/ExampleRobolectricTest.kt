@@ -1,8 +1,7 @@
-package com.android.sample
+package com.github.aroundteam2026.aroundapp.screen
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.android.sample.screen.SecondScreen
 import com.github.aroundteam2026.aroundapp.SecondActivity
 import com.kaspersky.kaspresso.testcases.api.testcase.TestCase
 import io.github.kakaocup.compose.node.element.ComposeScreen
