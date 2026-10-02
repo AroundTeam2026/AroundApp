@@ -13,7 +13,6 @@ A Kotlin/Android Exploration/Social app (`com.github.aroundteam2026.aroundapp`),
 ## Architecture rules
 
 - Keep the **MVVM** separation. **ViewModels never import Firebase** or a repository implementation; they depend on repository interfaces. Firebase lives only in the `model/` repositories.
-- Do not edit anything under `sigchecks/` or generated code.
 
 ## Definition of done
 
