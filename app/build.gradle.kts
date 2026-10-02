@@ -28,6 +28,7 @@ android {
   buildTypes {
     release {
       isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(
           getDefaultProguardFile("proguard-android-optimize.txt"),
           "proguard-rules.pro",
@@ -94,49 +95,39 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
 }
 
 dependencies {
-  // ------------- AndroidX core ------------------
+  val composeBom = platform(libs.compose.bom)
+  val firebaseBom = platform(libs.firebase.bom)
+
+  implementation(composeBom)
+  implementation(firebaseBom)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
   implementation(libs.androidx.lifecycle.runtime.ktx)
-
-  // ------------- Firebase ------------------
-  implementation(platform(libs.firebase.bom))
-  androidTestImplementation(platform(libs.firebase.bom))
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
-
-  // ------------- Test basics ------------------
-  testImplementation(libs.junit)
-  globalTestImplementation(libs.androidx.junit)
-  globalTestImplementation(libs.androidx.espresso.core)
-
-  // ------------- Jetpack Compose ------------------
-  val composeBom = platform(libs.compose.bom)
-  implementation(composeBom)
-  globalTestImplementation(composeBom)
-
   implementation(libs.compose.ui)
   implementation(libs.compose.ui.graphics)
-  // Material Design 3
   implementation(libs.compose.material3)
-  // Integration with activities
   implementation(libs.compose.activity)
-  // Integration with ViewModels
   implementation(libs.compose.viewmodel)
-  // Android Studio Preview support
   implementation(libs.compose.preview)
+
   debugImplementation(libs.compose.tooling)
-  // UI Tests
-  globalTestImplementation(libs.compose.test.junit)
   debugImplementation(libs.compose.test.manifest)
 
-  // --------- Kaspresso test framework ----------
+  testImplementation(libs.junit)
+  testImplementation(libs.robolectric)
+
+  androidTestImplementation(firebaseBom)
+
+  // Shared by Robolectric (test/) and instrumented (androidTest/) tests
+  globalTestImplementation(composeBom)
+  globalTestImplementation(libs.androidx.junit)
+  globalTestImplementation(libs.androidx.espresso.core)
+  globalTestImplementation(libs.compose.test.junit)
   globalTestImplementation(libs.kaspresso)
   globalTestImplementation(libs.kaspresso.compose)
-
-  // ----------       Robolectric     ------------
-  testImplementation(libs.robolectric)
 }
 
 tasks.withType<Test> {

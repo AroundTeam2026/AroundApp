@@ -3,7 +3,9 @@ package com.github.aroundteam2026.aroundapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 class SecondActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    enableEdgeToEdge()
     setContent {
       AroundAppTheme {
         // A surface container using the 'background' color from the theme
@@ -25,7 +28,7 @@ class SecondActivity : ComponentActivity() {
             modifier = Modifier.fillMaxSize().semantics { testTag = C.Tag.second_screen_container },
             color = MaterialTheme.colorScheme.background,
         ) {
-          GreetingRobo("Robolectric")
+          GreetingRobo("Robolectric", modifier = Modifier.safeDrawingPadding())
         }
       }
     }

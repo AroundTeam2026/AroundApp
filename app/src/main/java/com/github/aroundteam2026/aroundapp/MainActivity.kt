@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    enableEdgeToEdge()
     setContent {
       AroundAppTheme {
         // A surface container using the 'background' color from the theme
@@ -25,7 +26,7 @@ class MainActivity : ComponentActivity() {
             modifier = Modifier.fillMaxSize().semantics { testTag = C.Tag.main_screen_container },
             color = MaterialTheme.colorScheme.background,
         ) {
-          Greeting("Android")
+          Greeting("Android", modifier = Modifier.safeDrawingPadding())
         }
       }
     }
