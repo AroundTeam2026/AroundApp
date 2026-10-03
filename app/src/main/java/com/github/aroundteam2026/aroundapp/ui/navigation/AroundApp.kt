@@ -105,7 +105,7 @@ private fun NavHostController.navigateToTab(tab: Tab) =
       restoreState = true
     }
 
-// TODO: one stand-in for every tab, until each gets its real screen in its own task
+// TODO (Issue #20): one stand-in for every tab, until each gets its real screen in its own task
 @Composable
 private fun PlaceholderScreen(tab: Tab) {
   Box(Modifier.fillMaxSize().testTag(tab.screenTag), contentAlignment = Alignment.Center) {
