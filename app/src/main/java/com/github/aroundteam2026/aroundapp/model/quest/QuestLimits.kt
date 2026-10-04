@@ -2,7 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.quest
 
 /**
- * Validation limits for [Quest] fields, shared by the create-quest form and its ViewModel.
+ * Validation limits for [Quest] fields.
  *
  * The length limits are placeholders until the team agrees on them (open decision 6 in the
  * Firestore schema).
