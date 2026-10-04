@@ -12,6 +12,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -27,18 +28,20 @@ class FakeQuestRepositoryTest {
   }
 
   /**
-   * Builds a quest with a blank id and timestamps that differ from [FIXED_NOW], so tests can tell
-   * the caller's values from the repository's.
+   * Builds a quest with a blank id by default and timestamps that differ from [FIXED_NOW], so tests
+   * can tell the caller's values from the repository's.
    */
   private fun quest(
+      id: String = "",
       venueId: String = "v1",
       status: QuestStatus = QuestStatus.ACTIVE,
       title: String = "Title",
+      reward: Reward? = null,
       createdAt: Long = 1_000L,
       updatedAt: Long = 1_000L,
   ) =
       Quest(
-          id = "",
+          id = id,
           venueId = venueId,
           venueName = "Cafe",
           location = Location(46.52, 6.57),
@@ -47,7 +50,7 @@ class FakeQuestRepositoryTest {
           description = "Description",
           requirements = "Requirements",
           proofType = ProofType.PHOTO,
-          reward = null,
+          reward = reward,
           status = status,
           createdAt = createdAt,
           updatedAt = updatedAt,
@@ -79,15 +82,17 @@ class FakeQuestRepositoryTest {
   }
 
   @Test
-  fun observeQuestsByVenue_returnsOnlyThatVenuesQuestsIncludingDrafts() = runBlocking {
+  fun observeQuestsByVenue_returnsAllOfThatVenuesQuestsWhateverTheirStatus() = runBlocking {
     val activeId = repository.createQuest(quest(venueId = "v1")).getOrThrow()
     val draftId =
         repository.createQuest(quest(venueId = "v1", status = QuestStatus.DRAFT)).getOrThrow()
+    val archivedId =
+        repository.createQuest(quest(venueId = "v1", status = QuestStatus.ARCHIVED)).getOrThrow()
     repository.createQuest(quest(venueId = "v2"))
 
     val quests = repository.observeQuestsByVenue("v1").first()
 
-    assertEquals(setOf(activeId, draftId), quests.map { it.id }.toSet())
+    assertEquals(setOf(activeId, draftId, archivedId), quests.map { it.id }.toSet())
   }
 
   @Test
@@ -100,14 +105,47 @@ class FakeQuestRepositoryTest {
   }
 
   @Test
+  fun createQuest_ignoresCallerId() = runBlocking {
+    val first = repository.createQuest(quest(id = "caller", title = "First")).getOrThrow()
+    val second = repository.createQuest(quest(id = "caller", title = "Second")).getOrThrow()
+
+    assertNotEquals("caller", first)
+    assertNotEquals("caller", second)
+    assertNotEquals(first, second)
+    assertEquals("First", repository.getQuest(first)?.title)
+    assertEquals("Second", repository.getQuest(second)?.title)
+  }
+
+  @Test
   fun getQuest_returnsStoredQuestWithRepositoryTimestamps() = runBlocking {
-    val input = quest(title = "Find the mural", createdAt = 1L, updatedAt = 2L)
+    // A clock that advances on every call, so reading it twice would give different timestamps.
+    var time = FIXED_NOW
+    repository = FakeQuestRepository(now = { time++ })
+    val input =
+        quest(
+            title = "Find the mural",
+            reward = Reward(description = "Free coffee", terms = "One per visit", expiresAt = 5L),
+            createdAt = 1L,
+            updatedAt = 2L,
+        )
     val id = repository.createQuest(input).getOrThrow()
 
     assertEquals(
         input.copy(id = id, createdAt = FIXED_NOW, updatedAt = FIXED_NOW),
         repository.getQuest(id),
     )
+  }
+
+  @Test
+  fun createQuest_defaultClockUsesCurrentTimeMillis() = runBlocking {
+    val defaultRepository = FakeQuestRepository()
+
+    val before = System.currentTimeMillis()
+    val id = defaultRepository.createQuest(quest()).getOrThrow()
+    val after = System.currentTimeMillis()
+
+    val createdAt = defaultRepository.getQuest(id)!!.createdAt
+    assertTrue(createdAt in before..after)
   }
 
   @Test
@@ -122,7 +160,7 @@ class FakeQuestRepositoryTest {
 
     val result = repository.createQuest(quest())
 
-    assertEquals(error, result.exceptionOrNull())
+    assertSame(error, result.exceptionOrNull())
     assertTrue(repository.observeActiveQuests().first().isEmpty())
   }
 
