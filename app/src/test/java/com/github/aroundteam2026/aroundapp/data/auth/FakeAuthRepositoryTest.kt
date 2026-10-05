@@ -87,7 +87,10 @@ class FakeAuthRepositoryTest {
   @Test
   fun nextErrorFailsOneCallThenClears() = runBlocking {
     repo.nextError = AuthError.Network
-    assertEquals(AuthError.Network, repo.signUpWithEmail("ada@around.test", PASSWORD).exceptionOrNull())
+    assertEquals(
+        AuthError.Network,
+        repo.signUpWithEmail("ada@around.test", PASSWORD).exceptionOrNull(),
+    )
     assertTrue(repo.signUpWithEmail("ada@around.test", PASSWORD).isSuccess)
   }
 

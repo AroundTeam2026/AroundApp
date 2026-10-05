@@ -32,7 +32,9 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
   }
 
   override suspend fun signUpWithEmail(email: String, password: String): Result<String> {
-    consumeNextError()?.let { return Result.failure(it) }
+    consumeNextError()?.let {
+      return Result.failure(it)
+    }
     val key = normalize(email)
     return when {
       !EMAIL_REGEX.matches(key) -> Result.failure(AuthError.InvalidEmail)
@@ -43,7 +45,9 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
   }
 
   override suspend fun signInWithEmail(email: String, password: String): Result<String> {
-    consumeNextError()?.let { return Result.failure(it) }
+    consumeNextError()?.let {
+      return Result.failure(it)
+    }
     val key = normalize(email)
     if (!EMAIL_REGEX.matches(key)) return Result.failure(AuthError.InvalidEmail)
     val account = accounts[key]
@@ -55,7 +59,9 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
   }
 
   override suspend fun signInWithGoogle(idToken: String): Result<String> {
-    consumeNextError()?.let { return Result.failure(it) }
+    consumeNextError()?.let {
+      return Result.failure(it)
+    }
     if (idToken.isBlank()) return Result.failure(AuthError.InvalidCredentials)
     return signIn(googleAccounts.getOrPut(idToken) { "fake-uid-${nextUid++}" })
   }
