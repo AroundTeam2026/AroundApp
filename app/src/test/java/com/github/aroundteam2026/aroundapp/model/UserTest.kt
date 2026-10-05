@@ -1,6 +1,5 @@
 package com.github.aroundteam2026.aroundapp.model
 
-import com.google.firebase.Timestamp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -9,7 +8,8 @@ class UserTest {
 
   @Test
   fun user_withNoRole_hasExpectedValues() {
-    val createdAt = Timestamp(1000, 0)
+
+    val createdAt = 1_000L
 
     val user =
         User(
@@ -35,7 +35,7 @@ class UserTest {
             email = "user@example.com",
             displayName = "Test User",
             role = Role.EXPLORER,
-            createdAt = Timestamp(1000, 0),
+            createdAt = 1_000L,
         )
 
     assertEquals(Role.EXPLORER, user.role)
