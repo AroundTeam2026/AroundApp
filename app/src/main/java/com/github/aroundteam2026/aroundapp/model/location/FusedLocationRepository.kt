@@ -11,17 +11,23 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.tasks.await
 
-/** A [LocationRepository] backed by Google Play services' fused location provider. */
+/**
+ * A [LocationRepository] backed by Google Play services' fused location provider.
+ *
+ * It keeps only the application context of [context], so it may outlive the screen that built it
+ * without keeping that screen in memory.
+ */
 class FusedLocationRepository(
-    private val context: Context,
+    context: Context,
     private val client: FusedLocationProviderClient =
-        LocationServices.getFusedLocationProviderClient(context),
+        LocationServices.getFusedLocationProviderClient(context.applicationContext),
 ) : LocationRepository {
+  private val appContext: Context = context.applicationContext
 
   // Lint can't see the permission check through LocationPermissions.isGranted
   @SuppressLint("MissingPermission")
   override suspend fun currentLocation(): Location? {
-    if (!LocationPermissions.isGranted(context)) return null
+    if (!LocationPermissions.isGranted(appContext)) return null
     // Cancelling the caller cancels the request, so leaving the map stops the location hardware
     val cancellation = CancellationTokenSource()
     return try {

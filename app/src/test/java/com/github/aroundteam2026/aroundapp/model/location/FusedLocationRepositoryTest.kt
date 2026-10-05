@@ -4,6 +4,8 @@ package com.github.aroundteam2026.aroundapp.model.location
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Application
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -19,6 +21,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import java.lang.ref.WeakReference
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -48,6 +51,24 @@ class FusedLocationRepositoryTest {
 
   private fun clientReturns(location: android.location.Location?) {
     every { client.getCurrentLocation(any<Int>(), any()) } returns Tasks.forResult(location)
+  }
+
+  /** A repository built from a screen's context, and a weak reference to that context. */
+  private fun buildFromAScreen(): Pair<LocationRepository, WeakReference<Context>> {
+    val screen = ContextWrapper(app)
+    return FusedLocationRepository(screen, client) to WeakReference(screen)
+  }
+
+  @Test
+  fun aScreenThatBuiltItCanBeFreedWhileItKeepsWorking() = runTest {
+    // The repository can outlive the screen, so keeping the screen's context would leak the screen
+    // with all its views
+    val (built, screen) = buildFromAScreen()
+
+    assertTrue("The repository keeps the screen's context alive", screen.isCollected())
+    grant(ACCESS_FINE_LOCATION)
+    clientReturns(deviceAt(46.5197, 6.6323))
+    assertEquals(Location(46.5197, 6.6323), built.currentLocation())
   }
 
   @Test
@@ -129,3 +150,14 @@ class FusedLocationRepositoryTest {
     assertTrue(token.captured.isCancellationRequested)
   }
 }
+
+/** Whether the garbage collector frees this reference's object; collection can take a few tries. */
+private fun WeakReference<*>.isCollected(): Boolean {
+  repeat(GC_ATTEMPTS) {
+    if (get() == null) return true
+    System.gc()
+  }
+  return get() == null
+}
+
+private const val GC_ATTEMPTS = 20
