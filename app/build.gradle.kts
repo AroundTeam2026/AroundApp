@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -113,12 +114,16 @@ dependencies {
   implementation(libs.compose.viewmodel)
   implementation(libs.compose.preview)
   implementation(libs.navigation.compose)
+  implementation(libs.play.services.location)
+  implementation(libs.kotlinx.coroutines.play.services)
 
   debugImplementation(libs.compose.tooling)
   debugImplementation(libs.compose.test.manifest)
 
   testImplementation(libs.junit)
   testImplementation(libs.robolectric)
+  testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.mockk)
 
   androidTestImplementation(firebaseBom)
 
