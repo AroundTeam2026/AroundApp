@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -76,6 +77,41 @@ class FakeQuestRepositoryTest {
           }
 
       repository.createQuest(quest())
+
+      assertEquals(listOf(0, 1), emissions.await().map { it.size })
+    }
+  }
+
+  @Test
+  fun observeActiveQuests_doesNotEmitWhenADraftIsCreated() = runBlocking {
+    withTimeout(TIMEOUT_MS) {
+      val emissions =
+          async(start = CoroutineStart.UNDISPATCHED) {
+            repository.observeActiveQuests().take(2).toList()
+          }
+
+      repository.createQuest(quest(status = QuestStatus.DRAFT))
+      // createQuest never suspends, so without this the collector would only see the state after
+      // both writes and the test would pass even if the draft caused a duplicate emission.
+      yield()
+      repository.createQuest(quest(status = QuestStatus.ACTIVE))
+
+      assertEquals(listOf(0, 1), emissions.await().map { it.size })
+    }
+  }
+
+  @Test
+  fun observeQuestsByVenue_doesNotEmitWhenAnotherVenueCreatesAQuest() = runBlocking {
+    withTimeout(TIMEOUT_MS) {
+      val emissions =
+          async(start = CoroutineStart.UNDISPATCHED) {
+            repository.observeQuestsByVenue("v1").take(2).toList()
+          }
+
+      repository.createQuest(quest(venueId = "v2"))
+      // Lets the collector see the state after the first write; see the active-quests test above.
+      yield()
+      repository.createQuest(quest(venueId = "v1"))
 
       assertEquals(listOf(0, 1), emissions.await().map { it.size })
     }

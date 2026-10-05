@@ -3,15 +3,16 @@ package com.github.aroundteam2026.aroundapp.model.quest
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 /**
  * In-memory [QuestRepository] for unit tests and for running the app without Firestore.
  *
- * Quests are kept in insertion order in a [MutableStateFlow], so every `observe*` flow emits again
- * as soon as a quest is created. Ids are generated as `quest-1`, `quest-2`, ... and are unique per
- * instance. Not thread-safe; use one instance per test.
+ * Quests are kept in insertion order in a [MutableStateFlow]. Each `observe*` flow emits again only
+ * when its own result changes, not on every write. Ids are generated as `quest-1`, `quest-2`, ...
+ * and are unique per instance. Not thread-safe; use one instance per test.
  *
  * @param now Clock used for `createdAt` and `updatedAt`, in epoch milliseconds. Pass a fixed value
  *   in tests to make timestamps predictable.
@@ -31,15 +32,17 @@ class FakeQuestRepository(private val now: () -> Long = System::currentTimeMilli
   /** Number used for the next generated id. */
   private var nextId = 1
 
-  /** Emits the stored [QuestStatus.ACTIVE] quests, and again after every change. */
-  override fun observeActiveQuests(): Flow<List<Quest>> = quests.map { all ->
-    all.values.filter { it.status == QuestStatus.ACTIVE }
-  }
+  /** Emits the stored [QuestStatus.ACTIVE] quests, and again whenever that list changes. */
+  override fun observeActiveQuests(): Flow<List<Quest>> =
+      quests
+          .map { all -> all.values.filter { it.status == QuestStatus.ACTIVE } }
+          .distinctUntilChanged()
 
-  /** Emits every stored quest of [venueId], drafts included, and again after every change. */
-  override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> = quests.map { all ->
-    all.values.filter { it.venueId == venueId }
-  }
+  /**
+   * Emits every stored quest of [venueId], drafts included, and again whenever that list changes.
+   */
+  override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> =
+      quests.map { all -> all.values.filter { it.venueId == venueId } }.distinctUntilChanged()
 
   /** Returns the stored quest with [questId], or null if there is none. */
   override suspend fun getQuest(questId: String): Quest? = quests.value[questId]
