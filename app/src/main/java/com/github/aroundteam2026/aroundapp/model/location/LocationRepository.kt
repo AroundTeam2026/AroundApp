@@ -7,7 +7,8 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 interface LocationRepository {
   /**
    * The device's current position, or null when it can't be known: the location permission is
-   * missing, location is turned off, or no fix is available.
+   * missing or revoked during the request, location is turned off, location services fail, or no
+   * fix is available.
    */
   suspend fun currentLocation(): Location?
 }
