@@ -3,16 +3,14 @@ package com.github.aroundteam2026.aroundapp.model.quest
 
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Reads and writes [Quest]s. ViewModels depend on this interface only; the Firestore implementation
- * and [FakeQuestRepository] are swapped in behind it.
- */
+/** Reads and writes [Quest]s. ViewModels depend on this interface only. */
 interface QuestRepository {
   /**
    * Observes the quests explorers can see. Emits the current list on collection, then again
    * whenever a quest is added or changes.
    *
-   * @return every quest whose status is [QuestStatus.ACTIVE].
+   * @return every quest whose status is [QuestStatus.ACTIVE], in unspecified order. Callers that
+   *   need an order must sort the list themselves.
    */
   fun observeActiveQuests(): Flow<List<Quest>>
 
@@ -20,7 +18,8 @@ interface QuestRepository {
    * Observes one venue's quests, for its "My quests" list. Emits on collection and on every change.
    *
    * @param venueId id of the venue whose quests to return.
-   * @return all of that venue's quests, whatever their status (including drafts).
+   * @return all of that venue's quests, whatever their status (including drafts), in unspecified
+   *   order. Callers that need an order must sort the list themselves.
    */
   fun observeQuestsByVenue(venueId: String): Flow<List<Quest>>
 

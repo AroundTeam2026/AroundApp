@@ -6,10 +6,9 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 /**
  * A quest offered by a venue, which explorers complete by visiting it and submitting proof.
  *
- * Stored in the Firestore `quests` collection. This is a plain domain model: Firestore types such
- * as `Timestamp` and `GeoPoint` are converted to and from it inside the repository implementation.
+ * The repository assigns [Quest.id], [Quest.createdAt] and [Quest.updatedAt]; any values the caller
+ * sets for them are overwritten.
  *
- * @property id Firestore document id. Ignored by [QuestRepository.createQuest], which assigns one.
  * @property venueId Id of the owning venue, equal to the venue owner's uid.
  * @property venueName Copied from the venue at creation, so the map needs a single query.
  * @property location Copied from the venue at creation; where the quest takes place.
