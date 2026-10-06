@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged into the main manifest for debug builds only. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+  <!-- Backups are off in debug builds, so test data never ends up in device backups.
+       Release builds keep the main manifest's backup rules. -->
+  <application
+      android:allowBackup="false"
+      android:networkSecurityConfig="@xml/network_security_config"
+      tools:replace="android:allowBackup" />
+</manifest>
