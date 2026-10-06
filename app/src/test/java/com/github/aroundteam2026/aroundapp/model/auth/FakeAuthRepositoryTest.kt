@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.model.auth
 
 import kotlinx.coroutines.Dispatchers
@@ -199,7 +200,7 @@ class FakeAuthRepositoryTest {
     assertNull(repo.currentUserId.value)
   }
 
-  @Test
+  @Test(timeout = CONCURRENCY_TIMEOUT_MS)
   fun concurrentSignUpsWithTheSameEmailCreateOnlyOneAccount() = runBlocking {
     val results =
         (1..CONCURRENT_CALLS)
@@ -213,7 +214,7 @@ class FakeAuthRepositoryTest {
     )
   }
 
-  @Test
+  @Test(timeout = CONCURRENCY_TIMEOUT_MS)
   fun concurrentSignUpsGetDistinctUids() = runBlocking {
     val uids =
         (1..CONCURRENT_CALLS)
@@ -234,5 +235,6 @@ class FakeAuthRepositoryTest {
   private companion object {
     const val PASSWORD = "password123"
     const val CONCURRENT_CALLS = 100
+    const val CONCURRENCY_TIMEOUT_MS = 10_000L
   }
 }
