@@ -4,7 +4,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import java.util.UUID
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -12,9 +14,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Runs against the Firebase Auth emulator. Each test uses a fresh email, so tests never collide.
- *
- * Replace [useEmulatorOnce] with the shared emulator setup once mcpeblocker's CI work lands.
+ * Runs against the Firebase Auth emulator. Each test uses a fresh email or Google account, so tests
+ * never collide.
  */
 @RunWith(AndroidJUnit4::class)
 class AuthRepositoryFirebaseTest {
@@ -78,10 +79,52 @@ class AuthRepositoryFirebaseTest {
     assertNull(repo.currentUserId.value)
   }
 
+  @Test
+  fun googleSignInSignsTheUserIn() = runBlocking {
+    val uid = repo.signInWithGoogle(fakeGoogleIdToken()).getOrThrow()
+    assertEquals(uid, repo.currentUserId.value)
+  }
+
+  @Test
+  fun googleSignInReturnsTheSameUidForTheSameAccount() = runBlocking {
+    val token = fakeGoogleIdToken()
+    val uid = repo.signInWithGoogle(token).getOrThrow()
+    repo.signOut()
+    assertEquals(uid, repo.signInWithGoogle(token).getOrThrow())
+  }
+
+  @Test
+  fun newRepositoryStartsWithTheAlreadySignedInUser() = runBlocking {
+    // Simulates reopening the app: Firebase still holds the session, so a fresh repository
+    // must report that user straight away, without a new sign-in.
+    val uid = repo.signUpWithEmail(newEmail(), PASSWORD).getOrThrow()
+    assertEquals(uid, AuthRepositoryFirebase(Firebase.auth).currentUserId.value)
+  }
+
+  @Test
+  fun signOutOutsideTheRepositoryClearsTheCurrentUser() = runBlocking {
+    // Covers sessions that end without going through the repository, such as a deleted account.
+    // Only Firebase's auth state listener can notice those.
+    repo.signUpWithEmail(newEmail(), PASSWORD).getOrThrow()
+    Firebase.auth.signOut()
+    withTimeout(LISTENER_TIMEOUT_MS) { repo.currentUserId.first { it == null } }
+    assertNull(repo.currentUserId.value)
+  }
+
   private fun newEmail() = "test-${UUID.randomUUID()}@around.test"
+
+  /**
+   * The Auth emulator accepts unsigned JSON in place of a real Google ID token, so tests can sign
+   * in with Google without a Google account.
+   */
+  private fun fakeGoogleIdToken(): String {
+    val sub = UUID.randomUUID().toString()
+    return """{"sub": "$sub", "email": "$sub@around.test", "email_verified": true}"""
+  }
 
   private companion object {
     const val PASSWORD = "password123"
+    const val LISTENER_TIMEOUT_MS = 5_000L
     // 10.0.2.2 is the host machine as seen from the Android emulator.
     const val EMULATOR_HOST = "10.0.2.2"
     const val AUTH_PORT = 9099
