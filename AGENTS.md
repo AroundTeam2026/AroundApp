@@ -27,6 +27,7 @@ A Kotlin/Android Exploration/Social app (`com.github.aroundteam2026.aroundapp`),
 - Make one **bounded, reviewable** change per PR. If it sprawls across unrelated files, split it.
 - Read the failing tests carefully and iterate until `./gradlew check` passes.
 - Stage only the files you changed; never `git add .` or `git add -A` (it can pull in local config like `local.properties`).
+- Dependencies are locked. After adding or changing a dependency or plugin version in `gradle/libs.versions.toml`, run `./gradlew :app:dependencies --write-locks` and commit the updated `*.lockfile` files with the change; otherwise the build fails with "Dependency version enforced by Dependency Locking".
 - Commit messages follow Conventional Commits: `type(scope): subject`, with type one of `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `ci`. The subject is lowercase, imperative, at most 50 characters after the prefix, with no trailing period (e.g. `feat(auth): add user authentication`). Add a blank line to separate it from the body. Add a body wrapped at 72 characters when the subject is not enough.
 - **Acknowledge your contributors** at the top of the file: credit the AI that wrote it with a `Co-authored-by` line. Acknowledge contributions on commit messages as well with a `Co-authoried-by` line at the end of the commit message. An AI agent is a contributor, so credit it.
 
