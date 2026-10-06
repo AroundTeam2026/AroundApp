@@ -1,4 +1,4 @@
-package com.github.aroundteam2026.aroundapp.data.auth
+package com.github.aroundteam2026.aroundapp.model.auth
 
 import com.google.firebase.Firebase
 import com.google.firebase.FirebaseNetworkException
