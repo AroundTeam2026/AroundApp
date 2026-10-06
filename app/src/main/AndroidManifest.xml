@@ -21,6 +21,11 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
+        <!-- Older Play services without the current Maps renderer draw the map with Apache HTTP classes,
+             which apps targeting Android 9+ only get on request: without this, the map crashes there -->
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false" />
 
         <activity
             android:name=".MainActivity"
