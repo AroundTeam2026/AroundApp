@@ -52,6 +52,13 @@ android {
     manifestPlaceholders[mapsApiKeyName] = mapsApiKey
   }
 
+  // The CI sets DEBUG_KEYSTORE_FILE to the team's CI keystore, whose SHA-1 is registered on
+  // the Maps API key (see the README). Without it, as on developers' machines, debug builds
+  // are signed with the machine's own debug keystore, as usual.
+  providers.environmentVariable("DEBUG_KEYSTORE_FILE").orNull?.let { keystore ->
+    signingConfigs.getByName("debug") { storeFile = file(keystore) }
+  }
+
   buildTypes {
     release {
       isMinifyEnabled = true
