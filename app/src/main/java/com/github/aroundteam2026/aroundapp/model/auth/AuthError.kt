@@ -1,4 +1,4 @@
-package com.github.aroundteam2026.aroundapp.data.auth
+package com.github.aroundteam2026.aroundapp.model.auth
 
 /** Why an authentication call failed. Screens map each case to a readable message. */
 sealed class AuthError(cause: Throwable? = null) : Exception(cause) {
