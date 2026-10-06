@@ -37,7 +37,9 @@ interface QuestRepository {
    * fields in [quest] are ignored.
    *
    * @param quest the quest to store; its `id`, `createdAt` and `updatedAt` are ignored.
-   * @return the new quest's id, or a failure if it could not be stored.
+   * @return the new quest's id, or a failure if the write could not be issued. Success does not
+   *   wait for the backend to confirm the write (e.g. while offline), and a later rejection is not
+   *   reported here.
    */
   suspend fun createQuest(quest: Quest): Result<String>
 }
