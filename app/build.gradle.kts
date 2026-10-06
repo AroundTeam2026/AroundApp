@@ -1,5 +1,9 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+import org.gradle.api.artifacts.dsl.LockMode
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+buildscript { configurations.classpath { resolutionStrategy.activateDependencyLocking() } }
 
 plugins {
   alias(libs.plugins.androidApplication)
@@ -18,8 +22,8 @@ android {
     applicationId = "com.github.aroundteam2026.aroundapp"
     minSdk = 28
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "0.1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     vectorDrawables { useSupportLibrary = true }
@@ -61,6 +65,16 @@ android {
 }
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
+
+// Pin every resolved dependency, transitive ones included, so every build resolves the same
+// versions. The lock state lives in this module's gradle.lockfile, where SonarCloud looks for it
+// (rule S8569). Strict mode fails the build when a configuration has no lock state, instead of
+// resolving it unlocked. After changing a version, refresh the lockfiles with
+// ./gradlew :app:dependencies --write-locks
+dependencyLocking {
+  lockAllConfigurations()
+  lockMode = LockMode.STRICT
+}
 
 sonar {
   properties {
@@ -113,12 +127,16 @@ dependencies {
   implementation(libs.compose.viewmodel)
   implementation(libs.compose.preview)
   implementation(libs.navigation.compose)
+  implementation(libs.play.services.location)
+  implementation(libs.kotlinx.coroutines.play.services)
 
   debugImplementation(libs.compose.tooling)
   debugImplementation(libs.compose.test.manifest)
 
   testImplementation(libs.junit)
   testImplementation(libs.robolectric)
+  testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.mockk)
 
   androidTestImplementation(firebaseBom)
 
