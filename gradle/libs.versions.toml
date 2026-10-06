@@ -20,7 +20,7 @@ sonar = "7.5.0.8588"
 gms = "4.5.0"
 firebaseBom = "34.18.0"
 playServicesLocation = "21.4.0"
-coroutines = "1.11.0"
+coroutines = "1.9.0"
 mockk = "1.14.11"
 
 
