@@ -95,6 +95,15 @@ class FakeAuthRepositoryTest {
   }
 
   @Test
+  fun newAccountsNeverReuseTheInitialUserId() = runBlocking {
+    val startedSignedIn = FakeAuthRepository(signedInUserId = "fake-uid-1")
+    val emailUid = startedSignedIn.signUpWithEmail("ada@around.test", PASSWORD).getOrThrow()
+    val googleUid = startedSignedIn.signInWithGoogle("token-a").getOrThrow()
+    val addedUid = startedSignedIn.addAccount("bob@around.test", PASSWORD)
+    assertEquals(4, setOf("fake-uid-1", emailUid, googleUid, addedUid).size)
+  }
+
+  @Test
   fun canStartSignedIn() {
     assertEquals("uid-1", FakeAuthRepository(signedInUserId = "uid-1").currentUserId.value)
   }

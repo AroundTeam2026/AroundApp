@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * In-memory [AuthRepository] for tests and for running the app without Firebase.
  *
  * Follows Firebase's rules: emails are case-insensitive, passwords need at least
- * [MIN_PASSWORD_LENGTH] characters, and an email can only be registered once.
+ * [MIN_PASSWORD_LENGTH] characters, and an email can only be registered once. Generated uids never
+ * collide with [signedInUserId] or with each other.
  */
 class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
 
@@ -19,6 +20,9 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
   private val _currentUserId = MutableStateFlow(signedInUserId)
   private var nextUid = 1
 
+  /** Every uid in use, including [signedInUserId], so new accounts never reuse one. */
+  private val usedUids = mutableSetOf<String>().apply { signedInUserId?.let { add(it) } }
+
   override val currentUserId: StateFlow<String?> = _currentUserId.asStateFlow()
 
   /** When set, the next call fails with this error, then it is cleared. */
@@ -26,7 +30,7 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
 
   /** Registers an account without signing in, for test setup. Returns its uid. */
   fun addAccount(email: String, password: String): String {
-    val uid = "fake-uid-${nextUid++}"
+    val uid = newUid()
     accounts[normalize(email)] = Account(uid, password)
     return uid
   }
@@ -63,7 +67,7 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
       return Result.failure(it)
     }
     if (idToken.isBlank()) return Result.failure(AuthError.InvalidCredentials)
-    return signIn(googleAccounts.getOrPut(idToken) { "fake-uid-${nextUid++}" })
+    return signIn(googleAccounts.getOrPut(idToken) { newUid() })
   }
 
   override fun signOut() {
@@ -73,6 +77,16 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
   private fun signIn(uid: String): Result<String> {
     _currentUserId.value = uid
     return Result.success(uid)
+  }
+
+  /** Returns the next `fake-uid-N` that isn't already in use. */
+  private fun newUid(): String {
+    var uid: String
+    do {
+      uid = "fake-uid-${nextUid++}"
+    } while (uid in usedUids)
+    usedUids += uid
+    return uid
   }
 
   private fun consumeNextError(): AuthError? = nextError.also { nextError = null }
