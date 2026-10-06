@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.model.auth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -109,6 +110,47 @@ class AuthRepositoryFirebaseTest {
     Firebase.auth.signOut()
     withTimeout(LISTENER_TIMEOUT_MS) { repo.currentUserId.first { it == null } }
     assertNull(repo.currentUserId.value)
+  }
+
+  @Test
+  fun invalidInputsKeepTheCurrentSession() = runBlocking {
+    val email = newEmail()
+    val uid = repo.signUpWithEmail(email, PASSWORD).getOrThrow()
+    val cases =
+        listOf<Pair<AuthError, suspend () -> Result<String>>>(
+            AuthError.InvalidEmail to { repo.signUpWithEmail("", PASSWORD) },
+            AuthError.InvalidEmail to { repo.signInWithEmail(" ", PASSWORD) },
+            AuthError.InvalidEmail to { repo.signUpWithEmail("not-an-email", PASSWORD) },
+            AuthError.InvalidEmail to { repo.signInWithEmail("not-an-email", PASSWORD) },
+            AuthError.WeakPassword to { repo.signUpWithEmail(newEmail(), "") },
+            AuthError.WeakPassword to { repo.signUpWithEmail(newEmail(), "12345") },
+            AuthError.InvalidCredentials to { repo.signInWithEmail(email, "") },
+            AuthError.InvalidCredentials to { repo.signInWithGoogle("") },
+            AuthError.InvalidCredentials to { repo.signInWithGoogle(" ") },
+        )
+    for ((expected, call) in cases) {
+      assertEquals(expected, call().exceptionOrNull())
+      assertEquals(uid, repo.currentUserId.value)
+      assertEquals(uid, Firebase.auth.currentUser?.uid)
+    }
+  }
+
+  @Test
+  fun failedFirebaseAuthenticationKeepsTheCurrentSession() = runBlocking {
+    val email = newEmail()
+    repo.signUpWithEmail(email, PASSWORD).getOrThrow()
+    val uid = repo.signUpWithEmail(newEmail(), PASSWORD).getOrThrow()
+    val cases =
+        listOf<Pair<AuthError, suspend () -> Result<String>>>(
+            AuthError.EmailAlreadyInUse to { repo.signUpWithEmail(email, "other-password") },
+            AuthError.InvalidCredentials to { repo.signInWithEmail(email, "wrong-password") },
+            AuthError.InvalidCredentials to { repo.signInWithEmail(newEmail(), PASSWORD) },
+        )
+    for ((expected, call) in cases) {
+      assertEquals(expected, call().exceptionOrNull())
+      assertEquals(uid, repo.currentUserId.value)
+      assertEquals(uid, Firebase.auth.currentUser?.uid)
+    }
   }
 
   private fun newEmail() = "test-${UUID.randomUUID()}@around.test"

@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.model.auth
 
 import com.google.firebase.Firebase
@@ -32,14 +33,21 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
   }
 
   override suspend fun signUpWithEmail(email: String, password: String): Result<String> = authCall {
-    auth.createUserWithEmailAndPassword(email.trim(), password).await().user?.uid
+    val normalizedEmail = email.trim()
+    if (!EMAIL_REGEX.matches(normalizedEmail)) throw AuthError.InvalidEmail
+    if (password.length < MIN_PASSWORD_LENGTH) throw AuthError.WeakPassword
+    auth.createUserWithEmailAndPassword(normalizedEmail, password).await().user?.uid
   }
 
   override suspend fun signInWithEmail(email: String, password: String): Result<String> = authCall {
-    auth.signInWithEmailAndPassword(email.trim(), password).await().user?.uid
+    val normalizedEmail = email.trim()
+    if (!EMAIL_REGEX.matches(normalizedEmail)) throw AuthError.InvalidEmail
+    if (password.isEmpty()) throw AuthError.InvalidCredentials
+    auth.signInWithEmailAndPassword(normalizedEmail, password).await().user?.uid
   }
 
   override suspend fun signInWithGoogle(idToken: String): Result<String> = authCall {
+    if (idToken.isBlank()) throw AuthError.InvalidCredentials
     val credential = GoogleAuthProvider.getCredential(idToken, null)
     auth.signInWithCredential(credential).await().user?.uid
   }
@@ -64,6 +72,11 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
       } catch (e: Exception) {
         Result.failure(e.toAuthError())
       }
+
+  private companion object {
+    const val MIN_PASSWORD_LENGTH = 6
+    val EMAIL_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+  }
 }
 
 /** Maps a Firebase exception to an [AuthError]. */
