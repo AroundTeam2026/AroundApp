@@ -169,6 +169,37 @@ class FakeAuthRepositoryTest {
   }
 
   @Test
+  fun signUpWithTakenEmailKeepsTheOriginalPassword() = runBlocking {
+    val uid = repo.signUpWithEmail("ada@around.test", PASSWORD).getOrThrow()
+    repo.signOut()
+    repo.signUpWithEmail("ada@around.test", "other-password")
+    assertEquals(uid, repo.signInWithEmail("ada@around.test", PASSWORD).getOrThrow())
+    repo.signOut()
+    val withNewPassword = repo.signInWithEmail("ada@around.test", "other-password")
+    assertEquals(AuthError.InvalidCredentials, withNewPassword.exceptionOrNull())
+  }
+
+  @Test
+  fun forcedErrorOnSignInAndGoogleSignInChangesNothing() = runBlocking {
+    val uid = repo.signUpWithEmail("ada@around.test", PASSWORD).getOrThrow()
+    repo.addAccount("bob@around.test", PASSWORD)
+    repo.nextError = AuthError.Network
+    assertEquals(
+        AuthError.Network,
+        repo.signInWithEmail("bob@around.test", PASSWORD).exceptionOrNull(),
+    )
+    repo.nextError = AuthError.Network
+    assertEquals(AuthError.Network, repo.signInWithGoogle("token-a").exceptionOrNull())
+    assertEquals(uid, repo.currentUserId.value)
+  }
+
+  @Test
+  fun signOutWhenSignedOutDoesNothing() {
+    repo.signOut()
+    assertNull(repo.currentUserId.value)
+  }
+
+  @Test
   fun concurrentSignUpsWithTheSameEmailCreateOnlyOneAccount() = runBlocking {
     val results =
         (1..CONCURRENT_CALLS)
