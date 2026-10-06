@@ -35,6 +35,8 @@ class AroundAppTest {
   }
 
   private fun pressBack() {
+    // Otherwise Back can arrive before the last tab switch finished, and leaves the app instead
+    composeTestRule.waitForIdle()
     composeTestRule.runOnUiThread {
       composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
     }
