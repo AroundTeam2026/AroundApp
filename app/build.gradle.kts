@@ -94,6 +94,12 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
   testImplementation(dep)
 }
 
+// Espresso's accessibility checks pull in protobuf-lite 3.0.1, which shadows Firestore's
+// protobuf-javalite in the test APK and makes Firestore crash with NoSuchMethodError.
+configurations
+    .matching { it.name.contains("AndroidTest") }
+    .configureEach { exclude(group = "com.google.protobuf", module = "protobuf-lite") }
+
 dependencies {
   val composeBom = platform(libs.compose.bom)
   val firebaseBom = platform(libs.firebase.bom)
