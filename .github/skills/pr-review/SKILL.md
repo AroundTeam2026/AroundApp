@@ -14,6 +14,13 @@ Go through each point before approving (or opening) a pull request.
 - [ ] New code has unit tests, and `./gradlew check` is green
 - [ ] CI passes
 
+## Test quality
+- [ ] For each test, it's clear what must break in production code for it to fail; no test only checks the compiler or a constant
+- [ ] No two tests fail for exactly the same breakages
+- [ ] Every behaviour in the acceptance criteria and KDoc is covered, including error paths and "nothing changes on failure"
+- [ ] Async and flow tests can't pass vacuously or hang: they subscribe before acting and use a timeout
+- [ ] Tests use fakes or emulators, not the real Firebase project
+
 ## Design
 - [ ] MVVM separation is respected (ViewModels never import Firebase)
 - [ ] Code lives in the right package (`model/`, `ui/`)
@@ -24,6 +31,9 @@ Go through each point before approving (or opening) a pull request.
 - [ ] Logic is as simple as it can be
 - [ ] No duplicated code, dead code, or leftover debug code
 - [ ] Functions are short and do one thing
+
+## Coverage
+- [ ] Line coverage of new code is at least 80% (course requirement; see the SonarCloud comment on the PR)
 
 ## Naming conventions
 - [ ] camelCase for functions and variables, PascalCase for classes and composables, UPPER_SNAKE_CASE for constants
