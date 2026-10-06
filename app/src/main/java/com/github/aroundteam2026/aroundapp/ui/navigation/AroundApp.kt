@@ -27,6 +27,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 
 /** The app's top-level destinations, one per tab of the bottom bar. */
 enum class Tab(
@@ -61,7 +62,7 @@ enum class Tab(
 @Composable
 fun AroundApp(
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (Tab) -> Unit = { PlaceholderScreen(it) },
+    screen: @Composable (Tab) -> Unit = { TabScreen(it) },
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = backStackEntry?.destination?.route
@@ -105,7 +106,14 @@ private fun NavHostController.navigateToTab(tab: Tab) =
       restoreState = true
     }
 
-// TODO (Issue #20): one stand-in for every tab, until each gets its real screen in its own task
+@Composable
+private fun TabScreen(tab: Tab) =
+    when (tab) {
+      Tab.MAP -> MapScreen()
+      else -> PlaceholderScreen(tab)
+    }
+
+// TODO (Issue #20): a stand-in for each tab, until it gets its real screen in its own task
 @Composable
 private fun PlaceholderScreen(tab: Tab) {
   Box(Modifier.fillMaxSize().testTag(tab.screenTag), contentAlignment = Alignment.Center) {
