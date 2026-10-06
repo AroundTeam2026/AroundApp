@@ -1,4 +1,6 @@
-package com.github.aroundteam2026.aroundapp.model
+// Co-authored-by: OpenAI Codex
+
+package com.github.aroundteam2026.aroundapp.model.user
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
