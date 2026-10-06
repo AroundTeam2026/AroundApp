@@ -10,10 +10,16 @@ import kotlinx.coroutines.flow.Flow
  * A user's role can only be assigned once and cannot be changed afterward.
  */
 interface UserRepository {
+  /** Emits the current profile and subsequent changes, or null when [uid] does not exist. */
   fun observeUser(uid: String): Flow<User?>
 
+  /** Returns the profile for [uid], or null when it does not exist. */
   suspend fun getUser(uid: String): User?
 
+  /**
+   * Creates [user]. Fails with [IllegalStateException] if its uid already exists, without replacing
+   * it.
+   */
   suspend fun createUser(user: User): Result<Unit>
 
   /**

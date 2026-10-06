@@ -2,12 +2,16 @@
 
 package com.github.aroundteam2026.aroundapp.model.user
 
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
@@ -205,5 +209,76 @@ class FakeUserRepositoryTest {
     val observedUser = repository.observeUser("unknown-user").first()
 
     Assert.assertNull(observedUser)
+  }
+
+  @Test(timeout = 30_000)
+  fun concurrentCreateUser_onlyOneCallSucceeds() = runBlocking {
+    repeat(1_000) {
+      val repository = FakeUserRepository()
+      val user = User("user-1", "user@example.com", "Test", null, 1_000L)
+      val barrier = CyclicBarrier(2)
+      val calls =
+          List(2) {
+            async(Dispatchers.IO) {
+              barrier.await(5, TimeUnit.SECONDS)
+              repository.createUser(user)
+            }
+          }
+      val results = calls.map { it.await() }
+      Assert.assertEquals(1, results.count { it.isSuccess })
+      Assert.assertTrue(results.single { it.isFailure }.exceptionOrNull() is IllegalStateException)
+      Assert.assertEquals(user, repository.getUser(user.uid))
+    }
+  }
+
+  @Test(timeout = 30_000)
+  fun concurrentSetRole_onlyOneRoleIsAssigned() = runBlocking {
+    repeat(1_000) {
+      val repository = FakeUserRepository()
+      val user = User("user-1", "user@example.com", "Test", null, 1_000L)
+      repository.createUser(user)
+      val barrier = CyclicBarrier(2)
+      val roles = listOf(Role.EXPLORER, Role.VENUE)
+      val calls = roles.map { role ->
+        async(Dispatchers.IO) {
+          barrier.await(5, TimeUnit.SECONDS)
+          repository.setRole(user.uid, role)
+        }
+      }
+      val results = calls.map { it.await() }
+      Assert.assertEquals(1, results.count { it.isSuccess })
+      Assert.assertTrue(results.single { it.isFailure }.exceptionOrNull() is IllegalStateException)
+      Assert.assertEquals(
+          user.copy(role = roles[results.indexOfFirst { it.isSuccess }]),
+          repository.getUser(user.uid),
+      )
+    }
+  }
+
+  @Test(timeout = 30_000)
+  fun setRoleRacingCreateUser_resultMatchesStoredRole() = runBlocking {
+    repeat(1_000) {
+      val repository = FakeUserRepository()
+      val user = User("user-1", "user@example.com", "Test", null, 1_000L)
+      val barrier = CyclicBarrier(2)
+      val creation =
+          async(Dispatchers.IO) {
+            barrier.await(5, TimeUnit.SECONDS)
+            repository.createUser(user)
+          }
+      val assignment =
+          async(Dispatchers.IO) {
+            barrier.await(5, TimeUnit.SECONDS)
+            repository.setRole(user.uid, Role.EXPLORER)
+          }
+      Assert.assertTrue(creation.await().isSuccess)
+      val result = assignment.await()
+      if (result.isSuccess) {
+        Assert.assertEquals(user.copy(role = Role.EXPLORER), repository.getUser(user.uid))
+      } else {
+        Assert.assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        Assert.assertEquals(user, repository.getUser(user.uid))
+      }
+    }
   }
 }

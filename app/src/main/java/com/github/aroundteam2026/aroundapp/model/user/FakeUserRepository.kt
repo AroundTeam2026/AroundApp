@@ -5,8 +5,8 @@ package com.github.aroundteam2026.aroundapp.model.user
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 
 /**
  * In-memory implementation of [UserRepository] for local development and testing without Firestore.
@@ -24,45 +24,26 @@ class FakeUserRepository : UserRepository {
   }
 
   override suspend fun createUser(user: User): Result<Unit> {
-    var created = false
-
-    users.update { current ->
-      if (user.uid in current) {
-        current
-      } else {
-        created = true
-        current + (user.uid to user)
-      }
+    val previous = users.getAndUpdate { current ->
+      if (user.uid in current) current else current + (user.uid to user)
     }
-
-    return if (created) {
-      Result.success(Unit)
-    } else {
+    return if (user.uid in previous) {
       Result.failure(IllegalStateException("User already exists"))
+    } else {
+      Result.success(Unit)
     }
   }
 
   override suspend fun setRole(uid: String, role: Role): Result<Unit> {
-    var result: Result<Unit> = Result.success(Unit)
-
-    users.update { current ->
+    val previous = users.getAndUpdate { current ->
       val user = current[uid]
-
-      when {
-        user == null -> {
-          result = Result.failure(IllegalArgumentException("User not found"))
-          current
-        }
-
-        user.role != null -> {
-          result = Result.failure(IllegalStateException("User role is already set"))
-          current
-        }
-
-        else -> current + (uid to user.copy(role = role))
-      }
+      if (user != null && user.role == null) current + (uid to user.copy(role = role)) else current
     }
-
-    return result
+    val user = previous[uid]
+    return when {
+      user == null -> Result.failure(IllegalArgumentException("User not found"))
+      user.role != null -> Result.failure(IllegalStateException("User role is already set"))
+      else -> Result.success(Unit)
+    }
   }
 }
