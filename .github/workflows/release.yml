@@ -1,8 +1,10 @@
+# Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 name: Release APK
 
-# Run by hand from the Actions tab. Builds a debug APK from main, tags it
-# v<versionName> and publishes it as a GitHub release and an Actions artifact.
-# Bump versionName and versionCode in app/build.gradle.kts before running.
+# Run by hand from the Actions tab, on main or on an M1 release branch. Builds a
+# debug APK, tags it v<versionName> and publishes it as a GitHub release and an
+# Actions artifact. Bump versionName and versionCode in app/build.gradle.kts
+# before running.
 
 on:
   workflow_dispatch:
@@ -14,7 +16,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/M1'
 
     steps:
       - name: Checkout
@@ -24,6 +26,10 @@ jobs:
         id: version
         run: |
           version=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          if [ -z "$version" ] || [ "$(echo "$version" | wc -l)" -ne 1 ]; then
+            echo "::error::Could not read exactly one versionName from app/build.gradle.kts."
+            exit 1
+          fi
           if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
             echo "::error::v$version is already released. Bump versionName and versionCode in app/build.gradle.kts."
             exit 1
@@ -38,10 +44,26 @@ jobs:
             21
             17
 
+      # Each step stops with a clear error if its secret is missing, instead of
+      # building an APK that can't reach Firebase or show the map.
       - name: Decode google-services.json
         env:
           GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
-        run: echo "$GOOGLE_SERVICES" | base64 --decode > ./app/google-services.json
+        run: echo "${GOOGLE_SERVICES:?secret GOOGLE_SERVICES is not set}" | base64 --decode > ./app/google-services.json
+
+      # The team's shared debug keystore: its SHA-1 is on the Maps key's
+      # restriction list, and installs can upgrade the previous release.
+      - name: Decode shared debug keystore
+        env:
+          DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+        run: |
+          mkdir -p ~/.android
+          echo "${DEBUG_KEYSTORE:?secret DEBUG_KEYSTORE is not set}" | base64 --decode > ~/.android/debug.keystore
+
+      - name: Write Maps API key
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: echo "MAPS_API_KEY=${MAPS_API_KEY:?secret MAPS_API_KEY is not set}" >> local.properties
 
       - name: Gradle cache
         uses: gradle/actions/setup-gradle@v6
@@ -54,7 +76,7 @@ jobs:
           cp app/build/outputs/apk/debug/*.apk "around-${{ steps.version.outputs.tag }}.apk"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: around-${{ steps.version.outputs.tag }}
           path: around-${{ steps.version.outputs.tag }}.apk
