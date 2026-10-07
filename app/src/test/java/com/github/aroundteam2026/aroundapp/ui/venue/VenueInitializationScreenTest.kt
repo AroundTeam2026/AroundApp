@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
@@ -179,6 +180,9 @@ class VenueInitializationScreenTest {
     var failSave = false
 
     override fun observeVenue(venueId: String) = delegate.observeVenue(venueId)
+
+    override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
+        delegate.setArea(venueId, location, radiusMeters)
 
     override suspend fun getVenue(venueId: String) = delegate.getVenue(venueId)
 

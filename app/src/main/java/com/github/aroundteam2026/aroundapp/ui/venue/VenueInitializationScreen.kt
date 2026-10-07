@@ -78,7 +78,12 @@ fun VenueInitializationScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   val currentOnContinue by rememberUpdatedState(onContinueToLocation)
-  LaunchedEffect(state.venueId) { state.venueId?.let { currentOnContinue(it) } }
+  LaunchedEffect(state.venueId) {
+    state.venueId?.let {
+      currentOnContinue(it)
+      viewModel.onLocationNavigationHandled()
+    }
+  }
   BackHandler { if (!state.isSaving) onBack() }
   VenueInitializationContent(
       state = state,

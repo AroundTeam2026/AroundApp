@@ -38,6 +38,11 @@ class VenueInitializationViewModel(
   private val mutableUiState = MutableStateFlow(VenueInitializationUiState())
   val uiState = mutableUiState.asStateFlow()
 
+  /** Consumes the navigation signal so Back from location does not immediately reopen it. */
+  fun onLocationNavigationHandled() {
+    mutableUiState.value = uiState.value.copy(venueId = null)
+  }
+
   fun updateBusinessName(name: String) {
     if (!uiState.value.canContinue) return
     mutableUiState.value = uiState.value.copy(businessName = name, error = null)

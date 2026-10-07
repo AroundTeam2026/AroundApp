@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
@@ -185,6 +186,24 @@ class VenueInitializationViewModelTest {
       }
 
   @Test
+  fun handledNavigationKeepsNameAndAllowsContinueWithoutRecreatingVenue() =
+      runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.updateBusinessName("Cafe")
+        viewModel.submit()
+        runCurrent()
+        viewModel.onLocationNavigationHandled()
+        assertNull(viewModel.uiState.value.venueId)
+        assertEquals("Cafe", viewModel.uiState.value.businessName)
+        assertTrue(viewModel.uiState.value.canContinue)
+
+        viewModel.submit()
+        runCurrent()
+        assertEquals("owner-1", viewModel.uiState.value.venueId)
+        assertEquals(1, repository.created.size)
+      }
+
+  @Test
   fun editingNameClearsValidationError() {
     val viewModel = viewModel()
     viewModel.submit()
@@ -202,6 +221,9 @@ class VenueInitializationViewModelTest {
     var saveGate: CompletableDeferred<Unit>? = null
 
     override fun observeVenue(venueId: String) = delegate.observeVenue(venueId)
+
+    override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
+        delegate.setArea(venueId, location, radiusMeters)
 
     override suspend fun getVenue(venueId: String): Venue? {
       reads++
