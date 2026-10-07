@@ -26,6 +26,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.GoogleMapComposable
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.rememberCameraPositionState
@@ -64,6 +65,7 @@ fun MapScreen(
  * which only runs once the map exists, as camera updates need. [width] and [height] are the map's
  * size in pixels.
  */
+@GoogleMapComposable
 @Composable
 internal fun FrameArea(
     area: GeoBounds?,
