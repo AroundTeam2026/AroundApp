@@ -3,6 +3,11 @@ package com.github.aroundteam2026.aroundapp.ui.venue
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.graphics.PointF
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -10,10 +15,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
+import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLngBounds
@@ -63,30 +70,56 @@ class VenueAreaScreenDeviceTest {
 
     val area = here.boundsWithin(FRAMED_RADIUS_METERS).toLatLngBounds()
     val visible = composeTestRule.runOnUiThread { camera.projection!!.visibleRegion.latLngBounds }
-    // Framing fits the area to the map's narrow side exactly, so allow for rounding at that edge
+    // The area fills the map's narrow side: none of it is cut off, and the map shows no more,
+    // allowing for rounding at that edge
     val heightRatio = visible.latitudeSpan() / area.latitudeSpan()
     val widthRatio = visible.longitudeSpan() / area.longitudeSpan()
-    assertTrue(
-        "Part of $area is cut off from $visible",
-        minOf(heightRatio, widthRatio) > 0.99,
-    )
+    assertEquals("visible $visible, area $area", 1.0, minOf(heightRatio, widthRatio), 0.01)
+  }
+
+  /** Taps the middle of the map until the tap places the marker, and returns where it is. */
+  private fun placeMarkerByTapping(): Location {
+    // Taps before the map has drawn are ignored, so tap again until one counts, as a user would.
+    // Taps closer together than a double tap would zoom instead.
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
+      composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_MAP).performTouchInput { click(center) }
+      Thread.sleep(500)
+      viewModel.uiState.value.marker != null
+    }
+    return viewModel.uiState.value.marker!!
   }
 
   @Test
   fun tappingTheMapPlacesTheMarkerWhereTapped() {
     show()
 
-    // Taps before the map has drawn are ignored, so tap again until one counts, as a user would.
-    // Taps closer together than a double tap would zoom instead.
-    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
-      composeTestRule.onNodeWithTag(VenueAreaTags.MAP).performTouchInput { click(center) }
-      Thread.sleep(500)
-      viewModel.uiState.value.marker != null
-    }
+    val marker = placeMarkerByTapping()
 
     // The map's center is where the camera points
-    val marker = viewModel.uiState.value.marker!!
-    assertTrue("The marker is at $marker", LatLng(marker.lat, marker.lng).isNear(here))
+    assertTrue("The marker is at $marker", marker.toLatLng().isNear(here))
+  }
+
+  @Test
+  fun draggingTheMarkerMovesItWhereItIsDropped() {
+    show()
+    val start = placeMarkerByTapping()
+    // The tap put the marker in the middle of the map, so pressing there presses the marker
+    val tapped =
+        composeTestRule
+            .onNodeWithTag(C.Tag.VENUE_AREA_MAP)
+            .fetchSemanticsNode()
+            .boundsInWindow
+            .center
+
+    dragOnScreen(from = PointF(tapped.x, tapped.y), to = PointF(tapped.x + 200, tapped.y))
+
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { viewModel.uiState.value.marker != start }
+    // Dragged to the right: it ends east of where it was, at about the same latitude
+    val dropped = viewModel.uiState.value.marker!!
+    assertTrue(
+        "The marker went from $start to $dropped",
+        dropped.lng > start.lng && abs(dropped.lat - start.lat) < 5e-4,
+    )
   }
 
   @Test
@@ -98,7 +131,7 @@ class VenueAreaScreenDeviceTest {
     }
     awaitCameraAt(elsewhere)
 
-    composeTestRule.onNodeWithTag(VenueAreaTags.USE_MY_LOCATION).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).performClick()
 
     awaitCameraAt(here)
     assertEquals(elsewhere, viewModel.uiState.value.marker)
@@ -123,6 +156,32 @@ class VenueAreaScreenDeviceTest {
     }
   }
 
+  /**
+   * Presses at [from], holds long enough for the Maps SDK to pick up a marker there, moves to [to]
+   * while still pressing, and lets go, as a finger does. Each event is delivered before the next.
+   */
+  private fun dragOnScreen(from: PointF, to: PointF) {
+    val instrumentation = InstrumentationRegistry.getInstrumentation()
+    val downTime = SystemClock.uptimeMillis()
+    fun send(action: Int, at: PointF) {
+      val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, at.x, at.y, 0)
+      event.source = InputDevice.SOURCE_TOUCHSCREEN
+      instrumentation.sendPointerSync(event)
+      event.recycle()
+    }
+    send(MotionEvent.ACTION_DOWN, from)
+    Thread.sleep(ViewConfiguration.getLongPressTimeout() * 3L)
+    for (step in 1..DRAG_STEPS) {
+      val fraction = step.toFloat() / DRAG_STEPS
+      send(
+          MotionEvent.ACTION_MOVE,
+          PointF(from.x + (to.x - from.x) * fraction, from.y + (to.y - from.y) * fraction),
+      )
+      Thread.sleep(10)
+    }
+    send(MotionEvent.ACTION_UP, to)
+  }
+
   /** Waits until the camera rests at [location]. */
   private fun awaitCameraAt(location: Location) {
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
@@ -130,10 +189,17 @@ class VenueAreaScreenDeviceTest {
     }
   }
 
+  private fun Location.toLatLng() = LatLng(lat, lng)
+
   private fun LatLng.isNear(location: Location) =
       abs(latitude - location.lat) < 1e-3 && abs(longitude - location.lng) < 1e-3
 
   private fun LatLngBounds.latitudeSpan() = northeast.latitude - southwest.latitude
 
   private fun LatLngBounds.longitudeSpan() = northeast.longitude - southwest.longitude
+
+  private companion object {
+    /** Moves a drag is split into, so the Maps SDK sees the marker travel. */
+    const val DRAG_STEPS = 20
+  }
 }

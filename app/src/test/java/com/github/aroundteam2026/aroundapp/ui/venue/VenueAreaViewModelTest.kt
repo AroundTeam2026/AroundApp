@@ -101,7 +101,7 @@ class VenueAreaViewModelTest {
   }
 
   @Test
-  fun aGrantedPermissionKeepsAPlacedMarkerInView() = test {
+  fun aGrantedPermissionDoesNotMoveTheCameraOnceAMarkerIsPlaced() = test {
     viewModel.onMarkerPlaced(entrance)
 
     viewModel.onLocationPermissionResult(granted = true)
@@ -109,6 +109,20 @@ class VenueAreaViewModelTest {
 
     assertEquals(lausanne, state.areaToFrame)
     assertEquals(entrance, state.marker)
+  }
+
+  @Test
+  fun aMarkerPlacedWhileLocatingStopsTheCameraFromMoving() = test {
+    val gate = CompletableDeferred<Unit>()
+    locations.gate = gate
+    viewModel.onLocationPermissionResult(granted = true)
+    advanceUntilIdle()
+
+    viewModel.onMarkerPlaced(entrance)
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(lausanne, state.areaToFrame)
   }
 
   @Test
@@ -182,6 +196,20 @@ class VenueAreaViewModelTest {
     advanceUntilIdle()
 
     assertEquals(aroundZurich, state.areaToFrame)
+    assertEquals(entrance, state.marker)
+  }
+
+  @Test
+  fun useMyLocationWithAnUnknownPositionLeavesTheCameraAndTheMarker() = test {
+    locations.location = null
+    viewModel.onMarkerPlaced(entrance)
+    viewModel.onAreaFramed(lausanne)
+
+    viewModel.onUseMyLocation()
+    advanceUntilIdle()
+
+    assertEquals(1, locations.calls)
+    assertNull(state.areaToFrame)
     assertEquals(entrance, state.marker)
   }
 

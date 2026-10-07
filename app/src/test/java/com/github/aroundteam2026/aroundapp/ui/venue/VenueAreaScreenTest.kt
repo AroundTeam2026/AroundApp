@@ -11,6 +11,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertRangeInfoEquals
 import androidx.compose.ui.test.assertTextEquals
@@ -20,12 +24,15 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
+import com.github.aroundteam2026.aroundapp.resources.C
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.MarkerState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -33,6 +40,8 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -64,7 +73,7 @@ class VenueAreaScreenTest {
     show()
 
     composeTestRule
-        .onNodeWithTag(VenueAreaTags.SLIDER)
+        .onNodeWithTag(C.Tag.VENUE_AREA_SLIDER)
         .assertRangeInfoEquals(
             ProgressBarRangeInfo(
                 DEFAULT_RADIUS_METERS.toFloat(),
@@ -77,21 +86,50 @@ class VenueAreaScreenTest {
   fun movingTheSliderSetsAndShowsTheRadiusInWholeMeters() {
     show()
 
-    composeTestRule.onNodeWithTag(VenueAreaTags.SLIDER).performSemanticsAction(
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_SLIDER).performSemanticsAction(
         SemanticsActions.SetProgress
     ) {
       it(120.6f)
     }
 
     assertEquals(121, viewModel.uiState.value.radiusMeters)
-    composeTestRule.onNodeWithTag(VenueAreaTags.RADIUS).assertTextEquals("121 m")
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("121 m")
+    // TalkBack reads the radius in meters, not as a percentage of the slider
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_AREA_SLIDER)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "121 m"))
+  }
+
+  @Test
+  fun theSliderIsNamedForTalkBack() {
+    show()
+
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_AREA_SLIDER)
+        .assertContentDescriptionEquals(
+            composeTestRule.activity.getString(R.string.venue_area_radius)
+        )
+  }
+
+  @Test
+  fun aTapCountsOnlyOnTheVisibleMap() {
+    val visible = LatLngBounds(LatLng(47.375, 8.539), LatLng(47.379, 8.544))
+
+    assertTrue(isOnVisibleMap(LatLng(47.377, 8.541), visible))
+    // Where a tap lands while the map still reports taps against its starting view
+    assertFalse(isOnVisibleMap(LatLng(49.738, -95.993), visible))
+  }
+
+  @Test
+  fun aTapBeforeTheMapExistsIsIgnored() {
+    assertFalse(isOnVisibleMap(LatLng(47.377, 8.541), visible = null))
   }
 
   @Test
   fun withoutThePermissionUseMyLocationIsHidden() {
     show()
 
-    composeTestRule.onNodeWithTag(VenueAreaTags.USE_MY_LOCATION).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).assertDoesNotExist()
     assertEquals(0, locations.calls)
   }
 
@@ -103,7 +141,7 @@ class VenueAreaScreenTest {
     // Opening the screen with the permission already locates the device once
     assertEquals(1, locations.calls)
 
-    composeTestRule.onNodeWithTag(VenueAreaTags.USE_MY_LOCATION).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).performClick()
     composeTestRule.waitForIdle()
 
     assertEquals(2, locations.calls)
@@ -116,7 +154,7 @@ class VenueAreaScreenTest {
 
     composeTestRule.setContent { VenueAreaScreen() }
 
-    composeTestRule.onNodeWithTag(VenueAreaTags.USE_MY_LOCATION).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).assertIsDisplayed()
   }
 
   @Test
@@ -133,15 +171,20 @@ class VenueAreaScreenTest {
     assertEquals(elsewhere.toLatLng(), marker.position)
   }
 
-  /** Moves the marker to [to] while [dragging] is true, then lets the drop be reported. */
+  /** Applies the state changes, so the flow reading them sees them, and lets it react. */
+  private fun TestScope.settle() {
+    Snapshot.sendApplyNotifications()
+    runCurrent()
+  }
+
+  /** Starts a drag, moves the marker to [to], then drops it, as the Maps SDK reports a drag. */
   private fun TestScope.drag(to: Location) {
     dragging = true
+    settle()
     position = to.toLatLng()
-    Snapshot.sendApplyNotifications()
-    runCurrent()
+    settle()
     dragging = false
-    Snapshot.sendApplyNotifications()
-    runCurrent()
+    settle()
   }
 
   @Test
@@ -150,14 +193,13 @@ class VenueAreaScreenTest {
     runCurrent()
 
     dragging = true
+    settle()
     position = elsewhere.toLatLng()
-    Snapshot.sendApplyNotifications()
-    runCurrent()
+    settle()
     assertEquals(emptyList<Location>(), drops)
 
     dragging = false
-    Snapshot.sendApplyNotifications()
-    runCurrent()
+    settle()
     assertEquals(listOf(elsewhere), drops)
   }
 

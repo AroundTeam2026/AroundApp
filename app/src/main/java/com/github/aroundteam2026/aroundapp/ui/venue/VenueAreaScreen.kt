@@ -23,24 +23,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
+import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.FrameArea
 import com.github.aroundteam2026.aroundapp.ui.map.RequestLocationPermission
 import com.github.aroundteam2026.aroundapp.ui.map.rememberMapCamera
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
@@ -52,29 +57,9 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 
-/** Test tags of [VenueAreaScreen]. */
-internal object VenueAreaTags {
-  const val SCREEN = "venue_area_screen"
-  const val MAP = "venue_area_map"
-  const val RADIUS = "venue_area_radius"
-  const val SLIDER = "venue_area_slider"
-  const val USE_MY_LOCATION = "venue_area_use_my_location"
-}
-
-/** Text of [VenueAreaScreen]. */
-internal object VenueAreaText {
-  const val TITLE = "Set your venue's location"
-  const val HINT = "Tap the map or drag the pin to your entrance."
-  const val RADIUS_LABEL = "Visit radius"
-  const val USE_MY_LOCATION = "Use my location"
-
-  /** [meters] as shown next to the slider. */
-  fun meters(meters: Int) = "$meters m"
-}
-
 /**
  * Where a venue places its marker, by tapping the map or dragging the marker, and sets the radius
- * in which a visit counts. It asks for the location permission like the Map tab; with it, the map
+ * in which a visit counts. It asks for the location permission once per visit; with it, the map
  * shows the device's position and frames it.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
@@ -87,9 +72,14 @@ fun VenueAreaScreen(
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
 
-  Column(Modifier.fillMaxSize().testTag(VenueAreaTags.SCREEN)) {
+  Column(Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_SCREEN)) {
     Box(Modifier.weight(1f).fillMaxWidth()) {
-      AreaMap(state, viewModel, cameraPositionState)
+      AreaMap(
+          state = state,
+          cameraPositionState = cameraPositionState,
+          onMarkerPlaced = viewModel::onMarkerPlaced,
+          onAreaFramed = viewModel::onAreaFramed,
+      )
       if (state.showsUserLocation) {
         UseMyLocationButton(
             onClick = viewModel::onUseMyLocation,
@@ -105,27 +95,28 @@ fun VenueAreaScreen(
 @Composable
 private fun AreaMap(
     state: VenueAreaUiState,
-    viewModel: VenueAreaViewModel,
     cameraPositionState: CameraPositionState,
+    onMarkerPlaced: (Location) -> Unit,
+    onAreaFramed: (GeoBounds) -> Unit,
 ) {
   // Outside the map's content, which only runs once the map exists
-  val markerState = state.marker?.let { rememberDraggableMarker(it, viewModel::onMarkerPlaced) }
+  val markerState = state.marker?.let { rememberDraggableMarker(it, onMarkerPlaced) }
   val color = MaterialTheme.colorScheme.primary
-  // Until the map first draws, the Maps SDK places taps on its starting view, far from the camera
-  var loaded by remember { mutableStateOf(false) }
   BoxWithConstraints(Modifier.fillMaxSize()) {
     val width = constraints.maxWidth
     val height = constraints.maxHeight
     GoogleMap(
-        modifier = Modifier.fillMaxSize().testTag(VenueAreaTags.MAP),
+        modifier = Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_MAP),
         cameraPositionState = cameraPositionState,
         // Needs the permission, or the Maps SDK throws a SecurityException
         properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
         // The "Use my location" button replaces the Maps SDK's own, and its zoom buttons would sit
         // under it; pinching still zooms
         uiSettings = MapUiSettings(myLocationButtonEnabled = false, zoomControlsEnabled = false),
-        onMapLoaded = { loaded = true },
-        onMapClick = { if (loaded) viewModel.onMarkerPlaced(it.toLocation()) },
+        onMapClick = { tap ->
+          val visible = cameraPositionState.projection?.visibleRegion?.latLngBounds
+          if (isOnVisibleMap(tap, visible)) onMarkerPlaced(tap.toLocation())
+        },
     ) {
       if (markerState != null) {
         // Centered on the marker's state, so the circle follows the marker while it is dragged
@@ -138,17 +129,25 @@ private fun AreaMap(
         )
         Marker(state = markerState, draggable = true)
       }
-      FrameArea(state.areaToFrame, cameraPositionState, width, height, viewModel::onAreaFramed)
+      FrameArea(state.areaToFrame, cameraPositionState, width, height, onAreaFramed)
     }
   }
 }
+
+/**
+ * Whether a tap at [tap] counts: it must lie on the part of the map the camera shows, [visible], or
+ * null before the map exists. Until the map first draws, the Maps SDK reports taps against its
+ * starting view, far from the camera; those don't count.
+ */
+internal fun isOnVisibleMap(tap: LatLng, visible: LatLngBounds?): Boolean =
+    visible?.contains(tap) == true
 
 /** Frames the device's position, without moving the marker. */
 @Composable
 private fun UseMyLocationButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
   Surface(
       onClick = onClick,
-      modifier = modifier.testTag(VenueAreaTags.USE_MY_LOCATION),
+      modifier = modifier.testTag(C.Tag.VENUE_AREA_USE_MY_LOCATION),
       shape = CircleShape,
       shadowElevation = 4.dp,
   ) {
@@ -159,7 +158,7 @@ private fun UseMyLocationButton(onClick: () -> Unit, modifier: Modifier = Modifi
       // The label already says what the button does, so the icon is decorative
       Icon(painterResource(R.drawable.ic_my_location), contentDescription = null)
       Spacer(Modifier.width(8.dp))
-      Text(VenueAreaText.USE_MY_LOCATION, style = MaterialTheme.typography.labelLarge)
+      Text(stringResource(R.string.use_my_location), style = MaterialTheme.typography.labelLarge)
     }
   }
 }
@@ -199,23 +198,28 @@ internal suspend fun reportDrops(
       .collect { onDropped(position().toLocation()) }
 }
 
-/** "Visit radius" with its value, above a slider bounded by [VenueLimits] and its limits. */
+/** The title, then the visit radius with its value, above a slider bounded by [VenueLimits]. */
 @Composable
 private fun RadiusPanel(radiusMeters: Int, onRadiusChanged: (Int) -> Unit) {
   Surface(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), shadowElevation = 8.dp) {
     Column(Modifier.fillMaxWidth().padding(24.dp)) {
-      Text(VenueAreaText.TITLE, style = MaterialTheme.typography.headlineSmall)
       Text(
-          VenueAreaText.HINT,
+          stringResource(R.string.venue_area_title),
+          style = MaterialTheme.typography.headlineSmall,
+      )
+      Text(
+          stringResource(R.string.venue_area_hint),
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       Spacer(Modifier.height(24.dp))
+      val label = stringResource(R.string.venue_area_radius)
+      val value = stringResource(R.string.venue_area_meters, radiusMeters)
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(VenueAreaText.RADIUS_LABEL, style = MaterialTheme.typography.titleSmall)
+        Text(label, style = MaterialTheme.typography.titleSmall)
         Text(
-            VenueAreaText.meters(radiusMeters),
-            modifier = Modifier.testTag(VenueAreaTags.RADIUS),
+            value,
+            modifier = Modifier.testTag(C.Tag.VENUE_AREA_RADIUS),
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.titleMedium,
         )
@@ -225,12 +229,17 @@ private fun RadiusPanel(radiusMeters: Int, onRadiusChanged: (Int) -> Unit) {
           onValueChange = { onRadiusChanged(it.roundToInt()) },
           valueRange =
               VenueLimits.MIN_RADIUS_METERS.toFloat()..VenueLimits.MAX_RADIUS_METERS.toFloat(),
-          modifier = Modifier.testTag(VenueAreaTags.SLIDER),
+          // TalkBack would otherwise read an unnamed slider, in percent
+          modifier =
+              Modifier.testTag(C.Tag.VENUE_AREA_SLIDER).semantics {
+                contentDescription = label
+                stateDescription = value
+              },
       )
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         listOf(VenueLimits.MIN_RADIUS_METERS, VenueLimits.MAX_RADIUS_METERS).forEach {
           Text(
-              VenueAreaText.meters(it),
+              stringResource(R.string.venue_area_meters, it),
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
