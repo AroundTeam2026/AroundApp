@@ -1,11 +1,9 @@
 # Firestore schema v1 (draft)
 
-Status: **draft for the Day 1 contracts meeting**. Once the team agrees, every change goes through a PR to this file, reviewed by jiayizhngepfl and announced in the team chat.
-
 ## Conventions
 
 - Domain models use our own `Location(lat: Double, lng: Double)`, never `GeoPoint` or `LatLng`. Conversion happens inside the Firestore implementations.
-- All timestamps are Firestore `Timestamp`, stored as `createdAt` / `submittedAt` / `slotStart`.
+- All timestamps (createdAt, updatedAt, slotStart, submittedAt, expiresAt) are stored as epoch milliseconds (Long), matching the Kotlin models.
 - Enum values are stored as upper-case strings (`EXPLORER`, `PENDING`, ...).
 - Document ids are Firestore auto ids unless stated otherwise.
 - Fields ending in `?` are optional (may be missing or null).
@@ -54,11 +52,11 @@ One venue per account in v1, so the document id is the owner's uid. This depends
 | Field | Type | Notes |
 |---|---|---|
 | `questId` | string | |
-| `venueId` | string | |
-| `explorerUids` | list of string | The party. |
-| `slotStart` | timestamp | |
-| `status` | `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` | See open decision 3. |
-| `createdAt` | timestamp | |
+| `venueId` | string | Id of the venue that owns the quest. |
+| `explorerUids` | list of string | The party. Non-empty, and the creator must be in the list (enforced by the rules and by `Reservation`). |
+| `slotStart` | int (epoch ms) | |
+| `status` | `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` | |
+| `createdAt` | int (epoch ms) | |
 
 Repository only, no UI this sprint.
 
@@ -68,11 +66,12 @@ Repository only, no UI this sprint.
 |---|---|---|
 | `reservationId` | string | |
 | `questId` | string | |
+| `venueId` | string | Id of the venue that owns the quest. Used by the venue's security rules. |
 | `explorerUid` | string | |
 | `proofUrl` | string | Cloud Storage URL. |
 | `status` | `PENDING`, `APPROVED`, `REJECTED` | |
-| `rejectReason` | string? | Required when status is `REJECTED`. |
-| `submittedAt` | timestamp | |
+| `rejectReason` | string? | Required when `status` is `REJECTED`; must be absent otherwise. Enforced in `Completion`. |
+| `submittedAt` | int (epoch ms) | |
 
 Data class only this sprint.
 
@@ -87,22 +86,3 @@ Encoded in `canTransition(from, to)` and enforced again in the security rules.
 | Reservation | `REJECTED`, `CANCELLED` | none |
 | Completion | `PENDING` | `APPROVED`, `REJECTED` |
 | Completion | `APPROVED`, `REJECTED` | none |
-
-## Security rules summary (v1)
-
-| Collection | Read | Write |
-|---|---|---|
-| `users` | See open decision 2 | Only the owner; `role` cannot change once set |
-| `venues` | Any signed-in user | Only the owner (`venueId == auth.uid`) |
-| `quests` | Any signed-in user | Only the owning venue |
-| `reservations` | The venue and the listed explorers | Explorer creates one that lists them; only the venue changes the status |
-| `completions` | The venue and the explorer | Explorer creates; only the venue changes the status |
-
-## Open decisions for the Day 1 meeting
-
-1. **Quest `DRAFT` state?** V4 says a draft is not visible to Explorers. The plan has only `ACTIVE` and `ARCHIVED`, so quests are published on creation. Either add `DRAFT` or write in V7 that creation publishes.
-2. **Who can read `users`?** Allowing any signed-in user exposes every email. Proposal: only the owner reads their document; public fields (display name) go to a separate public document when needed.
-3. **Reservation `EXPIRED`?** V11 is P1, but adding the value now avoids a schema change later.
-4. **G3: one role per account, or both?** The draft assumes one role per account, chosen once and permanent.
-5. **Must every quest be reserved?** The draft assumes yes: unlock requires an approved reservation, and a solo visit is a reservation with a party of one.
-6. **Radius range and title length limit.**
