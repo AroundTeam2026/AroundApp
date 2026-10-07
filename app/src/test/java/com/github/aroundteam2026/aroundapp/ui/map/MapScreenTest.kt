@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.core.app.ActivityOptionsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -136,6 +137,41 @@ class MapScreenTest {
 
     assertEquals(1, repository.calls)
     assertTrue(state.showsUserLocation)
+  }
+
+  /** Leaves the app and comes back, as when the user visits Android's settings. */
+  private fun leaveAndReturnToTheApp() {
+    composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+    composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+    composeTestRule.waitForIdle()
+  }
+
+  @Test
+  fun aPermissionGrantedInTheSettingsIsUsedWhenTheAppResumes() {
+    // Coming back from the settings resumes the app without leaving the map. Shown in the app,
+    // where the Map tab's navigation entry, not the activity, is what resumes the map.
+    val dialog = showInApp(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+    assertFalse(state.showsUserLocation)
+
+    shadowOf(ApplicationProvider.getApplicationContext<Application>())
+        .grantPermissions(ACCESS_COARSE_LOCATION)
+    leaveAndReturnToTheApp()
+
+    assertEquals(1, repository.calls)
+    assertTrue(state.showsUserLocation)
+    assertEquals(1, dialog.requests.size)
+  }
+
+  // Android's own permission dialog pauses and resumes the app, so asking on resume would loop
+  @Test
+  fun resumingAfterARefusalDoesNotAskAgain() {
+    val dialog = show(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+
+    leaveAndReturnToTheApp()
+
+    assertEquals(1, dialog.requests.size)
+    assertFalse(state.showsUserLocation)
+    assertEquals(0, repository.calls)
   }
 
   @Test

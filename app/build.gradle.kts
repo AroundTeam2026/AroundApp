@@ -148,6 +148,7 @@ dependencies {
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
   implementation(libs.androidx.lifecycle.runtime.ktx)
+  implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
   implementation(libs.compose.ui)
