@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.venue
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.testVenue
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -18,22 +19,6 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class FakeVenueRepositoryTest {
 
-  /** Builds a placed venue by default; tests override only the fields they care about. */
-  private fun venue(
-      id: String = "venue-1",
-      name: String = "Cafe",
-      location: Location? = Location(46.52, 6.57),
-      address: String? = "Rue du Lac 1",
-  ) =
-      Venue(
-          id = id,
-          name = name,
-          location = location,
-          radiusMeters = 50,
-          address = address,
-          createdAt = 1_000L,
-      )
-
   @Test
   fun getVenue_returnsNullForUnknownId() = runTest {
     val repository = FakeVenueRepository()
@@ -44,7 +29,7 @@ class FakeVenueRepositoryTest {
   @Test
   fun createVenue_thenGetVenue_returnsTheStoredVenue() = runTest {
     val repository = FakeVenueRepository()
-    val venue = venue()
+    val venue = testVenue()
 
     val result = repository.createVenue(venue)
 
@@ -55,7 +40,7 @@ class FakeVenueRepositoryTest {
   @Test
   fun createVenue_keepsANullLocation() = runTest {
     val repository = FakeVenueRepository()
-    val venue = venue(location = null, address = null)
+    val venue = testVenue(location = null, address = null)
 
     repository.createVenue(venue)
 
@@ -68,8 +53,8 @@ class FakeVenueRepositoryTest {
   @Test
   fun createVenue_withExistingId_failsAndKeepsTheOriginal() = runTest {
     val repository = FakeVenueRepository()
-    val original = venue(name = "Original")
-    val replacement = venue(name = "Replacement")
+    val original = testVenue(name = "Original")
+    val replacement = testVenue(name = "Replacement")
 
     repository.createVenue(original)
     val result = repository.createVenue(replacement)
@@ -81,8 +66,8 @@ class FakeVenueRepositoryTest {
   @Test
   fun createVenue_forDifferentIds_storesBoth() = runTest {
     val repository = FakeVenueRepository()
-    val venueA = venue(id = "venue-a")
-    val venueB = venue(id = "venue-b")
+    val venueA = testVenue(id = "venue-a")
+    val venueB = testVenue(id = "venue-b")
 
     repository.createVenue(venueA)
     repository.createVenue(venueB)
@@ -101,7 +86,7 @@ class FakeVenueRepositoryTest {
   @Test
   fun observeVenue_emitsTheVenueAfterCreate() = runTest {
     val repository = FakeVenueRepository()
-    val venue = venue()
+    val venue = testVenue()
     val emissions = mutableListOf<Venue?>()
     val job = launch { repository.observeVenue(venue.id).collect { emissions.add(it) } }
     runCurrent()
@@ -116,13 +101,13 @@ class FakeVenueRepositoryTest {
   @Test
   fun observeVenue_doesNotEmitWhenAnotherVenueIsCreated() = runTest {
     val repository = FakeVenueRepository()
-    val venueA = venue(id = "venue-a")
+    val venueA = testVenue(id = "venue-a")
     repository.createVenue(venueA)
     val emissions = mutableListOf<Venue?>()
     val job = launch { repository.observeVenue("venue-a").collect { emissions.add(it) } }
     runCurrent()
 
-    repository.createVenue(venue(id = "venue-b"))
+    repository.createVenue(testVenue(id = "venue-b"))
     runCurrent()
 
     Assert.assertEquals(listOf(venueA), emissions)
@@ -134,7 +119,7 @@ class FakeVenueRepositoryTest {
     repeat(1_000) {
       val repository = FakeVenueRepository()
       // Same id, different names, so the stored venue shows which call won.
-      val candidates = listOf(venue(name = "First"), venue(name = "Second"))
+      val candidates = listOf(testVenue(name = "First"), testVenue(name = "Second"))
       val barrier = CyclicBarrier(2)
       val calls = candidates.map { candidate ->
         async(Dispatchers.IO) {
@@ -153,7 +138,7 @@ class FakeVenueRepositoryTest {
   @Test
   fun setArea_onExistingVenue_succeedsAndReplacesOnlyLocationAndRadius() = runTest {
     val repository = FakeVenueRepository()
-    val original = venue(location = null)
+    val original = testVenue(location = null)
     repository.createVenue(original)
 
     val result = repository.setArea(original.id, Location(47.37, 8.54), 120)
@@ -178,7 +163,7 @@ class FakeVenueRepositoryTest {
   @Test
   fun setArea_calledTwice_keepsTheLastValues() = runTest {
     val repository = FakeVenueRepository()
-    val original = venue(location = null)
+    val original = testVenue(location = null)
     repository.createVenue(original)
 
     val first = repository.setArea(original.id, Location(47.37, 8.54), 120)
@@ -195,8 +180,8 @@ class FakeVenueRepositoryTest {
   @Test
   fun setArea_doesNotChangeAnotherVenue() = runTest {
     val repository = FakeVenueRepository()
-    val venueB = venue(id = "venue-b")
-    repository.createVenue(venue(id = "venue-a"))
+    val venueB = testVenue(id = "venue-b")
+    repository.createVenue(testVenue(id = "venue-a"))
     repository.createVenue(venueB)
 
     val result = repository.setArea("venue-a", Location(47.37, 8.54), 120)
@@ -208,7 +193,7 @@ class FakeVenueRepositoryTest {
   @Test
   fun observeVenue_emitsTheUpdatedVenueAfterSetArea() = runTest {
     val repository = FakeVenueRepository()
-    val original = venue(location = null)
+    val original = testVenue(location = null)
     repository.createVenue(original)
     val emissions = mutableListOf<Venue?>()
     val job = launch { repository.observeVenue(original.id).collect { emissions.add(it) } }
@@ -226,7 +211,7 @@ class FakeVenueRepositoryTest {
   fun observeVenue_doesNotEmitWhenSetAreaKeepsTheSameArea() = runTest {
     val repository = FakeVenueRepository()
     val location = Location(46.52, 6.57)
-    val original = venue(location = location)
+    val original = testVenue(location = location)
     repository.createVenue(original)
     val emissions = mutableListOf<Venue?>()
     val job = launch { repository.observeVenue(original.id).collect { emissions.add(it) } }
@@ -244,7 +229,7 @@ class FakeVenueRepositoryTest {
   fun concurrentSetArea_onOneVenue_storesOneCallsLocationAndRadiusTogether() = runBlocking {
     repeat(1_000) {
       val repository = FakeVenueRepository()
-      val original = venue(location = null)
+      val original = testVenue(location = null)
       repository.createVenue(original)
       // Each call pairs a distinct location with a distinct radius, so a mix shows up.
       val areas = (0 until 4).map { i -> Location(46.0 + i, 6.0 + i) to 20 + i * 10 }
@@ -268,8 +253,8 @@ class FakeVenueRepositoryTest {
   fun concurrentSetArea_onDifferentVenues_keepsBothUpdates() = runBlocking {
     repeat(1_000) {
       val repository = FakeVenueRepository()
-      val venueA = venue(id = "venue-a", location = null)
-      val venueB = venue(id = "venue-b", location = null)
+      val venueA = testVenue(id = "venue-a", location = null)
+      val venueB = testVenue(id = "venue-b", location = null)
       repository.createVenue(venueA)
       repository.createVenue(venueB)
       val barrier = CyclicBarrier(2)
@@ -301,7 +286,7 @@ class FakeVenueRepositoryTest {
   fun setAreaRacingCreateVenue_resultMatchesStoredVenue() = runBlocking {
     repeat(1_000) {
       val repository = FakeVenueRepository()
-      val original = venue(location = null)
+      val original = testVenue(location = null)
       val barrier = CyclicBarrier(2)
       val creation =
           async(Dispatchers.IO) {
@@ -325,5 +310,38 @@ class FakeVenueRepositoryTest {
         Assert.assertEquals(original, repository.getVenue(original.id))
       }
     }
+  }
+
+  @Test
+  fun keepsInitialVenuesExactlyAsGiven() = runTest {
+    val venue = testVenue(id = "cafe", featuredQuestId = "quest-7")
+    val repository = FakeVenueRepository(initialVenues = listOf(venue))
+
+    Assert.assertEquals(venue, repository.getVenue("cafe"))
+  }
+
+  @Test
+  fun anInitialVenueCannotBeCreatedAgain() = runTest {
+    val repository = FakeVenueRepository(initialVenues = listOf(testVenue(id = "cafe")))
+
+    val result = repository.createVenue(testVenue(id = "cafe", name = "Impostor"))
+
+    Assert.assertEquals(IllegalStateException::class.java, result.exceptionOrNull()?.javaClass)
+    Assert.assertEquals("Café Lumen", repository.getVenue("cafe")?.name)
+  }
+
+  @Test
+  fun rejectsInitialVenuesSharingAnId() {
+    Assert.assertThrows(IllegalArgumentException::class.java) {
+      FakeVenueRepository(initialVenues = listOf(testVenue(id = "same"), testVenue(id = "same")))
+    }
+  }
+
+  @Test
+  fun observeVenue_emitsAnInitialVenue() = runTest {
+    val venue = testVenue(id = "cafe")
+    val repository = FakeVenueRepository(initialVenues = listOf(venue))
+
+    Assert.assertEquals(venue, repository.observeVenue("cafe").first())
   }
 }

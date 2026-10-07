@@ -13,14 +13,24 @@ import kotlinx.coroutines.flow.map
  *
  * Creating a venue is atomic: of several concurrent calls with the same id, exactly one succeeds.
  * Setting an area is atomic too: the stored venue always holds the location and radius of a single
- * call. [observeVenue] emits again only when that venue changes, not on every write.
+ * call. [observeVenue] and [observeVenues] emit again only when their venues change, not on every
+ * write.
+ *
+ * @param initialVenues Venues stored from the start exactly as given; their ids must be unique.
  */
-class FakeVenueRepository : VenueRepository {
+class FakeVenueRepository(initialVenues: List<Venue> = emptyList()) : VenueRepository {
   /** All stored venues, keyed by id. */
-  private val venues = MutableStateFlow<Map<String, Venue>>(emptyMap())
+  private val venues = MutableStateFlow(initialVenues.associateBy { it.id })
+
+  init {
+    require(venues.value.size == initialVenues.size) { "Initial venues must have unique ids" }
+  }
 
   override fun observeVenue(venueId: String): Flow<Venue?> =
       venues.map { it[venueId] }.distinctUntilChanged()
+
+  override fun observeVenues(venueIds: Set<String>): Flow<List<Venue>> =
+      venues.map { all -> venueIds.mapNotNull { all[it] } }.distinctUntilChanged()
 
   override suspend fun getVenue(venueId: String): Venue? = venues.value[venueId]
 
