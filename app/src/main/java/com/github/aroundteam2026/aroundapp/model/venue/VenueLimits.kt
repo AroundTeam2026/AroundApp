@@ -2,8 +2,8 @@
 package com.github.aroundteam2026.aroundapp.model.venue
 
 /**
- * Limits and default for [Venue.radiusMeters]. The limits are enforced by the future ViewModel, not
- * by the repository.
+ * Limits and default for [Venue.radiusMeters]. The limits are enforced by
+ * [com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel], not by the repository.
  *
  * The values are placeholders until the team agrees on the range (open decision 6 of the Firestore
  * schema draft, PR #25).
