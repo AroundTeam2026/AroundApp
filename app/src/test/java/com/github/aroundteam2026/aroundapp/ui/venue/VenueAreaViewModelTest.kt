@@ -6,7 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
-import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.DEFAULT_CENTER
+import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +32,7 @@ class VenueAreaViewModelTest {
   private val entrance = Location(46.5191, 6.6335)
   private val elsewhere = Location(46.5210, 6.6300)
   private val zurich = Location(47.3769, 8.5417)
-  private val lausanne = DEFAULT_CENTER.boundsWithin(FRAMED_RADIUS_METERS)
+  private val lausanne = DEFAULT_MAP_CENTER.boundsWithin(FRAMED_RADIUS_METERS)
   private val aroundZurich = zurich.boundsWithin(FRAMED_RADIUS_METERS)
 
   private val locations = FakeLocationRepository(zurich)

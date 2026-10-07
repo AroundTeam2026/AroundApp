@@ -13,7 +13,8 @@ import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
-import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel
+import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
+import com.github.aroundteam2026.aroundapp.ui.map.afterFraming
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,14 +34,14 @@ data class VenueAreaUiState(
     val marker: Location? = null,
     val radiusMeters: Int = VenueLimits.DEFAULT_RADIUS_METERS,
     val areaToFrame: GeoBounds? =
-        MapViewModel.DEFAULT_CENTER.boundsWithin(VenueAreaViewModel.FRAMED_RADIUS_METERS),
+        DEFAULT_MAP_CENTER.boundsWithin(VenueAreaViewModel.FRAMED_RADIUS_METERS),
     val showsUserLocation: Boolean = false,
 )
 
 /**
  * Holds the marker a venue places on the map and the radius in which a visit counts. The map starts
- * on [MapViewModel.DEFAULT_CENTER], then frames the device once its position is known, unless a
- * marker is already placed.
+ * on [DEFAULT_MAP_CENTER], then frames the device once its position is known, unless a marker is
+ * already placed.
  */
 class VenueAreaViewModel(private val locationRepository: LocationRepository) : ViewModel() {
   private val _uiState = MutableStateFlow(VenueAreaUiState())
@@ -95,7 +96,7 @@ class VenueAreaViewModel(private val locationRepository: LocationRepository) : V
    * so it still gets framed.
    */
   fun onAreaFramed(area: GeoBounds) {
-    _uiState.update { if (it.areaToFrame == area) it.copy(areaToFrame = null) else it }
+    _uiState.update { it.copy(areaToFrame = it.areaToFrame.afterFraming(area)) }
   }
 
   private fun frameDevice(overMarker: Boolean): Job = viewModelScope.launch {
