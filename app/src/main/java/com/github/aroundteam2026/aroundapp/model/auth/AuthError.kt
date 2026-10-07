@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.auth
 
 /** Why an authentication call failed. Screens map each case to a readable message. */
