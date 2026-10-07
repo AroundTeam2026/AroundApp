@@ -1,0 +1,70 @@
+rules_version = '2';
+
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Firestore security rules v1, following the rules summary in docs/firestore-schema.md (PR #25).
+// Anything not allowed below is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function hasValidRole(data) {
+      return data.get('role', null) in [null, 'EXPLORER', 'VENUE'];
+    }
+
+    // Only the owner reads their profile
+    // The role is write-once: it can be chosen while null, then never changed.
+    match /users/{uid} {
+      allow read: if isUser(uid);
+      allow create: if isUser(uid) && hasValidRole(request.resource.data);
+      allow update: if isUser(uid)
+          && hasValidRole(request.resource.data)
+          && (resource.data.get('role', null) == null
+              || request.resource.data.get('role', null) == resource.data.role);
+    }
+
+    // One venue per account: the document id is the owner's uid.
+    match /venues/{ownerUid} {
+      allow read: if signedIn();
+      allow create, update, delete: if isUser(ownerUid);
+    }
+
+    // venueId is the owning venue's uid and can't be reassigned.
+    match /quests/{questId} {
+      allow read: if signedIn();
+      allow create: if isUser(request.resource.data.venueId);
+      allow update: if isUser(resource.data.venueId)
+          && request.resource.data.venueId == resource.data.venueId;
+      allow delete: if isUser(resource.data.venueId);
+    }
+
+    // The schema's allowed status transitions for reservations.
+    function isReservationTransition(from, to) {
+      return (from == 'PENDING' && to in ['APPROVED', 'REJECTED', 'CANCELLED'])
+          || (from == 'APPROVED' && to == 'CANCELLED');
+    }
+
+    // An explorer creates a pending reservation that lists them. Only the venue changes it, and
+    // only its status, along an allowed transition.
+    match /reservations/{reservationId} {
+      allow read: if signedIn()
+          && (request.auth.uid == resource.data.venueId
+              || request.auth.uid in resource.data.explorerUids);
+      allow create: if signedIn()
+          && request.auth.uid in request.resource.data.explorerUids
+          && request.resource.data.status == 'PENDING';
+      allow update: if isUser(resource.data.venueId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && isReservationTransition(resource.data.status, request.resource.data.status);
+    }
+
+    // completions: no rules yet, so all access is denied until completions get a repository.
+    // The venue's read and status rules will need a venueId field, which the schema lacks.
+  }
+}
