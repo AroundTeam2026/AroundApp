@@ -149,4 +149,107 @@ class FakeVenueRepositoryTest {
       Assert.assertEquals(winner, repository.getVenue(winner.id))
     }
   }
+
+  @Test
+  fun setArea_onExistingVenue_succeedsAndStoresTheNewArea() = runTest {
+    val repository = FakeVenueRepository()
+    repository.createVenue(venue(location = null))
+    val newLocation = Location(47.37, 8.54)
+
+    val result = repository.setArea("venue-1", newLocation, 120)
+
+    Assert.assertEquals(Result.success(Unit), result)
+    val stored = repository.getVenue("venue-1")
+    Assert.assertEquals(newLocation, stored?.location)
+    Assert.assertEquals(120, stored?.radiusMeters)
+  }
+
+  @Test
+  fun setArea_onUnknownId_failsAndCreatesNoVenue() = runTest {
+    val repository = FakeVenueRepository()
+
+    val result = repository.setArea("unknown-venue", Location(47.37, 8.54), 120)
+
+    Assert.assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    Assert.assertNull(repository.getVenue("unknown-venue"))
+  }
+
+  @Test
+  fun setArea_keepsIdNameAddressAndCreatedAt() = runTest {
+    val repository = FakeVenueRepository()
+    val original = venue(location = null)
+    repository.createVenue(original)
+
+    repository.setArea(original.id, Location(47.37, 8.54), 120)
+
+    val stored = repository.getVenue(original.id)
+    Assert.assertEquals(original.id, stored?.id)
+    Assert.assertEquals(original.name, stored?.name)
+    Assert.assertEquals(original.address, stored?.address)
+    Assert.assertEquals(original.createdAt, stored?.createdAt)
+  }
+
+  @Test
+  fun observeVenue_emitsTheUpdatedVenueAfterSetArea() = runTest {
+    val repository = FakeVenueRepository()
+    val original = venue(location = null)
+    repository.createVenue(original)
+    val emissions = mutableListOf<Venue?>()
+    val job = launch { repository.observeVenue(original.id).collect { emissions.add(it) } }
+    runCurrent()
+
+    repository.setArea(original.id, Location(47.37, 8.54), 120)
+    runCurrent()
+
+    val updated = original.copy(location = Location(47.37, 8.54), radiusMeters = 120)
+    Assert.assertEquals(listOf(original, updated), emissions)
+    job.cancel()
+  }
+
+  @Test
+  fun setArea_calledTwice_keepsTheLastValues() = runTest {
+    val repository = FakeVenueRepository()
+    repository.createVenue(venue(location = null))
+
+    repository.setArea("venue-1", Location(47.37, 8.54), 120)
+    repository.setArea("venue-1", Location(46.20, 6.14), 80)
+
+    val stored = repository.getVenue("venue-1")
+    Assert.assertEquals(Location(46.20, 6.14), stored?.location)
+    Assert.assertEquals(80, stored?.radiusMeters)
+  }
+
+  @Test
+  fun setArea_doesNotChangeAnotherVenue() = runTest {
+    val repository = FakeVenueRepository()
+    val venueA = venue(id = "venue-a")
+    val venueB = venue(id = "venue-b")
+    repository.createVenue(venueA)
+    repository.createVenue(venueB)
+
+    repository.setArea("venue-a", Location(47.37, 8.54), 120)
+
+    Assert.assertEquals(venueB, repository.getVenue("venue-b"))
+  }
+
+  @Test(timeout = 30_000)
+  fun concurrentSetArea_storesOneCallsLocationAndRadiusTogether() = runBlocking {
+    repeat(1_000) {
+      val repository = FakeVenueRepository()
+      repository.createVenue(venue(location = null))
+      // Each call pairs a distinct location with a distinct radius, so a mix shows up.
+      val areas = (0 until 4).map { i -> Location(46.0 + i, 6.0 + i) to 20 + i * 10 }
+      val barrier = CyclicBarrier(areas.size)
+      val calls = areas.map { (location, radiusMeters) ->
+        async(Dispatchers.IO) {
+          barrier.await(5, TimeUnit.SECONDS)
+          repository.setArea("venue-1", location, radiusMeters)
+        }
+      }
+      val results = calls.map { it.await() }
+      Assert.assertTrue(results.all { it.isSuccess })
+      val stored = repository.getVenue("venue-1")
+      Assert.assertTrue(areas.contains(stored?.location to stored?.radiusMeters))
+    }
+  }
 }
