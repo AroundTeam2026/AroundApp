@@ -2,6 +2,8 @@
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -21,20 +26,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
-import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel
-import com.google.android.gms.maps.model.CameraPosition
+import com.github.aroundteam2026.aroundapp.ui.map.FrameArea
+import com.github.aroundteam2026.aroundapp.ui.map.RequestLocationPermission
+import com.github.aroundteam2026.aroundapp.ui.map.rememberMapCamera
 import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.rememberCameraPositionState
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
@@ -42,8 +53,10 @@ import kotlinx.coroutines.flow.filter
 /** Test tags of [VenueAreaScreen]. */
 internal object VenueAreaTags {
   const val SCREEN = "venue_area_screen"
+  const val MAP = "venue_area_map"
   const val RADIUS = "venue_area_radius"
   const val SLIDER = "venue_area_slider"
+  const val USE_MY_LOCATION = "venue_area_use_my_location"
 }
 
 /** Text of [VenueAreaScreen]. */
@@ -51,24 +64,37 @@ internal object VenueAreaText {
   const val TITLE = "Set your venue's location"
   const val HINT = "Tap the map or drag the pin to your entrance."
   const val RADIUS_LABEL = "Visit radius"
+  const val USE_MY_LOCATION = "Use my location"
 
   /** [meters] as shown next to the slider. */
   fun meters(meters: Int) = "$meters m"
 }
 
-/** Map zoom at which a venue can tell its entrance from its neighbours'. */
-private const val STREET_ZOOM = 16f
-
 /**
  * Where a venue places its marker, by tapping the map or dragging the marker, and sets the radius
- * in which a visit counts. The map starts on [MapViewModel.DEFAULT_CENTER].
+ * in which a visit counts. It asks for the location permission like the Map tab; with it, the map
+ * shows the device's position and frames it.
+ *
+ * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
 @Composable
-fun VenueAreaScreen(viewModel: VenueAreaViewModel = viewModel()) {
+fun VenueAreaScreen(
+    viewModel: VenueAreaViewModel = viewModel(factory = VenueAreaViewModel.factory),
+    cameraPositionState: CameraPositionState = rememberMapCamera(),
+) {
   val state by viewModel.uiState.collectAsState()
+  RequestLocationPermission(viewModel::onLocationPermissionResult)
 
   Column(Modifier.fillMaxSize().testTag(VenueAreaTags.SCREEN)) {
-    AreaMap(state, viewModel::onMarkerPlaced, Modifier.weight(1f))
+    Box(Modifier.weight(1f).fillMaxWidth()) {
+      AreaMap(state, viewModel, cameraPositionState)
+      if (state.showsUserLocation) {
+        UseMyLocationButton(
+            onClick = viewModel::onUseMyLocation,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        )
+      }
+    }
     RadiusPanel(state.radiusMeters, viewModel::onRadiusChanged)
   }
 }
@@ -77,30 +103,57 @@ fun VenueAreaScreen(viewModel: VenueAreaViewModel = viewModel()) {
 @Composable
 private fun AreaMap(
     state: VenueAreaUiState,
-    onMarkerPlaced: (Location) -> Unit,
-    modifier: Modifier,
+    viewModel: VenueAreaViewModel,
+    cameraPositionState: CameraPositionState,
 ) {
-  val cameraPositionState = rememberCameraPositionState {
-    position = CameraPosition.fromLatLngZoom(MapViewModel.DEFAULT_CENTER.toLatLng(), STREET_ZOOM)
-  }
   // Outside the map's content, which only runs once the map exists
-  val markerState = state.marker?.let { rememberDraggableMarker(it, onMarkerPlaced) }
+  val markerState = state.marker?.let { rememberDraggableMarker(it, viewModel::onMarkerPlaced) }
   val color = MaterialTheme.colorScheme.primary
-  GoogleMap(
-      modifier = modifier.fillMaxWidth(),
-      cameraPositionState = cameraPositionState,
-      onMapClick = { onMarkerPlaced(it.toLocation()) },
+  BoxWithConstraints(Modifier.fillMaxSize()) {
+    val width = constraints.maxWidth
+    val height = constraints.maxHeight
+    GoogleMap(
+        modifier = Modifier.fillMaxSize().testTag(VenueAreaTags.MAP),
+        cameraPositionState = cameraPositionState,
+        // Needs the permission, or the Maps SDK throws a SecurityException
+        properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
+        // The "Use my location" button replaces the Maps SDK's own
+        uiSettings = MapUiSettings(myLocationButtonEnabled = false),
+        onMapClick = { viewModel.onMarkerPlaced(it.toLocation()) },
+    ) {
+      if (markerState != null) {
+        // Centered on the marker's state, so the circle follows the marker while it is dragged
+        Circle(
+            center = markerState.position,
+            radius = state.radiusMeters.toDouble(),
+            fillColor = color.copy(alpha = 0.3f),
+            strokeColor = color,
+            strokeWidth = 2f,
+        )
+        Marker(state = markerState, draggable = true)
+      }
+      FrameArea(state.areaToFrame, cameraPositionState, width, height, viewModel::onAreaFramed)
+    }
+  }
+}
+
+/** Frames the device's position, without moving the marker. */
+@Composable
+private fun UseMyLocationButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+  Surface(
+      onClick = onClick,
+      modifier = modifier.testTag(VenueAreaTags.USE_MY_LOCATION),
+      shape = CircleShape,
+      shadowElevation = 4.dp,
   ) {
-    if (markerState != null) {
-      // Centered on the marker's state, so the circle follows the marker while it is dragged
-      Circle(
-          center = markerState.position,
-          radius = state.radiusMeters.toDouble(),
-          fillColor = color.copy(alpha = 0.3f),
-          strokeColor = color,
-          strokeWidth = 2f,
-      )
-      Marker(state = markerState, draggable = true)
+    Row(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      // The label already says what the button does, so the icon is decorative
+      Icon(painterResource(R.drawable.ic_my_location), contentDescription = null)
+      Spacer(Modifier.width(8.dp))
+      Text(VenueAreaText.USE_MY_LOCATION, style = MaterialTheme.typography.labelLarge)
     }
   }
 }

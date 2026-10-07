@@ -1,6 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
+import android.Manifest.permission.ACCESS_COARSE_LOCATION
+import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,13 +11,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertRangeInfoEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
@@ -29,6 +36,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -38,7 +46,8 @@ class VenueAreaScreenTest {
   private val entrance = Location(46.5191, 6.6335)
   private val elsewhere = Location(46.5210, 6.6300)
 
-  private val viewModel = VenueAreaViewModel()
+  private val locations = FakeLocationRepository(Location(47.3769, 8.5417))
+  private val viewModel = VenueAreaViewModel(locations)
 
   // The Maps SDK can't drag a marker in a unit test, so these drive the state a marker exposes
   private var dragging by mutableStateOf(false)
@@ -76,6 +85,38 @@ class VenueAreaScreenTest {
 
     assertEquals(121, viewModel.uiState.value.radiusMeters)
     composeTestRule.onNodeWithTag(VenueAreaTags.RADIUS).assertTextEquals("121 m")
+  }
+
+  @Test
+  fun withoutThePermissionUseMyLocationIsHidden() {
+    show()
+
+    composeTestRule.onNodeWithTag(VenueAreaTags.USE_MY_LOCATION).assertDoesNotExist()
+    assertEquals(0, locations.calls)
+  }
+
+  @Test
+  fun withThePermissionUseMyLocationLocatesTheDevice() {
+    shadowOf(ApplicationProvider.getApplicationContext<Application>())
+        .grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
+    show()
+    // Opening the screen with the permission already locates the device once
+    assertEquals(1, locations.calls)
+
+    composeTestRule.onNodeWithTag(VenueAreaTags.USE_MY_LOCATION).performClick()
+    composeTestRule.waitForIdle()
+
+    assertEquals(2, locations.calls)
+  }
+
+  @Test
+  fun itsOwnViewModelShowsUseMyLocationWithThePermission() {
+    shadowOf(ApplicationProvider.getApplicationContext<Application>())
+        .grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
+
+    composeTestRule.setContent { VenueAreaScreen() }
+
+    composeTestRule.onNodeWithTag(VenueAreaTags.USE_MY_LOCATION).assertIsDisplayed()
   }
 
   @Test

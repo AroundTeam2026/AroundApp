@@ -54,16 +54,30 @@ fun MapScreen(
         properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
         uiSettings = MapUiSettings(myLocationButtonEnabled = state.showsUserLocation),
     ) {
-      // The content only runs once the map exists, which camera updates need
-      val area = state.areaToFrame
-      LaunchedEffect(area) {
-        if (area == null) return@LaunchedEffect
-        cameraPositionState.move(
-            CameraUpdateFactory.newLatLngBounds(area.toLatLngBounds(), width, height, 0)
-        )
-        viewModel.onAreaFramed(area)
-      }
+      FrameArea(state.areaToFrame, cameraPositionState, width, height, viewModel::onAreaFramed)
     }
+  }
+}
+
+/**
+ * Moves the camera to [area], if any, then reports it to [onFramed]. Call it from a map's content,
+ * which only runs once the map exists, as camera updates need. [width] and [height] are the map's
+ * size in pixels.
+ */
+@Composable
+internal fun FrameArea(
+    area: GeoBounds?,
+    cameraPositionState: CameraPositionState,
+    width: Int,
+    height: Int,
+    onFramed: (GeoBounds) -> Unit,
+) {
+  LaunchedEffect(area) {
+    if (area == null) return@LaunchedEffect
+    cameraPositionState.move(
+        CameraUpdateFactory.newLatLngBounds(area.toLatLngBounds(), width, height, 0)
+    )
+    onFramed(area)
   }
 }
 
@@ -81,7 +95,7 @@ fun MapScreen(
  * asks again.
  */
 @Composable
-private fun RequestLocationPermission(onResult: (granted: Boolean) -> Unit) {
+internal fun RequestLocationPermission(onResult: (granted: Boolean) -> Unit) {
   val context = LocalContext.current
   // The effect below outlives a composition; this keeps it calling the latest callback
   val currentOnResult by rememberUpdatedState(onResult)
