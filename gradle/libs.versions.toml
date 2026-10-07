@@ -19,8 +19,11 @@ robolectric = "4.16.1"
 sonar = "7.5.0.8588"
 gms = "4.5.0"
 firebaseBom = "34.18.0"
+# Newest maps-compose that keeps kotlin-stdlib at our Kotlin 2.3.0 (8.2.1 and later need 2.3.10
+# to 2.4.10). Bump it together with Kotlin.
+mapsCompose = "8.2.0"
 playServicesLocation = "21.4.0"
-coroutines = "1.9.0"
+coroutines = "1.10.2"
 mockk = "1.14.11"
 
 
@@ -32,6 +35,7 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
 
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
@@ -54,6 +58,7 @@ kaspresso-compose = { group = "com.kaspersky.android-components", name = "kaspre
 
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
+maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
