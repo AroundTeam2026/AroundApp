@@ -28,7 +28,9 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.Timeout
 import org.junit.runner.RunWith
 
 /**
@@ -41,6 +43,12 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class QuestRepositoryFirestoreTest {
+  /**
+   * Fails any test, including its setUp and tearDown, that runs longer than this instead of
+   * blocking CI forever, and reports where it was stuck.
+   */
+  @get:Rule val timeout: Timeout = Timeout.seconds(30)
+
   private lateinit var db: FirebaseFirestore
   private lateinit var repository: QuestRepositoryFirestore
 
@@ -50,18 +58,21 @@ class QuestRepositoryFirestoreTest {
       runBlocking<Unit> {
         db = emulatorClient(MAIN_APP)
         repository = QuestRepositoryFirestore(db) { FIXED_NOW }
-        // A batch is capped at 500 writes, so delete page by page until nothing is left.
-        while (true) {
-          val page = db.collection(QUESTS).limit(BATCH_LIMIT).get(Source.SERVER).await()
-          if (page.isEmpty) break
-          val batch = db.batch()
-          page.documents.forEach { batch.delete(it.reference) }
-          batch.commit().await()
+        withTimeout(SETUP_TIMEOUT_MS) {
+          // A batch is capped at 500 writes, so delete page by page until nothing is left.
+          while (true) {
+            val page = db.collection(QUESTS).limit(BATCH_LIMIT).get(Source.SERVER).await()
+            if (page.isEmpty) break
+            val batch = db.batch()
+            page.documents.forEach { batch.delete(it.reference) }
+            batch.commit().await()
+          }
         }
       }
 
   /** Terminates the client [setUp] created, so no listener or cached data leaks between tests. */
-  @After fun tearDown() = runBlocking<Unit> { db.terminate().await() }
+  @After
+  fun tearDown() = runBlocking<Unit> { withTimeout(SETUP_TIMEOUT_MS) { db.terminate().await() } }
 
   // Bug: a field is dropped or mis-mapped on write or read (e.g. lat/lng swapped, sign lost,
   // reward not nested, wrong enum, id not taken from the document id), or write never reaches the
@@ -309,6 +320,9 @@ class QuestRepositoryFirestoreTest {
     const val READER_APP = "quest-test-reader"
     const val BATCH_LIMIT = 500L
     const val TIMEOUT_MS = 10_000L
+
+    /** Bounds setUp and tearDown; the first connection to the emulator can be slow on CI. */
+    const val SETUP_TIMEOUT_MS = 15_000L
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
