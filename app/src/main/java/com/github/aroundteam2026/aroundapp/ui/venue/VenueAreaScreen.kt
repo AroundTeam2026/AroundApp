@@ -23,8 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,6 +111,8 @@ private fun AreaMap(
   // Outside the map's content, which only runs once the map exists
   val markerState = state.marker?.let { rememberDraggableMarker(it, viewModel::onMarkerPlaced) }
   val color = MaterialTheme.colorScheme.primary
+  // Until the map first draws, the Maps SDK places taps on its starting view, far from the camera
+  var loaded by remember { mutableStateOf(false) }
   BoxWithConstraints(Modifier.fillMaxSize()) {
     val width = constraints.maxWidth
     val height = constraints.maxHeight
@@ -117,9 +121,11 @@ private fun AreaMap(
         cameraPositionState = cameraPositionState,
         // Needs the permission, or the Maps SDK throws a SecurityException
         properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
-        // The "Use my location" button replaces the Maps SDK's own
-        uiSettings = MapUiSettings(myLocationButtonEnabled = false),
-        onMapClick = { viewModel.onMarkerPlaced(it.toLocation()) },
+        // The "Use my location" button replaces the Maps SDK's own, and its zoom buttons would sit
+        // under it; pinching still zooms
+        uiSettings = MapUiSettings(myLocationButtonEnabled = false, zoomControlsEnabled = false),
+        onMapLoaded = { loaded = true },
+        onMapClick = { if (loaded) viewModel.onMarkerPlaced(it.toLocation()) },
     ) {
       if (markerState != null) {
         // Centered on the marker's state, so the circle follows the marker while it is dragged

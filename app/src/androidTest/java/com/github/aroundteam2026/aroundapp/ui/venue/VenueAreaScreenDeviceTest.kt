@@ -20,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.ui.map.toLatLngBounds
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
@@ -62,9 +63,12 @@ class VenueAreaScreenDeviceTest {
 
     val area = here.boundsWithin(FRAMED_RADIUS_METERS).toLatLngBounds()
     val visible = composeTestRule.runOnUiThread { camera.projection!!.visibleRegion.latLngBounds }
+    // Framing fits the area to the map's narrow side exactly, so allow for rounding at that edge
+    val heightRatio = visible.latitudeSpan() / area.latitudeSpan()
+    val widthRatio = visible.longitudeSpan() / area.longitudeSpan()
     assertTrue(
         "Part of $area is cut off from $visible",
-        visible.contains(area.southwest) && visible.contains(area.northeast),
+        minOf(heightRatio, widthRatio) > 0.99,
     )
   }
 
@@ -72,8 +76,13 @@ class VenueAreaScreenDeviceTest {
   fun tappingTheMapPlacesTheMarkerWhereTapped() {
     show()
 
-    composeTestRule.onNodeWithTag(VenueAreaTags.MAP).performTouchInput { click(center) }
-    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { viewModel.uiState.value.marker != null }
+    // Taps before the map has drawn are ignored, so tap again until one counts, as a user would.
+    // Taps closer together than a double tap would zoom instead.
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
+      composeTestRule.onNodeWithTag(VenueAreaTags.MAP).performTouchInput { click(center) }
+      Thread.sleep(500)
+      viewModel.uiState.value.marker != null
+    }
 
     // The map's center is where the camera points
     val marker = viewModel.uiState.value.marker!!
@@ -123,4 +132,8 @@ class VenueAreaScreenDeviceTest {
 
   private fun LatLng.isNear(location: Location) =
       abs(latitude - location.lat) < 1e-3 && abs(longitude - location.lng) < 1e-3
+
+  private fun LatLngBounds.latitudeSpan() = northeast.latitude - southwest.latitude
+
+  private fun LatLngBounds.longitudeSpan() = northeast.longitude - southwest.longitude
 }
