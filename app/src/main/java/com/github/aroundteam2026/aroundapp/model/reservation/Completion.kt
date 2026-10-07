@@ -7,6 +7,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
  * @property id Document id, assigned by the repository.
  * @property reservationId Id of the approved reservation this proof belongs to.
  * @property questId Id of the quest that was completed.
+ * @property venueId Id of the venue that owns the quest, equal to the venue owner's uid.
  * @property explorerUid Uid of the explorer who submitted the proof.
  * @property proofUrl Cloud Storage URL of the submitted proof.
  * @property status Lifecycle state; see [canTransition] for the allowed changes.
@@ -18,6 +19,7 @@ data class Completion(
     val id: String,
     val reservationId: String,
     val questId: String,
+    val venueId: String,
     val explorerUid: String,
     val proofUrl: String,
     val status: CompletionStatus,
