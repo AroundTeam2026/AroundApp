@@ -21,4 +21,6 @@ class MainScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
   val questsScreen: KNode = child { hasTestTag(C.Tag.QUESTS_SCREEN) }
   val mapScreen: KNode = child { hasTestTag(C.Tag.MAP_SCREEN) }
   val profileScreen: KNode = child { hasTestTag(C.Tag.PROFILE_SCREEN) }
+
+  val map: KNode = child { hasTestTag(C.Tag.MAP) }
 }
