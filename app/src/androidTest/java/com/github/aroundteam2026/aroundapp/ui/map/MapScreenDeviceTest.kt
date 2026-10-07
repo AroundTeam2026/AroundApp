@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
@@ -21,6 +22,7 @@ import com.github.aroundteam2026.aroundapp.ui.navigation.Tab
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraPositionState
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
@@ -143,6 +145,21 @@ class MapScreenDeviceTest {
       composeTestRule.runOnUiThread { !map.isMyLocationEnabled }
     }
     assertFalse(composeTestRule.runOnUiThread { map.uiSettings.isMyLocationButtonEnabled })
+  }
+
+  @Test
+  fun theMapsSdkAcceptsTheMapStyle() {
+    // A style the SDK can't read leaves the standard colours without any error
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    val viewModel = MapViewModel(StaticLocation(here))
+    composeTestRule.setContent { MapScreen(viewModel) }
+    val map = composeTestRule.awaitGoogleMap()
+
+    val accepted = composeTestRule.runOnUiThread {
+      map.setMapStyle(MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style))
+    }
+
+    assertTrue("The Maps SDK rejected the map style", accepted)
   }
 
   private fun openTab(tab: Tab) {

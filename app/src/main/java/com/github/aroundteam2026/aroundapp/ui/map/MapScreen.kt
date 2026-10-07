@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -18,12 +19,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
@@ -31,8 +34,8 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.rememberCameraPositionState
 
 /**
- * The Explorer's map. It asks for the location permission if needed, then frames
- * [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
+ * The Explorer's map, in the app's colours. It asks for the location permission if needed, then
+ * frames [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
@@ -43,6 +46,9 @@ fun MapScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
+  val context = LocalContext.current
+  val mapStyle =
+      remember(context) { MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style) }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
@@ -51,7 +57,11 @@ fun MapScreen(
         modifier = Modifier.fillMaxSize().testTag(C.Tag.MAP),
         cameraPositionState = cameraPositionState,
         // Both need the permission, or the Maps SDK throws a SecurityException
-        properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
+        properties =
+            MapProperties(
+                isMyLocationEnabled = state.showsUserLocation,
+                mapStyleOptions = mapStyle,
+            ),
         uiSettings = MapUiSettings(myLocationButtonEnabled = state.showsUserLocation),
     ) {
       // The content only runs once the map exists, which camera updates need
