@@ -1,7 +1,9 @@
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.auth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import java.util.UUID
@@ -25,7 +27,7 @@ class AuthRepositoryFirebaseTest {
 
   @Before
   fun setUp() {
-    useEmulatorOnce()
+    FirebaseEmulator.connect()
     Firebase.auth.signOut()
     repo = AuthRepositoryFirebase(Firebase.auth)
   }
@@ -167,16 +169,5 @@ class AuthRepositoryFirebaseTest {
   private companion object {
     const val PASSWORD = "password123"
     const val LISTENER_TIMEOUT_MS = 5_000L
-    // 10.0.2.2 is the host machine as seen from the Android emulator.
-    const val EMULATOR_HOST = "10.0.2.2"
-    const val AUTH_PORT = 9099
-    var emulatorConfigured = false
-
-    fun useEmulatorOnce() {
-      if (!emulatorConfigured) {
-        Firebase.auth.useEmulator(EMULATOR_HOST, AUTH_PORT)
-        emulatorConfigured = true
-      }
-    }
   }
 }
