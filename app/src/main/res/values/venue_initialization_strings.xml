@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: OpenAI Codex -->
+<resources>
+    <string name="venue_initialization_title">Set up your venue</string>
+    <string name="venue_initialization_description">Explorers will see this on your quests and on the map.</string>
+    <string name="venue_initialization_step">Step 1 of 2</string>
+    <string name="venue_initialization_name">Venue name</string>
+    <string name="venue_initialization_name_hint">Café Lumière</string>
+    <string name="venue_initialization_continue">Continue</string>
+    <string name="venue_initialization_saving">Saving…</string>
+    <string name="venue_initialization_back">Back</string>
+    <string name="venue_initialization_empty_name">Enter your business name.</string>
+    <string name="venue_initialization_sign_in_required">Sign in to set up your venue.</string>
+    <string name="venue_initialization_save_failed">Could not save your venue. Please try again.</string>
+</resources>

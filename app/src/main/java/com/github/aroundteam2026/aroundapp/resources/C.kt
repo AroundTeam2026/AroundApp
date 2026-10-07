@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.resources
 
 // Like R, but C
@@ -14,5 +15,11 @@ object C {
     const val QUESTS_SCREEN = "quests_screen"
     const val MAP_SCREEN = "map_screen"
     const val PROFILE_SCREEN = "profile_screen"
+
+    const val VENUE_INITIALIZATION_SCREEN = "venue_initialization_screen"
+    const val VENUE_INITIALIZATION_NAME = "venue_initialization_name"
+    const val VENUE_INITIALIZATION_CONTINUE = "venue_initialization_continue"
+    const val VENUE_INITIALIZATION_BACK = "venue_initialization_back"
+    const val VENUE_INITIALIZATION_ERROR = "venue_initialization_error"
   }
 }
