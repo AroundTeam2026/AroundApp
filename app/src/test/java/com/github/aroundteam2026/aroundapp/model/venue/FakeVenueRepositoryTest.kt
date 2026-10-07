@@ -151,17 +151,18 @@ class FakeVenueRepositoryTest {
   }
 
   @Test
-  fun setArea_onExistingVenue_succeedsAndStoresTheNewArea() = runTest {
+  fun setArea_onExistingVenue_succeedsAndReplacesOnlyLocationAndRadius() = runTest {
     val repository = FakeVenueRepository()
-    repository.createVenue(venue(location = null))
-    val newLocation = Location(47.37, 8.54)
+    val original = venue(location = null)
+    repository.createVenue(original)
 
-    val result = repository.setArea("venue-1", newLocation, 120)
+    val result = repository.setArea(original.id, Location(47.37, 8.54), 120)
 
     Assert.assertEquals(Result.success(Unit), result)
-    val stored = repository.getVenue("venue-1")
-    Assert.assertEquals(newLocation, stored?.location)
-    Assert.assertEquals(120, stored?.radiusMeters)
+    Assert.assertEquals(
+        original.copy(location = Location(47.37, 8.54), radiusMeters = 120),
+        repository.getVenue(original.id),
+    )
   }
 
   @Test
@@ -175,18 +176,33 @@ class FakeVenueRepositoryTest {
   }
 
   @Test
-  fun setArea_keepsIdNameAddressAndCreatedAt() = runTest {
+  fun setArea_calledTwice_keepsTheLastValues() = runTest {
     val repository = FakeVenueRepository()
     val original = venue(location = null)
     repository.createVenue(original)
 
-    repository.setArea(original.id, Location(47.37, 8.54), 120)
+    val first = repository.setArea(original.id, Location(47.37, 8.54), 120)
+    val second = repository.setArea(original.id, Location(46.20, 6.14), 80)
 
-    val stored = repository.getVenue(original.id)
-    Assert.assertEquals(original.id, stored?.id)
-    Assert.assertEquals(original.name, stored?.name)
-    Assert.assertEquals(original.address, stored?.address)
-    Assert.assertEquals(original.createdAt, stored?.createdAt)
+    Assert.assertEquals(Result.success(Unit), first)
+    Assert.assertEquals(Result.success(Unit), second)
+    Assert.assertEquals(
+        original.copy(location = Location(46.20, 6.14), radiusMeters = 80),
+        repository.getVenue(original.id),
+    )
+  }
+
+  @Test
+  fun setArea_doesNotChangeAnotherVenue() = runTest {
+    val repository = FakeVenueRepository()
+    val venueB = venue(id = "venue-b")
+    repository.createVenue(venue(id = "venue-a"))
+    repository.createVenue(venueB)
+
+    val result = repository.setArea("venue-a", Location(47.37, 8.54), 120)
+
+    Assert.assertEquals(Result.success(Unit), result)
+    Assert.assertEquals(venueB, repository.getVenue("venue-b"))
   }
 
   @Test
@@ -207,49 +223,107 @@ class FakeVenueRepositoryTest {
   }
 
   @Test
-  fun setArea_calledTwice_keepsTheLastValues() = runTest {
+  fun observeVenue_doesNotEmitWhenSetAreaKeepsTheSameArea() = runTest {
     val repository = FakeVenueRepository()
-    repository.createVenue(venue(location = null))
+    val location = Location(46.52, 6.57)
+    val original = venue(location = location)
+    repository.createVenue(original)
+    val emissions = mutableListOf<Venue?>()
+    val job = launch { repository.observeVenue(original.id).collect { emissions.add(it) } }
+    runCurrent()
 
-    repository.setArea("venue-1", Location(47.37, 8.54), 120)
-    repository.setArea("venue-1", Location(46.20, 6.14), 80)
+    val result = repository.setArea(original.id, location, original.radiusMeters)
+    runCurrent()
 
-    val stored = repository.getVenue("venue-1")
-    Assert.assertEquals(Location(46.20, 6.14), stored?.location)
-    Assert.assertEquals(80, stored?.radiusMeters)
-  }
-
-  @Test
-  fun setArea_doesNotChangeAnotherVenue() = runTest {
-    val repository = FakeVenueRepository()
-    val venueA = venue(id = "venue-a")
-    val venueB = venue(id = "venue-b")
-    repository.createVenue(venueA)
-    repository.createVenue(venueB)
-
-    repository.setArea("venue-a", Location(47.37, 8.54), 120)
-
-    Assert.assertEquals(venueB, repository.getVenue("venue-b"))
+    Assert.assertEquals(Result.success(Unit), result)
+    Assert.assertEquals(listOf(original), emissions)
+    job.cancel()
   }
 
   @Test(timeout = 30_000)
-  fun concurrentSetArea_storesOneCallsLocationAndRadiusTogether() = runBlocking {
+  fun concurrentSetArea_onOneVenue_storesOneCallsLocationAndRadiusTogether() = runBlocking {
     repeat(1_000) {
       val repository = FakeVenueRepository()
-      repository.createVenue(venue(location = null))
+      val original = venue(location = null)
+      repository.createVenue(original)
       // Each call pairs a distinct location with a distinct radius, so a mix shows up.
       val areas = (0 until 4).map { i -> Location(46.0 + i, 6.0 + i) to 20 + i * 10 }
       val barrier = CyclicBarrier(areas.size)
       val calls = areas.map { (location, radiusMeters) ->
         async(Dispatchers.IO) {
           barrier.await(5, TimeUnit.SECONDS)
-          repository.setArea("venue-1", location, radiusMeters)
+          repository.setArea(original.id, location, radiusMeters)
         }
       }
       val results = calls.map { it.await() }
       Assert.assertTrue(results.all { it.isSuccess })
-      val stored = repository.getVenue("venue-1")
-      Assert.assertTrue(areas.contains(stored?.location to stored?.radiusMeters))
+      val candidates = areas.map { (location, radiusMeters) ->
+        original.copy(location = location, radiusMeters = radiusMeters)
+      }
+      Assert.assertTrue(repository.getVenue(original.id) in candidates)
+    }
+  }
+
+  @Test(timeout = 30_000)
+  fun concurrentSetArea_onDifferentVenues_keepsBothUpdates() = runBlocking {
+    repeat(1_000) {
+      val repository = FakeVenueRepository()
+      val venueA = venue(id = "venue-a", location = null)
+      val venueB = venue(id = "venue-b", location = null)
+      repository.createVenue(venueA)
+      repository.createVenue(venueB)
+      val barrier = CyclicBarrier(2)
+      val updateA =
+          async(Dispatchers.IO) {
+            barrier.await(5, TimeUnit.SECONDS)
+            repository.setArea(venueA.id, Location(47.37, 8.54), 120)
+          }
+      val updateB =
+          async(Dispatchers.IO) {
+            barrier.await(5, TimeUnit.SECONDS)
+            repository.setArea(venueB.id, Location(46.20, 6.14), 80)
+          }
+      Assert.assertTrue(updateA.await().isSuccess)
+      Assert.assertTrue(updateB.await().isSuccess)
+      // A read-then-write update would let one call overwrite the other's change.
+      Assert.assertEquals(
+          venueA.copy(location = Location(47.37, 8.54), radiusMeters = 120),
+          repository.getVenue(venueA.id),
+      )
+      Assert.assertEquals(
+          venueB.copy(location = Location(46.20, 6.14), radiusMeters = 80),
+          repository.getVenue(venueB.id),
+      )
+    }
+  }
+
+  @Test(timeout = 30_000)
+  fun setAreaRacingCreateVenue_resultMatchesStoredVenue() = runBlocking {
+    repeat(1_000) {
+      val repository = FakeVenueRepository()
+      val original = venue(location = null)
+      val barrier = CyclicBarrier(2)
+      val creation =
+          async(Dispatchers.IO) {
+            barrier.await(5, TimeUnit.SECONDS)
+            repository.createVenue(original)
+          }
+      val update =
+          async(Dispatchers.IO) {
+            barrier.await(5, TimeUnit.SECONDS)
+            repository.setArea(original.id, Location(47.37, 8.54), 120)
+          }
+      Assert.assertTrue(creation.await().isSuccess)
+      val result = update.await()
+      if (result.isSuccess) {
+        Assert.assertEquals(
+            original.copy(location = Location(47.37, 8.54), radiusMeters = 120),
+            repository.getVenue(original.id),
+        )
+      } else {
+        Assert.assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        Assert.assertEquals(original, repository.getVenue(original.id))
+      }
     }
   }
 }
