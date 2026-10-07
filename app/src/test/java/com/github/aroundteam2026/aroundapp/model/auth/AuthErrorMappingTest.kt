@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.auth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
