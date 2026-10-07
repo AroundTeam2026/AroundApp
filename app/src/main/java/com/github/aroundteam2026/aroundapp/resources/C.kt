@@ -21,5 +21,7 @@ object C {
     const val VENUE_INITIALIZATION_CONTINUE = "venue_initialization_continue"
     const val VENUE_INITIALIZATION_BACK = "venue_initialization_back"
     const val VENUE_INITIALIZATION_ERROR = "venue_initialization_error"
+
+    const val MAP = "map"
   }
 }

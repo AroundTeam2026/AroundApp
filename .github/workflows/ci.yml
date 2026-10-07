@@ -1,3 +1,4 @@
+# Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 name: CI - Test Runner
 
 # Run the workflow when commits are pushed on main or when a PR is modified
@@ -55,6 +56,33 @@ jobs:
             exit 1
           fi
 
+      # Without a keystore of its own, every CI run would sign debug builds with a new random one.
+      # The Maps API key only accepts registered certificates, so the CI restores the team's CI
+      # keystore from the DEBUG_KEYSTORE secret, whose SHA-1 is registered, and points Gradle at it
+      # with DEBUG_KEYSTORE_FILE for every later step. The keystore must stay out of the repository.
+      - name: Decode debug keystore
+        env:
+          DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+          # The CI keystore's SHA-1, registered on the Maps API key; see the README
+          REGISTERED_SHA1: BA:28:CF:28:FF:37:5A:A9:85:5D:7A:43:84:38:26:0A:1D:14:99:4D
+        run: |
+          keystore="$RUNNER_TEMP/ci-debug.keystore"
+          if [ -n "$DEBUG_KEYSTORE" ]; then
+            echo "$DEBUG_KEYSTORE" | base64 --decode > "$keystore"
+          else
+            echo "::error::DEBUG_KEYSTORE secret is not set. See \"Google Maps API key\" in the README."
+            exit 1
+          fi
+          # Any other keystore builds fine but gets an empty map, so check it here, where it's clear
+          sha1=$(keytool -list -v -keystore "$keystore" -storepass android \
+            -alias androiddebugkey | sed -n 's/^[[:space:]]*SHA1: //p')
+          echo "Restored debug keystore SHA-1: $sha1"
+          if [ "$sha1" != "$REGISTERED_SHA1" ]; then
+            echo "::error::DEBUG_KEYSTORE holds a keystore with SHA-1 $sha1, not the registered $REGISTERED_SHA1. See \"Google Maps API key\" in the README."
+            exit 1
+          fi
+          echo "DEBUG_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+
       # Caching is a very useful part of a CI, as a workflow is executed in a clean environment every time,
       # this means that one would need to re-download and re-process gradle files for every run. Which is very time consuming.
       #
@@ -102,6 +130,11 @@ jobs:
 
       # This step runs gradle commands to build the application
       - name: Assemble
+        # Only the steps that build the app (Assemble, Run tests, Run instrumented tests) get the
+        # Maps API key, which app/build.gradle.kts writes into the manifest; the other steps, like
+        # npm installs, never see it.
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           # To run the CI with debug information, add --info
           ./gradlew assembleDebug --parallel --build-cache
@@ -125,12 +158,16 @@ jobs:
 
       # Run unit tests + lint
       - name: Run tests
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           # To run the CI with debug information, add --info
           ./gradlew check --parallel --build-cache
 
       # Run connected (instrumented) tests on the emulator
       - name: Run instrumented tests
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -140,6 +177,23 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./gradlew connectedCheck --parallel --build-cache
+
+      # When the instrumented tests fail, show what the Maps SDK saw. Google rejects a build whose key
+      # or signing certificate isn't registered, and the map then never moves: the device log names
+      # the certificate Google got, and apksigner shows the one the CI signed with.
+      - name: Show Maps signing details
+        if: failure()
+        run: |
+          echo "Debug APK signed with:"
+          "$(ls -d "$ANDROID_HOME"/build-tools/* | tail -1)/apksigner" verify --print-certs \
+            app/build/outputs/apk/debug/app-debug.apk | grep -i 'SHA-1' || true
+          echo "Maps authorization errors in the device logs:"
+          logs=app/build/outputs/androidTest-results/connected/debug/*/logcat-*.txt
+          if grep -qh "Authorization failure" $logs 2>/dev/null; then
+            grep -h -A6 "Authorization failure" $logs | head -40
+          else
+            echo "none"
+          fi
 
       # This step generates the coverage report which will be uploaded to sonar
       - name: Generate Coverage Report
