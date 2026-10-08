@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The Explore tab's icon, from the Figma "Bottom bar/Explorer" component -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="22"
+    android:viewportHeight="22">
+    <path
+        android:pathData="M13.75,5.5L8.25,3.66667L2.75,5.5V18.3333L8.25,16.5M8.25,3.66667V16.5M8.25,16.5L13.75,18.3333L19.25,16.5V3.66667L13.75,5.5M13.75,5.5V18.3333"
+        android:strokeWidth="1.65"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

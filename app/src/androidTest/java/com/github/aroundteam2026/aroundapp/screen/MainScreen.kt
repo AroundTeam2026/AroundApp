@@ -14,12 +14,14 @@ class MainScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
 
   val navBar: KNode = child { hasTestTag(C.Tag.NAV_BAR) }
 
+  val exploreTab: KNode = child { hasTestTag(C.Tag.EXPLORE_TAB) }
   val questsTab: KNode = child { hasTestTag(C.Tag.QUESTS_TAB) }
-  val mapTab: KNode = child { hasTestTag(C.Tag.MAP_TAB) }
+  val friendsTab: KNode = child { hasTestTag(C.Tag.FRIENDS_TAB) }
   val profileTab: KNode = child { hasTestTag(C.Tag.PROFILE_TAB) }
 
-  val questsScreen: KNode = child { hasTestTag(C.Tag.QUESTS_SCREEN) }
   val mapScreen: KNode = child { hasTestTag(C.Tag.MAP_SCREEN) }
+  val questsScreen: KNode = child { hasTestTag(C.Tag.QUESTS_SCREEN) }
+  val friendsScreen: KNode = child { hasTestTag(C.Tag.FRIENDS_SCREEN) }
   val profileScreen: KNode = child { hasTestTag(C.Tag.PROFILE_SCREEN) }
 
   val map: KNode = child { hasTestTag(C.Tag.MAP) }

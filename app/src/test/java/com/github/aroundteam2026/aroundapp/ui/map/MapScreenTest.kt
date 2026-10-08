@@ -98,15 +98,17 @@ class MapScreenTest {
     assertEquals(DEFAULT_MAP_CENTER.boundsWithin(NEARBY_RADIUS_METERS), state.areaToFrame)
   }
 
-  /** Shows the app with this test's map on the Map tab, then opens it. */
+  /** Shows the app, which opens on the Explore tab, with this test's map. */
   private fun showInApp(answer: Map<String, Boolean>): PermissionDialog {
     val dialog = PermissionDialog(answer)
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        AroundApp(screen = { tab -> if (tab == Tab.MAP) MapScreen(viewModel) else Text(tab.route) })
+        AroundApp(
+            screen = { tab -> if (tab == Tab.EXPLORE) MapScreen(viewModel) else Text(tab.route) }
+        )
       }
     }
-    openTab(Tab.MAP)
+    composeTestRule.waitForIdle()
     return dialog
   }
 
@@ -120,7 +122,7 @@ class MapScreenTest {
     val dialog = showInApp(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
 
     openTab(Tab.PROFILE)
-    openTab(Tab.MAP)
+    openTab(Tab.EXPLORE)
 
     assertEquals(1, dialog.requests.size)
     assertFalse(state.showsUserLocation)
@@ -134,7 +136,7 @@ class MapScreenTest {
 
     shadowOf(ApplicationProvider.getApplicationContext<Application>())
         .grantPermissions(ACCESS_COARSE_LOCATION)
-    openTab(Tab.MAP)
+    openTab(Tab.EXPLORE)
 
     assertEquals(1, repository.calls)
     assertTrue(state.showsUserLocation)
@@ -150,7 +152,7 @@ class MapScreenTest {
   @Test
   fun aPermissionGrantedInTheSettingsIsUsedWhenTheAppResumes() {
     // Coming back from the settings resumes the app without leaving the map. Shown in the app,
-    // where the Map tab's navigation entry, not the activity, is what resumes the map.
+    // where the Explore tab's navigation entry, not the activity, is what resumes the map.
     val dialog = showInApp(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
     assertFalse(state.showsUserLocation)
 
@@ -176,17 +178,26 @@ class MapScreenTest {
   }
 
   @Test
-  fun backEndsTheVisitSoTheNextVisitAsksAgain() {
-    // Back pops the map with its state, unlike switching tabs
+  fun theAppAsksOnLaunchAsItOpensOnTheMap() {
+    val dialog = showInApp(mapOf(ACCESS_FINE_LOCATION to true))
+
+    assertEquals(1, dialog.requests.size)
+    assertTrue(state.showsUserLocation)
+  }
+
+  @Test
+  fun backToTheMapFromAnotherTabDoesNotAskAgain() {
+    // The map is the start tab, so Back returns to it with its state rather than a new visit
     val dialog = showInApp(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+    openTab(Tab.PROFILE)
 
     composeTestRule.runOnUiThread {
       composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
     }
     composeTestRule.waitForIdle()
-    openTab(Tab.MAP)
 
-    assertEquals(2, dialog.requests.size)
+    assertEquals(1, dialog.requests.size)
+    assertFalse(state.showsUserLocation)
   }
 
   @Test

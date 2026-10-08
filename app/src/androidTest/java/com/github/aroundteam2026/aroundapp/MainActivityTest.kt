@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest : TestCase() {
 
-  // Otherwise the Map tab's permission dialog covers the app
+  // Otherwise the map's permission dialog covers the app, which opens on it
   @get:Rule
   val permissions: GrantPermissionRule =
       GrantPermissionRule.grant(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
@@ -26,19 +26,26 @@ class MainActivityTest : TestCase() {
   @get:Rule val composeTestRule = createAndroidComposeRule<MainActivity>()
 
   @Test
-  fun opensOnQuestsAndSwitchesTabs() = run {
-    step("Start on the Quests tab") {
+  fun opensOnExploreAndSwitchesTabs() = run {
+    step("Start on the Explore tab, which shows the map") {
       ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) {
         navBar { assertIsDisplayed() }
+        exploreTab { assertIsSelected() }
+        mapScreen { assertIsDisplayed() }
+      }
+    }
+    step("Open the Quests tab") {
+      ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) {
+        questsTab { performClick() }
         questsTab { assertIsSelected() }
         questsScreen { assertIsDisplayed() }
       }
     }
-    step("Open the Map tab") {
+    step("Open the Friends tab") {
       ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) {
-        mapTab { performClick() }
-        mapTab { assertIsSelected() }
-        mapScreen { assertIsDisplayed() }
+        friendsTab { performClick() }
+        friendsTab { assertIsSelected() }
+        friendsScreen { assertIsDisplayed() }
       }
     }
     step("Open the Profile tab") {
@@ -48,15 +55,19 @@ class MainActivityTest : TestCase() {
         profileScreen { assertIsDisplayed() }
       }
     }
+    step("Go back to Explore") {
+      ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) {
+        exploreTab { performClick() }
+        exploreTab { assertIsSelected() }
+        mapScreen { assertIsDisplayed() }
+      }
+    }
   }
 
   @Test
-  fun theMapTabRunsAGoogleMap() = run {
-    step("Open the Map tab") {
-      ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) {
-        mapTab { performClick() }
-        map { assertIsDisplayed() }
-      }
+  fun theExploreTabRunsAGoogleMap() = run {
+    step("The app opens on the map") {
+      ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) { map { assertIsDisplayed() } }
     }
     step("The Maps SDK hands the map over, so it is set up in this build") {
       // Fails if the Maps SDK never provides the map

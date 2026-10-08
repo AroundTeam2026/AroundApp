@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The Friends tab's icon, from the Figma "Bottom bar/Explorer" component -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="22"
+    android:viewportHeight="22">
+    <path
+        android:pathData="M11,7.33333C11,8.85212 9.76878,10.0833 8.25,10.0833C6.73122,10.0833 5.5,8.85212 5.5,7.33333C5.5,5.81455 6.73122,4.58333 8.25,4.58333C9.76878,4.58333 11,5.81455 11,7.33333Z"
+        android:strokeWidth="1.65"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M17.4167,8.25C17.4167,9.51565 16.3907,10.5417 15.125,10.5417C13.8593,10.5417 12.8333,9.51565 12.8333,8.25C12.8333,6.98435 13.8593,5.95833 15.125,5.95833C16.3907,5.95833 17.4167,6.98435 17.4167,8.25Z"
+        android:strokeWidth="1.65"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M2.75,18.3333C3.66667,14.6667 5.5,12.8333 8.25,12.8333C11,12.8333 12.8333,14.6667 13.75,18.3333M13.75,12.8333C16.5,12.8333 18.3333,14.6667 19.25,17.4167"
+        android:strokeWidth="1.65"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

@@ -2,8 +2,9 @@
 <resources>
     <string name="app_name">Around</string>
     <string name="title_activity_main">MainActivity</string>
+    <string name="tab_explore">Explore</string>
     <string name="tab_quests">Quests</string>
-    <string name="tab_map">Map</string>
+    <string name="tab_friends">Friends</string>
     <string name="tab_profile">Profile</string>
     <string name="venue_area_title">Set your venue\'s location</string>
     <string name="venue_area_hint">Tap the map or drag the pin to your entrance.</string>

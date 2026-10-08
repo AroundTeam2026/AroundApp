@@ -87,14 +87,15 @@ class MapScreenDeviceTest {
   @Test
   fun switchingTabsKeepsTheCameraWhereTheExplorerLeftIt() {
     val viewModel = MapViewModel(StaticLocation(here), FakeQuestRepository(), FakeVenueRepository())
-    // The camera MapScreen makes by default, made where the app makes it: inside the Map tab, which
+    // The camera MapScreen makes by default, made where the app makes it: inside the Explore tab,
+    // which
     // saves it. This covers rememberMapCamera(), not that MapScreen's default argument still calls
     // it.
     var camera: CameraPositionState? = null
     composeTestRule.setContent {
       AroundApp(
           screen = { tab ->
-            if (tab == Tab.MAP) {
+            if (tab == Tab.EXPLORE) {
               val mapCamera = rememberMapCamera()
               SideEffect { camera = mapCamera }
               MapScreen(viewModel, mapCamera)
@@ -104,7 +105,7 @@ class MapScreenDeviceTest {
           }
       )
     }
-    openTab(Tab.MAP)
+    openTab(Tab.EXPLORE)
     awaitCameraAt(here) { camera }
 
     val elsewhere = Location(47.45, 8.70)
@@ -115,7 +116,7 @@ class MapScreenDeviceTest {
     // would hand the next map the old position
     awaitCameraAt(elsewhere) { camera }
     openTab(Tab.PROFILE)
-    openTab(Tab.MAP)
+    openTab(Tab.EXPLORE)
 
     // A new map: framing the explorer again, or a camera that wasn't saved, would move it away
     val map = composeTestRule.awaitGoogleMap()

@@ -12,7 +12,10 @@ import com.github.aroundteam2026.aroundapp.R
 
 // The design's tokens, for the screens that already follow it, until the app's theme does.
 
-/** The design's colours. */
+/**
+ * The earlier design's colours, which the quest markers still use until they follow the Sprint 1
+ * design. New code reads [AroundTheme.colors] instead.
+ */
 object AroundColors {
   /** The brand purple: primary actions, rewards. */
   val Purple = Color(0xFF4D0092)

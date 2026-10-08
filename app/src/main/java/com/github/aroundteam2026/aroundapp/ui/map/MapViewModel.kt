@@ -106,8 +106,8 @@ class MapViewModel(
 
   /**
    * Called with the answer to the location permission request, or with `true` when it was already
-   * granted. The explorer is located once per visit to the map: switching back to the Map tab keeps
-   * the camera where they left it, unless no position was found yet.
+   * granted. The explorer is located once per visit to the map: switching back to the Explore tab
+   * keeps the camera where they left it, unless no position was found yet.
    */
   fun onLocationPermissionResult(granted: Boolean) {
     _uiState.update { it.copy(showsUserLocation = granted) }

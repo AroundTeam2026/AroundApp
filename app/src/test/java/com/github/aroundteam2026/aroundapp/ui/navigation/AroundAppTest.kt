@@ -15,11 +15,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,9 +63,9 @@ class AroundAppTest {
   }
 
   @Test
-  fun startsOnQuests() {
+  fun startsOnExplore() {
     launch()
-    assertShowing(Tab.QUESTS)
+    assertShowing(Tab.EXPLORE)
   }
 
   @Test
@@ -75,44 +78,75 @@ class AroundAppTest {
   }
 
   @Test
-  fun theMapTabShowsTheMap() {
+  fun theExploreTabShowsTheMap() {
     launch()
-    select(Tab.MAP)
 
     composeTestRule.onNodeWithTag(C.Tag.MAP).assertIsDisplayed()
   }
 
   @Test
-  fun backFromAnyTabReturnsToQuests() {
+  fun backFromAnyTabReturnsToExplore() {
     launch()
-    select(Tab.MAP)
+    select(Tab.QUESTS)
+    select(Tab.FRIENDS)
     select(Tab.PROFILE)
     pressBack()
-    assertShowing(Tab.QUESTS)
+    assertShowing(Tab.EXPLORE)
+  }
+
+  @Test
+  fun backFromExploreLeavesTheApp() {
+    launch { AroundApp(screen = { CounterScreen(it) }) }
+    pressBack()
+    composeTestRule.waitForIdle()
+
+    assertTrue(composeTestRule.activity.isFinishing)
   }
 
   @Test
   fun reselectingATabDoesNotStackIt() {
     launch()
-    select(Tab.MAP)
-    select(Tab.MAP)
+    select(Tab.FRIENDS)
+    select(Tab.FRIENDS)
     pressBack()
-    assertShowing(Tab.QUESTS)
+    assertShowing(Tab.EXPLORE)
   }
 
-  // Map, not Quests: Quests stays at the bottom of the back stack, so its state would survive even
-  // if switching tabs did not save it.
+  @Test
+  fun reselectingExploreKeepsShowingIt() {
+    launch()
+    select(Tab.EXPLORE)
+    assertShowing(Tab.EXPLORE)
+  }
+
+  // Quests, not Explore: Explore stays at the bottom of the back stack, so its state would survive
+  // even if switching tabs did not save it.
   @Test
   fun eachTabKeepsItsOwnState() {
     launch { AroundApp(screen = { CounterScreen(it) }) }
-    select(Tab.MAP)
-    repeat(2) { composeTestRule.onNodeWithTag(Tab.MAP.screenTag).performClick() }
+    select(Tab.QUESTS)
+    repeat(2) { composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).performClick() }
 
-    select(Tab.PROFILE)
-    composeTestRule.onNodeWithTag(Tab.PROFILE.screenTag).assertTextEquals("0")
+    select(Tab.FRIENDS)
+    composeTestRule.onNodeWithTag(Tab.FRIENDS.screenTag).assertTextEquals("0")
 
-    select(Tab.MAP)
-    composeTestRule.onNodeWithTag(Tab.MAP.screenTag).assertTextEquals("2")
+    select(Tab.QUESTS)
+    composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertTextEquals("2")
+  }
+
+  @Test
+  fun theBarIsTheFigmaBar() {
+    launch { AroundApp(screen = { CounterScreen(it) }) }
+
+    // Only the design's bar has the pills; Material's would not
+    Tab.entries.forEach {
+      composeTestRule
+          .onNode(
+              hasTestTag(C.Tag.NAV_TAB_PILL) and hasAnyAncestor(hasTestTag(it.tabTag)),
+              useUnmergedTree = true,
+          )
+          .assertIsDisplayed()
+    }
   }
 }
 

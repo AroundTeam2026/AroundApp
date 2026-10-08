@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.theme
 
 import android.os.Build
@@ -8,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme =
@@ -30,6 +32,10 @@ private val LightColorScheme =
         */
     )
 
+/**
+ * The app's theme: Material's, plus the design's colour tokens in [AroundTheme.colors]. Only
+ * Material's colours follow [dynamicColor]; the design's stay the brand's, light or dark.
+ */
 @Composable
 fun AroundAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -47,5 +53,8 @@ fun AroundAppTheme(
         else -> LightColorScheme
       }
 
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  val aroundColors = if (darkTheme) DarkAroundColors else LightAroundColors
+  CompositionLocalProvider(LocalAroundColors provides aroundColors) {
+    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  }
 }

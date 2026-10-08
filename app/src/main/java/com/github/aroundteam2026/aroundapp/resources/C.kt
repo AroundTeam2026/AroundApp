@@ -8,13 +8,18 @@ object C {
   object Tag {
     const val APP = "app"
     const val NAV_BAR = "nav_bar"
+    const val NAV_TAB_PILL = "nav_tab_pill"
+    const val NAV_TAB_ICON = "nav_tab_icon"
+    const val NAV_TAB_LABEL = "nav_tab_label"
 
+    const val EXPLORE_TAB = "explore_tab"
     const val QUESTS_TAB = "quests_tab"
-    const val MAP_TAB = "map_tab"
+    const val FRIENDS_TAB = "friends_tab"
     const val PROFILE_TAB = "profile_tab"
 
-    const val QUESTS_SCREEN = "quests_screen"
     const val MAP_SCREEN = "map_screen"
+    const val QUESTS_SCREEN = "quests_screen"
+    const val FRIENDS_SCREEN = "friends_screen"
     const val PROFILE_SCREEN = "profile_screen"
 
     const val AUTH_SCREEN = "auth_screen"

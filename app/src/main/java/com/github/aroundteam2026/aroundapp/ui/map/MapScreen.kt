@@ -99,8 +99,8 @@ fun MapScreen(
  * Reports whether a location permission is granted, asking the user first when none is. It checks
  * each time the map resumes, so a permission granted in Android's settings counts as soon as the
  * explorer comes back. It asks once per visit to the map: after a refusal, resuming, switching tabs
- * or rotating doesn't show the dialog again. Back pops the map with its state, so the next visit
- * asks again.
+ * or rotating doesn't show the dialog again. The map is the start tab, so Back from it leaves the
+ * app, and the next launch asks again.
  */
 @Composable
 private fun RequestLocationPermission(onResult: (granted: Boolean) -> Unit) {
