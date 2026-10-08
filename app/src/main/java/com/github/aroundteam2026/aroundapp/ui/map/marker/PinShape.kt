@@ -17,10 +17,12 @@ import kotlin.math.sqrt
  * centre. The circle takes the top of the shape, so the shape must be at least as tall as it is
  * wide; the triangle fills the rest.
  *
+ * Pin shapes with the same pointer are equal, so a style holding one stays equal to the next.
+ *
  * @param pointerWidth Width of the triangle where it meets the circle; wider is narrowed to the
- *   circle's width.
+ *   circle's width, and none leaves the circle alone.
  */
-class PinShape(private val pointerWidth: Dp) : Shape {
+data class PinShape(private val pointerWidth: Dp) : Shape {
   override fun createOutline(
       size: Size,
       layoutDirection: LayoutDirection,
@@ -28,6 +30,9 @@ class PinShape(private val pointerWidth: Dp) : Shape {
   ): Outline {
     val radius = size.width / 2
     val halfBase = minOf(with(density) { pointerWidth.toPx() } / 2, radius)
+    // Without a pointer the arc below would be a full turn, which draws nothing
+    if (halfBase <= 0f)
+        return Outline.Generic(Path().apply { addOval(Rect(0f, 0f, size.width, size.width)) })
     // The triangle's sides start where a chord halfBase from the centre line meets the circle
     val baseBelowCentre = sqrt(radius * radius - halfBase * halfBase)
     // Angles run clockwise from the right, as y grows downwards

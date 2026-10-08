@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.map.marker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -19,7 +20,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,7 +61,7 @@ class QuestPinTest {
   }
 
   @Test
-  fun showsTheQuestFlagByDefault() {
+  fun theQuestFlagDrawsItsIcon() {
     composeTestRule.setContent { QuestPin(VenueAvatar.QuestFlag) }
 
     node(C.Tag.QUEST_FLAG_AVATAR).assertIsDisplayed()
@@ -90,10 +92,10 @@ class QuestPinTest {
     // Fractions of the pin's height: the ring's top, just inside it, the middle, near the tip
     fun at(dpFromTop: Float) = image.colorAt(0.5f, dpFromTop / height.value)
 
-    assertTrue("ring", at(dimensions.pinRingWidth.value / 2) == Color.Red)
-    assertTrue("inside the ring", at(dimensions.pinRingWidth.value + 2) == Color.Blue)
-    assertTrue("centre", at(dimensions.pinDiameter.value / 2) == Color.Blue)
-    assertTrue("pointer", at(height.value - 2) == Color.Red)
+    assertEquals("ring", Color.Red, at(dimensions.pinRingWidth.value / 2))
+    assertEquals("inside the ring", Color.Blue, at(dimensions.pinRingWidth.value + 2))
+    assertEquals("centre", Color.Blue, at(dimensions.pinDiameter.value / 2))
+    assertEquals("pointer", Color.Red, at(height.value - 2))
   }
 
   @Test
@@ -105,7 +107,7 @@ class QuestPinTest {
     }
     composeTestRule.waitForIdle()
 
-    assertTrue(tint == Color.Green)
+    assertEquals(Color.Green, tint)
   }
 
   @Test
@@ -118,15 +120,14 @@ class QuestPinTest {
     }
 
     val image = node("shape").captureToImage()
-    fun filled(x: Float, y: Float) = image.colorAt(x, y) == Color.Red
 
-    assertTrue("circle centre", filled(0.5f, 1 / 3f))
-    assertTrue("circle's left edge", filled(0.05f, 1 / 3f))
-    assertTrue("near the tip", filled(0.5f, 0.95f))
-    assertTrue("top-left corner", !filled(0.03f, 0.03f))
-    assertTrue("top-right corner", !filled(0.97f, 0.03f))
-    assertTrue("beside the tip, left", !filled(0.1f, 0.95f))
-    assertTrue("beside the tip, right", !filled(0.9f, 0.95f))
+    assertEquals("circle centre", Color.Red, image.colorAt(0.5f, 1 / 3f))
+    assertEquals("circle's left edge", Color.Red, image.colorAt(0.05f, 1 / 3f))
+    assertEquals("near the tip", Color.Red, image.colorAt(0.5f, 0.95f))
+    assertNotEquals("top-left corner", Color.Red, image.colorAt(0.03f, 0.03f))
+    assertNotEquals("top-right corner", Color.Red, image.colorAt(0.97f, 0.03f))
+    assertNotEquals("beside the tip, left", Color.Red, image.colorAt(0.1f, 0.95f))
+    assertNotEquals("beside the tip, right", Color.Red, image.colorAt(0.9f, 0.95f))
   }
 
   @Test
@@ -138,14 +139,28 @@ class QuestPinTest {
     }
 
     val image = node("shape").captureToImage()
-    assertTrue("circle centre", image.colorAt(0.5f, 1 / 3f) == Color.Red)
-    assertTrue("near the tip", image.colorAt(0.5f, 0.97f) == Color.Red)
+    assertEquals("circle centre", Color.Red, image.colorAt(0.5f, 1 / 3f))
+    assertEquals("near the tip", Color.Red, image.colorAt(0.5f, 0.97f))
+  }
+
+  @Test
+  fun aPinWithoutAPointerIsStillACircle() {
+    // A zero-width pointer would make the outline's arc a full turn, which draws nothing at all
+    val shape = PinShape(pointerWidth = 0.dp)
+    composeTestRule.setContent {
+      Box(Modifier.testTag("shape").size(40.dp, 60.dp).background(Color.Red, shape))
+    }
+
+    val image = node("shape").captureToImage()
+    assertEquals("circle centre", Color.Red, image.colorAt(0.5f, 1 / 3f))
+    assertEquals("circle's left edge", Color.Red, image.colorAt(0.05f, 1 / 3f))
+    assertNotEquals("top-left corner", Color.Red, image.colorAt(0.03f, 0.03f))
   }
 }
 
 /** An avatar that reports the tint it is drawn in. */
 private class RecordingAvatar(private val onTint: (Color) -> Unit) : VenueAvatar {
-  @androidx.compose.runtime.Composable
+  @Composable
   override fun Content(tint: Color, modifier: Modifier) {
     onTint(tint)
   }

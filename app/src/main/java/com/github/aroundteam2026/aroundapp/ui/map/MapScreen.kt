@@ -50,7 +50,7 @@ fun MapScreen(
   val darkTheme = isSystemInDarkTheme()
   val mapStyle =
       remember(context, darkTheme) { MapStyleOptions(mapStyle(context.resources, darkTheme)) }
-  val markerStyle = MarkerDefaults.style()
+  val markerStyle = remember { MarkerDefaults.style() }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
