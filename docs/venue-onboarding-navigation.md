@@ -32,7 +32,19 @@ fixture represents completion of authentication; it does not implement or
 test signup itself.
 
 The running app still needs the auth owner to register this graph and supply
-the actual location screen. At implementation time, `feature/auth-screens`
-contains no auth UI, and #54's screen exists only on
-`feature/venue-area-map-screen`. This change does not satisfy the two
-end-to-end acceptance criteria until those integrations are connected.
+the actual location screen. The auth UI in #67 (`feature/minimal-auth-screen`)
+observes authentication in a debug-only demo; it does not select a Venue role
+or route a successful Venue signup into this graph.
+
+The location UI in #69 (`feature/venue-marker-screen`, following #62) exposes
+`VenueAreaScreen(viewModel, cameraPositionState)`. Its ViewModel holds marker
+and radius state, but the screen does not yet accept a venue id or a Back
+callback, or save through `VenueRepository.setArea`. Navigation and saving
+are explicitly outside #54's scope. The follow-up post-role onboarding work
+can wrap the map in this graph's `locationScreen` callback and coordinate
+registration with #7's routing owner. Saving and loading the area remain a
+separate task.
+
+This change does not satisfy the two end-to-end acceptance criteria until
+the real Venue signup and location integrations are connected. The existing
+navigation tests cover the handoff contract using destination fixtures.
