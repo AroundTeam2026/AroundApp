@@ -19,6 +19,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.resources.C
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +36,8 @@ class AroundAppTest {
   }
 
   private fun pressBack() {
+    // Otherwise Back can arrive before the last tab switch finished, and leaves the app instead
+    composeTestRule.waitForIdle()
     composeTestRule.runOnUiThread {
       composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
     }
@@ -69,6 +72,14 @@ class AroundAppTest {
       select(it)
       assertShowing(it)
     }
+  }
+
+  @Test
+  fun theMapTabShowsTheMap() {
+    launch()
+    select(Tab.MAP)
+
+    composeTestRule.onNodeWithTag(C.Tag.MAP).assertIsDisplayed()
   }
 
   @Test

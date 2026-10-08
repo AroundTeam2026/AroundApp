@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-import org.gradle.api.artifacts.dsl.LockMode
+import java.util.Properties
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -14,6 +14,26 @@ plugins {
   id("jacoco")
 }
 
+// The Google Maps API key, from MAPS_API_KEY in local.properties, else from the MAPS_API_KEY
+// environment variable (set by the CI from a repository secret). Never commit the key itself.
+// The key only accepts builds signed by a registered certificate: if the map stays grey, send your
+// debug SHA-1 to get it registered (see "Google Maps API key" in the README).
+val mapsApiKeyName = "MAPS_API_KEY"
+// The Maps SDK crashes the app when the key is blank, so a missing key falls back to a placeholder
+// instead: the app still runs, and the map stays empty.
+val mapsApiKey: String =
+    rootProject
+        .file("local.properties")
+        .takeIf { it.exists() }
+        ?.let { file -> Properties().apply { file.inputStream().use(::load) } }
+        ?.getProperty(mapsApiKeyName)
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.environmentVariable(mapsApiKeyName).orNull?.takeIf { it.isNotBlank() }
+        ?: "MISSING_MAPS_API_KEY"
+            .also {
+              logger.warn("$mapsApiKeyName is not set, so the map will stay empty. See the README.")
+            }
+
 android {
   namespace = "com.github.aroundteam2026.aroundapp"
   compileSdk = 37
@@ -27,6 +47,15 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     vectorDrawables { useSupportLibrary = true }
+
+    manifestPlaceholders[mapsApiKeyName] = mapsApiKey
+  }
+
+  // The CI sets DEBUG_KEYSTORE_FILE to the team's CI keystore, whose SHA-1 is registered on
+  // the Maps API key (see the README). Without it, as on developers' machines, debug builds
+  // are signed with the machine's own debug keystore, as usual.
+  providers.environmentVariable("DEBUG_KEYSTORE_FILE").orNull?.let { keystore ->
+    signingConfigs.getByName("debug") { storeFile = file(keystore) }
   }
 
   buildTypes {
@@ -68,13 +97,11 @@ kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 // Pin every resolved dependency, transitive ones included, so every build resolves the same
 // versions. The lock state lives in this module's gradle.lockfile, where SonarCloud looks for it
-// (rule S8569). Strict mode fails the build when a configuration has no lock state, instead of
-// resolving it unlocked. After changing a version, refresh the lockfiles with
+// (rule S8569). Configurations without lock state, such as the copies Android Studio makes while
+// syncing, resolve unlocked, and so would a new build type or flavor: nothing fails to remind you.
+// So after changing a version, or adding a build type or flavor, refresh the lockfiles with
 // ./gradlew :app:dependencies --write-locks
-dependencyLocking {
-  lockAllConfigurations()
-  lockMode = LockMode.STRICT
-}
+dependencyLocking { lockAllConfigurations() }
 
 sonar {
   properties {
@@ -108,6 +135,12 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
   testImplementation(dep)
 }
 
+// Espresso's accessibility checks pull in protobuf-lite 3.0.1, which shadows Firestore's
+// protobuf-javalite in the test APK and makes Firestore crash with NoSuchMethodError.
+configurations
+    .matching { it.name.contains("AndroidTest") }
+    .configureEach { exclude(group = "com.google.protobuf", module = "protobuf-lite") }
+
 dependencies {
   val composeBom = platform(libs.compose.bom)
   val firebaseBom = platform(libs.firebase.bom)
@@ -118,6 +151,7 @@ dependencies {
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
   implementation(libs.androidx.lifecycle.runtime.ktx)
+  implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
   implementation(libs.compose.ui)
@@ -127,6 +161,7 @@ dependencies {
   implementation(libs.compose.viewmodel)
   implementation(libs.compose.preview)
   implementation(libs.navigation.compose)
+  implementation(libs.maps.compose)
   implementation(libs.play.services.location)
   implementation(libs.kotlinx.coroutines.play.services)
 

@@ -1,3 +1,4 @@
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 # Around
 
 ## Pitch
@@ -30,6 +31,29 @@ In offline mode, users can still view quests they have already picked up, access
 ### Firebase configuration
 
 The app connects to the `around-67942` Firebase project and needs a `google-services.json` file in `app/`. Download it from the [Firebase console](https://console.firebase.google.com/) for the `around-67942` project (Project settings → Your apps → Android app) and place it at `app/google-services.json`.
+
+### Google Maps API key
+
+The map needs a Google Maps API key. Add it to `local.properties` at the repository root, which git ignores:
+
+```properties
+MAPS_API_KEY=AIza...
+```
+
+Ask the team for the key. It lives in the [Google Cloud console](https://console.cloud.google.com/google/maps-apis/credentials) of the `around-67942` project, restricted to the Maps SDK for Android and to the package `com.github.aroundteam2026.aroundapp`, signed by one of the team's registered debug certificates.
+
+> [!IMPORTANT]
+> **Map stays grey? Your certificate isn't registered yet.** Every computer signs debug builds with its own certificate, and the key rejects certificates it doesn't know: logcat then shows `Authorization failure`. Run `./gradlew :app:signingReport`, copy the `SHA1` line of the `debug` variant, and send it to [@ferido1510](https://github.com/ferido1510) to be added to the key. The SHA-1 is a public fingerprint, not a secret, so any team channel is fine. Never share the API key itself in public channels.
+
+On CI, the key comes from the `MAPS_API_KEY` repository secret, and CI builds are signed with the team's CI keystore from the `DEBUG_KEYSTORE` secret (base64-encoded, like `GOOGLE_SERVICES`), whose SHA-1 is registered on the key. The keystore is never committed. It uses Android's standard debug alias and passwords, which Gradle expects; keeping the file secret is what protects it. It was generated with:
+
+```sh
+keytool -genkeypair -keystore around-ci-debug.keystore -storetype PKCS12 -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Around CI Debug,O=AroundTeam2026,C=CH"
+```
+
+Its SHA-1 is `BA:28:CF:28:FF:37:5A:A9:85:5D:7A:43:84:38:26:0A:1D:14:99:4D`, and [@ferido1510](https://github.com/ferido1510) keeps the original file. To replace it, generate a new keystore with the command above, register its SHA-1 on the key, update the `DEBUG_KEYSTORE` secret, update the SHA-1 here and in `REGISTERED_SHA1` in `.github/workflows/ci.yml` (CI checks the restored keystore against it and fails if they differ), then remove the old SHA-1 from the key.
+
+Without a key the app still builds and runs, but the map stays empty and `MapScreenDeviceTest` fails.
 
 ### Firebase emulators
 

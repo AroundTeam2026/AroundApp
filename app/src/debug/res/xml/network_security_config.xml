@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <!-- Debug builds only: lets the app reach the Firebase emulators, which serve plain HTTP.
      Release builds keep Android's default, which blocks all cleartext traffic. -->
 <network-security-config>
