@@ -14,6 +14,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.MemoryCacheSettings
+import com.google.firebase.firestore.Source
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -101,7 +102,10 @@ class QuestRepositoryFirestoreTest {
     val noRewardId = repository.createQuest(fullQuest().copy(reward = null)).getOrThrow()
 
     // Only the stored representation is checked here; the values are checked by the round trip.
-    val full = db.collection(QUESTS).document(fullId).get().await()
+    // Reads come from the cache, which holds the pending writes with the types sent to the server,
+    // so no server round trip is needed. createdAt and updatedAt are client Timestamps; a
+    // FieldValue.serverTimestamp() would read as null from the cache until the server acknowledges.
+    val full = db.collection(QUESTS).document(fullId).get(Source.CACHE).await()
     assertTrue(full.get("location") is GeoPoint)
     assertTrue(full.get("createdAt") is Timestamp)
     assertTrue(full.get("updatedAt") is Timestamp)
@@ -113,11 +117,12 @@ class QuestRepositoryFirestoreTest {
     assertEquals("PERCENT", reward["unit"])
     assertTrue(reward["expiresAt"] is Timestamp)
     assertFalse("id must not be stored", full.contains("id"))
-    val freeItem = db.collection(QUESTS).document(freeItemId).get().await().get("reward")
+    val freeItem =
+        db.collection(QUESTS).document(freeItemId).get(Source.CACHE).await().get("reward")
     assertEquals(mapOf("type" to "FREE_ITEM", "name" to "Coffee"), freeItem)
-    val other = db.collection(QUESTS).document(otherId).get().await().get("reward")
+    val other = db.collection(QUESTS).document(otherId).get(Source.CACHE).await().get("reward")
     assertEquals(mapOf("type" to "OTHER", "description" to "Sticker"), other)
-    val noReward = db.collection(QUESTS).document(noRewardId).get().await()
+    val noReward = db.collection(QUESTS).document(noRewardId).get(Source.CACHE).await()
     assertFalse("a null reward must be omitted", noReward.contains("reward"))
   }
 
