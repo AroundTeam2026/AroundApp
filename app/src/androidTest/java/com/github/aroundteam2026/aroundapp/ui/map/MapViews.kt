@@ -33,7 +33,7 @@ fun View.findMapView(): MapView? =
 
 /**
  * The [GoogleMap] of the activity's map, once the Maps SDK provides it; fails if it never does.
- * Each new [MapView], like the one shown after returning to the Map tab, has its own.
+ * Each new [MapView], like the one shown after returning to the Explore tab, has its own.
  */
 fun AndroidComposeTestRule<*, out ComponentActivity>.awaitGoogleMap(): GoogleMap {
   waitUntil(MAP_TIMEOUT_MILLIS) {

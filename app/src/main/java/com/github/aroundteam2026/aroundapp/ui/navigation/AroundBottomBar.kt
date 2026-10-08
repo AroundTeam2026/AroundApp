@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -58,8 +58,8 @@ private val LabelStyle =
  * label, the [selectedTab]'s pill filled with mint and drawn in the primary green, the others in
  * muted grey. Tapping a tab, even the selected one, calls [onTabClick] with it.
  *
- * The bar is 84dp tall, the design's 22dp of bottom padding included. A system bar taller than that
- * padding replaces it, so the tabs stay above it.
+ * The bar is 84dp tall, the design's 22dp of bottom padding included, and grows when large text
+ * needs it. A system bar taller than that padding replaces it, so the tabs stay above it.
  *
  * @param selectedTab The tab shown, or null when none is.
  * @param windowInsets The system bars to keep clear of; only their bottom and sides count.
@@ -86,8 +86,9 @@ fun AroundBottomBar(
           )
   ) {
     Row(
+        // At least the design's height; large text makes it taller rather than cutting the labels
         Modifier.fillMaxWidth()
-            .height(BAR_HEIGHT - BAR_BOTTOM_PADDING)
+            .heightIn(min = BAR_HEIGHT - BAR_BOTTOM_PADDING)
             .padding(start = BAR_SIDE_PADDING, end = BAR_SIDE_PADDING, top = BAR_TOP_PADDING),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

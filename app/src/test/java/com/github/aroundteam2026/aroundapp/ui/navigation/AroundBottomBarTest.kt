@@ -2,12 +2,14 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -24,8 +26,10 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
@@ -126,6 +130,26 @@ class AroundBottomBarTest {
     bar().assertHeightIsEqualTo(84.dp - 22.dp + 48.dp)
     val barBottom = bar().getBoundsInRoot().bottom
     Tab.entries.forEach { assertTrue(tab(it).getBoundsInRoot().bottom <= barBottom - 48.dp) }
+  }
+
+  @Test
+  fun growsWithLargeTextRatherThanCuttingTheLabels() {
+    composeTestRule.setContent {
+      val density = LocalDensity.current
+      CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+        AroundAppTheme(dynamicColor = false) {
+          AroundBottomBar(Tab.EXPLORE, {}, windowInsets = WindowInsets(0))
+        }
+      }
+    }
+
+    val bar = bar().getBoundsInRoot()
+    Tab.entries.forEach {
+      val label = label(it).getBoundsInRoot()
+      // 12sp at twice the size is at least 24dp tall when laid out whole
+      assertTrue("$it label is cut to ${label.height}", label.height >= 24.dp)
+      assertTrue("$it label runs into the bottom padding", label.bottom <= bar.bottom - 22.dp)
+    }
   }
 
   @Test

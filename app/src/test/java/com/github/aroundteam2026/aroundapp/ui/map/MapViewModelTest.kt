@@ -104,7 +104,7 @@ class MapViewModelTest {
     advanceUntilIdle()
     viewModel.onAreaFramed(zurich.boundsWithin(NEARBY_RADIUS_METERS))
 
-    // Coming back to the Map tab reports the permission again, from somewhere else
+    // Coming back to the Explore tab reports the permission again, from somewhere else
     repository.location = geneva
     viewModel.onLocationPermissionResult(granted = true)
     advanceUntilIdle()
