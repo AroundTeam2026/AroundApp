@@ -71,17 +71,16 @@ class MapViewModel(
   private var lookup: Job? = null
   private var located = false
 
-  /** Every venue with valid quests, on screen or not. */
-  private var allPins: List<VenuePin> = emptyList()
   /** The part of the world on screen, or null until the map reports it. */
-  private var visibleArea: GeoBounds? = null
+  private val visibleArea = MutableStateFlow<GeoBounds?>(null)
 
   init {
     viewModelScope.launch {
-      venuePins().collect {
-        allPins = it
-        showPins()
-      }
+      // Only the venues on screen get a pin
+      combine(venuePins(), visibleArea) { pins, area ->
+            if (area == null) emptyList() else pins.filter { it.location in area }
+          }
+          .collect { pins -> _uiState.update { it.copy(pins = pins) } }
     }
   }
 
@@ -110,16 +109,7 @@ class MapViewModel(
 
   /** Called with the part of the world on screen, each time the camera stops moving. */
   fun onVisibleAreaChanged(area: GeoBounds) {
-    visibleArea = area
-    showPins()
-  }
-
-  /** Shows the pins of the venues on screen. */
-  private fun showPins() {
-    val area = visibleArea
-    _uiState.update { state ->
-      state.copy(pins = if (area == null) emptyList() else allPins.filter { it.location in area })
-    }
+    visibleArea.value = area
   }
 
   /**
