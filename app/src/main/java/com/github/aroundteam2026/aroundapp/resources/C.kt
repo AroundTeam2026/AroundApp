@@ -37,6 +37,7 @@ object C {
     const val VENUE_AREA_MAP = "venue_area_map"
     const val VENUE_AREA_RADIUS = "venue_area_radius"
     const val VENUE_AREA_SLIDER = "venue_area_slider"
+    const val VENUE_AREA_USE_MY_LOCATION = "venue_area_use_my_location"
 
     const val QUEST_PIN = "quest_pin"
     const val QUEST_FLAG_AVATAR = "quest_flag_avatar"

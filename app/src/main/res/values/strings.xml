@@ -9,6 +9,7 @@
     <string name="venue_area_hint">Tap the map or drag the pin to your entrance.</string>
     <string name="venue_area_radius">Visit radius</string>
     <string name="venue_area_meters">%1$d m</string>
+    <string name="use_my_location">Use my location</string>
 
     <!-- What screen readers say for a venue's pin on the map: the venue, then its featured quest -->
     <string name="map_pin_description">%1$s: %2$s</string>
