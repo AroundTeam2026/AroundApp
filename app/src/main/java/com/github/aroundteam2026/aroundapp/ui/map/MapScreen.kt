@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -36,10 +35,9 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.rememberCameraPositionState
 
 /**
- * The Explorer's map, in the app's colours in light mode. In dark mode it shows Google's own dark
- * map, where the device's Maps renderer has one, until the design has a night version. It asks for
- * the location permission if needed, then frames [MapViewModel.NEARBY_RADIUS_METERS] around the
- * explorer.
+ * The Explorer's map, in the app's colours: a light style in light mode and a night one in dark
+ * mode, both hiding Google's place icons (see [mapStyle]). It asks for the location permission if
+ * needed, then frames [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
@@ -51,12 +49,10 @@ fun MapScreen(
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
   val context = LocalContext.current
-  // The light style would glare in dark mode, where the map takes Google's dark colours instead
+  // The light style would glare in dark mode, which has its own
   val darkTheme = isSystemInDarkTheme()
   val mapStyle =
-      remember(context, darkTheme) {
-        if (darkTheme) null else MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
-      }
+      remember(context, darkTheme) { MapStyleOptions(mapStyle(context.resources, darkTheme)) }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
@@ -71,8 +67,8 @@ fun MapScreen(
                 mapStyleOptions = mapStyle,
             ),
         uiSettings = MapUiSettings(myLocationButtonEnabled = state.showsUserLocation),
-        // Google's dark colours in dark mode, where there is no style; it uses the light ones
-        // unless told otherwise
+        // Whatever the style leaves uncoloured follows the theme too, where the device's Maps
+        // renderer has dark colours; it uses the light ones unless told otherwise
         mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
     ) {
       // The content only runs once the map exists, which camera updates need

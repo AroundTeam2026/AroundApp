@@ -10,17 +10,11 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
-import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
-import com.google.android.gms.maps.MapsInitializer
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 import org.json.JSONArray
 import org.junit.AfterClass
-import org.junit.Assume.assumeTrue
 import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
@@ -41,9 +35,9 @@ class MapColoursDeviceTest {
     val viewModel = MapViewModel(LocatedAt(LAUSANNE))
     composeTestRule.setContent { MapScreen(viewModel) }
 
-    composeTestRule.awaitMapColours("the style's land and water") { pixels ->
-      pixels.share { it.isOneOf(styleLand) } >= 0.15 &&
-          pixels.share { it.isOneOf(styleWater) } >= 0.25
+    composeTestRule.awaitMapColours(lightPalette, "the light style's land and water") { pixels ->
+      pixels.share { it.isOneOf(lightPalette.land) } >= 0.15 &&
+          pixels.share { it.isOneOf(lightPalette.water) } >= 0.25
     }
   }
 
@@ -62,15 +56,18 @@ class DarkMapColoursDeviceTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   @Test
-  fun inDarkModeTheMapIsGooglesDarkMap() {
-    // There is no night version of the style yet, so the map takes Google's own dark colours.
-    // Only the current Maps renderer has them; older Play services, as on CI's image, can't.
-    assumeTrue("This device's Maps renderer has no dark map", hasLatestMapsRenderer())
+  fun inDarkModeTheMapIsDrawnInTheNightColours() {
+    // A style draws on every Maps renderer, so this runs on CI's legacy renderer too
     val viewModel = MapViewModel(LocatedAt(LAUSANNE))
     composeTestRule.setContent { MapScreen(viewModel) }
 
-    composeTestRule.awaitMapColours("mostly dark, and none of the light style") { pixels ->
-      pixels.share { it.luminance() < 0.35 } >= 0.5 && pixels.share { it.isStyleColour() } < 0.05
+    composeTestRule.awaitMapColours(
+        darkPalette,
+        "the dark style's land and water, and none of the light style",
+    ) { pixels ->
+      pixels.share { it.isOneOf(darkPalette.land) } >= 0.15 &&
+          pixels.share { it.isOneOf(darkPalette.water) } >= 0.25 &&
+          pixels.share { it.isOneOf(lightPalette.land) || it.isOneOf(lightPalette.water) } < 0.05
     }
   }
 
@@ -87,21 +84,6 @@ private class LocatedAt(private val location: Location) : LocationRepository {
   override suspend fun currentLocation() = location
 }
 
-/** Whether the Maps SDK draws with its current renderer here, rather than the legacy one. */
-private fun hasLatestMapsRenderer(): Boolean {
-  val instrumentation = InstrumentationRegistry.getInstrumentation()
-  val renderer = AtomicReference<MapsInitializer.Renderer>()
-  val ready = CountDownLatch(1)
-  instrumentation.runOnMainSync {
-    MapsInitializer.initialize(instrumentation.targetContext, MapsInitializer.Renderer.LATEST) {
-      renderer.set(it)
-      ready.countDown()
-    }
-  }
-  ready.await(MAP_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
-  return renderer.get() == MapsInitializer.Renderer.LATEST
-}
-
 /** Turns the device's dark mode on or off; activities started afterwards follow it. */
 private fun setNightMode(on: Boolean) {
   InstrumentationRegistry.getInstrumentation()
@@ -110,13 +92,13 @@ private fun setNightMode(on: Boolean) {
       .close()
 }
 
-/** The colours the style gives [featureTypes], read from the style itself. */
-private fun styleColours(vararg featureTypes: String): List<Int> {
-  val context = InstrumentationRegistry.getInstrumentation().targetContext
-  val rules =
-      context.resources.openRawResource(R.raw.map_style).bufferedReader().use {
-        JSONArray(it.readText())
-      }
+/** A style's own colours for the land and the water, unlike Google's or any near-white. */
+private class Palette(val land: List<Int>, val water: List<Int>)
+
+/** The colours the map's style for [darkTheme] gives [featureTypes], read from the style itself. */
+private fun styleColours(darkTheme: Boolean, vararg featureTypes: String): List<Int> {
+  val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
+  val rules = JSONArray(mapStyle(resources, darkTheme))
   return (0 until rules.length())
       .map { rules.getJSONObject(it) }
       .filter { it.optString("featureType") in featureTypes }
@@ -129,9 +111,14 @@ private fun styleColours(vararg featureTypes: String): List<Int> {
       .map(Color::parseColor)
 }
 
-/** The style's own colours for the land and the water, unlike Google's or any near-white. */
-private val styleLand by lazy { styleColours("landscape", "landscape.man_made") }
-private val styleWater by lazy { styleColours("water") }
+private fun palette(darkTheme: Boolean) =
+    Palette(
+        land = styleColours(darkTheme, "landscape", "landscape.man_made"),
+        water = styleColours(darkTheme, "water"),
+    )
+
+private val lightPalette by lazy { palette(darkTheme = false) }
+private val darkPalette by lazy { palette(darkTheme = true) }
 
 /** Whether this colour is one of [colours], give or take the screen's rounding. */
 private fun Int.isOneOf(colours: List<Int>) = colours.any { colour ->
@@ -139,12 +126,6 @@ private fun Int.isOneOf(colours: List<Int>) = colours.any { colour ->
       abs(Color.green(this) - Color.green(colour)) <= 6 &&
       abs(Color.blue(this) - Color.blue(colour)) <= 6
 }
-
-/** Whether this colour is the style's land or water. */
-private fun Int.isStyleColour() = isOneOf(styleLand) || isOneOf(styleWater)
-
-private fun Int.luminance() =
-    (0.2126 * Color.red(this) + 0.7152 * Color.green(this) + 0.0722 * Color.blue(this)) / 255
 
 private fun List<Int>.share(predicate: (Int) -> Boolean) =
     if (isEmpty()) 0.0 else count(predicate).toDouble() / size
@@ -154,9 +135,11 @@ private fun percent(pixels: List<Int>, predicate: (Int) -> Boolean) =
 
 /**
  * Waits until the colours of the middle of the screen, where only the map is, meet [expected]; the
- * map draws its tiles a while after it appears. Fails with [what] it expected and what it saw.
+ * map draws its tiles a while after it appears. Fails with [what] it expected and how much of
+ * [palette]'s land and water it saw.
  */
 private fun androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>.awaitMapColours(
+    palette: Palette,
     what: String,
     expected: (List<Int>) -> Boolean,
 ) {
@@ -168,9 +151,9 @@ private fun androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>.awaitMa
     }
   } catch (e: ComposeTimeoutException) {
     throw AssertionError(
-        "Expected the map to be $what, but ${percent(last) { it.isOneOf(styleLand) }}% was the " +
-            "style's land, ${percent(last) { it.isOneOf(styleWater) }}% its water and " +
-            "${percent(last) { it.luminance() < 0.35 }}% dark",
+        "Expected the map to be $what, but ${percent(last) { it.isOneOf(palette.land) }}% was " +
+            "that style's land, ${percent(last) { it.isOneOf(palette.water) }}% its water, and " +
+            "${percent(last) { it.isOneOf(lightPalette.land) }}% the light style's land",
         e,
     )
   }
