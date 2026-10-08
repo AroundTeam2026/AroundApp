@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -10,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -24,15 +26,18 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraPositionState
+import com.google.maps.android.compose.ComposeMapColorScheme
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.rememberCameraPositionState
 
 /**
- * The Explorer's map. It asks for the location permission if needed, then frames
- * [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
+ * The Explorer's map, in the app's colours: a light style in light mode and a night one in dark
+ * mode, both hiding Google's place icons (see [mapStyle]). It asks for the location permission if
+ * needed, then frames [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
@@ -43,6 +48,11 @@ fun MapScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
+  val context = LocalContext.current
+  // The light style would glare in dark mode, which has its own
+  val darkTheme = isSystemInDarkTheme()
+  val mapStyle =
+      remember(context, darkTheme) { MapStyleOptions(mapStyle(context.resources, darkTheme)) }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
@@ -51,8 +61,15 @@ fun MapScreen(
         modifier = Modifier.fillMaxSize().testTag(C.Tag.MAP),
         cameraPositionState = cameraPositionState,
         // Both need the permission, or the Maps SDK throws a SecurityException
-        properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
+        properties =
+            MapProperties(
+                isMyLocationEnabled = state.showsUserLocation,
+                mapStyleOptions = mapStyle,
+            ),
         uiSettings = MapUiSettings(myLocationButtonEnabled = state.showsUserLocation),
+        // Whatever the style leaves uncoloured follows the theme too, where the device's Maps
+        // renderer has dark colours; it uses the light ones unless told otherwise
+        mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
     ) {
       // The content only runs once the map exists, which camera updates need
       val area = state.areaToFrame
