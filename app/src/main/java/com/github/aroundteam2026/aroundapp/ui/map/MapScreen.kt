@@ -16,11 +16,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.ComposeMapColorScheme
@@ -33,6 +36,8 @@ import com.google.maps.android.compose.MapUiSettings
  * mode, both hiding Google's place icons (see [mapStyle]). It asks for the location permission if
  * needed, then frames [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
  *
+ * It marks each venue on screen that has valid quests with a pin over its area.
+ *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
 @Composable
@@ -42,11 +47,12 @@ fun MapScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
-  val context = LocalContext.current
+  // Unlike the context's, these follow configuration changes
+  val resources = LocalResources.current
   // The light style would glare in dark mode, which has its own
   val darkTheme = isSystemInDarkTheme()
-  val mapStyle =
-      remember(context, darkTheme) { MapStyleOptions(mapStyle(context.resources, darkTheme)) }
+  val mapStyle = remember(resources, darkTheme) { MapStyleOptions(mapStyle(resources, darkTheme)) }
+  val markerStyle = remember { MarkerDefaults.style() }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
@@ -66,6 +72,12 @@ fun MapScreen(
         mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
     ) {
       FrameArea(state.areaToFrame, cameraPositionState, width, height, viewModel::onAreaFramed)
+      ReportVisibleArea(
+          cameraPositionState,
+          IntSize(width, height),
+          viewModel::onVisibleAreaChanged,
+      )
+      QuestMarkers(pins = state.pins, style = markerStyle)
     }
   }
 }

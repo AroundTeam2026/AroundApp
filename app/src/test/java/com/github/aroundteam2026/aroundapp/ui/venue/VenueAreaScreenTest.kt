@@ -24,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIU
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.MarkerState
@@ -185,6 +186,4 @@ class VenueAreaScreenTest {
         .getMethod("setDragging\$maps_compose_release", Boolean::class.javaPrimitiveType)
         .invoke(this, dragging)
   }
-
-  private fun Location.toLatLng() = LatLng(lat, lng)
 }

@@ -5,7 +5,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.common.contains
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -32,6 +34,35 @@ class LatLngBoundsConversionTest {
     assertTrue(bounds.contains(LatLng(-17.85, 179.99)))
     assertTrue(bounds.contains(LatLng(-17.85, -179.99)))
     assertFalse(bounds.contains(LatLng(-17.85, 0.0)))
+  }
+
+  @Test
+  fun theMapsVisibleRegionKeepsEachEdge() {
+    val bounds = LatLngBounds(LatLng(46.50, 6.60), LatLng(46.55, 6.66)).toGeoBounds()
+
+    assertEquals(GeoBounds(south = 46.50, west = 6.60, north = 46.55, east = 6.66), bounds)
+  }
+
+  @Test
+  fun aVisibleRegionAcrossTheAntimeridianStillHoldsTheDateLine() {
+    // The Maps SDK gives a southwest east of the northeast there; GeoBounds reads that as wrapping
+    val bounds = LatLngBounds(LatLng(-18.0, 179.0), LatLng(-17.0, -179.0)).toGeoBounds()
+
+    assertTrue(Location(-17.5, 179.5) in bounds)
+    assertTrue(Location(-17.5, -179.5) in bounds)
+    assertFalse(Location(-17.5, 0.0) in bounds)
+  }
+
+  @Test
+  fun convertingBackAndForthKeepsTheBounds() {
+    val bounds = GeoBounds(south = -18.0, west = 179.0, north = -17.0, east = -179.0)
+
+    assertEquals(bounds, bounds.toLatLngBounds().toGeoBounds())
+  }
+
+  @Test
+  fun aLocationKeepsItsCoordinates() {
+    assertEquals(LatLng(46.5197, 6.6323), Location(46.5197, 6.6323).toLatLng())
   }
 
   @Test
