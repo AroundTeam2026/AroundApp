@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -23,8 +26,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,6 +42,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.FrameArea
+import com.github.aroundteam2026.aroundapp.ui.map.RequestLocationPermission
 import com.github.aroundteam2026.aroundapp.ui.map.rememberMapCamera
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
 import com.google.android.gms.maps.model.LatLng
@@ -44,6 +50,7 @@ import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
@@ -53,16 +60,18 @@ import kotlinx.coroutines.flow.filter
 
 /**
  * Where a venue places its marker, by tapping the map or dragging the marker, and sets the radius
- * in which a visit counts. The map starts framed around a default center.
+ * in which a visit counts. It asks for the location permission once per visit; with it, the map
+ * shows the device's position and frames it.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
 @Composable
 fun VenueAreaScreen(
-    viewModel: VenueAreaViewModel = viewModel(),
+    viewModel: VenueAreaViewModel = viewModel(factory = VenueAreaViewModel.factory),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
 ) {
   val state by viewModel.uiState.collectAsState()
+  RequestLocationPermission(viewModel::onLocationPermissionResult)
 
   Column(Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_SCREEN)) {
     Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -72,6 +81,12 @@ fun VenueAreaScreen(
           onMarkerPlaced = viewModel::onMarkerPlaced,
           onAreaFramed = viewModel::onAreaFramed,
       )
+      if (state.showsUserLocation) {
+        UseMyLocationButton(
+            onClick = viewModel::onUseMyLocation,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        )
+      }
     }
     RadiusPanel(state.radiusMeters, viewModel::onRadiusChanged)
   }
@@ -94,8 +109,17 @@ private fun AreaMap(
     GoogleMap(
         modifier = Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_MAP),
         cameraPositionState = cameraPositionState,
-        // The design has no zoom buttons; pinching still zooms
-        uiSettings = MapUiSettings(zoomControlsEnabled = false),
+        // Needs the permission, or the Maps SDK throws a SecurityException
+        properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
+        // The "Use my location" button replaces the Maps SDK's own, and its zoom buttons and
+        // toolbar
+        // would sit under it; pinching still zooms
+        uiSettings =
+            MapUiSettings(
+                myLocationButtonEnabled = false,
+                zoomControlsEnabled = false,
+                mapToolbarEnabled = false,
+            ),
         onMapClick = { tap ->
           val visible = cameraPositionState.projection?.visibleRegion?.latLngBounds
           if (isOnVisibleMap(tap, visible)) onMarkerPlaced(tap.toLocation())
@@ -124,6 +148,18 @@ private fun AreaMap(
  */
 internal fun isOnVisibleMap(tap: LatLng, visible: LatLngBounds?): Boolean =
     visible?.contains(tap) == true
+
+/** Frames the device's position, without moving the marker. */
+@Composable
+private fun UseMyLocationButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+  ExtendedFloatingActionButton(
+      onClick = onClick,
+      modifier = modifier.testTag(C.Tag.VENUE_AREA_USE_MY_LOCATION),
+      // The label already says what the button does, so the icon is decorative
+      icon = { Icon(painterResource(R.drawable.ic_my_location), contentDescription = null) },
+      text = { Text(stringResource(R.string.use_my_location)) },
+  )
+}
 
 /**
  * The state of a draggable marker at [location]. It moves when [location] changes, and tells
