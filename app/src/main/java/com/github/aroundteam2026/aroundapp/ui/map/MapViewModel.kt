@@ -22,11 +22,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -122,26 +126,34 @@ class MapViewModel(
    * Every venue with valid quests, again whenever quests or their venues change, and when a reward
    * expires. Without quests, or when they fail, there are none; without venues, pins are drawn from
    * the quests alone.
+   *
+   * The quests are listened to once, and their venues again only when the set of venues changes, as
+   * each new listener costs Firestore reads.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
-  private fun venuePins(): Flow<List<VenuePin>> =
-      questRepository
-          .observeActiveQuests()
-          .catch { emit(emptyList()) }
-          .flatMapLatest { quests ->
-            venueRepository
-                .observeVenues(quests.mapTo(mutableSetOf()) { it.venueId })
-                .catch { emit(emptyList()) }
-                .map { venues -> quests to venues.associateBy { it.id } }
-          }
-          .transformLatest { (quests, venues) ->
-            while (true) {
-              val now = clock()
-              emit(buildVenuePins(quests, venues, now))
-              val nextExpiry = quests.nextExpiryAfter(now) ?: break
-              delay(nextExpiry - now)
+  private fun venuePins(): Flow<List<VenuePin>> {
+    val quests =
+        questRepository
+            .observeActiveQuests()
+            .catch { emit(emptyList()) }
+            .shareIn(viewModelScope, SharingStarted.WhileSubscribed(), replay = 1)
+    val venues =
+        quests
+            .map { it.mapTo(mutableSetOf()) { quest -> quest.venueId } }
+            .distinctUntilChanged()
+            .flatMapLatest { venueIds ->
+              venueRepository.observeVenues(venueIds).catch { emit(emptyList()) }
             }
+    return combine(quests, venues) { current, known -> current to known.associateBy { it.id } }
+        .transformLatest { (quests, venues) ->
+          while (true) {
+            val now = clock()
+            emit(buildVenuePins(quests, venues, now))
+            val nextExpiry = quests.nextExpiryAfter(now) ?: break
+            delay(nextExpiry - now)
           }
+        }
+  }
 
   companion object {
     /** The map frames this distance around the explorer. */

@@ -18,6 +18,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -42,8 +43,12 @@ class MapViewModelPinsTest {
   private val cafeLocation = Location(46.5220, 6.6330)
   private val barLocation = Location(46.5235, 6.6365)
   private val genevaLocation = Location(46.2044, 6.1432)
+  private val museumLocation = Location(46.5150, 6.6200)
 
-  /** What the explorer sees: central Lausanne, holding the café and the bar but not Geneva. */
+  /**
+   * What the explorer sees: central Lausanne, holding the café, the bar and the museum but not
+   * Geneva.
+   */
   private val lausanneView = GeoBounds(south = 46.50, west = 6.60, north = 46.55, east = 6.66)
   private val genevaView = GeoBounds(south = 46.19, west = 6.12, north = 46.22, east = 6.16)
 
@@ -221,6 +226,106 @@ class MapViewModelPinsTest {
     showing()
 
     assertEquals(setOf("cafe", "bar", "geneva"), asked.last())
+  }
+
+  @Test
+  fun aQuestChangeAtTheSameVenuesKeepsListeningToThem() = test {
+    // On Firestore, asking again would restart the venue listeners and pay for their reads again
+    val asked = mutableListOf<Set<String>>()
+    venueRepository = RecordingVenueRepository(asked)
+    showing()
+
+    quests.value += testQuest(id = "cafe-2", venueId = "cafe", location = cafeLocation)
+    runCurrent()
+    quests.value = quests.value.filterNot { it.id == "bar-1" } + barQuest.copy(title = "Renamed")
+    runCurrent()
+
+    assertEquals(listOf(setOf("cafe", "bar", "geneva")), asked)
+    // The pins still follow the quests
+    assertEquals(1, state.pins.single { it.venueId == "cafe" }.otherQuestCount)
+    assertEquals("Renamed", state.pins.single { it.venueId == "bar" }.featuredQuest.title)
+  }
+
+  @Test
+  fun aQuestAtAnotherVenueAsksForTheNewSetOfVenues() = test {
+    val asked = mutableListOf<Set<String>>()
+    venueRepository = RecordingVenueRepository(asked)
+    showing()
+
+    quests.value += testQuest(id = "museum-1", venueId = "museum", location = museumLocation)
+    runCurrent()
+    quests.value = quests.value.filterNot { it.venueId == "geneva" }
+    runCurrent()
+
+    assertEquals(
+        listOf(
+            setOf("cafe", "bar", "geneva"),
+            setOf("cafe", "bar", "geneva", "museum"),
+            setOf("cafe", "bar", "museum"),
+        ),
+        asked,
+    )
+    assertEquals(setOf("cafe", "bar", "museum"), pinIds)
+  }
+
+  @Test
+  fun theQuestsAreListenedToOnce() = test {
+    // Listening to them once for the pins and again for their venues would double the reads
+    var listeners = 0
+    questRepository = ScriptedQuestRepository(activeQuests = quests.onStart { listeners++ })
+    showing()
+
+    quests.value += testQuest(id = "museum-1", venueId = "museum", location = museumLocation)
+    runCurrent()
+
+    assertEquals(1, listeners)
+  }
+
+  @Test
+  fun aQuestArrivingWhileARewardIsAboutToExpireShowsAtOnceAndTheRewardStillExpires() = test {
+    quests.value = listOf(cafeQuest.copy(reward = rewardExpiringAt(START + 1_000)), barQuest)
+    showing()
+
+    advanceTimeBy(400)
+    runCurrent()
+    quests.value += testQuest(id = "museum-1", venueId = "museum", location = museumLocation)
+    runCurrent()
+    assertEquals(setOf("cafe", "bar", "museum"), pinIds)
+
+    advanceTimeBy(599)
+    runCurrent()
+    assertEquals(setOf("cafe", "bar", "museum"), pinIds)
+
+    advanceTimeBy(1)
+    runCurrent()
+    assertEquals(setOf("bar", "museum"), pinIds)
+  }
+
+  @Test
+  fun aQuestArrivingWithASoonerExpiryIsDroppedOnTime() = test {
+    // The map was waiting for the bar's reward; the new one ends first
+    quests.value = listOf(cafeQuest, barQuest.copy(reward = rewardExpiringAt(START + 5_000)))
+    showing()
+
+    advanceTimeBy(400)
+    runCurrent()
+    quests.value +=
+        testQuest(
+            id = "museum-1",
+            venueId = "museum",
+            location = museumLocation,
+            reward = rewardExpiringAt(START + 1_000),
+        )
+    runCurrent()
+    assertEquals(setOf("cafe", "bar", "museum"), pinIds)
+
+    advanceTimeBy(600)
+    runCurrent()
+    assertEquals(setOf("cafe", "bar"), pinIds)
+
+    advanceTimeBy(4_000)
+    runCurrent()
+    assertEquals(setOf("cafe"), pinIds)
   }
 
   @Test
