@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
@@ -71,7 +72,11 @@ fun MapScreen(
         mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
     ) {
       FrameArea(state.areaToFrame, cameraPositionState, width, height, viewModel::onAreaFramed)
-      ReportVisibleArea(cameraPositionState, viewModel::onVisibleAreaChanged)
+      ReportVisibleArea(
+          cameraPositionState,
+          IntSize(width, height),
+          viewModel::onVisibleAreaChanged,
+      )
       QuestMarkers(pins = state.pins, style = markerStyle)
     }
   }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerStyle
@@ -73,17 +74,25 @@ internal fun VenuePin.description(): String =
 
 /**
  * Reports the part of the world on screen to [onVisibleAreaChanged] each time the camera stops
- * moving. Call it from a map's content, which only runs once the map exists.
+ * moving, and each time the map changes size, as in split-screen, which shows more or less of the
+ * world without moving the camera. Call it from a map's content, which only runs once the map
+ * exists.
+ *
+ * @param mapSize The map's size in pixels.
  */
 @Composable
 fun ReportVisibleArea(
     cameraPositionState: CameraPositionState,
+    mapSize: IntSize,
     onVisibleAreaChanged: (GeoBounds) -> Unit,
 ) {
   val currentOnVisibleAreaChanged by rememberUpdatedState(onVisibleAreaChanged)
+  val currentMapSize by rememberUpdatedState(mapSize)
   LaunchedEffect(cameraPositionState) {
-    snapshotFlow { cameraPositionState.isMoving to cameraPositionState.position }
-        .filter { (moving, _) -> !moving }
+    snapshotFlow {
+      Triple(cameraPositionState.isMoving, cameraPositionState.position, currentMapSize)
+    }
+        .filter { (moving, _, _) -> !moving }
         .mapNotNull { cameraPositionState.projection?.visibleRegion?.latLngBounds?.toGeoBounds() }
         .distinctUntilChanged()
         .collect { currentOnVisibleAreaChanged(it) }

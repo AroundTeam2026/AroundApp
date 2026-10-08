@@ -4,7 +4,17 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -48,13 +58,20 @@ class QuestMarkersDeviceTest {
           FakeVenueRepository(),
       )
   private val camera = CameraPositionState()
+  /** The map's height, or null for the whole screen; tests change it to resize the map. */
+  private var mapHeight by mutableStateOf<Dp?>(null)
 
   private val state
     get() = composeTestRule.runOnUiThread { viewModel.uiState.value }
 
   @Before
   fun showTheMapAroundHere() {
-    composeTestRule.setContent { MapScreen(viewModel, camera) }
+    composeTestRule.setContent {
+      val height = mapHeight
+      Box(if (height == null) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(height)) {
+        MapScreen(viewModel, camera)
+      }
+    }
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
       composeTestRule.runOnUiThread { camera.position.target.isNear(here) && !camera.isMoving }
     }
@@ -79,6 +96,22 @@ class QuestMarkersDeviceTest {
     }
 
     awaitPins("geneva")
+  }
+
+  @Test
+  fun growingTheMapShowsTheVenuesThatCameIntoView() {
+    // As in split-screen: the map grows but its camera stays put, so only its size changes.
+    // At this zoom a short map shows about 1 km north and south of the café, a tall one about 5
+    composeTestRule.runOnUiThread { mapHeight = 120.dp }
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnUiThread {
+      camera.move(CameraUpdateFactory.newLatLngZoom(here.toLatLng(), 12.5f))
+    }
+    awaitPins("cafe")
+
+    composeTestRule.runOnUiThread { mapHeight = null }
+
+    awaitPins("cafe", "bar")
   }
 
   private fun quest(venueId: String, venueName: String, location: Location) =
