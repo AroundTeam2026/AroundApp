@@ -28,8 +28,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
+import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.VenuePin
+import java.text.NumberFormat
 import java.util.Locale
 
 /**
@@ -125,7 +128,7 @@ private fun CardChips(pin: VenuePin, partySize: Int?, style: MarkerStyle) {
   val spacing = Arrangement.spacedBy(style.dimensions.chipSpacing)
   FlowRow(horizontalArrangement = spacing, verticalArrangement = spacing) {
     pin.featuredQuest.reward?.let {
-      Chip(it.description, C.Tag.QUEST_CARD_REWARD, colors.accent, colors.onAccent, style)
+      Chip(rewardText(it), C.Tag.QUEST_CARD_REWARD, colors.accent, colors.onAccent, style)
     }
     partySize?.let {
       Chip(
@@ -208,3 +211,28 @@ private fun distanceText(meters: Double): String {
 
 /** The app's language, which decides the distance's decimal separator; recomposes if it changes. */
 @Composable private fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
+
+/** What a [reward] chip says, e.g. "10% off", "CHF 5 off" or "Free coffee". */
+@Composable
+private fun rewardText(reward: Reward): String =
+    when (reward) {
+      is Reward.Discount -> {
+        val amount = formatRewardAmount(reward.amount, currentLocale())
+        when (reward.unit) {
+          DiscountUnit.PERCENT -> stringResource(R.string.map_card_reward_percent_off, amount)
+          DiscountUnit.CHF -> stringResource(R.string.map_card_reward_chf_off, amount)
+        }
+      }
+      is Reward.FreeItem -> stringResource(R.string.map_card_reward_free_item, reward.name)
+      is Reward.Other -> reward.description
+    }
+
+/** Writes a discount [amount] for [locale], without decimals when it is whole (10, but 2.50). */
+internal fun formatRewardAmount(amount: Double, locale: Locale): String =
+    NumberFormat.getNumberInstance(locale)
+        .apply {
+          val whole = amount % 1.0 == 0.0
+          minimumFractionDigits = if (whole) 0 else 2
+          maximumFractionDigits = if (whole) 0 else 2
+        }
+        .format(amount)

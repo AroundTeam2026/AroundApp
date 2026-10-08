@@ -45,13 +45,53 @@ data class Quest(
 )
 
 /**
- * What an explorer gets for completing a quest.
+ * What an explorer gets for completing a quest: a [Discount], a [FreeItem] or [Other].
  *
- * @property description The reward itself, e.g. "Free coffee".
- * @property terms Conditions that apply, or null if there are none.
  * @property expiresAt When the reward stops being valid, in epoch milliseconds, or null if never.
  */
-data class Reward(val description: String, val terms: String?, val expiresAt: Long?)
+sealed interface Reward {
+  val expiresAt: Long?
+
+  /**
+   * A discount, e.g. 10 % or 5 CHF off.
+   *
+   * @property amount Size of the discount, in [unit].
+   * @property specifics What the discount applies to, or null if not specified.
+   */
+  data class Discount(
+      val amount: Double,
+      val unit: DiscountUnit,
+      val specifics: String?,
+      override val expiresAt: Long? = null,
+  ) : Reward
+
+  /**
+   * An item given for free, e.g. a coffee.
+   *
+   * @property name The item.
+   * @property specifics Details about the item, or null if not specified.
+   */
+  data class FreeItem(
+      val name: String,
+      val specifics: String?,
+      override val expiresAt: Long? = null,
+  ) : Reward
+
+  /**
+   * A reward that is neither a discount nor a free item.
+   *
+   * @property description The reward itself.
+   */
+  data class Other(val description: String, override val expiresAt: Long? = null) : Reward
+}
+
+/** The unit of a [Reward.Discount] amount. */
+enum class DiscountUnit {
+  /** A percentage of the price. */
+  PERCENT,
+  /** An amount in Swiss francs. */
+  CHF,
+}
 
 /** The kind of proof an explorer submits to complete a quest. */
 enum class ProofType {

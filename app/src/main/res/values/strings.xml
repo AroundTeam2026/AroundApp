@@ -31,4 +31,8 @@
     <!-- How far a venue is; the amount is already written for the language -->
     <string name="map_card_distance_meters">%1$s m</string>
     <string name="map_card_distance_kilometers">%1$s km</string>
+    <!-- A quest's reward on its card; the amount is already written for the language -->
+    <string name="map_card_reward_percent_off">%1$s%% off</string>
+    <string name="map_card_reward_chf_off">CHF %1$s off</string>
+    <string name="map_card_reward_free_item">Free %1$s</string>
 </resources>

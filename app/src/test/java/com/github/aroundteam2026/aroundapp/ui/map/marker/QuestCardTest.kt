@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -37,7 +38,7 @@ class QuestCardTest {
   private fun pin(
       venueName: String = "Café Lumen",
       title: String = "Order the secret menu",
-      reward: Reward? = Reward("Free coffee", terms = null, expiresAt = null),
+      reward: Reward? = Reward.Other("Free coffee"),
       minPartySize: Int = 1,
       otherQuestCount: Int = 0,
       distanceMeters: Double? = null,
@@ -123,7 +124,28 @@ class QuestCardTest {
 
   @Test
   fun showsTheRewardAsAChip() {
-    show(pin(reward = Reward("Free coffee", terms = null, expiresAt = null)))
+    show(pin(reward = Reward.Other("Free coffee")))
+
+    node(C.Tag.QUEST_CARD_REWARD).assertTextEquals("Free coffee")
+  }
+
+  @Test
+  fun aPercentDiscountSaysHowMuchIsOff() {
+    show(pin(reward = Reward.Discount(10.0, DiscountUnit.PERCENT, specifics = null)))
+
+    node(C.Tag.QUEST_CARD_REWARD).assertTextEquals("10% off")
+  }
+
+  @Test
+  fun aFrancDiscountSaysHowManyFrancsAreOff() {
+    show(pin(reward = Reward.Discount(2.5, DiscountUnit.CHF, specifics = null)))
+
+    node(C.Tag.QUEST_CARD_REWARD).assertTextEquals("CHF 2.50 off")
+  }
+
+  @Test
+  fun aFreeItemSaysWhatIsFree() {
+    show(pin(reward = Reward.FreeItem("coffee", specifics = null)))
 
     node(C.Tag.QUEST_CARD_REWARD).assertTextEquals("Free coffee")
   }
@@ -201,7 +223,7 @@ class QuestCardTest {
   fun chipsThatDoNotFitWrapInsteadOfWideningTheCard() {
     show(
         pin(
-            reward = Reward("Free dessert for the whole table", terms = null, expiresAt = null),
+            reward = Reward.Other("Free dessert for the whole table"),
             minPartySize = 6,
             distanceMeters = 12_000.0,
         )

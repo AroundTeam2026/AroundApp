@@ -134,7 +134,7 @@ class FakeQuestRepositoryTest {
     val input =
         testQuest(
             title = "Find the mural",
-            reward = Reward(description = "Free coffee", terms = "One per visit", expiresAt = 5L),
+            reward = Reward.Discount(10.0, DiscountUnit.PERCENT, "On drinks", expiresAt = 5L),
             createdAt = 1L,
             updatedAt = 2L,
         )

@@ -110,7 +110,7 @@ object MapDemoData {
       )
 
   private fun reward(description: String, expiresAt: Long? = null) =
-      Reward(description, terms = null, expiresAt = expiresAt)
+      Reward.Other(description, expiresAt = expiresAt)
 
   private fun quest(
       venue: Venue,
