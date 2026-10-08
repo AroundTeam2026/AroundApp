@@ -26,5 +26,10 @@ object C {
     const val AUTH_LOADING = "auth_loading"
 
     const val MAP = "map"
+
+    const val VENUE_AREA_SCREEN = "venue_area_screen"
+    const val VENUE_AREA_MAP = "venue_area_map"
+    const val VENUE_AREA_RADIUS = "venue_area_radius"
+    const val VENUE_AREA_SLIDER = "venue_area_slider"
   }
 }

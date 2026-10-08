@@ -4,4 +4,8 @@
     <string name="tab_quests">Quests</string>
     <string name="tab_map">Map</string>
     <string name="tab_profile">Profile</string>
+    <string name="venue_area_title">Set your venue\'s location</string>
+    <string name="venue_area_hint">Tap the map or drag the pin to your entrance.</string>
+    <string name="venue_area_radius">Visit radius</string>
+    <string name="venue_area_meters">%1$d m</string>
 </resources>

@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
-import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
@@ -28,12 +27,14 @@ import kotlinx.coroutines.launch
 data class MapUiState(val areaToFrame: GeoBounds?, val showsUserLocation: Boolean = false)
 
 /**
- * Holds the map's state. The map starts on [DEFAULT_CENTER], then frames [NEARBY_RADIUS_METERS]
+ * Holds the map's state. The map starts on [DEFAULT_MAP_CENTER], then frames [NEARBY_RADIUS_METERS]
  * around the explorer once their position is known.
  */
 class MapViewModel(private val locationRepository: LocationRepository) : ViewModel() {
   private val _uiState =
-      MutableStateFlow(MapUiState(areaToFrame = DEFAULT_CENTER.boundsWithin(NEARBY_RADIUS_METERS)))
+      MutableStateFlow(
+          MapUiState(areaToFrame = DEFAULT_MAP_CENTER.boundsWithin(NEARBY_RADIUS_METERS))
+      )
   /** What the map shows now; the screen observes it. */
   val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
@@ -60,13 +61,10 @@ class MapViewModel(private val locationRepository: LocationRepository) : ViewMod
    * so it still gets framed.
    */
   fun onAreaFramed(area: GeoBounds) {
-    _uiState.update { if (it.areaToFrame == area) it.copy(areaToFrame = null) else it }
+    _uiState.update { it.copy(areaToFrame = it.areaToFrame.afterFraming(area)) }
   }
 
   companion object {
-    /** Where the map starts, and stays when the explorer's position is unknown: Lausanne. */
-    val DEFAULT_CENTER = Location(46.5197, 6.6323)
-
     /** The map frames this distance around the explorer. */
     const val NEARBY_RADIUS_METERS = 5_000.0
 

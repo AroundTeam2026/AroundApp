@@ -3,11 +3,25 @@ package com.github.aroundteam2026.aroundapp.model.venue
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 
 /** Reads, creates and updates [Venue]s. ViewModels depend on this interface only. */
 interface VenueRepository {
   /** Emits the current venue and subsequent changes, or null when [venueId] does not exist. */
   fun observeVenue(venueId: String): Flow<Venue?>
+
+  /**
+   * Emits the venues among [venueIds] that exist, in unspecified order, and again whenever one of
+   * them changes. Emits an empty list at once for no ids.
+   *
+   * The default watches each venue with [observeVenue], so implementations that only watch one at a
+   * time, such as other features' test doubles, still work. It costs a listener per venue: a
+   * backend repository should override it with a single query.
+   */
+  fun observeVenues(venueIds: Set<String>): Flow<List<Venue>> =
+      if (venueIds.isEmpty()) flowOf(emptyList())
+      else combine(venueIds.map(::observeVenue)) { venues -> venues.filterNotNull() }
 
   /** Returns the venue for [venueId], or null when it does not exist. */
   suspend fun getVenue(venueId: String): Venue?

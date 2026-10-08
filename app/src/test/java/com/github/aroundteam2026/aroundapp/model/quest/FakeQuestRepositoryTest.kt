@@ -1,7 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.quest
 
-import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -14,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -28,40 +29,11 @@ class FakeQuestRepositoryTest {
     repository = FakeQuestRepository(now = { FIXED_NOW })
   }
 
-  /**
-   * Builds a quest with a blank id by default and timestamps that differ from [FIXED_NOW], so tests
-   * can tell the caller's values from the repository's.
-   */
-  private fun quest(
-      id: String = "",
-      venueId: String = "v1",
-      status: QuestStatus = QuestStatus.ACTIVE,
-      title: String = "Title",
-      reward: Reward? = null,
-      createdAt: Long = 1_000L,
-      updatedAt: Long = 1_000L,
-  ) =
-      Quest(
-          id = id,
-          venueId = venueId,
-          venueName = "Cafe",
-          location = Location(46.52, 6.57),
-          radiusMeters = 50,
-          title = title,
-          description = "Description",
-          requirements = "Requirements",
-          proofType = ProofType.PHOTO,
-          reward = reward,
-          status = status,
-          createdAt = createdAt,
-          updatedAt = updatedAt,
-      )
-
   @Test
   fun observeActiveQuests_excludesDraftAndArchived() = runBlocking {
-    repository.createQuest(quest(status = QuestStatus.DRAFT))
-    repository.createQuest(quest(status = QuestStatus.ARCHIVED))
-    val activeId = repository.createQuest(quest(status = QuestStatus.ACTIVE)).getOrThrow()
+    repository.createQuest(testQuest(status = QuestStatus.DRAFT))
+    repository.createQuest(testQuest(status = QuestStatus.ARCHIVED))
+    val activeId = repository.createQuest(testQuest(status = QuestStatus.ACTIVE)).getOrThrow()
 
     val active = repository.observeActiveQuests().first()
 
@@ -76,7 +48,7 @@ class FakeQuestRepositoryTest {
             repository.observeActiveQuests().take(2).toList()
           }
 
-      repository.createQuest(quest())
+      repository.createQuest(testQuest())
 
       assertEquals(listOf(0, 1), emissions.await().map { it.size })
     }
@@ -90,11 +62,11 @@ class FakeQuestRepositoryTest {
             repository.observeActiveQuests().take(2).toList()
           }
 
-      repository.createQuest(quest(status = QuestStatus.DRAFT))
+      repository.createQuest(testQuest(status = QuestStatus.DRAFT))
       // createQuest never suspends, so without this the collector would only see the state after
       // both writes and the test would pass even if the draft caused a duplicate emission.
       yield()
-      repository.createQuest(quest(status = QuestStatus.ACTIVE))
+      repository.createQuest(testQuest(status = QuestStatus.ACTIVE))
 
       assertEquals(listOf(0, 1), emissions.await().map { it.size })
     }
@@ -108,10 +80,10 @@ class FakeQuestRepositoryTest {
             repository.observeQuestsByVenue("v1").take(2).toList()
           }
 
-      repository.createQuest(quest(venueId = "v2"))
+      repository.createQuest(testQuest(venueId = "v2"))
       // Lets the collector see the state after the first write; see the active-quests test above.
       yield()
-      repository.createQuest(quest(venueId = "v1"))
+      repository.createQuest(testQuest(venueId = "v1"))
 
       assertEquals(listOf(0, 1), emissions.await().map { it.size })
     }
@@ -119,12 +91,14 @@ class FakeQuestRepositoryTest {
 
   @Test
   fun observeQuestsByVenue_returnsAllOfThatVenuesQuestsWhateverTheirStatus() = runBlocking {
-    val activeId = repository.createQuest(quest(venueId = "v1")).getOrThrow()
+    val activeId = repository.createQuest(testQuest(venueId = "v1")).getOrThrow()
     val draftId =
-        repository.createQuest(quest(venueId = "v1", status = QuestStatus.DRAFT)).getOrThrow()
+        repository.createQuest(testQuest(venueId = "v1", status = QuestStatus.DRAFT)).getOrThrow()
     val archivedId =
-        repository.createQuest(quest(venueId = "v1", status = QuestStatus.ARCHIVED)).getOrThrow()
-    repository.createQuest(quest(venueId = "v2"))
+        repository
+            .createQuest(testQuest(venueId = "v1", status = QuestStatus.ARCHIVED))
+            .getOrThrow()
+    repository.createQuest(testQuest(venueId = "v2"))
 
     val quests = repository.observeQuestsByVenue("v1").first()
 
@@ -133,8 +107,8 @@ class FakeQuestRepositoryTest {
 
   @Test
   fun createQuest_returnsNewUniqueId() = runBlocking {
-    val first = repository.createQuest(quest()).getOrThrow()
-    val second = repository.createQuest(quest()).getOrThrow()
+    val first = repository.createQuest(testQuest()).getOrThrow()
+    val second = repository.createQuest(testQuest()).getOrThrow()
 
     assertTrue(first.isNotBlank())
     assertNotEquals(first, second)
@@ -142,8 +116,8 @@ class FakeQuestRepositoryTest {
 
   @Test
   fun createQuest_ignoresCallerId() = runBlocking {
-    val first = repository.createQuest(quest(id = "caller", title = "First")).getOrThrow()
-    val second = repository.createQuest(quest(id = "caller", title = "Second")).getOrThrow()
+    val first = repository.createQuest(testQuest(id = "caller", title = "First")).getOrThrow()
+    val second = repository.createQuest(testQuest(id = "caller", title = "Second")).getOrThrow()
 
     assertNotEquals("caller", first)
     assertNotEquals("caller", second)
@@ -158,7 +132,7 @@ class FakeQuestRepositoryTest {
     var time = FIXED_NOW
     repository = FakeQuestRepository(now = { time++ })
     val input =
-        quest(
+        testQuest(
             title = "Find the mural",
             reward = Reward(description = "Free coffee", terms = "One per visit", expiresAt = 5L),
             createdAt = 1L,
@@ -177,7 +151,7 @@ class FakeQuestRepositoryTest {
     val defaultRepository = FakeQuestRepository()
 
     val before = System.currentTimeMillis()
-    val id = defaultRepository.createQuest(quest()).getOrThrow()
+    val id = defaultRepository.createQuest(testQuest()).getOrThrow()
     val after = System.currentTimeMillis()
 
     val createdAt = defaultRepository.getQuest(id)!!.createdAt
@@ -194,10 +168,56 @@ class FakeQuestRepositoryTest {
     val error = IllegalStateException("forced")
     repository.forcedFailure = error
 
-    val result = repository.createQuest(quest())
+    val result = repository.createQuest(testQuest())
 
     assertSame(error, result.exceptionOrNull())
     assertTrue(repository.observeActiveQuests().first().isEmpty())
+  }
+
+  @Test
+  fun startsEmptyByDefault() = runBlocking {
+    assertEquals(emptyList<Quest>(), FakeQuestRepository().observeActiveQuests().first())
+  }
+
+  @Test
+  fun keepsInitialQuestsExactlyAsGiven() = runBlocking {
+    // Unlike createQuest, seeding keeps ids and timestamps: venues feature quests by id, and the
+    // newest quest must stay the newest
+    val seeded = testQuest(id = "seed-1", createdAt = 42L)
+    val repository = FakeQuestRepository(now = { 9_999L }, initialQuests = listOf(seeded))
+
+    assertEquals(seeded, repository.getQuest("seed-1"))
+  }
+
+  @Test
+  fun initialQuestsAreObservedLikeCreatedOnes() = runBlocking {
+    val active = testQuest(id = "active", venueId = "v1")
+    val draft = testQuest(id = "draft", venueId = "v1", status = QuestStatus.DRAFT)
+    val repository = FakeQuestRepository(initialQuests = listOf(active, draft))
+
+    assertEquals(listOf(active), repository.observeActiveQuests().first())
+    assertEquals(setOf(active, draft), repository.observeQuestsByVenue("v1").first().toSet())
+  }
+
+  @Test
+  fun createdQuestsNeverReuseASeededId() = runBlocking {
+    // The generated ids start at quest-1, so a seed using that id must not be overwritten
+    val seeded = testQuest(id = "quest-1", title = "Seeded")
+    val repository = FakeQuestRepository(initialQuests = listOf(seeded))
+
+    val id = repository.createQuest(testQuest(title = "Created")).getOrThrow()
+
+    assertNotEquals("quest-1", id)
+    assertEquals("Seeded", repository.getQuest("quest-1")?.title)
+    assertEquals("Created", repository.getQuest(id)?.title)
+  }
+
+  @Test
+  fun rejectsInitialQuestsSharingAnId() {
+    // Keeping only one of them would silently drop a quest
+    assertThrows(IllegalArgumentException::class.java) {
+      FakeQuestRepository(initialQuests = listOf(testQuest(id = "same"), testQuest(id = "same")))
+    }
   }
 
   private companion object {
