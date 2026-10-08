@@ -147,22 +147,6 @@ class VenueAreaScreenTest {
   }
 
   @Test
-  fun aDragReportsOnlyWhereItEnded() = runTest {
-    backgroundScope.launch { reportDrops({ dragging }, { position }, drops::add) }
-    runCurrent()
-
-    dragging = true
-    settle()
-    position = elsewhere.toLatLng()
-    settle()
-    assertEquals(emptyList<Location>(), drops)
-
-    dragging = false
-    settle()
-    assertEquals(listOf(elsewhere), drops)
-  }
-
-  @Test
   fun eachDragIsReported() = runTest {
     backgroundScope.launch { reportDrops({ dragging }, { position }, drops::add) }
     runCurrent()
@@ -171,6 +155,35 @@ class VenueAreaScreenTest {
     drag(to = entrance)
 
     assertEquals(listOf(elsewhere, entrance), drops)
+  }
+
+  // The Maps SDK can't drag a marker in a test, so this sets the drag state it reports after a
+  // real drag: started, moved, then ended
+  @Test
+  fun aDraggedMarkerReportsWhereItWasDropped() {
+    lateinit var marker: MarkerState
+    composeTestRule.setContent { marker = rememberDraggableMarker(entrance) { drops += it } }
+    composeTestRule.runOnIdle { marker.setDragging(true) }
+
+    composeTestRule.runOnIdle {
+      marker.position = elsewhere.toLatLng()
+      marker.setDragging(false)
+    }
+    composeTestRule.waitForIdle()
+
+    assertEquals(listOf(elsewhere), drops)
+  }
+
+  /**
+   * Sets whether this marker is being dragged, as the Maps SDK does. maps-compose keeps the setter
+   * internal, so this reaches it by its compiled name, which can change when maps-compose is
+   * upgraded.
+   */
+  private fun MarkerState.setDragging(dragging: Boolean) {
+    MarkerState::class
+        .java
+        .getMethod("setDragging\$maps_compose_release", Boolean::class.javaPrimitiveType)
+        .invoke(this, dragging)
   }
 
   private fun Location.toLatLng() = LatLng(lat, lng)
