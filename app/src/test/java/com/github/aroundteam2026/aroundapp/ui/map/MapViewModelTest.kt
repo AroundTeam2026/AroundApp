@@ -4,7 +4,6 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
-import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.DEFAULT_CENTER
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +26,7 @@ import org.junit.Test
 class MapViewModelTest {
 
   private val dispatcher = StandardTestDispatcher()
-  private val lausanne = DEFAULT_CENTER.boundsWithin(NEARBY_RADIUS_METERS)
+  private val lausanne = DEFAULT_MAP_CENTER.boundsWithin(NEARBY_RADIUS_METERS)
   private val zurich = Location(47.3769, 8.5417)
   private val geneva = Location(46.2044, 6.1432)
 
