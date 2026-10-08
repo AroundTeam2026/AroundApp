@@ -1,3 +1,5 @@
+// Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.auth
 
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,8 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * In-memory [AuthRepository] for tests and for running the app without Firebase.
  *
  * Follows Firebase's rules: emails are case-insensitive, passwords need at least
- * [MIN_PASSWORD_LENGTH] characters, and an email can only be registered once. Generated uids never
- * collide with [signedInUserId] or with each other.
+ * [AuthInputValidation.MIN_PASSWORD_LENGTH] characters, and an email can only be registered once.
+ * Generated uids never collide with [signedInUserId] or with each other.
  *
  * Safe to call from several threads at once: every operation runs under one lock, so two concurrent
  * sign-ups with the same email can't both succeed.
@@ -49,8 +51,9 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
       }
       val key = normalize(email)
       when {
-        !EMAIL_REGEX.matches(key) -> Result.failure(AuthError.InvalidEmail)
-        password.length < MIN_PASSWORD_LENGTH -> Result.failure(AuthError.WeakPassword)
+        !AuthInputValidation.isValidEmail(key) -> Result.failure(AuthError.InvalidEmail)
+        password.length < AuthInputValidation.MIN_PASSWORD_LENGTH ->
+            Result.failure(AuthError.WeakPassword)
         key in accounts -> Result.failure(AuthError.EmailAlreadyInUse)
         else -> signIn(addAccount(key, password))
       }
@@ -63,7 +66,7 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
         return Result.failure(it)
       }
       val key = normalize(email)
-      if (!EMAIL_REGEX.matches(key)) return Result.failure(AuthError.InvalidEmail)
+      if (!AuthInputValidation.isValidEmail(key)) return Result.failure(AuthError.InvalidEmail)
       val account = accounts[key]
       if (account != null && account.password == password) {
         signIn(account.uid)
@@ -109,9 +112,4 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
   private fun consumeNextError(): AuthError? = nextError.also { nextError = null }
 
   private fun normalize(email: String) = email.trim().lowercase()
-
-  companion object {
-    const val MIN_PASSWORD_LENGTH = 6
-    private val EMAIL_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
-  }
 }

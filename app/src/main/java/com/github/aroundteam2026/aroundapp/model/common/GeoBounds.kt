@@ -13,9 +13,6 @@ import kotlin.math.sin
  */
 data class GeoBounds(val south: Double, val west: Double, val north: Double, val east: Double)
 
-/** Mean radius of the Earth, in meters. */
-private const val EARTH_RADIUS_METERS = 6_371_000.0
-
 /**
  * The smallest [GeoBounds] holding every point within [radiusMeters] of this location.
  *
@@ -55,3 +52,13 @@ fun Location.boundsWithin(radiusMeters: Double): GeoBounds {
 
 /** Brings [degrees] back into [-180, 180) after it went past the antimeridian. */
 private fun wrapLongitude(degrees: Double) = (degrees + 540.0) % 360.0 - 180.0
+
+/**
+ * Whether [point] lies in these bounds, edges included. Bounds whose [GeoBounds.west] is greater
+ * than their [GeoBounds.east] wrap around the antimeridian.
+ */
+operator fun GeoBounds.contains(point: Location): Boolean {
+  val inLongitude =
+      if (west <= east) point.lng in west..east else point.lng >= west || point.lng <= east
+  return point.lat in south..north && inLongitude
+}

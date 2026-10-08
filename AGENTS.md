@@ -20,6 +20,8 @@ A Kotlin/Android Exploration/Social app (`com.github.aroundteam2026.aroundapp`),
 - **All new code comes with unit tests.**
 - `./gradlew check` is green (unit tests + lint) and `./gradlew ktfmtCheck` passes (formatting) before you submit.
 - Features covered by instrumented tests (under `androidTest/`, e.g. the Firestore repository) must also pass `./gradlew connectedDebugAndroidTest`, with an Android emulator and the Firebase emulator running.
+  - Start the Firebase emulators from the repository root with `firebase emulators:start`; it loads `firestore.rules`. Tests that use Firebase call `FirebaseEmulator.connect()` (in `androidTest/.../testing/`) in their setup, never the real project.
+  - A change to `firestore.rules` comes with a test in `FirestoreRulesTest`.
 - The CI runs the whole test suit, no flags exist to govern the CI behavior.
 
 ## How to work
