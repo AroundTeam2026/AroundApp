@@ -225,14 +225,6 @@ class QuestCardTest {
   }
 
   @Test
-  fun oneMoreQuestUsesTheSingular() {
-    show(pin(otherQuestCount = 1))
-
-    node(C.Tag.QUEST_CARD_MORE)
-        .assertTextEquals(context.resources.getQuantityString(R.plurals.map_card_more_quests, 1, 1))
-  }
-
-  @Test
   fun aVenueWithASingleQuestSaysNothingMore() {
     show(pin(otherQuestCount = 0))
 

@@ -434,15 +434,17 @@ class MapViewModelPinsTest {
 
   @Test
   fun tappingAPinThatIsGoneChangesNothing() = test {
-    // A tap can arrive just after the pin's last quest ended
+    // A tap can arrive just after the pin's last quest ended, before the map drops the pin
     showing()
+    viewModel.onPinClick("bar")
+    runCurrent()
+    quests.value = listOf(barQuest, genevaQuest)
+    runCurrent()
+
     viewModel.onPinClick("cafe")
     runCurrent()
 
-    viewModel.onPinClick("closed-venue")
-    runCurrent()
-
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("bar", state.selectedVenueId)
   }
 
   @Test
@@ -456,6 +458,13 @@ class MapViewModelPinsTest {
 
     assertNull(state.selectedVenueId)
     assertNull(selectedPin)
+
+    // A new quest brings the pin back, but the explorer must tap it to open it again
+    quests.value = listOf(barQuest, cafeQuest)
+    runCurrent()
+
+    assertEquals(setOf("cafe", "bar"), pinIds)
+    assertNull(state.selectedVenueId)
   }
 
   @Test
