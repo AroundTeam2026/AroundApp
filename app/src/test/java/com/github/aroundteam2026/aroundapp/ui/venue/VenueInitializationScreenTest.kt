@@ -41,7 +41,9 @@ import org.robolectric.annotation.GraphicsMode
 class VenueInitializationScreenTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val repository = ScreenVenueRepository()
-  private val viewModel = VenueInitializationViewModel(FakeAuthRepository("owner-1"), repository)
+  private val viewModel by lazy {
+    VenueInitializationViewModel(FakeAuthRepository("owner-1"), repository)
+  }
   private val navigatedIds = mutableListOf<String>()
   private var backCalls = 0
   private val recompositions = mutableIntStateOf(0)
@@ -142,11 +144,14 @@ class VenueInitializationScreenTest {
   }
 
   @Test
-  fun existingVenueContinuesWithoutReplacingProfile() {
+  fun existingVenuePrefillsDisabledNameAndContinuesWithoutReplacingProfile() {
     val original = Venue("owner-1", "Original", null, 75, "Address", 1L)
     runBlocking { repository.seed(original) }
     launch()
-    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput("Replacement")
+    compose
+        .onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME)
+        .assertTextContains("Original")
+        .assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
     compose.waitForIdle()
     assertEquals(listOf("owner-1"), navigatedIds)
@@ -171,6 +176,23 @@ class VenueInitializationScreenTest {
     compose.waitForIdle()
     assertEquals(listOf("owner-1"), navigatedIds)
     assertEquals(1, repository.saveCalls)
+  }
+
+  @Test
+  fun overlongNameShowsLimitAndDoesNotSave() {
+    launch()
+    compose
+        .onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME)
+        .performTextInput("a".repeat(VenueLimits.MAX_NAME_LENGTH + 1))
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose
+        .onNodeWithTag(C.Tag.VENUE_INITIALIZATION_ERROR)
+        .assertTextContains(
+            "Use ${VenueLimits.MAX_NAME_LENGTH} characters or fewer",
+            substring = true,
+        )
+    assertEquals(0, repository.saveCalls)
+    assertTrue(navigatedIds.isEmpty())
   }
 
   private class ScreenVenueRepository : VenueRepository {

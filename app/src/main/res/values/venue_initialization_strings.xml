@@ -10,6 +10,7 @@
     <string name="venue_initialization_saving">Saving…</string>
     <string name="venue_initialization_back">Back</string>
     <string name="venue_initialization_empty_name">Enter your business name.</string>
+    <string name="venue_initialization_name_too_long">Use %1$d characters or fewer for your business name.</string>
     <string name="venue_initialization_sign_in_required">Sign in to set up your venue.</string>
     <string name="venue_initialization_save_failed">Could not save your venue. Please try again.</string>
 </resources>

@@ -63,6 +63,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
 
 /**
@@ -183,9 +184,11 @@ fun VenueInitializationContent(
         OutlinedTextField(
             value = state.businessName,
             onValueChange = onNameChange,
-            enabled = state.canContinue,
+            enabled = state.canEditName,
             singleLine = true,
-            isError = state.error == VenueInitializationError.EMPTY_NAME,
+            isError =
+                state.error == VenueInitializationError.EMPTY_NAME ||
+                    state.error == VenueInitializationError.NAME_TOO_LONG,
             placeholder = { Text(stringResource(R.string.venue_initialization_name_hint)) },
             shape = RoundedCornerShape(14.dp),
             textStyle = MaterialTheme.typography.bodyLarge,
@@ -218,12 +221,14 @@ fun VenueInitializationContent(
           val message =
               when (error) {
                 VenueInitializationError.EMPTY_NAME -> R.string.venue_initialization_empty_name
+                VenueInitializationError.NAME_TOO_LONG ->
+                    R.string.venue_initialization_name_too_long
                 VenueInitializationError.SIGN_IN_REQUIRED ->
                     R.string.venue_initialization_sign_in_required
                 VenueInitializationError.SAVE_FAILED -> R.string.venue_initialization_save_failed
               }
           Text(
-              stringResource(message),
+              stringResource(message, VenueLimits.MAX_NAME_LENGTH),
               color = MaterialTheme.colorScheme.error,
               style = MaterialTheme.typography.bodyMedium,
               modifier =

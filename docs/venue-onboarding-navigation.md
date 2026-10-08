@@ -24,13 +24,16 @@ the profile before navigating and passes its id to location as a route
 argument. Both system Back and the location Back callback return to the form
 with its name intact. The success signal is consumed after navigation so
 returning does not immediately reopen location. Continuing again preserves
-the existing profile.
+the existing profile. Existing profiles prefill the business name and disable
+name editing, including after Back from location. New names are trimmed and
+limited to `VenueLimits.MAX_NAME_LENGTH` (100 characters).
 
 Integration is tested with a signup callback fixture, the real initialization
 screen, fake repositories, and a location destination fixture. The signup
 fixture represents completion of authentication; it does not implement or
 test signup itself.
 
+Follow-up integration is tracked in [#79](https://github.com/AroundTeam2026/AroundApp/issues/79).
 The running app still needs the auth owner to register this graph and supply
 the actual location screen. The auth UI in #67 (`feature/minimal-auth-screen`)
 observes authentication in a debug-only demo; it does not select a Venue role

@@ -1,18 +1,15 @@
 // Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.ui.venue
 
-import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -26,14 +23,12 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class VenueInitializationViewModelTest {
   private val dispatcher = StandardTestDispatcher()
-  private val signedInUid = MutableStateFlow<String?>("owner-1")
-  private val authRepository = mockk<AuthRepository>()
+  private val authRepository = FakeAuthRepository("owner-1")
   private val repository = RecordingVenueRepository()
 
   @Before
   fun setUp() {
     Dispatchers.setMain(dispatcher)
-    every { authRepository.currentUserId } returns signedInUid
   }
 
   @After
@@ -43,11 +38,13 @@ class VenueInitializationViewModelTest {
 
   private fun viewModel() =
       VenueInitializationViewModel(authRepository, repository, currentTimeMillis = { 123_456L })
+          .also { dispatcher.scheduler.runCurrent() }
 
   @Test
-  fun emptyAndWhitespaceNamesAreRejectedWithoutRepositoryCalls() =
+  fun emptyAndWhitespaceNamesAreRejectedWithoutAdditionalRepositoryCalls() =
       runTest(dispatcher) {
         val viewModel = viewModel()
+        val reads = repository.reads
         listOf("", " \t\n ").forEach { name ->
           viewModel.updateBusinessName(name)
           viewModel.submit()
@@ -55,7 +52,7 @@ class VenueInitializationViewModelTest {
           assertEquals(VenueInitializationError.EMPTY_NAME, viewModel.uiState.value.error)
           assertFalse(viewModel.uiState.value.isSaving)
         }
-        assertEquals(0, repository.reads)
+        assertEquals(reads, repository.reads)
         assertTrue(repository.created.isEmpty())
       }
 
@@ -142,12 +139,15 @@ class VenueInitializationViewModelTest {
       }
 
   @Test
-  fun existingVenueContinuesWithoutCreatingOrOverwriting() =
+  fun existingVenuePrefillsNameAndPreventsEditing() =
       runTest(dispatcher) {
         val original = Venue("owner-1", "Original", null, 75, "Existing address", 1L)
         repository.seed(original)
         val viewModel = viewModel()
+        assertEquals("Original", viewModel.uiState.value.businessName)
+        assertFalse(viewModel.uiState.value.canEditName)
         viewModel.updateBusinessName("Replacement")
+        assertEquals("Original", viewModel.uiState.value.businessName)
         viewModel.submit()
         runCurrent()
         assertTrue(repository.created.isEmpty())
@@ -168,6 +168,8 @@ class VenueInitializationViewModelTest {
         repository.saveGate!!.complete(Unit)
         runCurrent()
         assertEquals(winner, repository.getVenue("owner-1"))
+        assertEquals("Winner", viewModel.uiState.value.businessName)
+        assertFalse(viewModel.uiState.value.canEditName)
         assertEquals("owner-1", viewModel.uiState.value.venueId)
         assertNull(viewModel.uiState.value.error)
       }
@@ -175,7 +177,7 @@ class VenueInitializationViewModelTest {
   @Test
   fun missingSessionIsRejectedWithoutSaving() =
       runTest(dispatcher) {
-        signedInUid.value = null
+        authRepository.signOut()
         val viewModel = viewModel()
         viewModel.updateBusinessName("Cafe")
         viewModel.submit()
@@ -193,6 +195,8 @@ class VenueInitializationViewModelTest {
         viewModel.submit()
         runCurrent()
         viewModel.onLocationNavigationHandled()
+        assertFalse(viewModel.uiState.value.canEditName)
+        viewModel.updateBusinessName("Discarded edit")
         assertNull(viewModel.uiState.value.venueId)
         assertEquals("Cafe", viewModel.uiState.value.businessName)
         assertTrue(viewModel.uiState.value.canContinue)
@@ -211,6 +215,65 @@ class VenueInitializationViewModelTest {
     assertEquals("Cafe", viewModel.uiState.value.businessName)
     assertNull(viewModel.uiState.value.error)
   }
+
+  @Test
+  fun overlongNameIsRejectedAndEditingClearsError() =
+      runTest(dispatcher) {
+        val viewModel = viewModel()
+        val reads = repository.reads
+        viewModel.updateBusinessName("a".repeat(VenueLimits.MAX_NAME_LENGTH + 1))
+        viewModel.submit()
+        runCurrent()
+        assertEquals(VenueInitializationError.NAME_TOO_LONG, viewModel.uiState.value.error)
+        assertEquals(reads, repository.reads)
+        assertTrue(repository.created.isEmpty())
+        viewModel.updateBusinessName("Cafe")
+        assertNull(viewModel.uiState.value.error)
+      }
+
+  @Test
+  fun maximumLengthTrimmedNameIsAccepted() =
+      runTest(dispatcher) {
+        val viewModel = viewModel()
+        val name = "a".repeat(VenueLimits.MAX_NAME_LENGTH)
+        viewModel.updateBusinessName("  $name  ")
+        viewModel.submit()
+        runCurrent()
+        assertEquals(name, repository.created.single().name)
+        assertNull(viewModel.uiState.value.error)
+      }
+
+  @Test
+  fun loadingDisablesFormUntilExistingVenueIsChecked() =
+      runTest(dispatcher) {
+        val viewModel = VenueInitializationViewModel(authRepository, repository)
+        assertTrue(viewModel.uiState.value.isLoading)
+        assertFalse(viewModel.uiState.value.canContinue)
+        assertFalse(viewModel.uiState.value.canEditName)
+        viewModel.updateBusinessName("Ignored")
+        viewModel.submit()
+        runCurrent()
+        assertEquals("", viewModel.uiState.value.businessName)
+        assertTrue(viewModel.uiState.value.canEditName)
+        assertTrue(repository.created.isEmpty())
+      }
+
+  @Test
+  fun failedInitialReadAllowsRetryWithoutOverwritingExistingVenue() =
+      runTest(dispatcher) {
+        repository.seed(Venue("owner-1", "Original", null, 50, null, 1L))
+        repository.readFailure = IllegalStateException("Offline")
+        val viewModel = viewModel()
+        assertEquals(VenueInitializationError.SAVE_FAILED, viewModel.uiState.value.error)
+        assertTrue(viewModel.uiState.value.canContinue)
+        repository.readFailure = null
+        viewModel.updateBusinessName("Replacement")
+        viewModel.submit()
+        runCurrent()
+        assertEquals("Original", viewModel.uiState.value.businessName)
+        assertFalse(viewModel.uiState.value.canEditName)
+        assertTrue(repository.created.isEmpty())
+      }
 
   private class RecordingVenueRepository : VenueRepository {
     private val delegate = FakeVenueRepository()

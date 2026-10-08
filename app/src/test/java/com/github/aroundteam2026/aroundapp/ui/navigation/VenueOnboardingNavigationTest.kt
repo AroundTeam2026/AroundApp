@@ -7,6 +7,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -116,6 +117,7 @@ class VenueOnboardingNavigationTest {
     submitName()
     compose.onNodeWithTag("location").performClick()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).assertTextContains("My Cafe")
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).assertIsNotEnabled()
     compose.onNodeWithTag("location").assertDoesNotExist()
     val saved = runBlocking { repository.getVenue("owner-1") }
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()

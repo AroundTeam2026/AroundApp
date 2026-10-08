@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.model.venue
 
 /**
@@ -9,6 +10,9 @@ package com.github.aroundteam2026.aroundapp.model.venue
  * schema draft, PR #25).
  */
 object VenueLimits {
+  /** Maximum length of a trimmed business name entered during initialization. */
+  const val MAX_NAME_LENGTH = 100
+
   /** Smallest allowed [Venue.radiusMeters]. */
   const val MIN_RADIUS_METERS = 20
 
