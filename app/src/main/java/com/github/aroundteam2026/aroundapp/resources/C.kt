@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.resources
 
@@ -14,6 +15,15 @@ object C {
     const val QUESTS_SCREEN = "quests_screen"
     const val MAP_SCREEN = "map_screen"
     const val PROFILE_SCREEN = "profile_screen"
+
+    const val AUTH_SCREEN = "auth_screen"
+    const val AUTH_EMAIL = "auth_email"
+    const val AUTH_PASSWORD = "auth_password"
+    const val AUTH_CONFIRMATION = "auth_confirmation"
+    const val AUTH_SUBMIT = "auth_submit"
+    const val AUTH_SWITCH_MODE = "auth_switch_mode"
+    const val AUTH_ERROR = "auth_error"
+    const val AUTH_LOADING = "auth_loading"
 
     const val MAP = "map"
   }
