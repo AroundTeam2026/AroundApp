@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.model.address
 
 import android.location.Address
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.address.GeocoderAddressRepository.Companion.MAX_SUGGESTIONS
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
@@ -10,6 +11,9 @@ import com.github.aroundteam2026.aroundapp.model.common.contains
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import java.io.IOException
 import java.util.Locale
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -67,6 +71,63 @@ class GeocoderAddressRepositoryTest {
 
     assertEquals("Cathédrale de Lausanne", suggestion.title)
     assertEquals("1005 Lausanne", suggestion.subtitle)
+  }
+
+  @Test
+  fun aNamedPlaceKeepsItsNameAboveItsStreet() = runTest {
+    val epfl =
+        address(46.5191, 6.5668, "Route Cantonale", null, "1015", "Lausanne").apply {
+          featureName = "EPFL"
+        }
+    geocoding.answer = { _, _ -> listOf(epfl) }
+
+    val suggestion = found(repository.search("epfl", near = null)).single()
+
+    assertEquals("EPFL", suggestion.title)
+    assertEquals("Route Cantonale, 1015 Lausanne", suggestion.subtitle)
+    assertEquals("EPFL, Route Cantonale, 1015 Lausanne", suggestion.address)
+  }
+
+  @Test
+  fun aNamedPlaceWithoutATownStillShowsItsStreet() = runTest {
+    val cafe =
+        address(46.52, 6.63, "Rue de Bourg", "12", null, null).apply {
+          featureName = "Café Lumière"
+        }
+    geocoding.answer = { _, _ -> listOf(cafe) }
+
+    val suggestion = found(repository.search("lumière", near = null)).single()
+
+    assertEquals("Café Lumière", suggestion.title)
+    assertEquals("Rue de Bourg 12", suggestion.subtitle)
+  }
+
+  @Test
+  fun aFeatureNameThatIsTheHouseNumberIsNotAPlaceName() = runTest {
+    // Geocoders often name a street address by its number
+    geocoding.answer = { _, _ -> listOf(bourg.apply { featureName = "12" }) }
+
+    val suggestion = found(repository.search("rue de bourg 12", near = null)).single()
+
+    assertEquals("Rue de Bourg 12", suggestion.title)
+    assertEquals("1003 Lausanne", suggestion.subtitle)
+  }
+
+  @Test
+  fun aFeatureNameThatRepeatsTheStreetIsNotAPlaceName() = runTest {
+    val named = listOf("Rue de Bourg 12", "rue de bourg", "Rue de Bourg")
+    geocoding.answer = { _, _ ->
+      named.map { name ->
+        address(46.5199, 6.6346, "Rue de Bourg", "12", "1003", "Lausanne").apply {
+          featureName = name
+        }
+      }
+    }
+
+    val titles = found(repository.search("rue de bourg", near = null)).map { it.title }
+
+    // All three are the same street address, listed once
+    assertEquals(listOf("Rue de Bourg 12"), titles)
   }
 
   @Test
@@ -146,7 +207,7 @@ class GeocoderAddressRepositoryTest {
 
     assertEquals(1, geocoding.calls.size)
     assertNull(geocoding.calls.single().within)
-    assertEquals(GeocoderAddressRepository.MAX_SUGGESTIONS, geocoding.calls.single().maxResults)
+    assertEquals(MAX_SUGGESTIONS, geocoding.calls.single().maxResults)
   }
 
   @Test
@@ -155,7 +216,7 @@ class GeocoderAddressRepositoryTest {
 
     repository.search("gare", near = visible)
 
-    val within = geocoding.calls.first().within!!
+    val within = geocoding.calls.mapNotNull { it.within }.single()
     val centre = Location(46.5226, 6.6356)
     // A view of a few hundred metres would find almost nothing; the search looks around it
     assertTrue(within.contains(centre.copy(lat = centre.lat + 0.17)))
@@ -172,27 +233,49 @@ class GeocoderAddressRepositoryTest {
 
     // Place de la Gare is found both times, and listed once
     assertEquals(listOf("Place de la Gare 9", "Bahnhofplatz 1"), titles)
-    assertEquals(listOf(true, false), geocoding.calls.map { it.within != null })
+    assertEquals(setOf(true, false), geocoding.calls.map { it.within != null }.toSet())
   }
 
   @Test
-  fun enoughResultsAroundTheViewSkipTheWorldSearch() = runTest {
-    val nearby = (1..5).map { address(46.52, 6.63, "Rue de Bourg", "$it", "1003", "Lausanne") }
+  fun bothLookupsRunAtTheSameTime() = runTest {
+    val nearbyGate = CompletableDeferred<Unit>()
+    geocoding.gate = { within -> if (within != null) nearbyGate else null }
+    geocoding.answer = { _, within -> if (within != null) listOf(gare) else listOf(bahnhof) }
+
+    val search = async { repository.search("platz gare", near = visible) }
+    runCurrent()
+
+    // The world lookup started while the nearby one is still waiting for its answer
+    assertEquals(2, geocoding.calls.size)
+    assertTrue(search.isActive)
+    nearbyGate.complete(Unit)
+    assertEquals(
+        listOf("Place de la Gare 9", "Bahnhofplatz 1"),
+        found(search.await()).map { it.title },
+    )
+  }
+
+  @Test
+  fun fiveResultsAroundTheViewLeaveNoRoomForTheWorld() = runTest {
+    val nearby =
+        (1..MAX_SUGGESTIONS).map { address(46.52, 6.63, "Rue de Bourg", "$it", "1003", "Lausanne") }
     geocoding.answer = { _, within -> if (within != null) nearby else listOf(bahnhof) }
 
     val titles = found(repository.search("rue de bourg", near = visible)).map { it.title }
 
-    assertEquals((1..5).map { "Rue de Bourg $it" }, titles)
-    assertEquals(1, geocoding.calls.size)
+    assertEquals((1..MAX_SUGGESTIONS).map { "Rue de Bourg $it" }, titles)
   }
 
   @Test
-  fun neverMoreThanFiveSuggestions() = runTest {
-    val many = (1..9).map { address(47.37, 8.54, "Bahnhofstrasse", "$it", "8001", "Zürich") }
+  fun neverMoreThanTheMaximumSuggestions() = runTest {
+    val many =
+        (1..MAX_SUGGESTIONS + 4).map {
+          address(47.37, 8.54, "Bahnhofstrasse", "$it", "8001", "Zürich")
+        }
     geocoding.answer = { _, within -> if (within != null) emptyList() else many }
 
-    assertEquals(5, found(repository.search("bahnhofstrasse", near = visible)).size)
-    assertEquals(GeocoderAddressRepository.MAX_SUGGESTIONS, geocoding.calls.last().maxResults)
+    assertEquals(MAX_SUGGESTIONS, found(repository.search("bahnhofstrasse", near = visible)).size)
+    geocoding.calls.forEach { assertEquals(MAX_SUGGESTIONS, it.maxResults) }
   }
 
   @Test
@@ -213,12 +296,44 @@ class GeocoderAddressRepositoryTest {
   }
 
   @Test
-  fun aFailureAroundTheViewStillReportsAFailure() = runTest {
+  fun aFailedSearchAroundTheViewFallsBackToTheWorld() = runTest {
     geocoding.answer = { _, within ->
       if (within != null) throw IOException("Timeout") else listOf(bahnhof)
     }
 
-    assertEquals(AddressSearchResult.Failed, repository.search("bahnhofplatz", near = visible))
+    assertEquals(
+        listOf("Bahnhofplatz 1"),
+        found(repository.search("bahnhofplatz", near = visible)).map { it.title },
+    )
+  }
+
+  @Test
+  fun resultsAroundTheViewSurviveAFailedWorldSearch() = runTest {
+    geocoding.answer = { _, within ->
+      if (within != null) listOf(gare) else throw IOException("Timeout")
+    }
+
+    assertEquals(
+        listOf("Place de la Gare 9"),
+        found(repository.search("gare", near = visible)).map { it.title },
+    )
+  }
+
+  @Test
+  fun bothSearchesFailingReportsAFailure() = runTest {
+    geocoding.answer = { _, _ -> throw IOException("No network") }
+
+    assertEquals(AddressSearchResult.Failed, repository.search("gare", near = visible))
+  }
+
+  @Test
+  fun aFailedSearchAroundTheViewWithNothingElsewhereFindsNothing() = runTest {
+    geocoding.answer = { _, within ->
+      if (within != null) throw IOException("Timeout") else emptyList()
+    }
+
+    // The world search answered: there is nothing to find, not a failure to report
+    assertEquals(AddressSearchResult.Found(emptyList()), repository.search("zzz", near = visible))
   }
 
   @Test
@@ -252,16 +367,18 @@ class GeocoderAddressRepositoryTest {
       }
 }
 
-/** Answers lookups with [answer] and records them. */
+/** Answers lookups with [answer], once their [gate] opens if they have one, and records them. */
 private class FakeGeocoding : Geocoding {
   data class Call(val query: String, val maxResults: Int, val within: GeoBounds?)
 
   override var isAvailable = true
   var answer: (query: String, within: GeoBounds?) -> List<Address> = { _, _ -> emptyList() }
+  var gate: (within: GeoBounds?) -> CompletableDeferred<Unit>? = { null }
   val calls = mutableListOf<Call>()
 
   override suspend fun fromName(query: String, maxResults: Int, within: GeoBounds?): List<Address> {
     calls += Call(query, maxResults, within)
+    gate(within)?.await()
     return answer(query, within)
   }
 }

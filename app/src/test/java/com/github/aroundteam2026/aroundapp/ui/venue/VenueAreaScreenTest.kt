@@ -133,7 +133,7 @@ class VenueAreaScreenTest {
         .onNodeWithTag(C.Tag.VENUE_ADDRESS_FIELD)
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
         .assertTextEquals("Search for your address", includeEditableText = false)
-    assertEquals("", viewModel.uiState.value.addressSearch.query)
+    assertEquals("", viewModel.addressQuery)
   }
 
   @Test

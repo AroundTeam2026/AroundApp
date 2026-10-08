@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundFonts
 
 // The Figma "Search" field and "Search results" card of the explorer search, in the second draft
@@ -70,10 +74,13 @@ private val AVATAR_ICON = 20.dp
 private val LINE_GAP = 2.dp
 private val HAIRLINE = 1.dp
 
-private val QueryStyle = TextStyle(fontFamily = AroundFonts.Body, fontSize = 15.sp)
-private val TitleStyle =
+/** How visible a suggestion from the previous query stays while the next search runs. */
+private const val STALE_ALPHA = 0.5f
+
+private val QUERY_STYLE = TextStyle(fontFamily = AroundFonts.Body, fontSize = 15.sp)
+private val TITLE_STYLE =
     TextStyle(fontFamily = AroundFonts.Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-private val SubtitleStyle = TextStyle(fontFamily = AroundFonts.Body, fontSize = 13.sp)
+private val SUBTITLE_STYLE = TextStyle(fontFamily = AroundFonts.Body, fontSize = 13.sp)
 
 /**
  * The colours of the address search, from the Figma tokens.
@@ -103,22 +110,25 @@ data class AddressSearchColors(
 
 /** The address search's default colours: the Figma second draft's, light and dark. */
 object AddressSearchDefaults {
-  private val Light =
+  // The light tokens the app's colours already hold; the tile's teal is the second draft's
+  // "tertiary", lighter than AroundColors.Teal, which came from the first draft
+  private val LIGHT =
       AddressSearchColors(
-          surface = Color(0xFFFFFFF6),
-          outline = Color(0xFF4D0092),
-          ink = Color(0xFF2D2D2D),
-          muted = Color(0xFF6E6C66),
-          line = Color(0xFFE3E5CF),
+          surface = AroundColors.Paper,
+          outline = AroundColors.Purple,
+          ink = AroundColors.Ink,
+          muted = AroundColors.InkMuted,
+          line = AroundColors.Line,
           avatar = Color(0xFF5EA89D),
-          onAvatar = Color(0xFFFDFFE8),
-          highlight = Color(0xFF4D0092),
+          onAvatar = AroundColors.Cream,
+          highlight = AroundColors.Purple,
           shadow = Color(0x266B5947),
       )
 
-  // The dark mode's highlight is its accent text colour, the same as its ink, as in Figma
-  private val Dark =
-      Light.copy(
+  // The app has no dark colours yet. The dark mode's highlight is its accent text colour, the same
+  // as its ink, as in Figma
+  private val DARK =
+      LIGHT.copy(
           surface = Color(0xFF383838),
           ink = Color(0xFFFDFFE8),
           muted = Color(0xFFB5B6A6),
@@ -127,23 +137,26 @@ object AddressSearchDefaults {
       )
 
   /** The colours for dark mode when [darkTheme], else for light mode. */
-  fun colors(darkTheme: Boolean): AddressSearchColors = if (darkTheme) Dark else Light
+  fun colors(darkTheme: Boolean): AddressSearchColors = if (darkTheme) DARK else LIGHT
 
   /** The colours for the system's light or dark mode. */
   @Composable fun colors(): AddressSearchColors = colors(isSystemInDarkTheme())
 }
 
 /**
- * Where a venue searches its address: a rounded field, then a card listing [state]'s suggestions,
- * or a message saying it is searching or why there are none. Nothing shows under the field while
- * there is nothing to say.
+ * Where a venue searches its address: a rounded field showing [query], then a card listing
+ * [state]'s suggestions, or a message saying it is searching or why there are none. Nothing shows
+ * under the field while there is nothing to say. When the bar has less height than the card needs,
+ * as above the keyboard, the card scrolls.
  *
  * Typing reports each change to [onQueryChange]; the keyboard's search key calls [onSearch]; the
  * clear button, shown once there is a query, calls [onClear]. Tapping a suggestion calls [onPick]
- * and hides the keyboard.
+ * and hides the keyboard. While a search runs, the suggestions from the previous query stay in view
+ * but can't be picked, as they may not match the query anymore.
  */
 @Composable
 fun AddressSearchBar(
+    query: String,
     state: AddressSearchUiState,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
@@ -154,26 +167,29 @@ fun AddressSearchBar(
 ) {
   val focusManager = LocalFocusManager.current
   Column(modifier, verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-    SearchField(state.query, onQueryChange, onSearch, onClear, colors)
+    SearchField(query, onQueryChange, onSearch, onClear, colors)
     val message = statusMessage(state)
+    // Takes what height is left, without stretching, so a short space makes it scroll
+    val cardModifier = Modifier.weight(1f, fill = false)
     if (state.suggestions.isNotEmpty()) {
-      ResultsCard(colors) {
+      val pickable = state.status != AddressSearchStatus.SEARCHING
+      ResultsCard(colors, cardModifier) {
         state.suggestions.forEachIndexed { index, suggestion ->
           if (index > 0) HorizontalDivider(thickness = HAIRLINE, color = colors.line)
-          SuggestionRow(suggestion, state.query, colors) {
+          SuggestionRow(suggestion, query, colors, enabled = pickable) {
             focusManager.clearFocus()
             onPick(suggestion)
           }
         }
       }
     } else if (message != null) {
-      ResultsCard(colors) {
+      ResultsCard(colors, cardModifier) {
         Text(
             message,
             Modifier.testTag(C.Tag.VENUE_ADDRESS_STATUS)
                 .padding(horizontal = ROW_HORIZONTAL_PADDING, vertical = ROW_VERTICAL_PADDING),
             color = colors.muted,
-            style = SubtitleStyle,
+            style = SUBTITLE_STYLE,
         )
       }
     }
@@ -205,7 +221,7 @@ private fun SearchField(
       value = query,
       onValueChange = onQueryChange,
       modifier = Modifier.testTag(C.Tag.VENUE_ADDRESS_FIELD).fillMaxWidth(),
-      textStyle = QueryStyle.copy(color = colors.ink),
+      textStyle = QUERY_STYLE.copy(color = colors.ink),
       singleLine = true,
       cursorBrush = SolidColor(colors.outline),
       keyboardOptions =
@@ -244,7 +260,7 @@ private fun SearchField(
               Text(
                   stringResource(R.string.venue_address_placeholder),
                   color = colors.muted,
-                  style = QueryStyle,
+                  style = QUERY_STYLE,
                   maxLines = 1,
                   overflow = TextOverflow.Ellipsis,
               )
@@ -276,33 +292,44 @@ private fun ClearButton(onClear: () -> Unit, colors: AddressSearchColors) {
   }
 }
 
-/** The card under the field. */
+/** The card under the field, which scrolls when [modifier] leaves it too little height. */
 @Composable
-private fun ResultsCard(colors: AddressSearchColors, content: @Composable () -> Unit) {
+private fun ResultsCard(
+    colors: AddressSearchColors,
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
   val shape = RoundedCornerShape(CARD_RADIUS)
   Column(
-      Modifier.testTag(C.Tag.VENUE_ADDRESS_RESULTS)
+      modifier
+          .testTag(C.Tag.VENUE_ADDRESS_RESULTS)
           .fillMaxWidth()
           .clip(shape)
           .background(colors.surface)
           .border(HAIRLINE, colors.line, shape)
+          .verticalScroll(rememberScrollState())
   ) {
     content()
   }
 }
 
-/** One suggestion: a pin on a round tile, then its title over its second line. */
+/**
+ * One suggestion: a pin on a round tile, then its title over its second line. Faded and inert
+ * unless [enabled].
+ */
 @Composable
 private fun SuggestionRow(
     suggestion: AddressSuggestion,
     query: String,
     colors: AddressSearchColors,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
   Row(
       Modifier.testTag(C.Tag.VENUE_ADDRESS_RESULT)
           .fillMaxWidth()
-          .clickable(role = Role.Button, onClick = onClick)
+          .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+          .alpha(if (enabled) 1f else STALE_ALPHA)
           .padding(horizontal = ROW_HORIZONTAL_PADDING, vertical = ROW_VERTICAL_PADDING),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(ROW_GAP),
@@ -326,7 +353,7 @@ private fun SuggestionRow(
           highlighted(suggestion.title, query, colors.highlight),
           Modifier.testTag(C.Tag.VENUE_ADDRESS_RESULT_TITLE),
           color = colors.ink,
-          style = TitleStyle,
+          style = TITLE_STYLE,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
       )
@@ -335,7 +362,7 @@ private fun SuggestionRow(
         Text(
             it,
             color = colors.muted,
-            style = SubtitleStyle,
+            style = SUBTITLE_STYLE,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

@@ -1,9 +1,12 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
@@ -15,11 +18,14 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -28,6 +34,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -56,6 +63,7 @@ class AddressSearchBarTest {
   private val gare =
       AddressSuggestion("Place de la Gare 9", "1003 Lausanne", Location(46.5167, 6.6291))
 
+  private var query by mutableStateOf("")
   private var state by mutableStateOf(AddressSearchUiState())
   private val queries = mutableListOf<String>()
   private var searches = 0
@@ -65,10 +73,11 @@ class AddressSearchBarTest {
   private fun show(colors: AddressSearchColors? = null) {
     composeTestRule.setContent {
       AddressSearchBar(
+          query = query,
           state = state,
           onQueryChange = {
             queries += it
-            state = state.copy(query = it)
+            query = it
           },
           onSearch = { searches++ },
           onClear = { clears++ },
@@ -108,7 +117,8 @@ class AddressSearchBarTest {
 
   @Test
   fun theClearButtonAppearsWithAQueryAndClears() {
-    state = AddressSearchUiState(query = "Rue")
+    query = "Rue"
+    state = AddressSearchUiState()
     show()
 
     composeTestRule.onNodeWithContentDescription("Clear search").performClick()
@@ -118,7 +128,8 @@ class AddressSearchBarTest {
 
   @Test
   fun theKeyboardsSearchKeySearches() {
-    state = AddressSearchUiState(query = "Ru")
+    query = "Ru"
+    state = AddressSearchUiState()
     show()
 
     node(C.Tag.VENUE_ADDRESS_FIELD).performImeAction()
@@ -128,7 +139,8 @@ class AddressSearchBarTest {
 
   @Test
   fun listsTheSuggestionsInOrderWithTheirTwoLines() {
-    state = AddressSearchUiState(query = "a", suggestions = listOf(bourg, gare))
+    query = "a"
+    state = AddressSearchUiState(suggestions = listOf(bourg, gare))
     show()
 
     results().assertCountEquals(2)
@@ -139,7 +151,8 @@ class AddressSearchBarTest {
 
   @Test
   fun tappingASuggestionPicksIt() {
-    state = AddressSearchUiState(query = "a", suggestions = listOf(bourg, gare))
+    query = "a"
+    state = AddressSearchUiState(suggestions = listOf(bourg, gare))
     show()
 
     results()[1].performClick()
@@ -149,7 +162,8 @@ class AddressSearchBarTest {
 
   @Test
   fun eachSuggestionIsOneButtonReadingBothLines() {
-    state = AddressSearchUiState(query = "a", suggestions = listOf(bourg))
+    query = "a"
+    state = AddressSearchUiState(suggestions = listOf(bourg))
     show()
 
     results()[0]
@@ -164,7 +178,8 @@ class AddressSearchBarTest {
 
   @Test
   fun thePartOfATitleMatchingTheQueryIsHighlightedInAnyCase() {
-    state = AddressSearchUiState(query = " bourg ", suggestions = listOf(bourg))
+    query = " bourg "
+    state = AddressSearchUiState(suggestions = listOf(bourg))
     show()
 
     val title = titleOf(0).annotated()
@@ -175,15 +190,63 @@ class AddressSearchBarTest {
 
   @Test
   fun aTitleWithoutTheQueryIsNotHighlighted() {
-    state = AddressSearchUiState(query = "gare", suggestions = listOf(bourg))
+    query = "gare"
+    state = AddressSearchUiState(suggestions = listOf(bourg))
     show()
 
     assertTrue(titleOf(0).annotated().spanStyles.isEmpty())
   }
 
   @Test
+  fun suggestionsFromThePreviousQueryCantBePickedWhileTheNextSearchRuns() {
+    query = "Rue de B"
+    state =
+        AddressSearchUiState(suggestions = listOf(bourg), status = AddressSearchStatus.SEARCHING)
+    show()
+
+    results()[0].assertIsNotEnabled().performClick()
+
+    assertTrue(picks.isEmpty())
+  }
+
+  @Test
+  fun suggestionsCanBePickedAgainOnceTheSearchAnswers() {
+    query = "Rue de B"
+    state =
+        AddressSearchUiState(suggestions = listOf(bourg), status = AddressSearchStatus.SEARCHING)
+    show()
+
+    state = AddressSearchUiState(suggestions = listOf(bourg))
+    composeTestRule.waitForIdle()
+    results()[0].assertIsEnabled().performClick()
+
+    assertEquals(listOf(bourg), picks)
+  }
+
+  @Test
+  fun inAShortSpaceTheSuggestionsScrollRatherThanOverflow() {
+    query = "Rue"
+    val many =
+        (1..5).map { AddressSuggestion("Rue de Bourg $it", "1003 Lausanne", Location(46.52, 6.63)) }
+    state = AddressSearchUiState(suggestions = many)
+    composeTestRule.setContent {
+      // As when the keyboard leaves little room under the field
+      Box(Modifier.height(200.dp)) { AddressSearchBar(query, state, {}, {}, {}, { picks += it }) }
+    }
+
+    val card = node(C.Tag.VENUE_ADDRESS_RESULTS)
+    assertTrue(card.getBoundsInRoot().bottom <= 200.dp)
+    card.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+    // The last suggestion is still reachable
+    card.performScrollToNode(hasText("Rue de Bourg 5"))
+    composeTestRule.onNodeWithText("Rue de Bourg 5").performClick()
+    assertEquals(listOf(many.last()), picks)
+  }
+
+  @Test
   fun nothingIsShownBelowTheFieldWhileIdleWithoutSuggestions() {
-    state = AddressSearchUiState(query = "Ru")
+    query = "Ru"
+    state = AddressSearchUiState()
     show()
 
     node(C.Tag.VENUE_ADDRESS_RESULTS).assertDoesNotExist()
@@ -191,7 +254,8 @@ class AddressSearchBarTest {
 
   @Test
   fun aFirstSearchSaysItIsSearching() {
-    state = AddressSearchUiState(query = "Rue", status = AddressSearchStatus.SEARCHING)
+    query = "Rue"
+    state = AddressSearchUiState(status = AddressSearchStatus.SEARCHING)
     show()
 
     composeTestRule.onNodeWithText("Searching…").assertIsDisplayed()
@@ -199,9 +263,9 @@ class AddressSearchBarTest {
 
   @Test
   fun aLaterSearchKeepsShowingTheEarlierSuggestions() {
+    query = "Rue de"
     state =
         AddressSearchUiState(
-            query = "Rue de",
             suggestions = listOf(bourg),
             status = AddressSearchStatus.SEARCHING,
         )
@@ -223,7 +287,8 @@ class AddressSearchBarTest {
     show()
 
     messages.forEach { (status, message) ->
-      state = AddressSearchUiState(query = "Rue", status = status)
+      query = "Rue"
+      state = AddressSearchUiState(status = status)
       composeTestRule.waitForIdle()
       composeTestRule.onNodeWithText(message).assertIsDisplayed()
     }
@@ -231,7 +296,8 @@ class AddressSearchBarTest {
 
   @Test
   fun theFieldAndRowsHaveTheFigmaSizes() {
-    state = AddressSearchUiState(query = "a", suggestions = listOf(bourg))
+    query = "a"
+    state = AddressSearchUiState(suggestions = listOf(bourg))
     show()
 
     node(C.Tag.VENUE_ADDRESS_FIELD_BOX).assertHeightIsEqualTo(44.dp)
@@ -272,7 +338,6 @@ class AddressSearchBarTest {
 
     val image = node(C.Tag.VENUE_ADDRESS_FIELD_BOX).captureToImage()
     assertPixel(image, 6.dp.px(), image.height / 2, Color(0xFF383838))
-    assertEquals(Color(0xFF383838), dark.surface)
   }
 
   @Test

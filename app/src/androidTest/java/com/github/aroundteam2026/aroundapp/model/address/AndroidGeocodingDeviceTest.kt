@@ -50,8 +50,9 @@ class AndroidGeocodingDeviceTest {
 
   @Test
   fun returnsAtMostTheResultsAskedFor() = runTest {
+    // Many towns have a Rue de Lausanne, so there is more to find than asked for
     val found = geocoding.fromName("Rue de Lausanne", maxResults = 2, within = null)
 
-    assertTrue(found.size <= 2)
+    assertTrue("Found ${found.size}", found.size in 1..2)
   }
 }

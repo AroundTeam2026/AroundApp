@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -31,6 +32,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -77,41 +79,55 @@ fun VenueAreaScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
+  val focusManager = LocalFocusManager.current
 
-  Column(Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_SCREEN)) {
-    Box(Modifier.weight(1f).fillMaxWidth()) {
-      AreaMap(
-          state = state,
-          cameraPositionState = cameraPositionState,
-          onMarkerPlaced = viewModel::onMarkerPlaced,
-          onAreaFramed = viewModel::onAreaFramed,
-          onVisibleAreaChanged = viewModel::onVisibleAreaChanged,
-      )
+  Box(Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_SCREEN)) {
+    Column(Modifier.fillMaxSize()) {
+      Box(Modifier.weight(1f).fillMaxWidth()) {
+        AreaMap(
+            state = state,
+            cameraPositionState = cameraPositionState,
+            onMarkerPlaced = viewModel::onMarkerPlaced,
+            onAreaFramed = viewModel::onAreaFramed,
+            onVisibleAreaChanged = viewModel::onVisibleAreaChanged,
+            // Turning to the map closes the keyboard and the suggestions
+            onMapTapped = {
+              focusManager.clearFocus()
+              viewModel.onAddressSearchDismissed()
+            },
+        )
+        if (state.showsUserLocation) {
+          UseMyLocationButton(
+              onClick = viewModel::onUseMyLocation,
+              modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+          )
+        }
+      }
+      RadiusPanel(state.radiusMeters, viewModel::onRadiusChanged)
+    }
+    // Over the whole screen and above the keyboard, so the suggestions scroll rather than hide
+    // behind it. Taps beside the bar reach the map.
+    Box(
+        Modifier.fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .imePadding()
+            .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 16.dp)
+    ) {
       AddressSearchBar(
+          query = viewModel.addressQuery,
           state = state.addressSearch,
           onQueryChange = viewModel::onAddressQueryChanged,
           onSearch = viewModel::onAddressSearch,
           onClear = viewModel::onAddressCleared,
           onPick = viewModel::onAddressPicked,
-          modifier =
-              Modifier.align(Alignment.TopCenter)
-                  .windowInsetsPadding(WindowInsets.statusBars)
-                  .padding(start = 16.dp, end = 16.dp, top = 12.dp),
       )
-      if (state.showsUserLocation) {
-        UseMyLocationButton(
-            onClick = viewModel::onUseMyLocation,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-        )
-      }
     }
-    RadiusPanel(state.radiusMeters, viewModel::onRadiusChanged)
   }
 }
 
 /**
- * The map with the marker and the circle around it; tapping the map places the marker. It reports
- * what it shows to [onVisibleAreaChanged] each time it stops moving.
+ * The map with the marker and the circle around it; tapping the map calls [onMapTapped], then
+ * places the marker. It reports what it shows to [onVisibleAreaChanged] each time it stops moving.
  */
 @Composable
 private fun AreaMap(
@@ -120,6 +136,7 @@ private fun AreaMap(
     onMarkerPlaced: (Location) -> Unit,
     onAreaFramed: (GeoBounds) -> Unit,
     onVisibleAreaChanged: (GeoBounds) -> Unit,
+    onMapTapped: () -> Unit,
 ) {
   // Outside the map's content, which only runs once the map exists
   val markerState = state.marker?.let { rememberDraggableMarker(it, onMarkerPlaced) }
@@ -142,6 +159,7 @@ private fun AreaMap(
                 mapToolbarEnabled = false,
             ),
         onMapClick = { tap ->
+          onMapTapped()
           val visible = cameraPositionState.projection?.visibleRegion?.latLngBounds
           if (isOnVisibleMap(tap, visible)) onMarkerPlaced(tap.toLocation())
         },

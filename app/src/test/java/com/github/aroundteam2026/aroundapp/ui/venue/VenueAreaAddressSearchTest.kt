@@ -6,7 +6,9 @@ import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.ADDRESS_DRIFT_METERS
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.SEARCH_DELAY_MILLIS
 import kotlinx.coroutines.CompletableDeferred
@@ -59,7 +61,7 @@ class VenueAreaAddressSearchTest {
 
   @Test
   fun theSearchStartsEmptyAndIdle() {
-    assertEquals("", search.query)
+    assertEquals("", viewModel.addressQuery)
     assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
     assertEquals(AddressSearchStatus.IDLE, search.status)
     assertNull(state.address)
@@ -69,7 +71,7 @@ class VenueAreaAddressSearchTest {
   fun typingShowsTheQueryAtOnce() {
     viewModel.onAddressQueryChanged("Ru")
 
-    assertEquals("Ru", search.query)
+    assertEquals("Ru", viewModel.addressQuery)
   }
 
   @Test
@@ -237,7 +239,7 @@ class VenueAreaAddressSearchTest {
     assertEquals(bourg.location, state.marker)
     assertEquals(bourg.location.boundsWithin(FRAMED_RADIUS_METERS), state.areaToFrame)
     assertEquals("Rue de Bourg 12, 1003 Lausanne", state.address)
-    assertEquals("Rue de Bourg 12, 1003 Lausanne", search.query)
+    assertEquals("Rue de Bourg 12, 1003 Lausanne", viewModel.addressQuery)
     assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
     assertEquals(AddressSearchStatus.IDLE, search.status)
   }
@@ -297,7 +299,95 @@ class VenueAreaAddressSearchTest {
 
     viewModel.onMarkerPlaced(entrance)
 
-    // The marker refines where the entrance is; the street address stays the venue's
+    // About 120 m away: the marker refines where the entrance is; the address stays the venue's
+    assertTrue(bourg.location.distanceTo(entrance) < ADDRESS_DRIFT_METERS)
+    assertEquals("Rue de Bourg 12, 1003 Lausanne", state.address)
+  }
+
+  @Test
+  fun movingTheMarkerFarFromThePickedAddressForgetsIt() {
+    viewModel.onAddressPicked(bourg)
+    val acrossTown = Location(46.5235, 6.6382)
+    assertTrue(bourg.location.distanceTo(acrossTown) > ADDRESS_DRIFT_METERS)
+
+    viewModel.onMarkerPlaced(acrossTown)
+
+    // The address no longer describes where the marker is, so it mustn't be saved with it
+    assertNull(state.address)
+    assertEquals(acrossTown, state.marker)
+  }
+
+  @Test
+  fun aForgottenAddressStaysForgottenWhenTheMarkerComesBack() {
+    viewModel.onAddressPicked(bourg)
+    viewModel.onMarkerPlaced(Location(46.5235, 6.6382))
+
+    viewModel.onMarkerPlaced(bourg.location)
+
+    assertNull(state.address)
+  }
+
+  @Test
+  fun aNewPickAfterForgettingKeepsTheNewAddress() {
+    viewModel.onAddressPicked(bourg)
+    viewModel.onMarkerPlaced(Location(46.5235, 6.6382))
+
+    viewModel.onAddressPicked(gare)
+    viewModel.onMarkerPlaced(gare.location)
+
+    assertEquals("Place de la Gare 9, 1003 Lausanne", state.address)
+  }
+
+  @Test
+  fun aMarkerPlacedWithoutAPickHasNoAddress() {
+    viewModel.onMarkerPlaced(entrance)
+
+    assertNull(state.address)
+  }
+
+  @Test
+  fun dismissingHidesTheSuggestionsButKeepsTheQuery() = test {
+    viewModel.onAddressQueryChanged("Rue")
+    advanceUntilIdle()
+
+    viewModel.onAddressSearchDismissed()
+
+    assertEquals("Rue", viewModel.addressQuery)
+    assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
+    assertEquals(AddressSearchStatus.IDLE, search.status)
+  }
+
+  @Test
+  fun dismissingCancelsAPendingSearch() = test {
+    viewModel.onAddressQueryChanged("Rue")
+    viewModel.onAddressSearchDismissed()
+    advanceUntilIdle()
+
+    assertTrue(addresses.searches.isEmpty())
+    assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
+  }
+
+  @Test
+  fun dismissingDuringASearchDropsItsResults() = test {
+    addresses.gates["Rue"] = CompletableDeferred()
+    viewModel.onAddressQueryChanged("Rue")
+    advanceTimeBy(SEARCH_DELAY_MILLIS + 1)
+
+    viewModel.onAddressSearchDismissed()
+    addresses.gates.getValue("Rue").complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
+    assertEquals(AddressSearchStatus.IDLE, search.status)
+  }
+
+  @Test
+  fun dismissingKeepsTheMarkerAndAddress() {
+    viewModel.onAddressPicked(bourg)
+
+    viewModel.onAddressSearchDismissed()
+
+    assertEquals(bourg.location, state.marker)
     assertEquals("Rue de Bourg 12, 1003 Lausanne", state.address)
   }
 
@@ -309,7 +399,7 @@ class VenueAreaAddressSearchTest {
 
     viewModel.onAddressCleared()
 
-    assertEquals("", search.query)
+    assertEquals("", viewModel.addressQuery)
     assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
     assertEquals(AddressSearchStatus.IDLE, search.status)
     assertEquals(bourg.location, state.marker)
