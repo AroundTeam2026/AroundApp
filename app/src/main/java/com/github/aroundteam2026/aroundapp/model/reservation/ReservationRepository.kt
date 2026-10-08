@@ -24,6 +24,8 @@ interface ReservationRepository {
    *
    * @param venueId id of the venue whose reservations to return.
    * @return all of that venue's reservations, whatever their status, in unspecified order.
+   * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
+   *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
    */
   fun observeForVenue(venueId: String): Flow<List<Reservation>>
 
@@ -33,11 +35,18 @@ interface ReservationRepository {
    * @param uid uid of the explorer.
    * @return every reservation whose party includes [uid], whatever its status, in unspecified
    *   order.
+   * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
+   *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
    */
   fun observeForExplorer(uid: String): Flow<List<Reservation>>
 
   /**
    * Moves a reservation to [status], changing nothing else.
+   *
+   * For now only the venue that owns the reservation can change its status, because the security
+   * rules allow nothing else. The Firestore implementation therefore fails when an explorer calls
+   * this, for example to cancel their own reservation (E21), even though the fake allows it. The
+   * rules will have to change when E21 is scheduled.
    *
    * @param id id of the reservation.
    * @param status the new status; the change must be allowed by [canTransition].
