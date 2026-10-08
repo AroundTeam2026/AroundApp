@@ -4,13 +4,21 @@ package com.github.aroundteam2026.aroundapp.ui.venue
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepository
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchResult
+import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
+import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
@@ -49,7 +57,11 @@ class VenueAreaScreenDeviceTest {
       VenueAreaViewModel(
           object : LocationRepository {
             override suspend fun currentLocation() = here
-          }
+          },
+          object : AddressSearchRepository {
+            override suspend fun search(query: String, near: GeoBounds?) =
+                AddressSearchResult.Found(listOf(AddressSuggestion("Seefeldstrasse 1", null, here)))
+          },
       )
   private val camera = CameraPositionState()
 
@@ -92,6 +104,27 @@ class VenueAreaScreenDeviceTest {
 
     // The map's center is where the camera points
     assertTrue("The marker is at $marker", marker.toLatLng().isNear(here))
+  }
+
+  @Test
+  fun tappingTheMapClosesTheAddressSuggestionsAndTheKeyboard() {
+    show()
+    val field = composeTestRule.onNodeWithTag(C.Tag.VENUE_ADDRESS_FIELD)
+    field.performTextInput("Seefeld")
+    field.performImeAction()
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
+      composeTestRule
+          .onAllNodesWithTag(C.Tag.VENUE_ADDRESS_RESULT)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+
+    placeMarkerByTapping()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_ADDRESS_RESULTS).assertDoesNotExist()
+    field.assertIsNotFocused()
+    // The tap still places the marker, and the query stays to search again
+    assertEquals("Seefeld", viewModel.addressQuery)
   }
 
   @Test

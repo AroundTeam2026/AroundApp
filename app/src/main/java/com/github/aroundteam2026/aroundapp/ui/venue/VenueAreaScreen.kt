@@ -7,11 +7,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -28,12 +32,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
@@ -42,6 +48,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.FrameArea
+import com.github.aroundteam2026.aroundapp.ui.map.ReportVisibleArea
 import com.github.aroundteam2026.aroundapp.ui.map.RequestLocationPermission
 import com.github.aroundteam2026.aroundapp.ui.map.rememberMapCamera
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
@@ -59,9 +66,9 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 
 /**
- * Where a venue places its marker, by tapping the map or dragging the marker, and sets the radius
- * in which a visit counts. It asks for the location permission once per visit; with it, the map
- * shows the device's position and frames it.
+ * Where a venue places its marker, by tapping the map, dragging the marker or searching its
+ * address, and sets the radius in which a visit counts. It asks for the location permission once
+ * per visit; with it, the map shows the device's position and frames it.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
@@ -72,33 +79,64 @@ fun VenueAreaScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
+  val focusManager = LocalFocusManager.current
 
-  Column(Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_SCREEN)) {
-    Box(Modifier.weight(1f).fillMaxWidth()) {
-      AreaMap(
-          state = state,
-          cameraPositionState = cameraPositionState,
-          onMarkerPlaced = viewModel::onMarkerPlaced,
-          onAreaFramed = viewModel::onAreaFramed,
-      )
-      if (state.showsUserLocation) {
-        UseMyLocationButton(
-            onClick = viewModel::onUseMyLocation,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+  Box(Modifier.fillMaxSize().testTag(C.Tag.VENUE_AREA_SCREEN)) {
+    Column(Modifier.fillMaxSize()) {
+      Box(Modifier.weight(1f).fillMaxWidth()) {
+        AreaMap(
+            state = state,
+            cameraPositionState = cameraPositionState,
+            onMarkerPlaced = viewModel::onMarkerPlaced,
+            onAreaFramed = viewModel::onAreaFramed,
+            onVisibleAreaChanged = viewModel::onVisibleAreaChanged,
+            // Turning to the map closes the keyboard and the suggestions
+            onMapTapped = {
+              focusManager.clearFocus()
+              viewModel.onAddressSearchDismissed()
+            },
         )
+        if (state.showsUserLocation) {
+          UseMyLocationButton(
+              onClick = viewModel::onUseMyLocation,
+              modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+          )
+        }
       }
+      RadiusPanel(state.radiusMeters, viewModel::onRadiusChanged)
     }
-    RadiusPanel(state.radiusMeters, viewModel::onRadiusChanged)
+    // Over the whole screen and above the keyboard, so the suggestions scroll rather than hide
+    // behind it. Taps beside the bar reach the map.
+    Box(
+        Modifier.fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .imePadding()
+            .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 16.dp)
+    ) {
+      AddressSearchBar(
+          query = viewModel.addressQuery,
+          state = state.addressSearch,
+          onQueryChange = viewModel::onAddressQueryChanged,
+          onSearch = viewModel::onAddressSearch,
+          onClear = viewModel::onAddressCleared,
+          onPick = viewModel::onAddressPicked,
+      )
+    }
   }
 }
 
-/** The map with the marker and the circle around it; tapping the map places the marker. */
+/**
+ * The map with the marker and the circle around it; tapping the map calls [onMapTapped], then
+ * places the marker. It reports what it shows to [onVisibleAreaChanged] each time it stops moving.
+ */
 @Composable
 private fun AreaMap(
     state: VenueAreaUiState,
     cameraPositionState: CameraPositionState,
     onMarkerPlaced: (Location) -> Unit,
     onAreaFramed: (GeoBounds) -> Unit,
+    onVisibleAreaChanged: (GeoBounds) -> Unit,
+    onMapTapped: () -> Unit,
 ) {
   // Outside the map's content, which only runs once the map exists
   val markerState = state.marker?.let { rememberDraggableMarker(it, onMarkerPlaced) }
@@ -121,6 +159,7 @@ private fun AreaMap(
                 mapToolbarEnabled = false,
             ),
         onMapClick = { tap ->
+          onMapTapped()
           val visible = cameraPositionState.projection?.visibleRegion?.latLngBounds
           if (isOnVisibleMap(tap, visible)) onMarkerPlaced(tap.toLocation())
         },
@@ -137,6 +176,8 @@ private fun AreaMap(
         Marker(state = markerState, draggable = true)
       }
       FrameArea(state.areaToFrame, cameraPositionState, width, height, onAreaFramed)
+      // The address search prefers what the map shows
+      ReportVisibleArea(cameraPositionState, IntSize(width, height), onVisibleAreaChanged)
     }
   }
 }

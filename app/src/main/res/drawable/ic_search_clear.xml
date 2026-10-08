@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The cross of the search field's "Clear" button, from Figma; its round background is drawn apart -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="22"
+    android:viewportHeight="22">
+    <path
+        android:pathData="M7,7L11,11M11,11L15,15M11,11L15,7M11,11L7,15"
+        android:strokeWidth="1.8"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round" />
+</vector>

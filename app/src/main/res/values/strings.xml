@@ -11,6 +11,14 @@
     <string name="venue_area_meters">%1$d m</string>
     <string name="use_my_location">Use my location</string>
 
+    <!-- The address search on the venue location screen -->
+    <string name="venue_address_placeholder">Search for your address</string>
+    <string name="venue_address_clear">Clear search</string>
+    <string name="venue_address_searching">Searching…</string>
+    <string name="venue_address_no_results">No addresses found</string>
+    <string name="venue_address_failed">Couldn\'t search for addresses. Check your connection and try again.</string>
+    <string name="venue_address_unavailable">Address search isn\'t available on this device.</string>
+
     <!-- What screen readers say for a venue's pin on the map: the venue, then its featured quest -->
     <string name="map_pin_description">%1$s: %2$s</string>
 

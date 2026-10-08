@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
@@ -37,7 +38,7 @@ class VenueAreaViewModelTest {
   private val aroundZurich = zurich.boundsWithin(FRAMED_RADIUS_METERS)
 
   private val locations = FakeLocationRepository(zurich)
-  private val viewModel by lazy { VenueAreaViewModel(locations) }
+  private val viewModel by lazy { VenueAreaViewModel(locations, FakeAddressSearchRepository()) }
 
   private val state
     get() = viewModel.uiState.value
@@ -217,7 +218,7 @@ class VenueAreaViewModelTest {
   @Test
   fun useMyLocationDuringTheOpeningLookupFramesTheDeviceOnlyOnce() = test {
     val lookups = AnsweredInAnyOrder()
-    val viewModel = VenueAreaViewModel(lookups)
+    val viewModel = VenueAreaViewModel(lookups, FakeAddressSearchRepository())
     viewModel.onLocationPermissionResult(granted = true)
     advanceUntilIdle()
     viewModel.onUseMyLocation()
