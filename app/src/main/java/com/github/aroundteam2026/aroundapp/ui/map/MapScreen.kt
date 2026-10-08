@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -45,11 +46,11 @@ fun MapScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
-  val context = LocalContext.current
+  // Unlike the context's, these follow configuration changes
+  val resources = LocalResources.current
   // The light style would glare in dark mode, which has its own
   val darkTheme = isSystemInDarkTheme()
-  val mapStyle =
-      remember(context, darkTheme) { MapStyleOptions(mapStyle(context.resources, darkTheme)) }
+  val mapStyle = remember(resources, darkTheme) { MapStyleOptions(mapStyle(resources, darkTheme)) }
   val markerStyle = remember { MarkerDefaults.style() }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
