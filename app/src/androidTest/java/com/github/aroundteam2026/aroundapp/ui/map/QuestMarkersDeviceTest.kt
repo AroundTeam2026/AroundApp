@@ -17,7 +17,6 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.maps.android.compose.CameraPositionState
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -34,9 +33,10 @@ class QuestMarkersDeviceTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val here = Location(47.3769, 8.5417)
-  private val cafe = quest("cafe", "Café Lumen", here)
+  // Venues of the test's own, in Zürich: the demo data's are in Lausanne
+  private val cafe = quest("cafe", "Café Zürich", here)
   // About 3 km south: on screen too, clear of the café's pin
-  private val bar = quest("bar", "Bar Nocturne", Location(47.3499, 8.5417))
+  private val bar = quest("bar", "Bar Zürich", Location(47.3499, 8.5417))
   private val geneva = quest("geneva", "Atelier Genève", Location(46.2044, 6.1432))
 
   private val viewModel =
@@ -58,7 +58,6 @@ class QuestMarkersDeviceTest {
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
       composeTestRule.runOnUiThread { camera.position.target.isNear(here) && !camera.isMoving }
     }
-    awaitPins("cafe", "bar")
   }
 
   private fun awaitPins(vararg venueIds: String) {
@@ -69,8 +68,8 @@ class QuestMarkersDeviceTest {
 
   @Test
   fun onlyVenuesOnScreenGetAPin() {
-    // Checked in setUp too: Geneva is far out of the 5 km around here
-    assertEquals(setOf("cafe", "bar"), state.pins.map { it.venueId }.toSet())
+    // Geneva's venue is far out of the 5 km around here
+    awaitPins("cafe", "bar")
   }
 
   @Test

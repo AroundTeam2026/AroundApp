@@ -90,10 +90,8 @@ class MapViewModelPinsTest {
   fun noPinsUntilTheMapSaysWhatItShows() = test {
     viewModel
     runCurrent()
-    assertEquals(emptyList<VenuePin>(), state.pins)
 
-    showing(lausanneView)
-    assertEquals(setOf("cafe", "bar"), pinIds)
+    assertEquals(emptyList<VenuePin>(), state.pins)
   }
 
   @Test

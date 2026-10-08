@@ -37,13 +37,9 @@ class RepositoryProvidersTest {
     val written = VenueRepositoryProvider.create()
     val venue = testVenue(id = "written-to-another-repository")
     written.createVenue(venue)
-    val quests = QuestRepositoryProvider.create { now }
-    quests.createQuest(MapDemoData.quests(now).first())
+    val created = QuestRepositoryProvider.create { now }.createQuest(testQuest()).getOrThrow()
 
     assertNull(VenueRepositoryProvider.create().getVenue(venue.id))
-    assertEquals(
-        MapDemoData.quests(now).count { it.status == QuestStatus.ACTIVE },
-        QuestRepositoryProvider.create { now }.observeActiveQuests().first().size,
-    )
+    assertNull(QuestRepositoryProvider.create { now }.getQuest(created))
   }
 }

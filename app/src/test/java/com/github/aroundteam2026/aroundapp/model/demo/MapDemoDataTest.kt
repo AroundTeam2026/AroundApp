@@ -12,8 +12,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tests that the demo data stays consistent, and keeps showing every case the map handles: debug
- * builds fall back to it, so it is what the team sees until sign-in exists.
+ * Tests that the demo data stays consistent, and keeps showing every case the map handles: every
+ * build shows it until the map reads Firestore, so it is what the team tests and screenshots.
  */
 class MapDemoDataTest {
 
@@ -92,7 +92,7 @@ class MapDemoDataTest {
   }
 
   @Test
-  fun showsEveryKindOfCardLine() {
+  fun showsEveryKindOfQuest() {
     assertTrue("No group quest", valid.any { it.minPartySize > 1 })
     assertTrue("No solo quest", valid.any { it.minPartySize == 1 })
     assertTrue("No quest without a reward", valid.any { it.reward == null })
