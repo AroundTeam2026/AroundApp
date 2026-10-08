@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.venue
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Application
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,23 +20,35 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertRangeInfoEquals
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchResult
+import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
+import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.SEARCH_DELAY_MILLIS
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.MarkerState
+import java.time.Duration
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -57,8 +70,12 @@ class VenueAreaScreenTest {
   private val entrance = Location(46.5191, 6.6335)
   private val elsewhere = Location(46.5210, 6.6300)
 
+  private val bourg =
+      AddressSuggestion("Rue de Bourg 12", "1003 Lausanne", Location(46.5199, 6.6346))
+
   private val locations = FakeLocationRepository(Location(47.3769, 8.5417))
-  private val viewModel = VenueAreaViewModel(locations)
+  private val addresses = FakeAddressSearchRepository { AddressSearchResult.Found(listOf(bourg)) }
+  private val viewModel = VenueAreaViewModel(locations, addresses)
 
   // The Maps SDK can't drag a marker in a unit test, so these drive the state a marker exposes
   private var dragging by mutableStateOf(false)
@@ -68,6 +85,55 @@ class VenueAreaScreenTest {
   private fun show() {
     composeTestRule.setContent { VenueAreaScreen(viewModel) }
     composeTestRule.waitForIdle()
+  }
+
+  @Test
+  fun theAddressFieldFloatsAtTheTopOfTheMap() {
+    show()
+
+    val map = composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_MAP).getBoundsInRoot()
+    val field =
+        composeTestRule
+            .onNodeWithTag(C.Tag.VENUE_ADDRESS_FIELD_BOX, useUnmergedTree = true)
+            .getBoundsInRoot()
+    assertDpEquals("left margin", map.left + 16.dp, field.left)
+    assertDpEquals("right margin", map.right - 16.dp, field.right)
+    assertDpEquals("top margin", map.top + 12.dp, field.top)
+  }
+
+  @Test
+  fun searchingThenPickingAnAddressPlacesTheMarkerThere() {
+    show()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_ADDRESS_FIELD).performTextInput("Rue de Bourg")
+    // The search waits for typing to pause
+    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(SEARCH_DELAY_MILLIS + 50))
+    composeTestRule.waitForIdle()
+    composeTestRule.onAllNodesWithTag(C.Tag.VENUE_ADDRESS_RESULT)[0].performClick()
+    composeTestRule.waitForIdle()
+
+    assertEquals(listOf("Rue de Bourg"), addresses.searches.map { it.query })
+    assertEquals(bourg.location, viewModel.uiState.value.marker)
+    assertEquals("Rue de Bourg 12, 1003 Lausanne", viewModel.uiState.value.address)
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_ADDRESS_FIELD)
+        .assertTextEquals("Rue de Bourg 12, 1003 Lausanne")
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_ADDRESS_RESULTS).assertDoesNotExist()
+  }
+
+  @Test
+  fun clearingTheFieldEmptiesIt() {
+    show()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_ADDRESS_FIELD).performTextInput("Rue")
+
+    composeTestRule.onNodeWithContentDescription("Clear search").performClick()
+
+    // Its text then is the placeholder alone, which TalkBack reads as a hint
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_ADDRESS_FIELD)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+        .assertTextEquals("Search for your address", includeEditableText = false)
+    assertEquals("", viewModel.uiState.value.addressSearch.query)
   }
 
   @Test

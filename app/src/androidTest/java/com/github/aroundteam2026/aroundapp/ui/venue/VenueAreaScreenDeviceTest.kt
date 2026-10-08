@@ -11,6 +11,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepository
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchResult
+import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
@@ -49,7 +52,11 @@ class VenueAreaScreenDeviceTest {
       VenueAreaViewModel(
           object : LocationRepository {
             override suspend fun currentLocation() = here
-          }
+          },
+          object : AddressSearchRepository {
+            override suspend fun search(query: String, near: GeoBounds?) =
+                AddressSearchResult.Found(emptyList())
+          },
       )
   private val camera = CameraPositionState()
 
