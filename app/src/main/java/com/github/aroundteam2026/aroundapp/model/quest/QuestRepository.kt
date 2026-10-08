@@ -11,6 +11,8 @@ interface QuestRepository {
    *
    * @return every quest whose status is [QuestStatus.ACTIVE], in unspecified order. Callers that
    *   need an order must sort the list themselves.
+   * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
+   *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
    */
   fun observeActiveQuests(): Flow<List<Quest>>
 
@@ -20,6 +22,8 @@ interface QuestRepository {
    * @param venueId id of the venue whose quests to return.
    * @return all of that venue's quests, whatever their status (including drafts), in unspecified
    *   order. Callers that need an order must sort the list themselves.
+   * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
+   *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
    */
   fun observeQuestsByVenue(venueId: String): Flow<List<Quest>>
 
