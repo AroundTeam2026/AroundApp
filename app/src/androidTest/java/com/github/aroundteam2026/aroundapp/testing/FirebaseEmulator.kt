@@ -1,6 +1,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.testing
 
+import android.os.Build
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
@@ -13,8 +15,8 @@ import com.google.firebase.firestore.firestore
  * the ports match firebase.json.
  */
 object FirebaseEmulator {
-  /** The host machine as seen from the Android emulator. */
-  const val HOST = "10.0.2.2"
+  /** Emulators use their host alias; USB devices use adb reverse for both Firebase ports. */
+  val HOST = if (Build.HARDWARE in listOf("ranchu", "goldfish")) "10.0.2.2" else "127.0.0.1"
   const val AUTH_PORT = 9099
   const val FIRESTORE_PORT = 8080
 

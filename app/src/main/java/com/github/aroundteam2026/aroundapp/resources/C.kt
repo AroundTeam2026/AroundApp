@@ -1,11 +1,14 @@
-// Co-authored-by: OpenAI Codex
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-// Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.resources
 
 // Like R, but C
 object C {
   object Tag {
+    const val SESSION_ERROR = "session_error"
+    const val SESSION_RETRY = "session_retry"
+    const val SESSION_SIGN_OUT = "session_sign_out"
+    const val SESSION_LOADING = "session_loading"
     const val APP = "app"
     const val NAV_BAR = "nav_bar"
 

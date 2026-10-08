@@ -1,11 +1,15 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -19,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -57,12 +62,14 @@ enum class Tab(
 /**
  * The app's root: the selected tab's screen above a bottom navigation bar.
  *
+ * @param onSignOut supplies the session owner's sign-out action for the Profile tab.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  */
 @Composable
 fun AroundApp(
+    onSignOut: (() -> Unit)? = null,
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (Tab) -> Unit = { TabScreen(it) },
+    screen: @Composable (Tab) -> Unit = { TabScreen(it, onSignOut) },
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = backStackEntry?.destination?.route
@@ -107,9 +114,10 @@ private fun NavHostController.navigateToTab(tab: Tab) =
     }
 
 @Composable
-private fun TabScreen(tab: Tab) =
+private fun TabScreen(tab: Tab, onSignOut: (() -> Unit)?) =
     when (tab) {
       Tab.MAP -> MapScreen()
+      Tab.PROFILE -> if (onSignOut != null) ProfileActions(onSignOut) else PlaceholderScreen(tab)
       else -> PlaceholderScreen(tab)
     }
 
@@ -118,5 +126,20 @@ private fun TabScreen(tab: Tab) =
 private fun PlaceholderScreen(tab: Tab) {
   Box(Modifier.fillMaxSize().testTag(tab.screenTag), contentAlignment = Alignment.Center) {
     Text(stringResource(tab.label), style = MaterialTheme.typography.headlineMedium)
+  }
+}
+
+/** Minimal Profile action while the full profile screen is implemented in its own issue. */
+@Composable
+private fun ProfileActions(onSignOut: () -> Unit) {
+  Column(
+      Modifier.fillMaxSize().testTag(C.Tag.PROFILE_SCREEN).padding(24.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Text(stringResource(R.string.tab_profile), style = MaterialTheme.typography.headlineMedium)
+    Button(onClick = onSignOut, modifier = Modifier.testTag(C.Tag.SESSION_SIGN_OUT)) {
+      Text(stringResource(R.string.auth_sign_out))
+    }
   }
 }
