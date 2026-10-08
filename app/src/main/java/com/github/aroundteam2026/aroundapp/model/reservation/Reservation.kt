@@ -11,6 +11,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
  * @property slotStart Start of the booked slot, in epoch milliseconds.
  * @property status Lifecycle state; see [canTransition] for the allowed changes.
  * @property createdAt Creation time, in epoch milliseconds.
+ * @throws IllegalArgumentException if [explorerUids] is empty.
  */
 data class Reservation(
     val id: String,
@@ -20,7 +21,11 @@ data class Reservation(
     val slotStart: Long,
     val status: ReservationStatus,
     val createdAt: Long,
-)
+) {
+  init {
+    require(explorerUids.isNotEmpty()) { "A reservation needs at least one explorer" }
+  }
+}
 
 /** Lifecycle state of a reservation. */
 enum class ReservationStatus {

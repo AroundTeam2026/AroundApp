@@ -54,9 +54,15 @@ class CompletionStatusTest {
     assertEquals("Photo is blurry", completion(REJECTED, "Photo is blurry").rejectReason)
   }
 
-  /** The reason is only required for rejections, so a pending completion needs none. */
+  /** The reason is only for rejections, so a pending completion needs none. */
   @Test
   fun pendingCompletion_withoutReason_isAccepted() {
     assertNull(completion(PENDING, null).rejectReason)
+  }
+
+  /** A reason only makes sense for a rejection, so any other status refuses one. */
+  @Test(expected = IllegalArgumentException::class)
+  fun approvedCompletion_withReason_isRejected() {
+    completion(APPROVED, "Photo is blurry")
   }
 }

@@ -12,10 +12,10 @@ package com.github.aroundteam2026.aroundapp.model.reservation
  * @property proofUrl Cloud Storage URL of the submitted proof.
  * @property status Lifecycle state; see [canTransition] for the allowed changes.
  * @property rejectReason Why the venue rejected the proof; required when [status] is
- *   [CompletionStatus.REJECTED], null otherwise.
+ *   [CompletionStatus.REJECTED], and null otherwise.
  * @property submittedAt Submission time, in epoch milliseconds.
- * @throws IllegalArgumentException if [status] is [CompletionStatus.REJECTED] and [rejectReason] is
- *   null or blank.
+ * @throws IllegalArgumentException if [status] is [CompletionStatus.REJECTED] without a reason, or
+ *   if a reason is given for any other status.
  */
 data class Completion(
     val id: String,
@@ -31,6 +31,9 @@ data class Completion(
   init {
     require(status != CompletionStatus.REJECTED || !rejectReason.isNullOrBlank()) {
       "A rejected completion needs a reason"
+    }
+    require(status == CompletionStatus.REJECTED || rejectReason == null) {
+      "Only a rejected completion has a reason"
     }
   }
 }
