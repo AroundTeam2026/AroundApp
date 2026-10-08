@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -140,6 +141,11 @@ class VenueAreaScreenTest {
     show()
     // Opening the screen with the permission already locates the device once
     assertEquals(1, locations.calls)
+
+    // TalkBack announces it as a button
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).performClick()
     composeTestRule.waitForIdle()

@@ -113,11 +113,10 @@ class VenueAreaScreenDeviceTest {
     show()
     val map = composeTestRule.awaitGoogleMap()
 
-    // Granted by the rule above; the "Use my location" button replaces the Maps SDK's own
+    // Granted by the rule above
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
       composeTestRule.runOnUiThread { map.isMyLocationEnabled }
     }
-    assertFalse(composeTestRule.runOnUiThread { map.uiSettings.isMyLocationButtonEnabled })
 
     // A test can't revoke its own app's permission without killing itself, so it reports the
     // refusal directly
@@ -125,6 +124,21 @@ class VenueAreaScreenDeviceTest {
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
       composeTestRule.runOnUiThread { !map.isMyLocationEnabled }
     }
+  }
+
+  @Test
+  fun theMapsSdkOwnButtonsStayOff() {
+    show()
+    val map = composeTestRule.awaitGoogleMap()
+
+    // "Use my location" replaces the location button, and the others would sit under it
+    val settings = composeTestRule.runOnUiThread { map.uiSettings }
+    assertFalse(
+        "location button",
+        composeTestRule.runOnUiThread { settings.isMyLocationButtonEnabled },
+    )
+    assertFalse("zoom buttons", composeTestRule.runOnUiThread { settings.isZoomControlsEnabled })
+    assertFalse("map toolbar", composeTestRule.runOnUiThread { settings.isMapToolbarEnabled })
   }
 
   /** Waits until the camera rests at [location]. */

@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -110,9 +110,15 @@ private fun AreaMap(
         cameraPositionState = cameraPositionState,
         // Needs the permission, or the Maps SDK throws a SecurityException
         properties = MapProperties(isMyLocationEnabled = state.showsUserLocation),
-        // The "Use my location" button replaces the Maps SDK's own, and its zoom buttons would sit
-        // under it; pinching still zooms
-        uiSettings = MapUiSettings(myLocationButtonEnabled = false, zoomControlsEnabled = false),
+        // The "Use my location" button replaces the Maps SDK's own, and its zoom buttons and
+        // toolbar
+        // would sit under it; pinching still zooms
+        uiSettings =
+            MapUiSettings(
+                myLocationButtonEnabled = false,
+                zoomControlsEnabled = false,
+                mapToolbarEnabled = false,
+            ),
         onMapClick = { tap ->
           val visible = cameraPositionState.projection?.visibleRegion?.latLngBounds
           if (isOnVisibleMap(tap, visible)) onMarkerPlaced(tap.toLocation())
@@ -145,22 +151,13 @@ internal fun isOnVisibleMap(tap: LatLng, visible: LatLngBounds?): Boolean =
 /** Frames the device's position, without moving the marker. */
 @Composable
 private fun UseMyLocationButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-  Surface(
+  ExtendedFloatingActionButton(
       onClick = onClick,
       modifier = modifier.testTag(C.Tag.VENUE_AREA_USE_MY_LOCATION),
-      shape = CircleShape,
-      shadowElevation = 4.dp,
-  ) {
-    Row(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
       // The label already says what the button does, so the icon is decorative
-      Icon(painterResource(R.drawable.ic_my_location), contentDescription = null)
-      Spacer(Modifier.width(8.dp))
-      Text(stringResource(R.string.use_my_location), style = MaterialTheme.typography.labelLarge)
-    }
-  }
+      icon = { Icon(painterResource(R.drawable.ic_my_location), contentDescription = null) },
+      text = { Text(stringResource(R.string.use_my_location)) },
+  )
 }
 
 /**
