@@ -18,6 +18,8 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  *   [VenueLimits.DEFAULT_RADIUS_METERS].
  * @property address Street address, or null if the venue did not give one.
  * @property createdAt Creation time, in epoch milliseconds, set by the caller.
+ * @property featuredQuestId Id of the quest the venue wants shown first, or null for no preference.
+ *   Nothing checks that it names one of the venue's quests, or one that is still valid.
  */
 data class Venue(
     val id: String,
@@ -26,4 +28,5 @@ data class Venue(
     val radiusMeters: Int,
     val address: String?,
     val createdAt: Long,
+    val featuredQuestId: String? = null,
 )

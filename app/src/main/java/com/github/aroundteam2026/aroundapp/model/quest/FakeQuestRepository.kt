@@ -16,9 +16,13 @@ import kotlinx.coroutines.flow.update
  *
  * @param now Clock used for `createdAt` and `updatedAt`, in epoch milliseconds. Pass a fixed value
  *   in tests to make timestamps predictable.
+ * @param initialQuests Quests stored from the start exactly as given, ids and timestamps included.
+ *   Their ids must be unique; generated ids never reuse them.
  */
-class FakeQuestRepository(private val now: () -> Long = System::currentTimeMillis) :
-    QuestRepository {
+class FakeQuestRepository(
+    private val now: () -> Long = System::currentTimeMillis,
+    initialQuests: List<Quest> = emptyList(),
+) : QuestRepository {
   /**
    * Simulates a backend error (e.g. no network or a rejected write) so callers' error paths can be
    * tested. While non-null, [createQuest] returns `Result.failure(forcedFailure)` and stores
@@ -27,7 +31,11 @@ class FakeQuestRepository(private val now: () -> Long = System::currentTimeMilli
   var forcedFailure: Throwable? = null
 
   /** All stored quests, keyed by id. */
-  private val quests = MutableStateFlow<Map<String, Quest>>(emptyMap())
+  private val quests = MutableStateFlow(initialQuests.associateBy { it.id })
+
+  init {
+    require(quests.value.size == initialQuests.size) { "Initial quests must have unique ids" }
+  }
 
   /** Number used for the next generated id. */
   private var nextId = 1
@@ -55,7 +63,7 @@ class FakeQuestRepository(private val now: () -> Long = System::currentTimeMilli
     forcedFailure?.let {
       return Result.failure(it)
     }
-    val id = "quest-${nextId++}"
+    val id = generateSequence { "quest-${nextId++}" }.first { it !in quests.value }
     val time = now()
     quests.update { it + (id to quest.copy(id = id, createdAt = time, updatedAt = time)) }
     return Result.success(id)
