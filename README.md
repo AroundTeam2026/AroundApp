@@ -63,6 +63,10 @@ Instrumented tests that exercise the Firestore repository run against the Fireba
 - JDK 21
 - [firebase-tools](https://firebase.google.com/docs/cli)
 
+### Demo quests on the map
+
+Until the map reads quests from Firestore, it shows made-up venues and quests around Lausanne, from `model/demo/MapDemoData.kt`, kept in memory.
+
 ### Useful commands
 
 ```sh

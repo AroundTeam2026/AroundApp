@@ -12,12 +12,12 @@ import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
+import com.github.aroundteam2026.aroundapp.ui.map.isNear
+import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLngBounds
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
-import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
-import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -82,11 +82,6 @@ class VenueAreaScreenDeviceTest {
       composeTestRule.runOnUiThread { camera.position.target.isNear(location) && !camera.isMoving }
     }
   }
-
-  private fun Location.toLatLng() = LatLng(lat, lng)
-
-  private fun LatLng.isNear(location: Location) =
-      abs(latitude - location.lat) < 1e-3 && abs(longitude - location.lng) < 1e-3
 
   private fun LatLngBounds.latitudeSpan() = northeast.latitude - southwest.latitude
 
