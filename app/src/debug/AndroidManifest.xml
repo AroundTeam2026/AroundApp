@@ -12,12 +12,8 @@
       tools:replace="android:allowBackup">
     <activity
         android:name=".ui.auth.AuthDemoActivity"
-        android:exported="true"
+        android:exported="false"
         android:label="@string/auth_demo_title">
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-      </intent-filter>
     </activity>
   </application>
 </manifest>

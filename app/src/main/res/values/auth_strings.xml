@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: OpenAI Codex -->
 <resources>
+    <string name="session_profile_error">Could not load your profile. Please try again.</string>
+    <string name="session_retry">Try again</string>
+    <string name="session_checking">Checking your session</string>
     <string name="auth_demo_title">Around Auth Demo</string>
     <string name="auth_welcome">Welcome to Around</string>
     <string name="auth_sign_in">Sign in</string>

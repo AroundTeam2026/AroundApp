@@ -20,14 +20,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.github.aroundteam2026.aroundapp.AroundApplication
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
-import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryFirebase
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
 /** Debug-only entry for demonstrating the form independently of app and Venue routing. */
 class AuthDemoActivity : ComponentActivity() {
-  private val repository: AuthRepository by lazy { AuthRepositoryFirebase() }
+  private val repository: AuthRepository by lazy {
+    (application as AroundApplication).container.authRepository
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
