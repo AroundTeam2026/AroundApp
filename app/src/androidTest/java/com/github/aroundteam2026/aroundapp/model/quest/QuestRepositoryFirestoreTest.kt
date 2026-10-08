@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestoreTest.Companion.TIMEOUT_MS
+import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.Timestamp
@@ -330,12 +331,14 @@ class QuestRepositoryFirestoreTest {
 
     const val MAIN_APP = "quest-test"
     const val TERMINATED_APP = "quest-test-terminated"
-    const val EMULATOR_HOST = "10.0.2.2"
-    const val EMULATOR_PORT = 8080
 
     /**
      * Returns a client of the [FirebaseApp] named [appName] on the `demo-project` id, pointed at
      * the emulator and caching in memory only. The app is created on first use.
+     *
+     * [FirebaseEmulator.connect] only configures the default app, while these tests need separate
+     * named apps (one is terminated on purpose, another acts as a second device), so this reuses
+     * its host and port instead.
      */
     fun emulatorClient(appName: String): FirebaseFirestore {
       val context = InstrumentationRegistry.getInstrumentation().targetContext // get app context
@@ -351,7 +354,7 @@ class QuestRepositoryFirestoreTest {
                   appName,
               )
       return FirebaseFirestore.getInstance(app).apply {
-        useEmulator(EMULATOR_HOST, EMULATOR_PORT)
+        useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
         firestoreSettings =
             FirebaseFirestoreSettings.Builder()
                 .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
