@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.venue
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
@@ -214,6 +215,55 @@ class VenueAreaViewModelTest {
   }
 
   @Test
+  fun useMyLocationDuringTheOpeningLookupFramesTheDeviceOnlyOnce() = test {
+    val lookups = AnsweredInAnyOrder()
+    val viewModel = VenueAreaViewModel(lookups)
+    viewModel.onLocationPermissionResult(granted = true)
+    advanceUntilIdle()
+    viewModel.onUseMyLocation()
+    advanceUntilIdle()
+
+    // The button's lookup finishes first, the camera frames it and the venue pans away...
+    lookups.answer(lookup = 1, with = zurich)
+    advanceUntilIdle()
+    assertEquals(aroundZurich, viewModel.uiState.value.areaToFrame)
+    viewModel.onAreaFramed(aroundZurich)
+    // ...then the opening lookup finishes late, and must not move the camera back
+    lookups.answer(lookup = 0, with = zurich)
+    advanceUntilIdle()
+
+    assertNull(viewModel.uiState.value.areaToFrame)
+  }
+
+  @Test
+  fun aRefusalStopsTheOpeningLookup() = test {
+    val gate = CompletableDeferred<Unit>()
+    locations.gate = gate
+    viewModel.onLocationPermissionResult(granted = true)
+    advanceUntilIdle()
+
+    viewModel.onLocationPermissionResult(granted = false)
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(lausanne, state.areaToFrame)
+  }
+
+  @Test
+  fun aRefusalStopsUseMyLocation() = test {
+    val gate = CompletableDeferred<Unit>()
+    locations.gate = gate
+    viewModel.onUseMyLocation()
+    advanceUntilIdle()
+
+    viewModel.onLocationPermissionResult(granted = false)
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(lausanne, state.areaToFrame)
+  }
+
+  @Test
   fun useMyLocationTwiceWhileLocatingLooksUpOnce() = test {
     val gate = CompletableDeferred<Unit>()
     locations.gate = gate
@@ -245,5 +295,18 @@ class VenueAreaViewModelTest {
     viewModel.onAreaFramed(lausanne)
 
     assertEquals(aroundZurich, state.areaToFrame)
+  }
+}
+
+/** Answers each lookup only when the test says so, so lookups can finish in any order. */
+private class AnsweredInAnyOrder : LocationRepository {
+  private val answers = mutableListOf<CompletableDeferred<Location?>>()
+
+  override suspend fun currentLocation(): Location? =
+      CompletableDeferred<Location?>().also { answers += it }.await()
+
+  /** Ends the [lookup]th lookup, counting from 0, with the position [with]. */
+  fun answer(lookup: Int, with: Location?) {
+    answers[lookup].complete(with)
   }
 }

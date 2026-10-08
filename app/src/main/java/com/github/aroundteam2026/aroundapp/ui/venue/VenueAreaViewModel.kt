@@ -73,21 +73,29 @@ class VenueAreaViewModel(private val locationRepository: LocationRepository) : V
   /**
    * Called with the answer to the location permission request, or with `true` when it was already
    * granted. The device is located once per visit, and framed only while no marker is placed, so
-   * the venue's marker stays in view.
+   * the venue's marker stays in view. A refusal or revocation stops any lookup still running, so
+   * the camera doesn't move after the device's position was hidden.
    */
   fun onLocationPermissionResult(granted: Boolean) {
     _uiState.update { it.copy(showsUserLocation = granted) }
-    if (!granted || located || openingLookup?.isActive == true) return
+    if (!granted) {
+      openingLookup?.cancel()
+      myLocationLookup?.cancel()
+      return
+    }
+    if (located || openingLookup?.isActive == true) return
     openingLookup = frameDevice(overMarker = false)
   }
 
   /**
    * Frames the device's position, even when a marker is placed. The marker does not move: the
    * position is only accurate to about a city block. Does nothing while a previous call is still
-   * locating, or when the position is unknown.
+   * locating, or when the position is unknown. It replaces the lookup started when the screen
+   * opened, so that one can't move the camera again after this one framed the device.
    */
   fun onUseMyLocation() {
     if (myLocationLookup?.isActive == true) return
+    openingLookup?.cancel()
     myLocationLookup = frameDevice(overMarker = true)
   }
 
