@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.resources
 
 // Like R, but C
@@ -24,6 +25,11 @@ object C {
     const val AUTH_SWITCH_MODE = "auth_switch_mode"
     const val AUTH_ERROR = "auth_error"
     const val AUTH_LOADING = "auth_loading"
+    const val VENUE_INITIALIZATION_SCREEN = "venue_initialization_screen"
+    const val VENUE_INITIALIZATION_NAME = "venue_initialization_name"
+    const val VENUE_INITIALIZATION_CONTINUE = "venue_initialization_continue"
+    const val VENUE_INITIALIZATION_BACK = "venue_initialization_back"
+    const val VENUE_INITIALIZATION_ERROR = "venue_initialization_error"
 
     const val MAP = "map"
 
