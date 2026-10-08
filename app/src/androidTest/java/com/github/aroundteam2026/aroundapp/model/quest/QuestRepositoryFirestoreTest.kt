@@ -92,12 +92,12 @@ class QuestRepositoryFirestoreTest {
   @Test
   fun createQuest_storesSchemaTypesAndOmitsNullFields() = withTimeoutBlocking {
     val fullId = repository.createQuest(fullQuest()).getOrThrow()
-    val bareRewardId =
+    val freeItemId =
         repository
-            .createQuest(
-                fullQuest().copy(reward = Reward("Sticker", terms = null, expiresAt = null))
-            )
+            .createQuest(fullQuest().copy(reward = Reward.FreeItem("Coffee", specifics = null)))
             .getOrThrow()
+    val otherId =
+        repository.createQuest(fullQuest().copy(reward = Reward.Other("Sticker"))).getOrThrow()
     val noRewardId = repository.createQuest(fullQuest().copy(reward = null)).getOrThrow()
 
     // Only the stored representation is checked here; the values are checked by the round trip.
@@ -108,13 +108,52 @@ class QuestRepositoryFirestoreTest {
     assertEquals("DRAFT", full.get("status"))
     assertEquals("TEXT", full.get("proofType"))
     val reward = full.get("reward") as Map<*, *>
-    assertEquals(setOf("description", "terms", "expiresAt"), reward.keys)
+    assertEquals(setOf("type", "amount", "unit", "specifics", "expiresAt"), reward.keys)
+    assertEquals("DISCOUNT", reward["type"])
+    assertEquals("PERCENT", reward["unit"])
     assertTrue(reward["expiresAt"] is Timestamp)
     assertFalse("id must not be stored", full.contains("id"))
-    val bareReward = db.collection(QUESTS).document(bareRewardId).get().await()
-    assertEquals(setOf("description"), (bareReward.get("reward") as Map<*, *>).keys)
+    val freeItem = db.collection(QUESTS).document(freeItemId).get().await().get("reward")
+    assertEquals(mapOf("type" to "FREE_ITEM", "name" to "Coffee"), freeItem)
+    val other = db.collection(QUESTS).document(otherId).get().await().get("reward")
+    assertEquals(mapOf("type" to "OTHER", "description" to "Sticker"), other)
     val noReward = db.collection(QUESTS).document(noRewardId).get().await()
     assertFalse("a null reward must be omitted", noReward.contains("reward"))
+  }
+
+  // Bug: a reward type other than the one in fullQuest is mis-mapped on write or read (e.g. read
+  // back as another subtype, specifics or expiresAt dropped, a whole CHF amount read as a Long).
+  @Test
+  fun createQuest_thenGetQuest_roundTripsEveryRewardType() = withTimeoutBlocking {
+    val rewards =
+        listOf(
+            Reward.Discount(5.0, DiscountUnit.CHF, specifics = null),
+            Reward.FreeItem("Coffee", "Any size", expiresAt = REWARD_EXPIRES_AT),
+            Reward.Other("A hug", expiresAt = REWARD_EXPIRES_AT),
+        )
+    for (reward in rewards) {
+      val id = repository.createQuest(quest().copy(reward = reward)).getOrThrow()
+      assertEquals(reward, getQuestFromServer(id)!!.reward)
+    }
+  }
+
+  // Bug: a reward with a missing or unknown type, or a missing field, throws while mapping, so the
+  // whole quest is skipped instead of being read without a reward.
+  @Test
+  fun getQuest_readsAnUnreadableRewardAsNoReward() = withTimeoutBlocking {
+    val unreadableRewards =
+        listOf(
+            mapOf("type" to "MYSTERY", "description" to "Surprise"),
+            mapOf("description" to "No type"),
+            mapOf("type" to "DISCOUNT", "unit" to "CHF"),
+        )
+    for (reward in unreadableRewards) {
+      val id = repository.createQuest(quest()).getOrThrow()
+      db.collection(QUESTS).document(id).update("reward", reward).await()
+
+      val stored = repository.getQuest(id)
+      assertEquals(quest().copy(id = id, createdAt = FIXED_NOW, updatedAt = FIXED_NOW), stored)
+    }
   }
 
   // Bug: the caller's timestamps are kept, the clock is read once per field, or millis are
@@ -264,7 +303,13 @@ class QuestRepositoryFirestoreTest {
           requirements = "Photograph it.",
           proofType = ProofType.TEXT,
           minPartySize = 3,
-          reward = Reward("Free coffee", terms = "One per visit", expiresAt = REWARD_EXPIRES_AT),
+          reward =
+              Reward.Discount(
+                  12.5,
+                  DiscountUnit.PERCENT,
+                  "On drinks",
+                  expiresAt = REWARD_EXPIRES_AT,
+              ),
           status = QuestStatus.DRAFT,
           createdAt = 1L,
           updatedAt = 2L,

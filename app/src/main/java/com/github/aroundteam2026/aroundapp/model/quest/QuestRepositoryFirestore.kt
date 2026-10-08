@@ -1,4 +1,4 @@
-// Portions of this code were generated with the help of Claude.
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import android.util.Log
@@ -18,7 +18,8 @@ import kotlinx.coroutines.tasks.await
  * [QuestRepository] backed by the Firestore `quests` collection.
  *
  * Firestore types stay inside this class. [Location] is stored as a `GeoPoint`, epoch-millisecond
- * times as `Timestamp`s, enums as their names and [Reward] as a nested map. Null fields are
+ * times as `Timestamp`s, enums as their names and [Reward] as a nested map whose `type` field names
+ * its subtype; a reward that cannot be read back is logged and read as no reward. Null fields are
  * omitted, and the quest id is the document id rather than a stored field. Documents that cannot be
  * mapped back to a [Quest] are logged and skipped: the `observe*` flows leave them out and
  * [getQuest] returns null.
@@ -91,8 +92,23 @@ class QuestRepositoryFirestore(
   }
 
   private fun Reward.toFirestore(): Map<String, Any> = buildMap {
-    put(REWARD_DESCRIPTION, description)
-    terms?.let { put(REWARD_TERMS, it) }
+    when (val reward = this@toFirestore) {
+      is Reward.Discount -> {
+        put(REWARD_TYPE, DISCOUNT)
+        put(REWARD_AMOUNT, reward.amount)
+        put(REWARD_UNIT, reward.unit.name)
+        reward.specifics?.let { put(REWARD_SPECIFICS, it) }
+      }
+      is Reward.FreeItem -> {
+        put(REWARD_TYPE, FREE_ITEM)
+        put(REWARD_NAME, reward.name)
+        reward.specifics?.let { put(REWARD_SPECIFICS, it) }
+      }
+      is Reward.Other -> {
+        put(REWARD_TYPE, OTHER)
+        put(REWARD_DESCRIPTION, reward.description)
+      }
+    }
     expiresAt?.let { put(REWARD_EXPIRES_AT, Timestamp(Date(it))) }
   }
 
@@ -123,14 +139,34 @@ class QuestRepositoryFirestore(
     }
   }
 
-  private fun Map<*, *>.toReward() =
-      Reward(
-          description =
-              this[REWARD_DESCRIPTION] as String?
-                  ?: throw IllegalArgumentException("Missing field $REWARD.$REWARD_DESCRIPTION"),
-          terms = this[REWARD_TERMS] as String?,
-          expiresAt = (this[REWARD_EXPIRES_AT] as Timestamp?)?.toDate()?.time,
-      )
+  /**
+   * Maps this reward map to a [Reward], or returns null if its type is missing or unknown, or a
+   * field is missing or malformed, so a bad reward does not hide the whole quest.
+   */
+  private fun Map<*, *>.toReward(): Reward? =
+      try {
+        val expiresAt = (this[REWARD_EXPIRES_AT] as Timestamp?)?.toDate()?.time
+        when (val type = this[REWARD_TYPE]) {
+          DISCOUNT ->
+              Reward.Discount(
+                  amount = (this[REWARD_AMOUNT] as Number).toDouble(),
+                  unit = DiscountUnit.valueOf(this[REWARD_UNIT] as String),
+                  specifics = this[REWARD_SPECIFICS] as String?,
+                  expiresAt = expiresAt,
+              )
+          FREE_ITEM ->
+              Reward.FreeItem(
+                  name = this[REWARD_NAME] as String,
+                  specifics = this[REWARD_SPECIFICS] as String?,
+                  expiresAt = expiresAt,
+              )
+          OTHER -> Reward.Other(this[REWARD_DESCRIPTION] as String, expiresAt)
+          else -> throw IllegalArgumentException("Unknown reward type $type")
+        }
+      } catch (e: Exception) {
+        Log.w(TAG, "Ignoring malformed reward $this", e)
+        null
+      }
 
   /** Reads [field] with [read], throwing if it is absent. */
   private fun <T : Any> required(field: String, read: (String) -> T?): T =
@@ -154,8 +190,16 @@ class QuestRepositoryFirestore(
     const val CREATED_AT = "createdAt"
     const val UPDATED_AT = "updatedAt"
 
+    const val REWARD_TYPE = "type"
+    const val REWARD_AMOUNT = "amount"
+    const val REWARD_UNIT = "unit"
+    const val REWARD_NAME = "name"
+    const val REWARD_SPECIFICS = "specifics"
     const val REWARD_DESCRIPTION = "description"
-    const val REWARD_TERMS = "terms"
     const val REWARD_EXPIRES_AT = "expiresAt"
+
+    const val DISCOUNT = "DISCOUNT"
+    const val FREE_ITEM = "FREE_ITEM"
+    const val OTHER = "OTHER"
   }
 }
