@@ -10,11 +10,14 @@ interface ReservationRepository {
    * it generates a fresh id, sets the creation time, and starts the reservation as
    * [ReservationStatus.PENDING]. The values of those three fields in [reservation] are ignored.
    *
-   * The Firestore implementation fails if the signed-in user is not in `explorerUids`, because the
-   * security rules only let an explorer reserve for a party they belong to.
+   * The security rules only let an explorer reserve for a party they belong to, so the Firestore
+   * implementation's server rejects a reservation whose `explorerUids` lacks the signed-in user.
+   * That rejection comes after this call has returned, so it is not reported here.
    *
    * @param reservation the reservation to store; its `id`, `createdAt` and `status` are ignored.
-   * @return the new reservation's id, or a failure if it could not be stored.
+   * @return the new reservation's id, or a failure if the write could not be issued. Success does
+   *   not wait for the backend to confirm the write (e.g. while offline), and a later rejection is
+   *   not reported here.
    */
   suspend fun createReservation(reservation: Reservation): Result<String>
 

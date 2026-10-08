@@ -93,7 +93,7 @@ class ReservationRepositoryFirestoreTest {
   // id).
   @Test
   fun createReservation_thenObserveForVenue_roundTripsEveryField() = withTimeoutBlocking {
-    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+    val id = createAndSync()
 
     val stored = fetchAsVenue(id)
 
@@ -116,7 +116,7 @@ class ReservationRepositoryFirestoreTest {
   // cannot see any of these.
   @Test
   fun createReservation_storesSchemaTypes() = withTimeoutBlocking {
-    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+    val id = createAndSync()
 
     val document = venueDb.collection(RESERVATIONS).document(id).get(Source.SERVER).await()
 
@@ -137,8 +137,8 @@ class ReservationRepositoryFirestoreTest {
     val input =
         reservation().copy(id = "caller", status = ReservationStatus.APPROVED, createdAt = 1L)
 
-    val first = explorerRepository.createReservation(input).getOrThrow()
-    val second = explorerRepository.createReservation(input).getOrThrow()
+    val first = createAndSync(input)
+    val second = createAndSync(input)
 
     assertNotEquals("caller", first)
     assertNotEquals(first, second)
@@ -148,13 +148,32 @@ class ReservationRepositoryFirestoreTest {
     assertEquals(second, fetchAsVenue(second).id)
   }
 
-  // Bug: createReservation does not wait for the server, so a write the rules refuse is reported
-  // as a success. The rules only let an explorer reserve for a party they belong to.
+  // Bug: a reservation the rules refuse is stored anyway, or createReservation reports the refusal
+  // as a failure although, like createQuest, it must not wait for the server. The rules only let an
+  // explorer reserve for a party they belong to.
   @Test
-  fun createReservation_failsWhenTheSignedInUserIsNotInTheParty() = withTimeoutBlocking {
-    val result = explorerRepository.createReservation(reservation(party = listOf(FRIEND_UID)))
+  fun createReservation_whenTheSignedInUserIsNotInTheParty_succeedsButTheServerRejectsTheWrite() =
+      withTimeoutBlocking {
+        val id = createAndSync(reservation(party = listOf(FRIEND_UID)))
 
-    assertPermissionDenied(result)
+        val stored = venueRepository.observeForVenue(venueId).first()
+
+        assertTrue(stored.none { it.id == id })
+      }
+
+  // Bug: createReservation waits for the server, so it hangs or fails while the device is offline.
+  @Test
+  fun createReservation_whileOffline_succeedsAndIsSentOnceBackOnline() = withTimeoutBlocking {
+    explorerDb.disableNetwork().await()
+    val id: String
+    try {
+      id = explorerRepository.createReservation(reservation()).getOrThrow()
+    } finally {
+      explorerDb.enableNetwork().await()
+    }
+    explorerDb.waitForPendingWrites().await()
+
+    assertEquals(id, fetchAsVenue(id).id)
   }
 
   // Bug: an exception escapes createReservation instead of becoming a failure.
@@ -172,8 +191,8 @@ class ReservationRepositoryFirestoreTest {
   @Test
   fun observeForVenue_returnsEveryReservationOfThatVenueWhateverTheirStatus() =
       withTimeoutBlocking {
-        val pending = explorerRepository.createReservation(reservation()).getOrThrow()
-        val approved = explorerRepository.createReservation(reservation()).getOrThrow()
+        val pending = createAndSync()
+        val approved = createAndSync()
         venueRepository.updateStatus(approved, ReservationStatus.APPROVED).getOrThrow()
         val ownIds = setOf(pending, approved)
 
@@ -201,7 +220,7 @@ class ReservationRepositoryFirestoreTest {
       // The first emission proves the listener is attached before the write.
       emissions.receive()
 
-      val id = explorerRepository.createReservation(reservation()).getOrThrow()
+      val id = createAndSync()
 
       // No assertion needed: a one-shot flow never emits again, so this loop never ends and the
       // test fails on TIMEOUT_MS.
@@ -218,14 +237,8 @@ class ReservationRepositoryFirestoreTest {
   @Test
   fun observeForExplorer_returnsEveryReservationWhosePartyIncludesTheExplorer() =
       withTimeoutBlocking {
-        val solo =
-            explorerRepository
-                .createReservation(reservation(party = listOf(explorerUid)))
-                .getOrThrow()
-        val withFriend =
-            explorerRepository
-                .createReservation(reservation(party = listOf(FRIEND_UID, explorerUid)))
-                .getOrThrow()
+        val solo = createAndSync(reservation(party = listOf(explorerUid)))
+        val withFriend = createAndSync(reservation(party = listOf(FRIEND_UID, explorerUid)))
         val expected = setOf(solo, withFriend)
 
         val reservations =
@@ -252,7 +265,7 @@ class ReservationRepositoryFirestoreTest {
             )
         )
         .await()
-    val validId = explorerRepository.createReservation(reservation()).getOrThrow()
+    val validId = createAndSync()
 
     val forVenue =
         venueRepository.observeForVenue(venueId).first { list -> list.any { it.id == validId } }
@@ -269,7 +282,7 @@ class ReservationRepositoryFirestoreTest {
   // status than asked.
   @Test
   fun updateStatus_byTheVenue_changesOnlyTheStatus() = withTimeoutBlocking {
-    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+    val id = createAndSync()
     val before = fetchAsVenue(id)
 
     venueRepository.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
@@ -282,7 +295,7 @@ class ReservationRepositoryFirestoreTest {
   // reports the refusal with the wrong exception.
   @Test
   fun updateStatus_refusesAForbiddenTransitionAndLeavesTheStatusUnchanged() = withTimeoutBlocking {
-    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+    val id = createAndSync()
     venueRepository.updateStatus(id, ReservationStatus.CANCELLED).getOrThrow()
 
     val result = venueRepository.updateStatus(id, ReservationStatus.APPROVED)
@@ -304,7 +317,7 @@ class ReservationRepositoryFirestoreTest {
   // is the one to change when E21 lets explorers cancel.
   @Test
   fun updateStatus_byTheExplorer_isRefusedByTheRules() = withTimeoutBlocking {
-    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+    val id = createAndSync()
 
     val result = explorerRepository.updateStatus(id, ReservationStatus.CANCELLED)
 
@@ -326,6 +339,17 @@ class ReservationRepositoryFirestoreTest {
           status = ReservationStatus.PENDING,
           createdAt = 1L,
       )
+
+  /**
+   * Creates [reservation] as the explorer and waits until the server has answered the write, so
+   * that the venue can read it. [ReservationRepositoryFirestore.createReservation] itself does not
+   * wait for the server. This also returns once the server has rejected the write.
+   */
+  private suspend fun createAndSync(reservation: Reservation = reservation()): String {
+    val id = explorerRepository.createReservation(reservation).getOrThrow()
+    explorerDb.waitForPendingWrites().await()
+    return id
+  }
 
   /** Runs [block] blocking, failing after [TIMEOUT_MS] instead of hanging on a missing emission. */
   private fun withTimeoutBlocking(block: suspend CoroutineScope.() -> Unit) = runBlocking {

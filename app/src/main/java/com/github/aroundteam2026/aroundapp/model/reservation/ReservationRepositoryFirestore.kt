@@ -21,9 +21,10 @@ import kotlinx.coroutines.tasks.await
  * Documents that cannot be mapped back to a [Reservation] are logged and skipped: the `observe*`
  * flows leave them out, and [updateStatus] treats them as missing.
  *
- * The security rules decide who may do what, and this class reports a refused write as a failure:
- * an explorer may only create a pending reservation that lists them, and only the venue may change
- * a reservation's status, along an allowed transition.
+ * The security rules decide who may do what: an explorer may only create a pending reservation that
+ * lists them, and only the venue may change a reservation's status, along an allowed transition. A
+ * creation the rules refuse is only logged, like a refused quest; a refused [updateStatus] comes
+ * back as a failure.
  *
  * @param db Firestore client to read from and write to.
  * @param now Clock used for `createdAt`, in epoch milliseconds.
@@ -36,18 +37,18 @@ class ReservationRepositoryFirestore(
     get() = db.collection(RESERVATIONS)
 
   /**
-   * Waits for the server to accept the write, so a write refused by the security rules (e.g. the
-   * signed-in user is not in `explorerUids`) comes back as a failure. The price is that the call
-   * does not complete while the device is offline: it returns once the device is back online, or
-   * when the caller's coroutine is cancelled.
+   * Issues the write without waiting for the server, so it also succeeds offline; Firestore sends
+   * it once the device is back online. A later server rejection, e.g. because the signed-in user is
+   * not in `explorerUids`, is only logged. Exceptions thrown while issuing the write (e.g. on a
+   * terminated client) are returned as a failure.
    */
   override suspend fun createReservation(reservation: Reservation): Result<String> =
       try {
         val document = reservations.document()
-        document.set(reservation.toFirestore(Timestamp(Date(now())))).await()
+        document.set(reservation.toFirestore(Timestamp(Date(now())))).addOnFailureListener {
+          Log.w(TAG, "Write of reservation ${document.id} was rejected", it)
+        }
         Result.success(document.id)
-      } catch (e: CancellationException) {
-        throw e
       } catch (e: Exception) {
         Result.failure(e)
       }
