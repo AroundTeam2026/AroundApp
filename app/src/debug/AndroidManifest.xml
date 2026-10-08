@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: OpenAI Codex -->
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <!-- Merged into the main manifest for debug builds only. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -8,5 +9,15 @@
   <application
       android:allowBackup="false"
       android:networkSecurityConfig="@xml/network_security_config"
-      tools:replace="android:allowBackup" />
+      tools:replace="android:allowBackup">
+    <activity
+        android:name=".ui.auth.AuthDemoActivity"
+        android:exported="true"
+        android:label="@string/auth_demo_title">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
 </manifest>

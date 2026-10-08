@@ -21,7 +21,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
-import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.DEFAULT_CENTER
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.Tab
@@ -39,7 +40,7 @@ class MapScreenTest {
 
   private val zurich = Location(47.3769, 8.5417)
   private val repository = FakeLocationRepository(zurich)
-  private val viewModel = MapViewModel(repository)
+  private val viewModel = MapViewModel(repository, FakeQuestRepository(), FakeVenueRepository())
   private val state
     get() = viewModel.uiState.value
 
@@ -94,7 +95,7 @@ class MapScreenTest {
     assertEquals(1, dialog.requests.size)
     assertEquals(0, repository.calls)
     assertFalse(state.showsUserLocation)
-    assertEquals(DEFAULT_CENTER.boundsWithin(NEARBY_RADIUS_METERS), state.areaToFrame)
+    assertEquals(DEFAULT_MAP_CENTER.boundsWithin(NEARBY_RADIUS_METERS), state.areaToFrame)
   }
 
   /** Shows the app with this test's map on the Map tab, then opens it. */

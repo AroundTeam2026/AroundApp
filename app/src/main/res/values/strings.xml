@@ -1,7 +1,38 @@
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
     <string name="app_name">Around</string>
     <string name="title_activity_main">MainActivity</string>
     <string name="tab_quests">Quests</string>
     <string name="tab_map">Map</string>
     <string name="tab_profile">Profile</string>
+    <string name="venue_area_title">Set your venue\'s location</string>
+    <string name="venue_area_hint">Tap the map or drag the pin to your entrance.</string>
+    <string name="venue_area_radius">Visit radius</string>
+    <string name="venue_area_meters">%1$d m</string>
+    <string name="use_my_location">Use my location</string>
+
+    <!-- The address search on the venue location screen -->
+    <string name="venue_address_placeholder">Search for your address</string>
+    <string name="venue_address_clear">Clear search</string>
+    <string name="venue_address_searching">Searching…</string>
+    <string name="venue_address_no_results">No addresses found</string>
+    <string name="venue_address_failed">Couldn\'t search for addresses. Check your connection and try again.</string>
+    <string name="venue_address_unavailable">Address search isn\'t available on this device.</string>
+
+    <!-- What screen readers say for a venue's pin on the map: the venue, then its featured quest -->
+    <string name="map_pin_description">%1$s: %2$s</string>
+
+    <!-- The card a venue's pin opens into on the map -->
+    <string name="map_card_party_size">Groups of %1$d+</string>
+    <plurals name="map_card_more_quests">
+        <item quantity="one">and %1$d more</item>
+        <item quantity="other">and %1$d more</item>
+    </plurals>
+    <!-- How far a venue is; the amount is already written for the language -->
+    <string name="map_card_distance_meters">%1$s m</string>
+    <string name="map_card_distance_kilometers">%1$s km</string>
+    <!-- A quest's reward on its card; the amount is already written for the language -->
+    <string name="map_card_reward_percent_off">%1$s%% off</string>
+    <string name="map_card_reward_chf_off">CHF %1$s off</string>
+    <string name="map_card_reward_free_item">Free %1$s</string>
 </resources>

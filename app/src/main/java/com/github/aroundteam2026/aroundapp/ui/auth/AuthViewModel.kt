@@ -18,13 +18,21 @@ import kotlinx.coroutines.launch
 
 /** Why the form can't go ahead. The screen turns each into a string resource. */
 enum class AuthFormError {
+  /** The email is malformed. */
   INVALID_EMAIL,
+  /** The sign-in password is empty. */
   EMPTY_PASSWORD,
+  /** The sign-up password is shorter than the minimum length. */
   PASSWORD_TOO_SHORT,
+  /** The sign-up password confirmation does not match the password. */
   PASSWORD_MISMATCH,
+  /** The email or password does not match an existing account. */
   WRONG_CREDENTIALS,
+  /** An account already uses the sign-up email. */
   EMAIL_TAKEN,
+  /** Authentication failed because the service could not be reached. */
   NETWORK,
+  /** Authentication failed for an unrecognized reason. */
   UNKNOWN,
 }
 
@@ -70,6 +78,9 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
   fun onPasswordConfirmationChange(passwordConfirmation: String) = _uiState.update {
     it.copy(passwordConfirmation = passwordConfirmation, error = null)
   }
+
+  /** Clears confirmation and the previous form error when switching authentication modes. */
+  fun onModeChange() = _uiState.update { it.copy(passwordConfirmation = "", error = null) }
 
   /** Validates and signs in; ignores submissions while a request is in progress. */
   fun signIn() =
