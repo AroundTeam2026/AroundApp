@@ -31,8 +31,10 @@ class QuestMarkersTest {
           venueName = "Café Lumen",
           location = Location(46.5220, 6.6330),
           icon = VenueAvatar.QuestFlag,
+          avatar = VenueAvatar.Initials("CL"),
           featuredQuest = testQuest(title = "Find the hidden fox"),
           otherQuestCount = 0,
+          distanceMeters = null,
           areaRadiusMeters = 120,
       )
 

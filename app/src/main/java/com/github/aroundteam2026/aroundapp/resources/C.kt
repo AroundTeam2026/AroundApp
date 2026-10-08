@@ -40,5 +40,15 @@ object C {
 
     const val QUEST_PIN = "quest_pin"
     const val QUEST_FLAG_AVATAR = "quest_flag_avatar"
+    const val QUEST_CARD = "quest_card"
+    const val QUEST_CARD_BODY = "quest_card_body"
+    const val QUEST_CARD_POINTER = "quest_card_pointer"
+    const val QUEST_CARD_AVATAR = "quest_card_avatar"
+    const val QUEST_CARD_VENUE = "quest_card_venue"
+    const val QUEST_CARD_TITLE = "quest_card_title"
+    const val QUEST_CARD_REWARD = "quest_card_reward"
+    const val QUEST_CARD_PARTY = "quest_card_party"
+    const val QUEST_CARD_DISTANCE = "quest_card_distance"
+    const val QUEST_CARD_MORE = "quest_card_more"
   }
 }

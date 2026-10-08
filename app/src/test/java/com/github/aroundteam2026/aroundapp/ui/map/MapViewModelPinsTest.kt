@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -28,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -75,6 +77,10 @@ class MapViewModelPinsTest {
 
   private val state
     get() = viewModel.uiState.value
+
+  /** The pin whose card is open, or null. */
+  private val selectedPin
+    get() = state.pins.find { it.venueId == state.selectedVenueId }
 
   private val pinIds
     get() = state.pins.map { it.venueId }.toSet()
@@ -347,6 +353,159 @@ class MapViewModelPinsTest {
 
     assertEquals(setOf("cafe", "bar"), pinIds)
     assertEquals("cafe-newer", state.pins.single { it.venueId == "cafe" }.featuredQuest.id)
+  }
+
+  @Test
+  fun pinsHaveNoDistanceUntilTheExplorerIsLocated() = test {
+    locationRepository.location = Location(46.5197, 6.6323)
+    showing()
+
+    assertTrue(state.pins.isNotEmpty())
+    assertTrue(state.pins.all { it.distanceMeters == null })
+  }
+
+  @Test
+  fun locatingTheExplorerGivesEachPinItsDistance() = test {
+    val here = Location(46.5197, 6.6323)
+    locationRepository.location = here
+    showing()
+
+    viewModel.onLocationPermissionResult(granted = true)
+    runCurrent()
+
+    val cafe = state.pins.single { it.venueId == "cafe" }
+    assertEquals(here.distanceTo(cafeLocation), cafe.distanceMeters!!, 1e-6)
+  }
+
+  @Test
+  fun anUnknownPositionLeavesPinsWithoutADistance() = test {
+    showing()
+
+    viewModel.onLocationPermissionResult(granted = true)
+    runCurrent()
+
+    assertTrue(state.pins.all { it.distanceMeters == null })
+  }
+
+  @Test
+  fun nothingIsSelectedAtFirst() = test {
+    showing()
+
+    assertNull(state.selectedVenueId)
+    assertNull(selectedPin)
+  }
+
+  @Test
+  fun tappingAPinOpensItsCard() = test {
+    showing()
+
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", selectedPin?.venueId)
+  }
+
+  @Test
+  fun tappingAnotherPinSwitchesTheCard() = test {
+    // Only one card is open at a time
+    showing()
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    viewModel.onPinClick("bar")
+    runCurrent()
+
+    assertEquals("bar", state.selectedVenueId)
+  }
+
+  @Test
+  fun tappingTheMapClosesTheCard() = test {
+    showing()
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    viewModel.onMapClick()
+    runCurrent()
+
+    assertNull(state.selectedVenueId)
+    assertEquals(setOf("cafe", "bar"), pinIds)
+  }
+
+  @Test
+  fun tappingAPinThatIsGoneChangesNothing() = test {
+    // A tap can arrive just after the pin's last quest ended
+    showing()
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    viewModel.onPinClick("closed-venue")
+    runCurrent()
+
+    assertEquals("cafe", state.selectedVenueId)
+  }
+
+  @Test
+  fun theCardClosesWhenItsVenueHasNoValidQuestLeft() = test {
+    showing()
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    quests.value = listOf(barQuest)
+    runCurrent()
+
+    assertNull(state.selectedVenueId)
+    assertNull(selectedPin)
+  }
+
+  @Test
+  fun theCardFollowsChangesToItsVenuesQuests() = test {
+    showing()
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    quests.value += testQuest(id = "cafe-2", venueId = "cafe", location = cafeLocation)
+    runCurrent()
+
+    assertEquals("cafe", state.selectedVenueId)
+    assertEquals(1, selectedPin?.otherQuestCount)
+  }
+
+  @Test
+  fun theOpenCardStaysWhenItsVenueLeavesTheView() = test {
+    // The card is much bigger than the pin: it can still be on screen when the venue isn't
+    showing(lausanneView)
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    showing(genevaView)
+
+    assertEquals(setOf("geneva", "cafe"), pinIds)
+    assertEquals("cafe", selectedPin?.venueId)
+  }
+
+  @Test
+  fun aVenueLeftOutOfViewIsDroppedOnceItsCardCloses() = test {
+    showing(lausanneView)
+    viewModel.onPinClick("cafe")
+    runCurrent()
+    showing(genevaView)
+
+    viewModel.onMapClick()
+    runCurrent()
+
+    assertEquals(setOf("geneva"), pinIds)
+  }
+
+  @Test
+  fun aTapThatRacedAPanStillOpensTheCard() = test {
+    // Venues out of view are known, so a tap that raced a pan still opens the card
+    showing(lausanneView)
+
+    viewModel.onPinClick("geneva")
+    runCurrent()
+
+    assertEquals("geneva", state.selectedVenueId)
   }
 
   private companion object {

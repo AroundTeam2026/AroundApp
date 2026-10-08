@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map.marker
 
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
@@ -52,4 +53,12 @@ data class PinShape(private val pointerWidth: Dp) : Shape {
         }
     return Outline.Generic(path)
   }
+}
+
+/** A triangle pointing down, filling its bounds: the card's pointer. */
+val PointerShape: Shape = GenericShape { size, _ ->
+  moveTo(0f, 0f)
+  lineTo(size.width, 0f)
+  lineTo(size.width / 2, size.height)
+  close()
 }

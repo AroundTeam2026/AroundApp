@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.IntSize
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerStyle
+import com.github.aroundteam2026.aroundapp.ui.map.marker.QuestCard
 import com.github.aroundteam2026.aroundapp.ui.map.marker.QuestPin
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.CameraPositionState
@@ -24,16 +25,29 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 
+/** Above the closed pins, so an open card covers its neighbours rather than the other way round. */
+private const val OPEN_CARD_Z_INDEX = 1f
+
 /**
- * Marks each of [pins] on the map with a pin over the venue's area.
+ * Marks each of [pins] on the map: a pin, or the card of the [selectedVenueId] venue, over the
+ * venue's area. Tapping a pin calls [onPinClick] with its venue; tapping the card calls
+ * [onCardClick].
  *
- * Each pin is drawn as an image, which is redrawn only when its icon or [style] stops being equal.
+ * Each marker is drawn as an image, which is redrawn only when what it shows changes: a pin's icon
+ * or [style], or for a card, its whole pin. So the whole marker is one tap target.
  */
 @Composable
 @GoogleMapComposable
-fun QuestMarkers(pins: List<VenuePin>, style: MarkerStyle) {
+fun QuestMarkers(
+    pins: List<VenuePin>,
+    selectedVenueId: String?,
+    style: MarkerStyle,
+    onPinClick: (venueId: String) -> Unit,
+    onCardClick: (VenuePin) -> Unit,
+) {
   pins.forEach { pin ->
     key(pin.venueId) {
+      val open = pin.venueId == selectedVenueId
       // Real metres on the ground, so the area grows as the explorer zooms in
       val area = pin.area(style)
       Circle(
@@ -42,16 +56,20 @@ fun QuestMarkers(pins: List<VenuePin>, style: MarkerStyle) {
           fillColor = area.fill,
           strokeWidth = 0f,
       )
-      // Keyed on what the image shows: a change to the pin's quests alone keeps it
+      // Keyed on what the image shows: a pin's icon, or the whole pin for its card
+      val keys: Array<Any> = if (open) arrayOf(pin, style) else arrayOf(pin.icon, style)
       MarkerComposable(
-          pin.icon,
-          style,
+          *keys,
           state = rememberUpdatedMarkerState(pin.location.toLatLng()),
           contentDescription = pin.description(),
-          // Handled: no info window, and the camera stays put
-          onClick = { true },
+          zIndex = if (open) OPEN_CARD_Z_INDEX else 0f,
+          onClick = {
+            if (open) onCardClick(pin) else onPinClick(pin.venueId)
+            // Handled: no info window, and the camera stays put
+            true
+          },
       ) {
-        QuestPin(pin.icon, style = style)
+        if (open) QuestCard(pin, style = style) else QuestPin(pin.icon, style = style)
       }
     }
   }

@@ -12,4 +12,14 @@
 
     <!-- What screen readers say for a venue's pin on the map: the venue, then its featured quest -->
     <string name="map_pin_description">%1$s: %2$s</string>
+
+    <!-- The card a venue's pin opens into on the map -->
+    <string name="map_card_party_size">Groups of %1$d+</string>
+    <plurals name="map_card_more_quests">
+        <item quantity="one">and %1$d more</item>
+        <item quantity="other">and %1$d more</item>
+    </plurals>
+    <!-- How far a venue is; the amount is already written for the language -->
+    <string name="map_card_distance_meters">%1$s m</string>
+    <string name="map_card_distance_kilometers">%1$s km</string>
 </resources>
