@@ -5,11 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -18,7 +14,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,35 +31,16 @@ fun SessionNavigation(
     repository: AuthRepository,
     navController: NavHostController = rememberNavController(),
     sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.factory(repository)),
-    mainScreen: @Composable () -> Unit = { AroundApp() },
+    mainScreen: @Composable () -> Unit = { AroundApp(onSignOut = repository::signOut) },
 ) {
   val state by sessionViewModel.uiState.collectAsStateWithLifecycle()
-  var appliedSession by rememberSaveable { mutableStateOf<String?>(null) }
-  LaunchedEffect(state) {
-    val destination =
-        when (state) {
-          SessionState.Checking -> CHECKING
-          SessionState.SignedOut -> AUTH_GRAPH
-          is SessionState.SignedIn -> MAIN_GRAPH
-        }
-    val sessionKey =
-        when (val session = state) {
-          SessionState.Checking -> CHECKING
-          SessionState.SignedOut -> AUTH_GRAPH
-          is SessionState.SignedIn -> "user/${session.userId}"
-        }
-    val alreadyInFlow =
-        navController.currentDestination?.hierarchy?.any { it.route == destination } == true
-    if (alreadyInFlow && (appliedSession == null || appliedSession == sessionKey)) {
-      appliedSession = sessionKey
-      return@LaunchedEffect
-    }
-    appliedSession = sessionKey
-    navController.navigate(destination) {
-      popUpTo(navController.graph.id) { inclusive = false }
-      launchSingleTop = true
-    }
-  }
+  val (flow, key) =
+      when (val session = state) {
+        SessionState.Checking -> CHECKING to CHECKING
+        SessionState.SignedOut -> AUTH_GRAPH to AUTH_GRAPH
+        is SessionState.SignedIn -> MAIN_GRAPH to "user/${session.userId}"
+      }
+  SessionFlowEffect(flow, key, CHECKING, navController)
   NavHost(navController, startDestination = CHECKING) {
     composable(CHECKING) { SessionLoading() }
     navigation(startDestination = AUTH_FORM, route = AUTH_GRAPH) {

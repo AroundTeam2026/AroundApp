@@ -1,6 +1,7 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,12 +10,14 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
@@ -46,15 +49,24 @@ class RoleRoutingViewModel(authRepository: AuthRepository, userRepository: UserR
               emit(RoleSessionState.SignedOut)
             } else {
               emit(RoleSessionState.Checking)
-              try {
-                userRepository.observeUser(uid).collect { user ->
-                  emit(RoleSessionState.SignedIn(uid, user?.role))
-                }
-              } catch (error: CancellationException) {
-                throw error
-              } catch (_: Exception) {
-                emit(RoleSessionState.ProfileUnavailable(uid))
-              }
+              emitAll(
+                  userRepository
+                      .observeUser(uid)
+                      .map<
+                          com.github.aroundteam2026.aroundapp.model.user.User?,
+                          RoleSessionState,
+                      > { user ->
+                        RoleSessionState.SignedIn(uid, user?.role)
+                      }
+                      .catch { error ->
+                        Log.w(
+                            "RoleRoutingViewModel",
+                            "Could not observe the authenticated profile",
+                            error,
+                        )
+                        emit(RoleSessionState.ProfileUnavailable(uid))
+                      }
+              )
             }
           }
           .stateIn(viewModelScope, SharingStarted.Eagerly, RoleSessionState.Checking)

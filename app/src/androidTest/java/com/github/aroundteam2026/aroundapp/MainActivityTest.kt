@@ -4,16 +4,22 @@ package com.github.aroundteam2026.aroundapp
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
-import com.github.aroundteam2026.aroundapp.model.AppContainer
-import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
+import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.screen.MainScreen
+import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
 import com.kaspersky.kaspresso.testcases.api.testcase.TestCase
 import io.github.kakaocup.compose.node.element.ComposeScreen
+import java.util.UUID
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -23,23 +29,23 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest : TestCase() {
 
-  // Inject before the activity launches; navigation tests never depend on a real auth session.
+  // Prepare an emulator session before MainActivity reads the immutable provider.
   @get:Rule(order = 0)
   val session =
       object : ExternalResource() {
-        private lateinit var original: AppContainer
-        private val app
-          get() =
-              InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
-                  as AroundApplication
-
         override fun before() {
-          original = app.container
-          app.container = AppContainer { FakeAuthRepository("device-test-user") }
+          FirebaseEmulator.connect()
+          val repository = AuthRepositoryProvider.repository
+          repository.signOut()
+          runBlocking {
+            repository
+                .signUpWithEmail("navigation-${UUID.randomUUID()}@around.test", "123456")
+                .getOrThrow()
+          }
         }
 
         override fun after() {
-          app.container = original
+          AuthRepositoryProvider.repository.signOut()
         }
       }
 
@@ -101,5 +107,17 @@ class MainActivityTest : TestCase() {
       // Fails if the Maps SDK never provides the map
       composeTestRule.awaitGoogleMap()
     }
+  }
+
+  @Test
+  fun profileSignOutReturnsToAuthAndStaysSignedOutAfterRecreation() {
+    composeTestRule.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.SESSION_SIGN_OUT).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
+    assertNull(AuthRepositoryProvider.repository.currentUserId.value)
+    composeTestRule.activityRule.scenario.recreate()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
   }
 }

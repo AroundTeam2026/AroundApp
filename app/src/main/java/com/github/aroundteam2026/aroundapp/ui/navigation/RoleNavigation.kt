@@ -9,11 +9,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -24,7 +20,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -49,34 +44,20 @@ fun RoleNavigation(
     userRepository: UserRepository,
     roleSelectionScreen: @Composable (userId: String) -> Unit,
     venueScreen: @Composable (userId: String) -> Unit,
-    explorerScreen: @Composable () -> Unit = { AroundApp() },
+    explorerScreen: @Composable () -> Unit = { AroundApp(onSignOut = authRepository::signOut) },
     navController: NavHostController = rememberNavController(),
     routingViewModel: RoleRoutingViewModel =
         viewModel(factory = RoleRoutingViewModel.factory(authRepository, userRepository)),
 ) {
   val state by routingViewModel.uiState.collectAsStateWithLifecycle()
   val flow = state.destination()
-  var appliedSession by rememberSaveable { mutableStateOf<String?>(null) }
-  LaunchedEffect(state) {
-    val uid =
-        when (val session = state) {
-          is RoleSessionState.SignedIn -> session.userId
-          is RoleSessionState.ProfileUnavailable -> session.userId
-          else -> ""
-        }
-    val sessionKey = "$flow/$uid"
-    val alreadyInFlow =
-        navController.currentDestination?.hierarchy?.any { it.route == flow } == true
-    if (alreadyInFlow && (appliedSession == null || appliedSession == sessionKey)) {
-      appliedSession = sessionKey
-      return@LaunchedEffect
-    }
-    appliedSession = sessionKey
-    navController.navigate(flow) {
-      popUpTo(navController.graph.id) { inclusive = false }
-      launchSingleTop = true
-    }
-  }
+  val uid =
+      when (val session = state) {
+        is RoleSessionState.SignedIn -> session.userId
+        is RoleSessionState.ProfileUnavailable -> session.userId
+        else -> ""
+      }
+  SessionFlowEffect(flow, "$flow/$uid", CHECKING, navController)
   NavHost(navController, startDestination = CHECKING) {
     composable(CHECKING) { SessionLoading() }
     navigation(startDestination = AUTH_FORM, route = AUTH) {

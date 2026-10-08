@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.navigation.SessionNavigation
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
@@ -13,7 +14,7 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
-    val repository = (application as AroundApplication).container.authRepository
+    val repository = AuthRepositoryProvider.repository
     setContent { AroundAppTheme { SessionNavigation(repository) } }
   }
 }
