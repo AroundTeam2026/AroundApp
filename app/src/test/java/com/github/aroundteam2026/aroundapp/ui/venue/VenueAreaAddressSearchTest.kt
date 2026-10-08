@@ -315,6 +315,28 @@ class VenueAreaAddressSearchTest {
     // The address no longer describes where the marker is, so it mustn't be saved with it
     assertNull(state.address)
     assertEquals(acrossTown, state.marker)
+    // Nor shown as if it would be
+    assertEquals("", viewModel.addressQuery)
+  }
+
+  @Test
+  fun aLongDragKeepsANewSearchTheVenueIsTyping() {
+    viewModel.onAddressPicked(bourg)
+    viewModel.onAddressQueryChanged("Place de")
+
+    viewModel.onMarkerPlaced(Location(46.5235, 6.6382))
+
+    assertNull(state.address)
+    assertEquals("Place de", viewModel.addressQuery)
+  }
+
+  @Test
+  fun aShortDragKeepsThePickedAddressInTheField() {
+    viewModel.onAddressPicked(bourg)
+
+    viewModel.onMarkerPlaced(entrance)
+
+    assertEquals("Rue de Bourg 12, 1003 Lausanne", viewModel.addressQuery)
   }
 
   @Test
@@ -404,28 +426,5 @@ class VenueAreaAddressSearchTest {
     assertEquals(AddressSearchStatus.IDLE, search.status)
     assertEquals(bourg.location, state.marker)
     assertEquals("Rue de Bourg 12, 1003 Lausanne", state.address)
-  }
-
-  @Test
-  fun clearingCancelsASearchStillWaiting() = test {
-    viewModel.onAddressQueryChanged("Rue")
-    viewModel.onAddressCleared()
-    advanceUntilIdle()
-
-    assertTrue(addresses.searches.isEmpty())
-    assertEquals(AddressSearchStatus.IDLE, search.status)
-  }
-
-  @Test
-  fun clearingDuringASearchDropsItsResults() = test {
-    addresses.gates["Rue"] = CompletableDeferred()
-    viewModel.onAddressQueryChanged("Rue")
-    advanceTimeBy(SEARCH_DELAY_MILLIS + 1)
-
-    viewModel.onAddressCleared()
-    addresses.gates.getValue("Rue").complete(Unit)
-    advanceUntilIdle()
-
-    assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
   }
 }

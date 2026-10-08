@@ -110,11 +110,16 @@ class VenueAreaViewModel(
 
   /**
    * Called when the venue taps the map, or drops the dragged marker, at [location]. A marker moved
-   * more than [ADDRESS_DRIFT_METERS] from the picked address forgets it.
+   * more than [ADDRESS_DRIFT_METERS] from the picked address forgets it, and empties the field if
+   * it still shows it.
    */
   fun onMarkerPlaced(location: Location) {
     val drifted = addressLocation?.let { it.distanceTo(location) > ADDRESS_DRIFT_METERS } == true
-    if (drifted) addressLocation = null
+    if (drifted) {
+      addressLocation = null
+      // The field mustn't keep showing an address that won't be saved; a new search stays
+      if (addressQuery == _uiState.value.address) addressQuery = ""
+    }
     _uiState.update {
       if (drifted) it.copy(marker = location, address = null) else it.copy(marker = location)
     }

@@ -27,9 +27,14 @@ interface Geocoding {
   suspend fun fromName(query: String, maxResults: Int, within: GeoBounds?): List<Address>
 }
 
-/** [Geocoding] through Android's [Geocoder], which Google Play services provides. */
-class AndroidGeocoding(context: Context) : Geocoding {
-  private val geocoder = Geocoder(context.applicationContext)
+/**
+ * [Geocoding] through Android's [geocoder], which Google Play services provides.
+ *
+ * @param geocoder The geocoder to ask; tests pass their own.
+ */
+class AndroidGeocoding(private val geocoder: Geocoder) : Geocoding {
+  /** Looks addresses up with the device's geocoder; any context will do. */
+  constructor(context: Context) : this(Geocoder(context.applicationContext))
 
   override val isAvailable: Boolean
     get() = Geocoder.isPresent()
