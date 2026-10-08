@@ -9,11 +9,12 @@ import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.MemoryCacheSettings
-import com.google.firebase.firestore.Source
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
@@ -35,12 +36,13 @@ import org.junit.rules.Timeout
 import org.junit.runner.RunWith
 
 /**
- * Tests [QuestRepositoryFirestore] on the Firestore emulator, started with `firebase
- * emulators:start --only firestore --project demo-project`.
+ * Tests [QuestRepositoryFirestore] on the Auth and Firestore emulators, started with `firebase
+ * emulators:start --only auth,firestore --project demo-project`, so firestore.rules apply.
  *
  * Clients belong to named [FirebaseApp]s on the `demo-project` id, never to the default app, so the
- * tests cannot reach the real project. Each comment above a test names the production bug it
- * catches.
+ * tests cannot reach the real project. Each test signs in a fresh user and uses their uid as the
+ * venue id, as the rules require, so tests never see each other's quests. Each comment above a test
+ * names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class QuestRepositoryFirestoreTest {
@@ -53,22 +55,16 @@ class QuestRepositoryFirestoreTest {
   private lateinit var db: FirebaseFirestore
   private lateinit var repository: QuestRepositoryFirestore
 
-  /** Connects a fresh client to the emulator and deletes every quest left by earlier tests. */
+  /** Uid of the user signed in by [setUp], used as the venue id of the quests it creates. */
+  private lateinit var venueId: String
+
+  /** Signs in a fresh venue user and connects a fresh client to the emulator. */
   @Before
   fun setUp() =
       runBlocking<Unit> {
+        withTimeout(SETUP_TIMEOUT_MS) { venueId = signInNewUser(MAIN_APP) }
         db = emulatorClient(MAIN_APP)
         repository = QuestRepositoryFirestore(db) { FIXED_NOW }
-        withTimeout(SETUP_TIMEOUT_MS) {
-          // A batch is capped at 500 writes, so delete page by page until nothing is left.
-          while (true) {
-            val page = db.collection(QUESTS).limit(BATCH_LIMIT).get(Source.SERVER).await()
-            if (page.isEmpty) break
-            val batch = db.batch()
-            page.documents.forEach { batch.delete(it.reference) }
-            batch.commit().await()
-          }
-        }
       }
 
   /** Terminates the client [setUp] created, so no listener or cached data leaks between tests. */
@@ -194,7 +190,8 @@ class QuestRepositoryFirestoreTest {
 
     val active = repository.observeActiveQuests().first { list -> list.any { it.id == activeId } }
 
-    assertEquals(listOf(activeId), active.map { it.id })
+    // Other tests' active quests are also listed, so only this venue's quests are compared.
+    assertEquals(listOf(activeId), active.ownedBy(venueId).map { it.id })
   }
 
   // Bug: the flow reads once (get()) instead of listening, so later quests never arrive.
@@ -224,18 +221,16 @@ class QuestRepositoryFirestoreTest {
   // Bug: observeQuestsByVenue does not filter on venueId, or also filters on status.
   @Test
   fun observeQuestsByVenue_returnsAllOfThatVenuesQuestsWhateverTheirStatus() = withTimeoutBlocking {
-    val v1Ids =
-        QuestStatus.entries
-            .map { repository.createQuest(quest(venueId = "v1", status = it)).getOrThrow() }
-            .toSet()
-    repository.createQuest(quest(venueId = "v2")).getOrThrow()
+    val ownIds =
+        QuestStatus.entries.map { repository.createQuest(quest(status = it)).getOrThrow() }.toSet()
+    createQuestAsAnotherVenue()
 
     val quests =
-        repository.observeQuestsByVenue("v1").first { list ->
-          list.map { it.id }.containsAll(v1Ids)
+        repository.observeQuestsByVenue(venueId).first { list ->
+          list.map { it.id }.containsAll(ownIds)
         }
 
-    assertEquals(v1Ids, quests.map { it.id }.toSet())
+    assertEquals(ownIds, quests.map { it.id }.toSet())
   }
 
   // Bug: a document that cannot be mapped crashes the listener or ends the flow instead of being
@@ -243,21 +238,24 @@ class QuestRepositoryFirestoreTest {
   @Test
   fun observeActiveQuests_skipsMalformedDocuments() = withTimeoutBlocking {
     db.collection(QUESTS)
-        .document("malformed")
-        .set(mapOf("venueId" to "v1", "status" to "ACTIVE")) // no title, location, ...
+        .document()
+        .set(mapOf("venueId" to venueId, "status" to "ACTIVE")) // no title, location, ...
         .await()
     val validId = repository.createQuest(quest()).getOrThrow()
 
     val active = repository.observeActiveQuests().first { list -> list.any { it.id == validId } }
 
-    assertEquals(listOf(validId), active.map { it.id })
+    assertEquals(listOf(validId), active.ownedBy(venueId).map { it.id })
   }
 
-  /** A quest whose fields all differ from the defaults of [quest] and of [Quest]. */
+  /**
+   * A quest whose fields all differ from the defaults of [quest] and of [Quest], except [venueId],
+   * which the rules require to be the signed-in user's uid.
+   */
   private fun fullQuest() =
       Quest(
           id = "",
-          venueId = "venue-42",
+          venueId = venueId,
           venueName = "Le Café",
           location = Location(46.5191, -6.5668),
           radiusMeters = 120,
@@ -275,7 +273,6 @@ class QuestRepositoryFirestoreTest {
   /** A minimal valid quest, varied only where a test needs it. */
   private fun quest(
       id: String = "",
-      venueId: String = "v1",
       status: QuestStatus = QuestStatus.ACTIVE,
       title: String = "Title",
   ) =
@@ -300,6 +297,24 @@ class QuestRepositoryFirestoreTest {
     withTimeout(TIMEOUT_MS, block)
   }
 
+  /** The quests of this list that belong to [venueId]. */
+  private fun List<Quest>.ownedBy(venueId: String) = filter { it.venueId == venueId }
+
+  /**
+   * Has another signed-in venue create an active quest and waits until the server has it, so a
+   * query that ignores the venue would see it.
+   */
+  private suspend fun createQuestAsAnotherVenue() {
+    val otherVenueId = signInNewUser(OTHER_VENUE_APP)
+    val other = emulatorClient(OTHER_VENUE_APP)
+    try {
+      QuestRepositoryFirestore(other).createQuest(quest().copy(venueId = otherVenueId)).getOrThrow()
+      other.waitForPendingWrites().await()
+    } finally {
+      other.terminate().await()
+    }
+  }
+
   /**
    * Waits until [db] has sent its pending writes, then reads [id] through a fresh client with an
    * empty cache, so the quest must come from the server.
@@ -307,7 +322,8 @@ class QuestRepositoryFirestoreTest {
   private suspend fun getQuestFromServer(id: String): Quest? {
     // ensure the write is sent to the emulator
     db.waitForPendingWrites().await()
-    // fresh client with empty cache, so every read comes from emulator
+    // fresh client with empty cache, so every read comes from emulator; reads need a signed-in user
+    signInNewUser(READER_APP)
     val reader = emulatorClient(READER_APP)
     try {
       return QuestRepositoryFirestore(reader).getQuest(id)
@@ -319,7 +335,8 @@ class QuestRepositoryFirestoreTest {
   private companion object {
     const val QUESTS = "quests"
     const val READER_APP = "quest-test-reader"
-    const val BATCH_LIMIT = 500L
+    const val OTHER_VENUE_APP = "quest-test-other-venue"
+    const val PASSWORD = "password123"
     const val TIMEOUT_MS = 10_000L
 
     /** Bounds setUp and tearDown; the first connection to the emulator can be slow on CI. */
@@ -340,11 +357,36 @@ class QuestRepositoryFirestoreTest {
      * named apps (one is terminated on purpose, another acts as a second device), so this reuses
      * its host and port instead.
      */
-    fun emulatorClient(appName: String): FirebaseFirestore {
+    fun emulatorClient(appName: String): FirebaseFirestore =
+        FirebaseFirestore.getInstance(emulatorApp(appName)).apply {
+          useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
+          firestoreSettings =
+              FirebaseFirestoreSettings.Builder()
+                  .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
+                  .build() // keep local cache in ram only
+        }
+
+    /**
+     * Creates a fresh user on the Auth emulator and signs them in on the app named [appName], so
+     * that app's Firestore client acts as them.
+     *
+     * @return the new user's uid.
+     */
+    suspend fun signInNewUser(appName: String): String {
+      val email = "quest-test-${UUID.randomUUID()}@around.test"
+      val auth = FirebaseAuth.getInstance(emulatorApp(appName))
+      return auth.createUserWithEmailAndPassword(email, PASSWORD).await().user!!.uid
+    }
+
+    /**
+     * Returns the [FirebaseApp] named [appName] on the `demo-project` id. On first use it creates
+     * the app and points its Auth at the emulator; Firestore is pointed per client, since a
+     * terminated client is replaced by a new one.
+     */
+    private fun emulatorApp(appName: String): FirebaseApp {
       val context = InstrumentationRegistry.getInstrumentation().targetContext // get app context
-      val app =
-          FirebaseApp.getApps(context).firstOrNull { it.name == appName }
-              ?: FirebaseApp.initializeApp(
+      return FirebaseApp.getApps(context).firstOrNull { it.name == appName }
+          ?: FirebaseApp.initializeApp(
                   context,
                   FirebaseOptions.Builder()
                       .setProjectId("demo-project")
@@ -353,13 +395,10 @@ class QuestRepositoryFirestoreTest {
                       .build(),
                   appName,
               )
-      return FirebaseFirestore.getInstance(app).apply {
-        useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
-        firestoreSettings =
-            FirebaseFirestoreSettings.Builder()
-                .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
-                .build() // keep local cache in ram only
-      }
+              .also {
+                FirebaseAuth.getInstance(it)
+                    .useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.AUTH_PORT)
+              }
     }
   }
 }
