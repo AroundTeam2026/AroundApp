@@ -65,7 +65,7 @@ class AuthViewModelTest {
         fill("ada@around.test", PASSWORD)
         vm.signUp()
         advanceUntilIdle()
-        assertTrue(repo.currentUserId.value != null)
+        assertNotNull(repo.currentUserId.value)
         assertNull(vm.uiState.value.error)
       }
 
@@ -160,7 +160,7 @@ class AuthViewModelTest {
       }
 
   @Test
-  fun typingClearsThePreviousError() =
+  fun typingAnEmailClearsThePreviousError() =
       runTest(dispatcher) {
         fill("not-an-email", PASSWORD)
         vm.signIn()
@@ -237,7 +237,6 @@ class AuthViewModelTest {
       runTest(dispatcher) {
         val created =
             AuthViewModel.factory(repo).create(AuthViewModel::class.java, CreationExtras.Empty)
-        assertNotNull(created)
         val uid = repo.addAccount("ada@around.test", PASSWORD)
         created.onEmailChange("ada@around.test")
         created.onPasswordChange(PASSWORD)
@@ -311,6 +310,23 @@ class AuthViewModelTest {
         assertNotNull(repo.currentUserId.value)
         assertFalse(vm.uiState.value.isLoading)
         assertNull(vm.uiState.value.error)
+      }
+
+  @Test
+  fun switchingModesClearsConfirmationAndErrorButKeepsCredentials() =
+      runTest(dispatcher) {
+        fill("ada@around.test", PASSWORD)
+        vm.onPasswordConfirmationChange("different")
+        vm.signUp()
+        assertEquals(AuthFormError.PASSWORD_MISMATCH, vm.uiState.value.error)
+
+        vm.onModeChange()
+
+        assertEquals("", vm.uiState.value.passwordConfirmation)
+        assertNull(vm.uiState.value.error)
+        assertEquals("ada@around.test", vm.uiState.value.email)
+        assertEquals(PASSWORD, vm.uiState.value.password)
+        assertFalse(vm.uiState.value.isLoading)
       }
 
   private companion object {

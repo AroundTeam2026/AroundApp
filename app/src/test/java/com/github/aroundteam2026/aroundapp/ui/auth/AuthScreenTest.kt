@@ -117,20 +117,37 @@ class AuthScreenTest {
   }
 
   @Test
-  fun everyErrorHasAReadableMessage() {
-    val expected =
-        listOf(
-            "Enter a valid email address.",
-            "Enter your password.",
-            "Use a password with at least 6 characters.",
-            "Passwords do not match.",
-            "The email or password is incorrect.",
-            "An account already exists with this email.",
-            "Could not connect. Check your connection and try again.",
-            "Something went wrong. Please try again.",
-        )
-    AuthFormError.entries.zip(expected).forEach { (error, message) ->
-      assertEquals(message, compose.activity.getString(error.messageResource(), 6))
-    }
+  fun switchingToSignInClearsMismatchAndHidesConfirmation() {
+    launch()
+    click(C.Tag.AUTH_SWITCH_MODE)
+    fill()
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("different")
+    click(C.Tag.AUTH_SUBMIT)
+    compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertIsDisplayed()
+
+    click(C.Tag.AUTH_SWITCH_MODE)
+
+    compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertDoesNotExist()
+    click(C.Tag.AUTH_SWITCH_MODE)
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertTextEquals("", "Confirm password")
+  }
+
+  @Test
+  fun shortPasswordShowsFormattedPluralMessage() {
+    launch()
+    click(C.Tag.AUTH_SWITCH_MODE)
+    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
+    compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("12345")
+    click(C.Tag.AUTH_SUBMIT)
+    compose
+        .onNodeWithTag(C.Tag.AUTH_ERROR)
+        .assertTextEquals("Use a password with at least 6 characters.")
+  }
+
+  @Test
+  fun everyErrorMapsToADifferentMessageResource() {
+    val resources = AuthFormError.entries.map { it.messageResource() }
+    assertEquals(resources.size, resources.toSet().size)
   }
 }

@@ -12,7 +12,10 @@
     <string name="auth_need_account">New to Around? Create an account</string>
     <string name="auth_invalid_email">Enter a valid email address.</string>
     <string name="auth_empty_password">Enter your password.</string>
-    <string name="auth_short_password">Use a password with at least %1$d characters.</string>
+    <plurals name="auth_short_password">
+        <item quantity="one">Use a password with at least %1$d character.</item>
+        <item quantity="other">Use a password with at least %1$d characters.</item>
+    </plurals>
     <string name="auth_password_mismatch">Passwords do not match.</string>
     <string name="auth_wrong_credentials">The email or password is incorrect.</string>
     <string name="auth_email_taken">An account already exists with this email.</string>

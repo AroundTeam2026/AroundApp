@@ -1,7 +1,7 @@
 // Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.ui.auth
 
-import androidx.annotation.StringRes
+import androidx.annotation.AnyRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -98,7 +99,15 @@ fun AuthScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
       }
       state.error?.let { error ->
         Text(
-            stringResource(error.messageResource(), AuthInputValidation.MIN_PASSWORD_LENGTH),
+            if (error == AuthFormError.PASSWORD_TOO_SHORT) {
+              pluralStringResource(
+                  error.messageResource(),
+                  AuthInputValidation.MIN_PASSWORD_LENGTH,
+                  AuthInputValidation.MIN_PASSWORD_LENGTH,
+              )
+            } else {
+              stringResource(error.messageResource())
+            },
             color = MaterialTheme.colorScheme.error,
             modifier =
                 Modifier.testTag(C.Tag.AUTH_ERROR).semantics { liveRegion = LiveRegionMode.Polite },
@@ -121,8 +130,7 @@ fun AuthScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
       TextButton(
           onClick = {
             isCreatingAccount = !isCreatingAccount
-            // Switching modes clears an error belonging to the previous form.
-            viewModel.onPasswordConfirmationChange("")
+            viewModel.onModeChange()
           },
           enabled = !state.isLoading,
           modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_SWITCH_MODE),
@@ -137,12 +145,13 @@ fun AuthScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
   }
 }
 
-@StringRes
+/** Returns the message resource; [AuthFormError.PASSWORD_TOO_SHORT] uses a plural resource. */
+@AnyRes
 internal fun AuthFormError.messageResource(): Int =
     when (this) {
       AuthFormError.INVALID_EMAIL -> R.string.auth_invalid_email
       AuthFormError.EMPTY_PASSWORD -> R.string.auth_empty_password
-      AuthFormError.PASSWORD_TOO_SHORT -> R.string.auth_short_password
+      AuthFormError.PASSWORD_TOO_SHORT -> R.plurals.auth_short_password
       AuthFormError.PASSWORD_MISMATCH -> R.string.auth_password_mismatch
       AuthFormError.WRONG_CREDENTIALS -> R.string.auth_wrong_credentials
       AuthFormError.EMAIL_TAKEN -> R.string.auth_email_taken
