@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.rewardExpiringAt
@@ -11,10 +12,11 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.map.marker.TestAvatar
 import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Tests [buildVenuePins]: one pin per venue with valid quests, and which quest it features. */
+/** Tests [buildVenuePins]: one pin per venue with valid quests, and which quest its card shows. */
 class VenuePinsTest {
 
   private val now = 10_000L
@@ -126,7 +128,7 @@ class VenuePinsTest {
 
   @Test
   fun questsCreatedTogetherFeatureTheSameOneEveryTime() {
-    // Ties go to the smallest id, so the featured quest doesn't switch between updates
+    // Ties go to the smallest id, so the card doesn't switch quests between updates
     val quests =
         listOf(
             testQuest(id = "b", venueId = "cafe", createdAt = 100),
@@ -257,22 +259,83 @@ class VenuePinsTest {
   }
 
   @Test
-  fun eachPinGetsTheIconChosenForItsVenue() {
-    // Where venue categories plug in later
+  fun cardsShowTheVenuesInitialsUntilVenuesHaveImages() {
+    val quests = listOf(testQuest(venueId = "cafe", venueName = "Old name"))
+    val venue = testVenue(id = "cafe", name = "Bar des Arches")
+
+    // From the name the card shows: the venue's own, not the quest's copy
+    assertEquals(VenueAvatar.Initials("BA"), pins(quests, venue).single().avatar)
+  }
+
+  @Test
+  fun eachPinGetsTheIconAndAvatarChosenForItsVenue() {
+    // Where categories and venue images plug in later
     val cafe = testVenue(id = "cafe", name = "Café Lumen")
-    val asked = mutableListOf<Venue?>()
-    val quests = listOf(testQuest(venueId = "cafe"), testQuest(id = "q2", venueId = "bar"))
+    val askedIcons = mutableListOf<Venue?>()
+    val askedAvatars = mutableListOf<Pair<Venue?, String>>()
+    val quests =
+        listOf(
+            testQuest(venueId = "cafe"),
+            testQuest(id = "q2", venueId = "bar", venueName = "Bar Nocturne"),
+        )
 
     val pins =
-        buildVenuePins(quests, mapOf("cafe" to cafe), now) { venue ->
-              asked += venue
-              if (venue == cafe) TestAvatar("cafe-icon") else VenueAvatar.QuestFlag
-            }
+        buildVenuePins(
+                quests,
+                mapOf("cafe" to cafe),
+                now,
+                iconOf = { venue ->
+                  askedIcons += venue
+                  if (venue == cafe) TestAvatar("cafe-icon") else VenueAvatar.QuestFlag
+                },
+                avatarOf = { venue, name ->
+                  askedAvatars += venue to name
+                  TestAvatar(name)
+                },
+            )
             .associateBy { it.venueId }
 
-    assertEquals(setOf(cafe, null), asked.toSet())
+    assertEquals(setOf(cafe, null), askedIcons.toSet())
+    assertEquals(setOf(cafe to "Café Lumen", null to "Bar Nocturne"), askedAvatars.toSet())
     assertEquals(TestAvatar("cafe-icon"), pins.getValue("cafe").icon)
     assertEquals(VenueAvatar.QuestFlag, pins.getValue("bar").icon)
+    assertEquals(TestAvatar("Bar Nocturne"), pins.getValue("bar").avatar)
+  }
+
+  @Test
+  fun withoutTheExplorersPositionPinsHaveNoDistance() {
+    assertNull(pins(listOf(testQuest())).single().distanceMeters)
+  }
+
+  @Test
+  fun withTheExplorersPositionEachPinKnowsHowFarItIs() {
+    val here = Location(46.5197, 6.6323)
+    val quests =
+        listOf(
+            testQuest(venueId = "cafe", location = Location(46.5220, 6.6330)),
+            testQuest(id = "q2", venueId = "geneva", location = Location(46.2044, 6.1432)),
+        )
+
+    val pins = buildVenuePins(quests, emptyMap(), now, from = here).associateBy { it.venueId }
+
+    assertEquals(
+        here.distanceTo(Location(46.5220, 6.6330)),
+        pins.getValue("cafe").distanceMeters!!,
+        1e-6,
+    )
+    assertEquals(51_359.2, pins.getValue("geneva").distanceMeters!!, 1.0)
+  }
+
+  @Test
+  fun theDistanceIsToWhereThePinStands() {
+    // The venue's own place when known, as for the pin itself
+    val here = Location(46.5197, 6.6323)
+    val quests = listOf(testQuest(venueId = "cafe", location = Location(1.0, 1.0)))
+    val venue = testVenue(id = "cafe", location = Location(46.5220, 6.6330))
+
+    val pin = buildVenuePins(quests, mapOf("cafe" to venue), now, from = here).single()
+
+    assertEquals(here.distanceTo(Location(46.5220, 6.6330)), pin.distanceMeters!!, 1e-6)
   }
 
   @Test

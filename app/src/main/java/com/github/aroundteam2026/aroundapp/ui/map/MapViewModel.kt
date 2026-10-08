@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.contains
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,12 +42,15 @@ import kotlinx.coroutines.launch
  *
  * @property areaToFrame The area the camera must move to, or null once the map framed it.
  * @property showsUserLocation Whether to draw the explorer's position, which needs the permission.
- * @property pins The venues to mark: those on screen with valid quests.
+ * @property pins The venues to mark: those on screen with valid quests, and the open one wherever
+ *   it is.
+ * @property selectedVenueId The venue whose card is open, or null when every pin is closed.
  */
 data class MapUiState(
     val areaToFrame: GeoBounds?,
     val showsUserLocation: Boolean = false,
     val pins: List<VenuePin> = emptyList(),
+    val selectedVenueId: String? = null,
 )
 
 /**
@@ -53,7 +58,7 @@ data class MapUiState(
  * around the explorer once their position is known.
  *
  * It marks every venue on screen that has valid quests, keeping up as quests and venues change and
- * as rewards expire, by [clock].
+ * as rewards expire, by [clock]. At most one pin is open into its card at a time.
  */
 class MapViewModel(
     private val locationRepository: LocationRepository,
@@ -73,14 +78,29 @@ class MapViewModel(
 
   /** The part of the world on screen, or null until the map reports it. */
   private val visibleArea = MutableStateFlow<GeoBounds?>(null)
+  /** Where the explorer was located, which pins measure their distance from; null until then. */
+  private val explorer = MutableStateFlow<Location?>(null)
+  /** The venue whose card the explorer opened, or null. */
+  private val selectedVenueId = MutableStateFlow<String?>(null)
+  /** Every venue with valid quests, on screen or not. */
+  private val allPins = venuePins().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
   init {
     viewModelScope.launch {
-      // Only the venues on screen get a pin
-      combine(venuePins(), visibleArea) { pins, area ->
-            if (area == null) emptyList() else pins.filter { it.location in area }
+      // The venues on screen get a pin, and the open one keeps it wherever it is: the card is far
+      // bigger than the pin, so it can still be on screen when its venue isn't
+      combine(allPins, visibleArea, selectedVenueId) { pins, area, opened ->
+            val selected = opened?.takeIf { id -> pins.any { it.venueId == id } }
+            val shown = pins.filter {
+              (area != null && it.location in area) || it.venueId == selected
+            }
+            Triple(shown, opened, selected)
           }
-          .collect { pins -> _uiState.update { it.copy(pins = pins) } }
+          .collect { (shown, opened, selected) ->
+            // A venue left without valid quests closes its card for good
+            if (selected == null && opened != null) selectedVenueId.compareAndSet(opened, null)
+            _uiState.update { it.copy(pins = shown, selectedVenueId = selected) }
+          }
     }
   }
 
@@ -95,6 +115,7 @@ class MapViewModel(
     lookup = viewModelScope.launch {
       val here = locationRepository.currentLocation() ?: return@launch
       located = true
+      explorer.value = here
       _uiState.update { it.copy(areaToFrame = here.boundsWithin(NEARBY_RADIUS_METERS)) }
     }
   }
@@ -113,9 +134,23 @@ class MapViewModel(
   }
 
   /**
-   * Every venue with valid quests, again whenever quests or their venues change, and when a reward
-   * expires. Without quests, or when they fail, there are none; without venues, pins are drawn from
-   * the quests alone.
+   * Called when the explorer taps the closed pin of [venueId]: opens its card, closing any other. A
+   * tap on a venue that no longer has valid quests changes nothing.
+   */
+  fun onPinClick(venueId: String) {
+    if (allPins.value.none { it.venueId == venueId }) return
+    selectedVenueId.value = venueId
+  }
+
+  /** Called when the explorer taps the map itself: closes the open card. */
+  fun onMapClick() {
+    selectedVenueId.value = null
+  }
+
+  /**
+   * Every venue with valid quests, again whenever quests or their venues change, when a reward
+   * expires, and once the explorer is located, which gives each its distance. Without quests, or
+   * when they fail, there are none; without venues, pins are drawn from the quests alone.
    *
    * The quests are listened to once, and their venues again only when the set of venues changes, as
    * each new listener costs Firestore reads.
@@ -134,11 +169,13 @@ class MapViewModel(
             .flatMapLatest { venueIds ->
               venueRepository.observeVenues(venueIds).catch { emit(emptyList()) }
             }
-    return combine(quests, venues) { current, known -> current to known.associateBy { it.id } }
-        .transformLatest { (quests, venues) ->
+    return combine(quests, venues, explorer) { current, known, here ->
+          Triple(current, known.associateBy { it.id }, here)
+        }
+        .transformLatest { (quests, venues, here) ->
           while (true) {
             val now = clock()
-            emit(buildVenuePins(quests, venues, now))
+            emit(buildVenuePins(quests, venues, now, from = here))
             val nextExpiry = quests.nextExpiryAfter(now) ?: break
             delay(nextExpiry - now)
           }
