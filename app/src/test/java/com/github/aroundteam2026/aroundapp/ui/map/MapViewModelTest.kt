@@ -4,6 +4,8 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +33,9 @@ class MapViewModelTest {
   private val geneva = Location(46.2044, 6.1432)
 
   private val repository = FakeLocationRepository(zurich)
-  private val viewModel by lazy { MapViewModel(repository) }
+  private val viewModel by lazy {
+    MapViewModel(repository, FakeQuestRepository(), FakeVenueRepository())
+  }
 
   private val state
     get() = viewModel.uiState.value

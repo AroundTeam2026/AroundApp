@@ -100,3 +100,10 @@ fun GeoBounds.toLatLngBounds(): LatLngBounds {
   val eastEdge = if (west == -180.0 && east == 180.0) Math.nextDown(180.0) else east
   return LatLngBounds(LatLng(south, west), LatLng(north, eastEdge))
 }
+
+/** These bounds, as the [GeoBounds] the rest of the app uses; wrapping ones keep wrapping. */
+fun LatLngBounds.toGeoBounds(): GeoBounds =
+    GeoBounds(southwest.latitude, southwest.longitude, northeast.latitude, northeast.longitude)
+
+/** This location as the Maps SDK's [LatLng]. */
+fun Location.toLatLng(): LatLng = LatLng(lat, lng)

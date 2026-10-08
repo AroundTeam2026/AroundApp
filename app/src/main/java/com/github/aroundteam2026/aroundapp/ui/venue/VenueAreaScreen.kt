@@ -44,6 +44,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.FrameArea
 import com.github.aroundteam2026.aroundapp.ui.map.RequestLocationPermission
 import com.github.aroundteam2026.aroundapp.ui.map.rememberMapCamera
+import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
@@ -245,7 +246,5 @@ private fun RadiusPanel(radiusMeters: Int, onRadiusChanged: (Int) -> Unit) {
     }
   }
 }
-
-private fun Location.toLatLng() = LatLng(lat, lng)
 
 private fun LatLng.toLocation() = Location(latitude, longitude)
