@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.ComposeMapColorScheme
@@ -32,6 +33,8 @@ import com.google.maps.android.compose.MapUiSettings
  * The Explorer's map, in the app's colours: a light style in light mode and a night one in dark
  * mode, both hiding Google's place icons (see [mapStyle]). It asks for the location permission if
  * needed, then frames [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
+ *
+ * It marks each venue on screen that has valid quests with a pin over its area.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
@@ -47,6 +50,7 @@ fun MapScreen(
   val darkTheme = isSystemInDarkTheme()
   val mapStyle =
       remember(context, darkTheme) { MapStyleOptions(mapStyle(context.resources, darkTheme)) }
+  val markerStyle = MarkerDefaults.style()
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
@@ -66,6 +70,8 @@ fun MapScreen(
         mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
     ) {
       FrameArea(state.areaToFrame, cameraPositionState, width, height, viewModel::onAreaFramed)
+      ReportVisibleArea(cameraPositionState, viewModel::onVisibleAreaChanged)
+      QuestMarkers(pins = state.pins, style = markerStyle)
     }
   }
 }
