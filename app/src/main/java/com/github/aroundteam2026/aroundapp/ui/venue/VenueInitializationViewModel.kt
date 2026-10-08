@@ -93,24 +93,7 @@ class VenueInitializationViewModel(
     mutableUiState.value = state.copy(isSaving = true, error = null)
     viewModelScope.launch {
       try {
-        var savedVenue = venueRepository.getVenue(uid)
-        if (savedVenue == null) {
-          val venue =
-              Venue(
-                  id = uid,
-                  name = name,
-                  location = null,
-                  radiusMeters = VenueLimits.DEFAULT_RADIUS_METERS,
-                  address = null,
-                  createdAt = currentTimeMillis(),
-              )
-          val result = venueRepository.createVenue(venue)
-          // Another initialization may have won the atomic create in the meantime.
-          savedVenue = if (result.isSuccess) venue else venueRepository.getVenue(uid)
-          if (savedVenue == null) {
-            throw result.exceptionOrNull()!!
-          }
-        }
+        val savedVenue = getOrCreateVenue(uid, name)
         mutableUiState.value =
             uiState.value.copy(
                 isSaving = false,
@@ -126,5 +109,24 @@ class VenueInitializationViewModel(
             uiState.value.copy(isSaving = false, error = VenueInitializationError.SAVE_FAILED)
       }
     }
+  }
+
+  private suspend fun getOrCreateVenue(uid: String, name: String): Venue {
+    venueRepository.getVenue(uid)?.let {
+      return it
+    }
+    val venue =
+        Venue(
+            id = uid,
+            name = name,
+            location = null,
+            radiusMeters = VenueLimits.DEFAULT_RADIUS_METERS,
+            address = null,
+            createdAt = currentTimeMillis(),
+        )
+    val result = venueRepository.createVenue(venue)
+    if (result.isSuccess) return venue
+    // Another initialization may have won the atomic create in the meantime.
+    return venueRepository.getVenue(uid) ?: throw result.exceptionOrNull()!!
   }
 }

@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -220,15 +221,21 @@ fun VenueInitializationContent(
         state.error?.let { error ->
           val message =
               when (error) {
-                VenueInitializationError.EMPTY_NAME -> R.string.venue_initialization_empty_name
+                VenueInitializationError.EMPTY_NAME ->
+                    stringResource(R.string.venue_initialization_empty_name)
                 VenueInitializationError.NAME_TOO_LONG ->
-                    R.string.venue_initialization_name_too_long
+                    pluralStringResource(
+                        R.plurals.venue_initialization_name_too_long,
+                        VenueLimits.MAX_NAME_LENGTH,
+                        VenueLimits.MAX_NAME_LENGTH,
+                    )
                 VenueInitializationError.SIGN_IN_REQUIRED ->
-                    R.string.venue_initialization_sign_in_required
-                VenueInitializationError.SAVE_FAILED -> R.string.venue_initialization_save_failed
+                    stringResource(R.string.venue_initialization_sign_in_required)
+                VenueInitializationError.SAVE_FAILED ->
+                    stringResource(R.string.venue_initialization_save_failed)
               }
           Text(
-              stringResource(message, VenueLimits.MAX_NAME_LENGTH),
+              message,
               color = MaterialTheme.colorScheme.error,
               style = MaterialTheme.typography.bodyMedium,
               modifier =
