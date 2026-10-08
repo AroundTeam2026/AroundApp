@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
@@ -7,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthError
+import com.github.aroundteam2026.aroundapp.model.auth.AuthInputValidation
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,22 +21,32 @@ enum class AuthFormError {
   INVALID_EMAIL,
   EMPTY_PASSWORD,
   PASSWORD_TOO_SHORT,
+  PASSWORD_MISMATCH,
   WRONG_CREDENTIALS,
   EMAIL_TAKEN,
   NETWORK,
   UNKNOWN,
 }
 
-/** Everything the sign-in screen shows. */
+/**
+ * State of the shared sign-in/sign-up form.
+ *
+ * @property email Email entered by the user.
+ * @property password Password entered by the user.
+ * @property passwordConfirmation Repeated password, checked only for sign-up.
+ * @property isLoading Whether an authentication request is in progress.
+ * @property error Current validation or repository error, or null.
+ */
 data class AuthUiState(
     val email: String = "",
     val password: String = "",
+    val passwordConfirmation: String = "",
     val isLoading: Boolean = false,
     val error: AuthFormError? = null,
 )
 
 /**
- * Holds the sign-in form and talks to [AuthRepository].
+ * Holds the sign-in/sign-up form and talks to [AuthRepository].
  *
  * Input is checked locally first, so obviously invalid forms never reach the repository. While a
  * request runs, further submits are ignored. On success nothing changes here: the repository's
@@ -43,19 +55,28 @@ data class AuthUiState(
 class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
 
   private val _uiState = MutableStateFlow(AuthUiState())
+  /** Observable form state; successful authentication updates [AuthRepository.currentUserId]. */
   val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+  /** Updates the email and clears the previous form error. */
   fun onEmailChange(email: String) = _uiState.update { it.copy(email = email, error = null) }
 
+  /** Updates the password and clears the previous form error. */
   fun onPasswordChange(password: String) = _uiState.update {
     it.copy(password = password, error = null)
   }
 
+  /** Updates the sign-up password confirmation and clears the previous form error. */
+  fun onPasswordConfirmationChange(passwordConfirmation: String) = _uiState.update {
+    it.copy(passwordConfirmation = passwordConfirmation, error = null)
+  }
+
+  /** Validates and signs in; ignores submissions while a request is in progress. */
   fun signIn() =
       submit(
           validate = { state ->
             when {
-              !isValidEmail(state.email) -> AuthFormError.INVALID_EMAIL
+              !AuthInputValidation.isValidEmail(state.email) -> AuthFormError.INVALID_EMAIL
               state.password.isEmpty() -> AuthFormError.EMPTY_PASSWORD
               else -> null
             }
@@ -63,12 +84,15 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
           call = repository::signInWithEmail,
       )
 
+  /** Validates email, password length and confirmation before creating an account. */
   fun signUp() =
       submit(
           validate = { state ->
             when {
-              !isValidEmail(state.email) -> AuthFormError.INVALID_EMAIL
-              state.password.length < MIN_PASSWORD_LENGTH -> AuthFormError.PASSWORD_TOO_SHORT
+              !AuthInputValidation.isValidEmail(state.email) -> AuthFormError.INVALID_EMAIL
+              state.password.length < AuthInputValidation.MIN_PASSWORD_LENGTH ->
+                  AuthFormError.PASSWORD_TOO_SHORT
+              state.password != state.passwordConfirmation -> AuthFormError.PASSWORD_MISMATCH
               else -> null
             }
           },
@@ -96,12 +120,6 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
   }
 
   companion object {
-    /** Firebase's minimum; checked here so users get feedback before a network call. */
-    const val MIN_PASSWORD_LENGTH = 6
-    private val EMAIL_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
-
-    private fun isValidEmail(email: String) = EMAIL_REGEX.matches(email.trim())
-
     private fun toFormError(error: Throwable): AuthFormError =
         when (error) {
           AuthError.InvalidEmail -> AuthFormError.INVALID_EMAIL

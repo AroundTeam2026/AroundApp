@@ -34,14 +34,14 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
 
   override suspend fun signUpWithEmail(email: String, password: String): Result<String> = authCall {
     val normalizedEmail = email.trim()
-    if (!EMAIL_REGEX.matches(normalizedEmail)) throw AuthError.InvalidEmail
-    if (password.length < MIN_PASSWORD_LENGTH) throw AuthError.WeakPassword
+    if (!AuthInputValidation.isValidEmail(normalizedEmail)) throw AuthError.InvalidEmail
+    if (password.length < AuthInputValidation.MIN_PASSWORD_LENGTH) throw AuthError.WeakPassword
     auth.createUserWithEmailAndPassword(normalizedEmail, password).await().user?.uid
   }
 
   override suspend fun signInWithEmail(email: String, password: String): Result<String> = authCall {
     val normalizedEmail = email.trim()
-    if (!EMAIL_REGEX.matches(normalizedEmail)) throw AuthError.InvalidEmail
+    if (!AuthInputValidation.isValidEmail(normalizedEmail)) throw AuthError.InvalidEmail
     if (password.isEmpty()) throw AuthError.InvalidCredentials
     auth.signInWithEmailAndPassword(normalizedEmail, password).await().user?.uid
   }
@@ -72,11 +72,6 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
       } catch (e: Exception) {
         Result.failure(e.toAuthError())
       }
-
-  private companion object {
-    const val MIN_PASSWORD_LENGTH = 6
-    val EMAIL_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
-  }
 }
 
 /** Maps a Firebase exception to an [AuthError]. */

@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
@@ -43,6 +44,7 @@ class AuthViewModelTest {
   private fun fill(email: String, password: String) {
     vm.onEmailChange(email)
     vm.onPasswordChange(password)
+    vm.onPasswordConfirmationChange(password)
   }
 
   @Test
@@ -162,6 +164,7 @@ class AuthViewModelTest {
       runTest(dispatcher) {
         fill("not-an-email", PASSWORD)
         vm.signIn()
+        assertEquals(AuthFormError.INVALID_EMAIL, vm.uiState.value.error)
         vm.onEmailChange("ada@around.test")
         assertNull(vm.uiState.value.error)
       }
@@ -171,6 +174,7 @@ class AuthViewModelTest {
       runTest(dispatcher) {
         fill("ada@around.test", "")
         vm.signIn()
+        assertEquals(AuthFormError.EMPTY_PASSWORD, vm.uiState.value.error)
         vm.onPasswordChange(PASSWORD)
         assertNull(vm.uiState.value.error)
       }
@@ -240,6 +244,73 @@ class AuthViewModelTest {
         created.signIn()
         advanceUntilIdle()
         assertEquals(uid, repo.currentUserId.value)
+      }
+
+  @Test
+  fun mismatchedConfirmationIsRejectedWithoutCallingTheRepository() =
+      runTest(dispatcher) {
+        repo.nextError = AuthError.Network
+        fill("ada@around.test", PASSWORD)
+        vm.onPasswordConfirmationChange("different")
+        vm.signUp()
+        advanceUntilIdle()
+        assertEquals(AuthFormError.PASSWORD_MISMATCH, vm.uiState.value.error)
+        assertEquals(AuthError.Network, repo.nextError)
+        assertNull(repo.currentUserId.value)
+      }
+
+  @Test
+  fun emptyConfirmationIsRejectedAndTypingConfirmationClearsTheError() =
+      runTest(dispatcher) {
+        repo.nextError = AuthError.Network
+        fill("ada@around.test", PASSWORD)
+        vm.onPasswordConfirmationChange("")
+        vm.signUp()
+        assertEquals(AuthFormError.PASSWORD_MISMATCH, vm.uiState.value.error)
+        assertEquals(AuthError.Network, repo.nextError)
+        vm.onPasswordConfirmationChange(PASSWORD)
+        assertEquals(PASSWORD, vm.uiState.value.passwordConfirmation)
+        assertNull(vm.uiState.value.error)
+      }
+
+  @Test
+  fun signInDoesNotRequirePasswordConfirmation() =
+      runTest(dispatcher) {
+        val uid = repo.addAccount("ada@around.test", PASSWORD)
+        fill("ada@around.test", PASSWORD)
+        vm.onPasswordConfirmationChange("")
+        vm.signIn()
+        advanceUntilIdle()
+        assertEquals(uid, repo.currentUserId.value)
+        assertNull(vm.uiState.value.error)
+      }
+
+  @Test
+  fun sixCharacterPasswordReachesTheRepository() =
+      runTest(dispatcher) {
+        fill("ada@around.test", "123456")
+        vm.signUp()
+        advanceUntilIdle()
+        assertNotNull(repo.currentUserId.value)
+        assertNull(vm.uiState.value.error)
+      }
+
+  @Test
+  fun resubmittingClearsThePreviousErrorWhileLoading() =
+      runTest(dispatcher) {
+        repo.nextError = AuthError.Network
+        fill("ada@around.test", PASSWORD)
+        vm.signUp()
+        advanceUntilIdle()
+        assertEquals(AuthFormError.NETWORK, vm.uiState.value.error)
+        assertFalse(vm.uiState.value.isLoading)
+        vm.signUp()
+        assertTrue(vm.uiState.value.isLoading)
+        assertNull(vm.uiState.value.error)
+        advanceUntilIdle()
+        assertNotNull(repo.currentUserId.value)
+        assertFalse(vm.uiState.value.isLoading)
+        assertNull(vm.uiState.value.error)
       }
 
   private companion object {
