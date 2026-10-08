@@ -3,9 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// The design's tokens, for the screens that already follow it, until the app's theme does. The
-// venue setup screen keeps the same values privately; both should move into the app's theme
-// together.
+// The design's tokens, for the screens that already follow it, until the app's theme does.
 
 /** The design's colours. */
 object AroundColors {
