@@ -1,12 +1,13 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.demo
 
-import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.contains
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
+import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
+import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,8 +23,8 @@ class MapDemoDataTest {
   private val quests = MapDemoData.quests(now)
   private val valid = quests.filter { it.isValidAt(now) }
 
-  /** Where the map opens, with the 5 km it frames: Lausanne. */
-  private val lausanne = Location(46.5197, 6.6323).boundsWithin(5_000.0)
+  /** Where the map opens, with the area it frames: Lausanne. */
+  private val lausanne = DEFAULT_MAP_CENTER.boundsWithin(NEARBY_RADIUS_METERS)
 
   @Test
   fun idsAreUnique() {
