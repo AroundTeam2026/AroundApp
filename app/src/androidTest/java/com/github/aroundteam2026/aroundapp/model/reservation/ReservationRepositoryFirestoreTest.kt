@@ -48,9 +48,10 @@ import org.junit.runner.RunWith
 class ReservationRepositoryFirestoreTest {
   /**
    * Fails any test, including its setUp and tearDown, that runs longer than this instead of
-   * blocking CI forever, and reports where it was stuck.
+   * blocking CI forever. It is longer than the setUp, test body and tearDown timeouts added
+   * together, so one of those reports where the test was stuck before this rule cuts it off.
    */
-  @get:Rule val timeout: Timeout = Timeout.seconds(30)
+  @get:Rule val timeout: Timeout = Timeout.millis(RULE_TIMEOUT_MS)
 
   private lateinit var explorerDb: FirebaseFirestore
   private lateinit var venueDb: FirebaseFirestore
@@ -305,11 +306,36 @@ class ReservationRepositoryFirestoreTest {
   }
 
   // Bug: updateStatus throws or hangs for an id with no document instead of returning a failure.
+  // The read rule cannot evaluate a missing document, so the server answers PERMISSION_DENIED
+  // rather than the transaction seeing a missing reservation.
   @Test
-  fun updateStatus_failsForAnUnknownId() = withTimeoutBlocking {
+  fun updateStatus_forAnUnknownId_failsWithPermissionDenied() = withTimeoutBlocking {
     val result = venueRepository.updateStatus("unknown", ReservationStatus.APPROVED)
 
-    assertTrue(result.isFailure)
+    assertPermissionDenied(result)
+  }
+
+  // Bug: updateStatus changes a document that cannot be mapped to a Reservation, or reports it
+  // with another exception than NoSuchElementException.
+  @Test
+  fun updateStatus_forAMalformedDocument_failsWithNoSuchElement() = withTimeoutBlocking {
+    val document = explorerDb.collection(RESERVATIONS).document()
+    // No questId, slotStart or createdAt; the rules only check the party and the status, and the
+    // venue may read it because the venueId matches.
+    document
+        .set(
+            mapOf(
+                "venueId" to venueId,
+                "explorerUids" to listOf(explorerUid),
+                "status" to "PENDING",
+            )
+        )
+        .await()
+
+    val result = venueRepository.updateStatus(document.id, ReservationStatus.APPROVED)
+
+    assertTrue(result.exceptionOrNull() is NoSuchElementException)
+    assertEquals("PENDING", storedStatus(document.id))
   }
 
   // Bug: the KDoc and the rules disagree: an explorer cancelling their own reservation is refused
@@ -399,6 +425,9 @@ class ReservationRepositoryFirestoreTest {
 
     /** Bounds setUp and tearDown; the first connection to the emulator can be slow on CI. */
     const val SETUP_TIMEOUT_MS = 15_000L
+
+    /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
+    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L

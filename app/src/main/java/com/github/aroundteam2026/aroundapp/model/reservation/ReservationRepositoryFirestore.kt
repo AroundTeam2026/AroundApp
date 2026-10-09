@@ -49,6 +49,8 @@ class ReservationRepositoryFirestore(
           Log.w(TAG, "Write of reservation ${document.id} was rejected", it)
         }
         Result.success(document.id)
+      } catch (e: CancellationException) {
+        throw e
       } catch (e: Exception) {
         Result.failure(e)
       }
@@ -64,9 +66,11 @@ class ReservationRepositoryFirestore(
    * against the status that is actually stored. Only `status` is written, which is all the rules
    * let the venue change. Needs a connection: a transaction fails while the device is offline.
    *
-   * Fails with [NoSuchElementException] if the reservation is missing or malformed, with
+   * Fails with [NoSuchElementException] if the reservation is malformed, with
    * [IllegalStateException] if [canTransition] forbids the change, and with the Firestore exception
-   * if the rules refuse it, which they do for everyone but the venue.
+   * if the rules refuse it, which they do for everyone but the venue. An id with no document is
+   * refused too: the read rule cannot evaluate a missing document, so the server answers
+   * `PERMISSION_DENIED` instead of the transaction seeing a missing reservation.
    */
   override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> =
       try {
