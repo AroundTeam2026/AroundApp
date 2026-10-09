@@ -77,7 +77,7 @@ Until the map reads quests from Firestore, it shows made-up venues and quests ar
 
 ## Design
 
-Wireframes: [Figma](https://www.figma.com/design/yC84SMe4qfm0Kgi6J7kRRj/wireframes--first-draft?node-id=0-1&t=u9vmQpgdUfN1YAHC-1)
+Wireframes: [Figma](https://www.figma.com/design/gk5zPAvbe1nj8Lh6vmJexJ/wireframes--second-draft?node-id=2067-1893&t=nJrSIakPcPEJN7Qz-0)
 
 ## Acknowledgements
 
