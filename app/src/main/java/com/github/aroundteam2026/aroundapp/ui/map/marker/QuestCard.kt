@@ -216,7 +216,7 @@ private fun distanceText(meters: Double): String {
 private fun rewardText(reward: Reward): String =
     when (reward) {
       is Reward.Discount -> {
-        val amount = formatRewardAmount(reward.amount, currentLocale())
+        val amount = formatRewardAmount(reward.amount, reward.unit, currentLocale())
         when (reward.unit) {
           DiscountUnit.PERCENT -> stringResource(R.string.map_card_reward_percent_off, amount)
           DiscountUnit.CHF -> stringResource(R.string.map_card_reward_chf_off, amount)
