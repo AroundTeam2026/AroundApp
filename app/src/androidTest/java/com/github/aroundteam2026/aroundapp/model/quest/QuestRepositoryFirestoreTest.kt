@@ -15,6 +15,7 @@ import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.Source
+import java.util.Date
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -127,7 +128,7 @@ class QuestRepositoryFirestoreTest {
   }
 
   // Bug: a reward type other than the one in fullQuest is mis-mapped on write or read (e.g. read
-  // back as another subtype, specifics or expiresAt dropped, a whole CHF amount read as a Long).
+  // back as another subtype, specifics or expiresAt dropped).
   @Test
   fun createQuest_thenGetQuest_roundTripsEveryRewardType() = withTimeoutBlocking {
     val rewards =
@@ -142,22 +143,38 @@ class QuestRepositoryFirestoreTest {
     }
   }
 
-  // Bug: a reward with a missing or unknown type, or a missing field, throws while mapping, so the
-  // whole quest is skipped instead of being read without a reward.
+  // Bug: the amount is cast with `as Double`, so a whole amount stored as an integer (as the
+  // console or the web SDK would) is read back as a Long and the quest is skipped.
   @Test
-  fun getQuest_readsAnUnreadableRewardAsNoReward() = withTimeoutBlocking {
+  fun getQuest_readsAWholeAmountStoredAsAnInteger() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    db.collection(QUESTS)
+        .document(id)
+        .update("reward", mapOf("type" to "DISCOUNT", "amount" to 5L, "unit" to "CHF"))
+        .await()
+
+    assertEquals(
+        Reward.Discount(5.0, DiscountUnit.CHF, specifics = null),
+        getQuestFromServer(id)!!.reward,
+    )
+  }
+
+  // Bug: a reward with a missing or unknown type, or a missing field, is read as no reward, so a
+  // quest whose reward has already expired never expires and shows up on the map again.
+  @Test
+  fun getQuest_skipsAQuestWithAnUnreadableReward() = withTimeoutBlocking {
+    val expired = Timestamp(Date(FIXED_NOW - 1))
     val unreadableRewards =
         listOf(
-            mapOf("type" to "MYSTERY", "description" to "Surprise"),
-            mapOf("description" to "No type"),
-            mapOf("type" to "DISCOUNT", "unit" to "CHF"),
+            mapOf("type" to "MYSTERY", "description" to "Surprise", "expiresAt" to expired),
+            mapOf("description" to "No type", "expiresAt" to expired),
+            mapOf("type" to "DISCOUNT", "unit" to "CHF", "expiresAt" to expired),
         )
     for (reward in unreadableRewards) {
       val id = repository.createQuest(quest()).getOrThrow()
       db.collection(QUESTS).document(id).update("reward", reward).await()
 
-      val stored = repository.getQuest(id)
-      assertEquals(quest().copy(id = id, createdAt = FIXED_NOW, updatedAt = FIXED_NOW), stored)
+      assertNull("reward $reward", repository.getQuest(id))
     }
   }
 
@@ -230,7 +247,7 @@ class QuestRepositoryFirestoreTest {
   fun observeActiveQuests_excludesDraftAndArchived() = withTimeoutBlocking {
     repository.createQuest(quest(status = QuestStatus.DRAFT)).getOrThrow()
     repository.createQuest(quest(status = QuestStatus.ARCHIVED)).getOrThrow()
-    val activeId = repository.createQuest(quest(status = QuestStatus.ACTIVE)).getOrThrow()
+    val activeId = repository.createQuest(quest()).getOrThrow()
 
     val active = repository.observeActiveQuests().first { list -> list.any { it.id == activeId } }
 

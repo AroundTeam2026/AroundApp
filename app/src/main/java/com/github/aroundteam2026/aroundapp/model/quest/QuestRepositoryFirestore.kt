@@ -19,10 +19,9 @@ import kotlinx.coroutines.tasks.await
  *
  * Firestore types stay inside this class. [Location] is stored as a `GeoPoint`, epoch-millisecond
  * times as `Timestamp`s, enums as their names and [Reward] as a nested map whose `type` field names
- * its subtype; a reward that cannot be read back is logged and read as no reward. Null fields are
- * omitted, and the quest id is the document id rather than a stored field. Documents that cannot be
- * mapped back to a [Quest] are logged and skipped: the `observe*` flows leave them out and
- * [getQuest] returns null.
+ * its subtype. Null fields are omitted, and the quest id is the document id rather than a stored
+ * field. Documents that cannot be mapped back to a [Quest], including those whose reward cannot be
+ * read, are logged and skipped: the `observe*` flows leave them out and [getQuest] returns null.
  *
  * @param db Firestore client to read from and write to.
  * @param now Clock used for `createdAt` and `updatedAt`, in epoch milliseconds.
@@ -140,33 +139,29 @@ class QuestRepositoryFirestore(
   }
 
   /**
-   * Maps this reward map to a [Reward], or returns null if its type is missing or unknown, or a
-   * field is missing or malformed, so a bad reward does not hide the whole quest.
+   * Maps this reward map to a [Reward], throwing if its type is missing or unknown, or a field is
+   * missing or malformed, so the quest is skipped rather than read without its expiry.
    */
-  private fun Map<*, *>.toReward(): Reward? =
-      try {
-        val expiresAt = (this[REWARD_EXPIRES_AT] as Timestamp?)?.toDate()?.time
-        when (val type = this[REWARD_TYPE]) {
-          DISCOUNT ->
-              Reward.Discount(
-                  amount = (this[REWARD_AMOUNT] as Number).toDouble(),
-                  unit = DiscountUnit.valueOf(this[REWARD_UNIT] as String),
-                  specifics = this[REWARD_SPECIFICS] as String?,
-                  expiresAt = expiresAt,
-              )
-          FREE_ITEM ->
-              Reward.FreeItem(
-                  name = this[REWARD_NAME] as String,
-                  specifics = this[REWARD_SPECIFICS] as String?,
-                  expiresAt = expiresAt,
-              )
-          OTHER -> Reward.Other(this[REWARD_DESCRIPTION] as String, expiresAt)
-          else -> throw IllegalArgumentException("Unknown reward type $type")
-        }
-      } catch (e: Exception) {
-        Log.w(TAG, "Ignoring malformed reward $this", e)
-        null
-      }
+  private fun Map<*, *>.toReward(): Reward {
+    val expiresAt = (this[REWARD_EXPIRES_AT] as Timestamp?)?.toDate()?.time
+    return when (val type = this[REWARD_TYPE]) {
+      DISCOUNT ->
+          Reward.Discount(
+              amount = (this[REWARD_AMOUNT] as Number).toDouble(),
+              unit = DiscountUnit.valueOf(this[REWARD_UNIT] as String),
+              specifics = this[REWARD_SPECIFICS] as String?,
+              expiresAt = expiresAt,
+          )
+      FREE_ITEM ->
+          Reward.FreeItem(
+              name = this[REWARD_NAME] as String,
+              specifics = this[REWARD_SPECIFICS] as String?,
+              expiresAt = expiresAt,
+          )
+      OTHER -> Reward.Other(this[REWARD_DESCRIPTION] as String, expiresAt)
+      else -> throw IllegalArgumentException("Unknown reward type $type")
+    }
+  }
 
   /** Reads [field] with [read], throwing if it is absent. */
   private fun <T : Any> required(field: String, read: (String) -> T?): T =
