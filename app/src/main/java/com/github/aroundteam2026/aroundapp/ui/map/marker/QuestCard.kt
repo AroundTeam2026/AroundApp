@@ -32,7 +32,6 @@ import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.VenuePin
-import java.text.NumberFormat
 import java.util.Locale
 
 /**
@@ -226,13 +225,3 @@ private fun rewardText(reward: Reward): String =
       is Reward.FreeItem -> stringResource(R.string.map_card_reward_free_item, reward.name)
       is Reward.Other -> reward.description
     }
-
-/** Writes a discount [amount] for [locale], without decimals when it is whole (10, but 2.50). */
-internal fun formatRewardAmount(amount: Double, locale: Locale): String =
-    NumberFormat.getNumberInstance(locale)
-        .apply {
-          val whole = amount % 1.0 == 0.0
-          minimumFractionDigits = if (whole) 0 else 2
-          maximumFractionDigits = if (whole) 0 else 2
-        }
-        .format(amount)
