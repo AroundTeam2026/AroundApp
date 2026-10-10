@@ -45,12 +45,16 @@ import kotlinx.coroutines.launch
  * @property pins The venues to mark: those on screen with valid quests, and the open one wherever
  *   it is.
  * @property selectedVenueId The venue whose card is open, or null when every pin is closed.
+ * @property nearby The valid quests for the list: those within [MapViewModel.NEARBY_RADIUS_METERS]
+ *   of the explorer, nearest first, or, while their position is unknown, every valid quest by venue
+ *   name, with no distance.
  */
 data class MapUiState(
     val areaToFrame: GeoBounds?,
     val showsUserLocation: Boolean = false,
     val pins: List<VenuePin> = emptyList(),
     val selectedVenueId: String? = null,
+    val nearby: List<NearbyQuest> = emptyList(),
 )
 
 /**
