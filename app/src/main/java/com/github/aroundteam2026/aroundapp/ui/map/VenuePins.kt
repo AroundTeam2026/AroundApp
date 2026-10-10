@@ -64,20 +64,44 @@ fun buildVenuePins(
         .toSortedMap()
         .map { (venueId, own) ->
           val venue = venues[venueId]
-          val featured =
-              own.find { it.id == venue?.featuredQuestId }
-                  ?: own.minWith(compareByDescending<Quest> { it.createdAt }.thenBy { it.id })
-          val name = venue?.name ?: featured.venueName
-          val location = venue?.location ?: featured.location
+          val shown = shownVenue(own, venue)
           VenuePin(
               venueId = venueId,
-              venueName = name,
-              location = location,
+              venueName = shown.name,
+              location = shown.location,
               icon = iconOf(venue),
-              avatar = avatarOf(venue, name),
-              featuredQuest = featured,
+              avatar = avatarOf(venue, shown.name),
+              featuredQuest = shown.featured,
               otherQuestCount = own.size - 1,
-              distanceMeters = from?.distanceTo(location),
-              areaRadiusMeters = venue?.radiusMeters ?: featured.radiusMeters,
+              distanceMeters = from?.distanceTo(shown.location),
+              areaRadiusMeters = venue?.radiusMeters ?: shown.featured.radiusMeters,
           )
         }
+
+/** Newest first, ties going to the smallest id, so the order never depends on the repository's. */
+internal val NEWEST_FIRST: Comparator<Quest> =
+    compareByDescending<Quest> { it.createdAt }.thenBy { it.id }
+
+/**
+ * How the map shows a venue: the quest it features, its name and its location.
+ *
+ * @property featured The venue's [Venue.featuredQuestId] when it is one of its valid quests, else
+ *   its newest valid quest.
+ * @property name The venue's name, from its record when known, else from [featured].
+ * @property location The venue's location, from its record when known, else from [featured].
+ */
+internal data class ShownVenue(val featured: Quest, val name: String, val location: Location)
+
+/**
+ * How the map shows the venue whose valid quests are [own], given its record [venue] when known.
+ * Without the record, the featured quest's copy of the name and location stands in, so the pin and
+ * the nearby list show the same name and distance for every quest of the venue.
+ */
+internal fun shownVenue(own: List<Quest>, venue: Venue?): ShownVenue {
+  val featured = own.find { it.id == venue?.featuredQuestId } ?: own.minWith(NEWEST_FIRST)
+  return ShownVenue(
+      featured = featured,
+      name = venue?.name ?: featured.venueName,
+      location = venue?.location ?: featured.location,
+  )
+}
