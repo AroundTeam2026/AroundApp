@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <string name="create_quest_title">New quest</string>
+    <string name="create_quest_close">Close</string>
+    <string name="create_quest_field_title">Title</string>
+    <string name="create_quest_field_title_hint">Find the hidden fox</string>
+    <string name="create_quest_field_description">Description</string>
+    <string name="create_quest_field_description_hint">A tiny ceramic fox hides somewhere in the café. Spot it and snap a photo.</string>
+    <string name="create_quest_field_requirements">Requirements</string>
+    <string name="create_quest_field_requirements_hint">Order any drink. One photo per party.</string>
+    <string name="create_quest_counter">%1$d / %2$d</string>
+    <string name="create_quest_blank">This field is required.</string>
+    <plurals name="create_quest_too_long">
+        <item quantity="one">Use %1$d character or fewer.</item>
+        <item quantity="other">Use %1$d characters or fewer.</item>
+    </plurals>
+</resources>

@@ -71,5 +71,17 @@ object C {
     const val NEARBY_VENUE = "nearby_venue"
     const val NEARBY_DOT = "nearby_dot"
     const val NEARBY_VIEW = "nearby_view"
+
+    const val CREATE_QUEST_SCREEN = "create_quest_screen"
+    const val CREATE_QUEST_CLOSE = "create_quest_close"
+    const val CREATE_QUEST_TITLE = "create_quest_title"
+    const val CREATE_QUEST_TITLE_COUNTER = "create_quest_title_counter"
+    const val CREATE_QUEST_TITLE_ERROR = "create_quest_title_error"
+    const val CREATE_QUEST_DESCRIPTION = "create_quest_description"
+    const val CREATE_QUEST_DESCRIPTION_COUNTER = "create_quest_description_counter"
+    const val CREATE_QUEST_DESCRIPTION_ERROR = "create_quest_description_error"
+    const val CREATE_QUEST_REQUIREMENTS = "create_quest_requirements"
+    const val CREATE_QUEST_REQUIREMENTS_COUNTER = "create_quest_requirements_counter"
+    const val CREATE_QUEST_REQUIREMENTS_ERROR = "create_quest_requirements_error"
   }
 }
