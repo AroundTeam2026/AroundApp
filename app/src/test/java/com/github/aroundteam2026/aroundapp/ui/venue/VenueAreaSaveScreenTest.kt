@@ -57,7 +57,7 @@ class VenueAreaSaveScreenTest {
   }
 
   @Test
-  fun saveNeedsAMarkerShowsProgressThenTellsTheCallerOnce() {
+  fun saveNeedsAMarkerShowsProgressThenTellsTheCallerOncePerSave() {
     writeGate = CompletableDeferred()
     show()
     save.assertIsNotEnabled()
@@ -72,6 +72,10 @@ class VenueAreaSaveScreenTest {
     writeGate.complete(Unit)
     composeTestRule.waitForIdle()
     assertEquals(1, saves)
+
+    save.performClick()
+    composeTestRule.waitForIdle()
+    assertEquals(2, saves)
   }
 
   @Test

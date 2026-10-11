@@ -39,19 +39,23 @@ class VenueAreaSaveLoadTest {
       testVenue(location = entrance, address = "Rue de Bourg 12")
           .copy(radiusMeters = MAX_RADIUS_METERS + 5)
 
-  // The stored venue, read once its gate opens; writes wait for theirs and give writeResult
+  // The stored venue, read once its gate opens; writes wait for theirs and give write()
   private var stored: Venue? = venue
   private var readGate = CompletableDeferred(Unit)
+  private var readError: Exception? = null
   private var writeGate = CompletableDeferred(Unit)
-  private var writeResult = Result.success(Unit)
+  private var write: () -> Result<Unit> = { Result.success(Unit) }
   private var writes = 0
   private val venues =
       object : VenueRepository by FakeVenueRepository() {
-        override suspend fun getVenue(venueId: String) =
-            readGate.await().let { stored?.takeIf { it.id == venueId } }
+        override suspend fun getVenue(venueId: String): Venue? {
+          readGate.await()
+          readError?.let { throw it }
+          return stored?.takeIf { it.id == venueId }
+        }
 
         override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
-            writeResult.also {
+            write().also {
               writes++
               writeGate.await()
               if (it.isSuccess)
@@ -87,23 +91,56 @@ class VenueAreaSaveLoadTest {
     assertEquals(entrance.boundsWithin(FRAMED_RADIUS_METERS), state.areaToFrame)
   }
 
+  @Test fun anUnknownVenueOpensOnTheDefaults() = opensOnTheDefaults { stored = null }
+
   @Test
-  fun withoutASavedAreaItOpensOnTheDefaults() {
-    stored = venue.copy(location = null)
+  fun aVenueThatCantBeReadOpensOnTheDefaults() = opensOnTheDefaults {
+    readError = IllegalStateException("offline")
+  }
+
+  @Test
+  fun withoutASavedAreaItOpensOnTheDefaultsAndCantSave() =
+      opensOnTheDefaults(
+          andThen = {
+            viewModel.onSave()
+            advanceUntilIdle()
+            assertEquals(0, writes)
+          }
+      ) {
+        stored = venue.copy(location = null)
+      }
+
+  /** Opens the venue after [setUp], checks it shows the defaults, then runs [andThen]. */
+  private fun opensOnTheDefaults(andThen: suspend TestScope.() -> Unit = {}, setUp: () -> Unit) {
+    setUp()
     test {
       assertNull(state.marker)
       assertEquals(DEFAULT_RADIUS_METERS, state.radiusMeters)
+      andThen()
     }
   }
 
   @Test
-  fun aMarkerPlacedBeforeLoadingFinishesIsKept() {
+  fun aMarkerPlacedBeforeLoadingFinishesIsKeptAndTheRadiusStillLoads() {
     readGate = CompletableDeferred()
     test {
       viewModel.onMarkerPlaced(placed)
       readGate.complete(Unit)
       advanceUntilIdle()
       assertEquals(placed, state.marker)
+      assertEquals(MAX_RADIUS_METERS, state.radiusMeters)
+    }
+  }
+
+  @Test
+  fun aRadiusChosenBeforeLoadingFinishesIsKeptAndTheMarkerStillLoads() {
+    readGate = CompletableDeferred()
+    test {
+      viewModel.onRadiusChanged(80)
+      readGate.complete(Unit)
+      advanceUntilIdle()
+      assertEquals(80, state.radiusMeters)
+      assertEquals(entrance, state.marker)
     }
   }
 
@@ -129,18 +166,33 @@ class VenueAreaSaveLoadTest {
 
   @Test
   fun aFailedSaveShowsAnErrorAndKeepsTheEditsToRetry() = test {
-    writeResult = Result.failure(IllegalStateException("offline"))
+    write = { Result.failure(IllegalStateException("offline")) }
     viewModel.onMarkerPlaced(placed)
+    viewModel.onRadiusChanged(80)
     viewModel.onSave()
     advanceUntilIdle()
     assertTrue(state.saveFailed)
     assertFalse(state.isSaved)
     assertEquals(placed, state.marker)
+    assertEquals(80, state.radiusMeters)
 
-    writeResult = Result.success(Unit)
+    write = { Result.success(Unit) }
+    writeGate = CompletableDeferred()
     viewModel.onSave()
     advanceUntilIdle()
     assertFalse(state.saveFailed)
+    writeGate.complete(Unit)
+    advanceUntilIdle()
     assertTrue(state.isSaved)
+  }
+
+  @Test
+  fun aSaveThatThrowsIsAFailedSave() = test {
+    write = { throw IllegalStateException("offline") }
+    viewModel.onSave()
+    advanceUntilIdle()
+
+    assertTrue(state.saveFailed)
+    assertFalse(state.isSaving)
   }
 }
