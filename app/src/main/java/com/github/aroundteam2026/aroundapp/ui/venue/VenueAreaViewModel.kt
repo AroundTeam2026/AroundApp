@@ -46,6 +46,9 @@ import kotlinx.coroutines.launch
  *   as the marker only refines the entrance; moving it farther forgets it, as it no longer says
  *   where the marker is.
  * @property addressSearch What the address search found.
+ * @property isSaving Whether the marker and radius are being saved.
+ * @property saveFailed Whether the latest save failed; the edits stay, to try again.
+ * @property isSaved Whether a save succeeded and its caller wasn't told yet.
  */
 data class VenueAreaUiState(
     val marker: Location? = null,
@@ -55,7 +58,14 @@ data class VenueAreaUiState(
     val showsUserLocation: Boolean = false,
     val address: String? = null,
     val addressSearch: AddressSearchUiState = AddressSearchUiState(),
-)
+    val isSaving: Boolean = false,
+    val saveFailed: Boolean = false,
+    val isSaved: Boolean = false,
+) {
+  /** Whether "Save location" can save: a marker is placed and no save is running. */
+  val canSave: Boolean
+    get() = marker != null && !isSaving
+}
 
 /**
  * What the address search found. The field's text is [VenueAreaViewModel.addressQuery].
@@ -277,6 +287,34 @@ class VenueAreaViewModel(
     delay(delayMillis)
     val result = addressSearchRepository.search(query, visibleArea)
     _uiState.update { it.copy(addressSearch = it.addressSearch.showing(result)) }
+  }
+
+  /**
+   * Called when the venue presses "Save location": saves the marker and radius with
+   * [VenueRepository.setArea], which changes nothing else. Does nothing unless
+   * [VenueAreaUiState.canSave]. A success sets [VenueAreaUiState.isSaved]; a failure sets
+   * [VenueAreaUiState.saveFailed] and keeps the edits.
+   */
+  fun onSave() {
+    val state = _uiState.value
+    val marker = state.marker?.takeIf { state.canSave } ?: return
+    _uiState.update { it.copy(isSaving = true, saveFailed = false) }
+    viewModelScope.launch {
+      val saved =
+          try {
+            venueRepository.setArea(venueId, marker, state.radiusMeters).isSuccess
+          } catch (cancelled: CancellationException) {
+            throw cancelled
+          } catch (_: Exception) {
+            false
+          }
+      _uiState.update { it.copy(isSaving = false, saveFailed = !saved, isSaved = saved) }
+    }
+  }
+
+  /** Called once the caller was told of the save, so it isn't told again. */
+  fun onSaveHandled() {
+    _uiState.update { it.copy(isSaved = false) }
   }
 
   /**
