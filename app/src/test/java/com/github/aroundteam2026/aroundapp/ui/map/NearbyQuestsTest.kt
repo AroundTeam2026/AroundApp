@@ -12,8 +12,8 @@ import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
-import com.github.aroundteam2026.aroundapp.ui.map.marker.TestAvatar
-import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.TestAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

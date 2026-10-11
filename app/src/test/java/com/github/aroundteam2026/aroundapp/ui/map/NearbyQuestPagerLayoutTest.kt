@@ -18,8 +18,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

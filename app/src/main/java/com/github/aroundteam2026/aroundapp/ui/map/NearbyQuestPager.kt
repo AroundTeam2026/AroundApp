@@ -35,11 +35,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.map.marker.CardAvatar
-import com.github.aroundteam2026.aroundapp.ui.map.marker.CardLine
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerStyle
-import com.github.aroundteam2026.aroundapp.ui.map.marker.QuestChips
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -218,19 +218,19 @@ private fun QuestPage(quest: NearbyQuest, style: MarkerStyle, onClick: () -> Uni
           ),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    CardAvatar(quest.avatar, style, Modifier.testTag(C.Tag.NEARBY_AVATAR))
+    QuestAvatar(quest.avatar, style.avatarStyle, Modifier.testTag(C.Tag.NEARBY_AVATAR))
     Column(
         Modifier.padding(start = style.dimensions.cardGap).weight(1f),
         verticalArrangement = Arrangement.spacedBy(style.dimensions.cardLineSpacing),
     ) {
-      CardLine(
+      QuestLine(
           quest.title,
           C.Tag.NEARBY_QUEST_TITLE,
           style.typography.questTitle,
           colors.onSurface,
           maxLines = 2,
       )
-      CardLine(
+      QuestLine(
           quest.venueName,
           C.Tag.NEARBY_VENUE,
           style.typography.venueName,
@@ -240,9 +240,9 @@ private fun QuestPage(quest: NearbyQuest, style: MarkerStyle, onClick: () -> Uni
           quest.reward,
           quest.minPartySize,
           quest.distanceMeters,
+          style.chipStyle,
           // Figma sets the chips a little further below the venue's name than the lines' gap
           Modifier.padding(top = AroundSpacing.ExtraSmall),
-          style = style,
       )
     }
   }

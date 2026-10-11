@@ -10,7 +10,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
-import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.google.android.gms.maps.model.LatLng
 import org.junit.Assert.assertEquals
 import org.junit.Rule

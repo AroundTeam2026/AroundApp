@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-package com.github.aroundteam2026.aroundapp.ui.map.marker
+package com.github.aroundteam2026.aroundapp.ui.quest
 
 import java.util.Locale
 import kotlin.math.roundToLong
@@ -10,11 +10,11 @@ enum class DistanceUnit {
   KILOMETERS,
 }
 
-/** A distance as the card says it: [amount], written for the language, in [unit]. */
+/** A distance as a quest's chip says it: [amount], written for the language, in [unit]. */
 data class DistanceText(val amount: String, val unit: DistanceUnit)
 
 /**
- * How far [meters] is, as the card says it: whole metres up to 100, then tens of metres, then
+ * How far [meters] is, as a quest's chip says it: whole metres up to 100, then tens of metres, then
  * kilometres with one decimal, and whole kilometres from 10, with [locale]'s decimal separator.
  * Each step is chosen on the rounded value, so 995 m reads 1.0 km rather than 1000 m.
  */

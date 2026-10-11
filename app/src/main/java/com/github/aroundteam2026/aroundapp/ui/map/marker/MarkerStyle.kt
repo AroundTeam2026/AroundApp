@@ -11,6 +11,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.aroundteam2026.aroundapp.ui.quest.ChipColors
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatarStyle
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestChipStyle
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundFonts
 
@@ -35,7 +38,37 @@ data class MarkerStyle(
     val pointerShape: Shape,
     val avatarShape: Shape,
     val chipShape: Shape,
-)
+) {
+  /**
+   * The chips in these colours, sizes and type: the reward on the accent, the distance on the
+   * secondary.
+   */
+  val chipStyle: QuestChipStyle
+    get() =
+        QuestChipStyle(
+            reward = ChipColors(colors.accent, colors.onAccent),
+            party = ChipColors(colors.surface, colors.onSurface, colors.outline),
+            distance = ChipColors(colors.secondary, colors.onSecondary),
+            textStyle = typography.chip,
+            shape = chipShape,
+            spacing = dimensions.chipSpacing,
+            horizontalPadding = dimensions.chipHorizontalPadding,
+            verticalPadding = dimensions.chipVerticalPadding,
+            outlineWidth = dimensions.outlineWidth,
+        )
+
+  /** The card's avatar, on the secondary colour, in the initials' type. */
+  val avatarStyle: QuestAvatarStyle
+    get() =
+        QuestAvatarStyle(
+            size = dimensions.cardAvatarSize,
+            padding = dimensions.cardAvatarPadding,
+            background = colors.secondary,
+            content = colors.onSecondary,
+            shape = avatarShape,
+            textStyle = typography.initials,
+        )
+}
 
 /**
  * The marker colours.

@@ -35,7 +35,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.map.marker.TestAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.TestAvatar
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test

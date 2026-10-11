@@ -7,25 +7,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextOverflow
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.VenuePin
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
+import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine
 
 /**
  * A venue's open marker: a card with the venue's avatar on the left, then its featured quest's
@@ -55,7 +51,7 @@ fun QuestCard(
             .border(dimensions.outlineWidth, colors.outline, style.cardShape)
             .padding(dimensions.cardPadding)
     ) {
-      CardAvatar(pin.avatar, style, Modifier.testTag(C.Tag.QUEST_CARD_AVATAR))
+      QuestAvatar(pin.avatar, style.avatarStyle, Modifier.testTag(C.Tag.QUEST_CARD_AVATAR))
       Column(
           Modifier.padding(start = dimensions.cardGap).weight(1f),
           verticalArrangement = Arrangement.spacedBy(dimensions.cardLineSpacing),
@@ -71,33 +67,17 @@ fun QuestCard(
   }
 }
 
-/** A venue's avatar on its round background, in the initials' text style. */
-@Composable
-internal fun CardAvatar(avatar: VenueAvatar, style: MarkerStyle, modifier: Modifier = Modifier) {
-  val dimensions = style.dimensions
-  Box(
-      modifier
-          .size(dimensions.cardAvatarSize)
-          .background(style.colors.secondary, style.avatarShape)
-          .padding(dimensions.cardAvatarPadding)
-  ) {
-    CompositionLocalProvider(LocalTextStyle provides style.typography.initials) {
-      avatar.Content(tint = style.colors.onSecondary, modifier = Modifier.fillMaxSize())
-    }
-  }
-}
-
 /** The quest's title, the venue's name, the chips, and how many more quests the venue has. */
 @Composable
 private fun CardText(pin: VenuePin, style: MarkerStyle) {
   val quest = pin.featuredQuest
   val colors = style.colors
   val typography = style.typography
-  CardLine(quest.title, C.Tag.QUEST_CARD_TITLE, typography.questTitle, colors.onSurface, 2)
-  CardLine(pin.venueName, C.Tag.QUEST_CARD_VENUE, typography.venueName, colors.onSurfaceVariant)
-  QuestChips(quest.reward, quest.minPartySize, pin.distanceMeters, style = style)
+  QuestLine(quest.title, C.Tag.QUEST_CARD_TITLE, typography.questTitle, colors.onSurface, 2)
+  QuestLine(pin.venueName, C.Tag.QUEST_CARD_VENUE, typography.venueName, colors.onSurfaceVariant)
+  QuestChips(quest.reward, quest.minPartySize, pin.distanceMeters, style.chipStyle)
   if (pin.otherQuestCount > 0) {
-    CardLine(
+    QuestLine(
         pluralStringResource(
             R.plurals.map_card_more_quests,
             pin.otherQuestCount,
@@ -108,23 +88,4 @@ private fun CardText(pin: VenuePin, style: MarkerStyle) {
         colors.onSurfaceVariant,
     )
   }
-}
-
-/** One line of a quest's text, cut off with an ellipsis past [maxLines]. */
-@Composable
-internal fun CardLine(
-    text: String,
-    tag: String,
-    style: TextStyle,
-    color: Color,
-    maxLines: Int = 1,
-) {
-  Text(
-      text,
-      Modifier.testTag(tag),
-      color = color,
-      style = style,
-      maxLines = maxLines,
-      overflow = TextOverflow.Ellipsis,
-  )
 }
