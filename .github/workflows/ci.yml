@@ -22,10 +22,12 @@ jobs:
     # The emulator the team develops on, a Pixel 10a with API 37.1, so a test means the same thing
     # on CI as locally. The command-line tools have no pixel_10a profile; pixel_9 has the same
     # screen (1080x2424, 420 dpi). The Pixel 10a AVD has 4 cores, as many as the runner has; the
-    # action's default is 2. Both emulator steps and the AVD cache key read these.
+    # action's default is 2. Unlike the Pixel 10a AVD, the image has no Play Store: CI boots it
+    # fresh every run, and the Play Store would update Google Play services mid-run, which kills
+    # the app under test. Both emulator steps and the AVD cache key read these.
     env:
       AVD_API_LEVEL: "37.1"
-      AVD_TARGET: google_apis_playstore_ps16k
+      AVD_TARGET: google_apis_ps16k
       AVD_PROFILE: pixel_9
       AVD_CORES: "4"
 
