@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.demo
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
@@ -11,8 +12,9 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 /**
  * Made-up venues and quests, which the map shows until it reads the real ones from Firestore. Most
  * are around Lausanne, where the map opens, and show every case the map handles: a venue featuring
- * an older quest, one with several quests, group quests, quests with and without rewards, an
- * expired reward and a draft, which the map hides, and a venue in Geneva, out of view at first.
+ * an older quest, one with several quests, group quests, quests without a reward or with each kind
+ * of reward, an expired reward and a draft, which the map hides, and a venue in Geneva, out of view
+ * at first.
  */
 object MapDemoData {
   private const val HOUR = 60 * 60 * 1000L
@@ -35,14 +37,14 @@ object MapDemoData {
               "demo-lumen-fox",
               "Find the hidden fox",
               now - 10 * DAY,
-              reward("Free coffee"),
+              Reward.FreeItem("coffee", specifics = null),
           ),
           quest(
               lumen,
               "demo-lumen-menu",
               "Order from the secret menu",
               now - DAY,
-              reward("Free cookie"),
+              Reward.Discount(2.5, DiscountUnit.CHF, specifics = null),
           ),
           quest(
               lumen,
@@ -56,7 +58,7 @@ object MapDemoData {
               "demo-lumen-brunch",
               "Join the Sunday brunch club",
               now - 2 * HOUR,
-              reward("Free juice"),
+              other("Free juice"),
               status = QuestStatus.DRAFT,
           ),
           quest(
@@ -64,7 +66,7 @@ object MapDemoData {
               "demo-quais-table",
               "Come as a party of six",
               now - 2 * DAY,
-              reward("Free dessert for the table"),
+              other("Free dessert for the table"),
               minPartySize = 6,
           ),
           quest(
@@ -72,7 +74,12 @@ object MapDemoData {
               "demo-nocturne-quiz",
               "Win a round of the pub quiz",
               now - 5 * DAY,
-              reward("Free drink", expiresAt = now + 7 * DAY),
+              Reward.Discount(
+                  10.0,
+                  DiscountUnit.PERCENT,
+                  "On drinks only",
+                  expiresAt = now + 7 * DAY,
+              ),
               minPartySize = 2,
           ),
           quest(
@@ -80,7 +87,7 @@ object MapDemoData {
               "demo-nocturne-neon",
               "Snap the neon sign",
               now - DAY,
-              reward("Half-price cocktail", expiresAt = now - HOUR),
+              Reward.Discount(50.0, DiscountUnit.PERCENT, "On cocktails", expiresAt = now - HOUR),
           ),
           quest(
               riviera,
@@ -94,7 +101,7 @@ object MapDemoData {
               "demo-atelier-sketch",
               "Sketch the view from the terrace",
               now - 6 * DAY,
-              reward("Free tea"),
+              other("Free tea"),
           ),
       )
 
@@ -109,8 +116,7 @@ object MapDemoData {
           featuredQuestId = featuredQuestId,
       )
 
-  private fun reward(description: String, expiresAt: Long? = null) =
-      Reward.Other(description, expiresAt = expiresAt)
+  private fun other(description: String) = Reward.Other(description)
 
   private fun quest(
       venue: Venue,
