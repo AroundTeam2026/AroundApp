@@ -35,4 +35,17 @@
     <string name="map_card_reward_percent_off">%1$s%% off</string>
     <string name="map_card_reward_chf_off">CHF %1$s off</string>
     <string name="map_card_reward_free_item">Free %1$s</string>
+
+    <!-- The pager of quests near the explorer, one quest per page -->
+    <string name="map_nearby_title">Nearby quests</string>
+    <!-- Which page is shown, of how many, and how the quests are ordered -->
+    <string name="map_nearby_closest_first">%1$d of %2$d · closest first</string>
+    <string name="map_nearby_by_name">%1$d of %2$d · by venue name</string>
+    <string name="map_nearby_location_off">Turn on location to see the closest quests first.</string>
+    <string name="map_nearby_empty">No quests around here yet. Check back soon.</string>
+    <string name="map_nearby_view">View quest</string>
+    <!-- What screen readers say a tap on a quest's page does -->
+    <string name="map_nearby_show_on_map">Show on the map</string>
+    <string name="map_nearby_previous">Previous quest</string>
+    <string name="map_nearby_next">Next quest</string>
 </resources>

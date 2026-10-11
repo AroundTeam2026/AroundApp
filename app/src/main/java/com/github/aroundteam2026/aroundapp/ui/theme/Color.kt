@@ -1,11 +1,111 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.theme
 
-import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Exact Figma colors mapped to Material roles.
+// The extra panel, lavender, sage and accent-text roles are available through AroundTheme.colors.
+internal val LightColorScheme =
+    lightColorScheme(
+        primary = AroundColors.Purple,
+        onPrimary = AroundColors.Cream,
+        primaryContainer = AroundColors.Lavender,
+        onPrimaryContainer = AroundColors.Purple,
+        secondary = AroundColors.Secondary,
+        onSecondary = AroundColors.Cream,
+        secondaryContainer = AroundColors.BabyBlue,
+        onSecondaryContainer = AroundColors.Sage,
+        tertiary = AroundColors.Tertiary,
+        onTertiary = AroundColors.Cream,
+        tertiaryContainer = AroundColors.Panel,
+        onTertiaryContainer = AroundColors.Sage,
+        background = AroundColors.Cream,
+        onBackground = AroundColors.Ink,
+        surface = AroundColors.Paper,
+        onSurface = AroundColors.Ink,
+        surfaceVariant = AroundColors.Paper,
+        onSurfaceVariant = AroundColors.InkMuted,
+        outline = AroundColors.Line,
+        outlineVariant = AroundColors.Line,
+        surfaceTint = AroundColors.Purple,
+        error = AroundColors.Error,
+        onError = AroundColors.Cream,
+        errorContainer = AroundColors.Panel,
+        onErrorContainer = AroundColors.Error,
+        inverseSurface = AroundColors.Ink,
+        inverseOnSurface = AroundColors.Cream,
+        inversePrimary = AroundColors.Lavender,
+        scrim = AroundColors.Ink,
+        surfaceBright = AroundColors.Paper,
+        surfaceDim = AroundColors.Panel,
+        surfaceContainerLowest = AroundColors.Cream,
+        surfaceContainerLow = AroundColors.Paper,
+        surfaceContainer = AroundColors.Paper,
+        surfaceContainerHigh = AroundColors.Paper,
+        surfaceContainerHighest = AroundColors.Paper,
+        primaryFixed = AroundColors.Lavender,
+        primaryFixedDim = AroundColors.Purple,
+        onPrimaryFixed = AroundColors.Purple,
+        onPrimaryFixedVariant = AroundColors.PrimaryDark,
+        secondaryFixed = AroundColors.BabyBlue,
+        secondaryFixedDim = AroundColors.Secondary,
+        onSecondaryFixed = AroundColors.Ink,
+        onSecondaryFixedVariant = AroundColors.Sage,
+        tertiaryFixed = AroundColors.Panel,
+        tertiaryFixedDim = AroundColors.Tertiary,
+        onTertiaryFixed = AroundColors.Ink,
+        onTertiaryFixedVariant = AroundColors.Sage,
+    )
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+internal val DarkColorScheme =
+    darkColorScheme(
+        primary = AroundColors.Purple,
+        onPrimary = AroundColors.Cream,
+        primaryContainer = AroundColors.DarkLavender,
+        onPrimaryContainer = AroundColors.Cream,
+        secondary = AroundColors.Secondary,
+        onSecondary = AroundColors.Cream,
+        secondaryContainer = AroundColors.DarkBabyBlue,
+        onSecondaryContainer = AroundColors.Secondary,
+        tertiary = AroundColors.Tertiary,
+        onTertiary = AroundColors.Cream,
+        tertiaryContainer = AroundColors.DarkPanel,
+        onTertiaryContainer = AroundColors.Secondary,
+        background = AroundColors.Ink,
+        onBackground = AroundColors.Cream,
+        surface = AroundColors.DarkSurface,
+        onSurface = AroundColors.Cream,
+        surfaceVariant = AroundColors.DarkSurface,
+        onSurfaceVariant = AroundColors.DarkMuted,
+        outline = AroundColors.DarkLine,
+        outlineVariant = AroundColors.DarkLine,
+        surfaceTint = AroundColors.Purple,
+        error = AroundColors.DarkError,
+        onError = AroundColors.Ink,
+        errorContainer = AroundColors.DarkPanel,
+        onErrorContainer = AroundColors.DarkError,
+        inverseSurface = AroundColors.Paper,
+        inverseOnSurface = AroundColors.Ink,
+        inversePrimary = AroundColors.Purple,
+        scrim = AroundColors.Ink,
+        surfaceBright = AroundColors.DarkSurface,
+        surfaceDim = AroundColors.Ink,
+        surfaceContainerLowest = AroundColors.Ink,
+        surfaceContainerLow = AroundColors.DarkSurface,
+        surfaceContainer = AroundColors.DarkSurface,
+        surfaceContainerHigh = AroundColors.DarkSurface,
+        surfaceContainerHighest = AroundColors.DarkSurface,
+        primaryFixed = AroundColors.Lavender,
+        primaryFixedDim = AroundColors.Purple,
+        onPrimaryFixed = AroundColors.Purple,
+        onPrimaryFixedVariant = AroundColors.PrimaryDark,
+        secondaryFixed = AroundColors.BabyBlue,
+        secondaryFixedDim = AroundColors.Secondary,
+        onSecondaryFixed = AroundColors.Ink,
+        onSecondaryFixedVariant = AroundColors.Sage,
+        tertiaryFixed = AroundColors.Panel,
+        tertiaryFixedDim = AroundColors.Tertiary,
+        onTertiaryFixed = AroundColors.Ink,
+        onTertiaryFixedVariant = AroundColors.Sage,
+    )
