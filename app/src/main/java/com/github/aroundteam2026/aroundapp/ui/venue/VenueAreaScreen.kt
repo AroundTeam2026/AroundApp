@@ -68,13 +68,16 @@ import kotlinx.coroutines.flow.filter
 /**
  * Where a venue places its marker, by tapping the map, dragging the marker or searching its
  * address, and sets the radius in which a visit counts. It asks for the location permission once
- * per visit; with it, the map shows the device's position and frames it.
+ * per visit; with it, the map shows the device's position and frames it. It opens on the venue's
+ * saved marker and radius.
  *
+ * @param venueId Id of the venue whose area this edits.
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
 @Composable
 fun VenueAreaScreen(
-    viewModel: VenueAreaViewModel = viewModel(factory = VenueAreaViewModel.factory),
+    venueId: String,
+    viewModel: VenueAreaViewModel = viewModel(factory = VenueAreaViewModel.factory(venueId)),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
 ) {
   val state by viewModel.uiState.collectAsState()

@@ -38,6 +38,7 @@ import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
@@ -75,7 +76,7 @@ class VenueAreaScreenTest {
 
   private val locations = FakeLocationRepository(Location(47.3769, 8.5417))
   private val addresses = FakeAddressSearchRepository { AddressSearchResult.Found(listOf(bourg)) }
-  private val viewModel = VenueAreaViewModel(locations, addresses)
+  private val viewModel = VenueAreaViewModel("venue", FakeVenueRepository(), locations, addresses)
 
   // The Maps SDK can't drag a marker in a unit test, so these drive the state a marker exposes
   private var dragging by mutableStateOf(false)
@@ -83,7 +84,7 @@ class VenueAreaScreenTest {
   private val drops = mutableListOf<Location>()
 
   private fun show() {
-    composeTestRule.setContent { VenueAreaScreen(viewModel) }
+    composeTestRule.setContent { VenueAreaScreen("venue", viewModel) }
     composeTestRule.waitForIdle()
   }
 
@@ -225,7 +226,7 @@ class VenueAreaScreenTest {
     shadowOf(ApplicationProvider.getApplicationContext<Application>())
         .grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
 
-    composeTestRule.setContent { VenueAreaScreen() }
+    composeTestRule.setContent { VenueAreaScreen("venue") }
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).assertIsDisplayed()
   }

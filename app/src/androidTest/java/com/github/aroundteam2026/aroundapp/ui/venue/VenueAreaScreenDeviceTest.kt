@@ -22,6 +22,7 @@ import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
@@ -55,6 +56,8 @@ class VenueAreaScreenDeviceTest {
 
   private val viewModel =
       VenueAreaViewModel(
+          "venue",
+          FakeVenueRepository(),
           object : LocationRepository {
             override suspend fun currentLocation() = here
           },
@@ -67,7 +70,7 @@ class VenueAreaScreenDeviceTest {
 
   /** Shows the screen and waits until it framed the device, as it does when opened. */
   private fun show() {
-    composeTestRule.setContent { VenueAreaScreen(viewModel, camera) }
+    composeTestRule.setContent { VenueAreaScreen("venue", viewModel, camera) }
     awaitCameraAt(here)
   }
 
