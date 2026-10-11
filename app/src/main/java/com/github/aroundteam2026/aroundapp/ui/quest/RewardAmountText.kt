@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-package com.github.aroundteam2026.aroundapp.ui.map.marker
+package com.github.aroundteam2026.aroundapp.ui.quest
 
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import java.util.Locale

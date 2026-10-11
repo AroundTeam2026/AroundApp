@@ -22,6 +22,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.VenuePin
+import com.github.aroundteam2026.aroundapp.ui.quest.TestAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
