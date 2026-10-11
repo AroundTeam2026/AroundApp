@@ -2,21 +2,16 @@
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.github.aroundteam2026.aroundapp.model.common.Location
-import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestoreTest.Companion.TIMEOUT_MS
-import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
+import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
+import com.github.aroundteam2026.aroundapp.testing.emulatorClient
+import com.github.aroundteam2026.aroundapp.testing.signInNewUser
+import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.GeoPoint
-import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.Source
-import java.util.UUID
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -40,10 +35,10 @@ import org.junit.runner.RunWith
  * Tests [QuestRepositoryFirestore] on the Auth and Firestore emulators, started with `firebase
  * emulators:start --only auth,firestore --project demo-project`, so firestore.rules apply.
  *
- * Clients belong to named [FirebaseApp]s on the `demo-project` id, never to the default app, so the
- * tests cannot reach the real project. Each test signs in a fresh user and uses their uid as the
- * venue id, as the rules require, so tests never see each other's quests. Each comment above a test
- * names the production bug it catches.
+ * Clients come from [emulatorClient], so they belong to named [FirebaseApp]s on the `demo-project`
+ * id, never to the default app, and the tests cannot reach the real project. Each test signs in a
+ * fresh user and uses their uid as the venue id, as the rules require, so tests never see each
+ * other's quests. Each test's KDoc names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class QuestRepositoryFirestoreTest {
@@ -53,7 +48,10 @@ class QuestRepositoryFirestoreTest {
    */
   @get:Rule val timeout: Timeout = Timeout.seconds(30)
 
+  /** The signed-in venue's client, created by [setUp] and terminated by [tearDown]. */
   private lateinit var db: FirebaseFirestore
+
+  /** The repository under test, on [db], with a clock that always returns [FIXED_NOW]. */
   private lateinit var repository: QuestRepositoryFirestore
 
   /** Uid of the user signed in by [setUp], used as the venue id of the quests it creates. */
@@ -72,9 +70,11 @@ class QuestRepositoryFirestoreTest {
   @After
   fun tearDown() = runBlocking<Unit> { withTimeout(SETUP_TIMEOUT_MS) { db.terminate().await() } }
 
-  // Bug: a field is dropped or mis-mapped on write or read (e.g. lat/lng swapped, sign lost,
-  // reward not nested, wrong enum, id not taken from the document id), or write never reaches the
-  // server (e.g. offline, or a synchronous Firestore exception escapes).
+  /**
+   * Bug: a field is dropped or mis-mapped on write or read (e.g. lat/lng swapped, sign lost, reward
+   * not nested, wrong enum, id not taken from the document id), or write never reaches the server
+   * (e.g. offline, or a synchronous Firestore exception escapes).
+   */
   @Test
   fun createQuest_thenGetQuest_roundTripsEveryField() = withTimeoutBlocking {
     val input = fullQuest()
@@ -87,9 +87,11 @@ class QuestRepositoryFirestoreTest {
     )
   }
 
-  // Bug: the document does not follow the schema (Location stored as a {lat, lng} map, a timestamp
-  // stored as a Long, enums stored as ordinals) or null fields are stored as "", 0 or null instead
-  // of being omitted. A round trip cannot see any of these.
+  /**
+   * Bug: the document does not follow the schema (Location stored as a {lat, lng} map, a timestamp
+   * stored as a Long, enums stored as ordinals) or null fields are stored as "", 0 or null instead
+   * of being omitted. A round trip cannot see any of these.
+   */
   @Test
   fun createQuest_storesSchemaTypesAndOmitsNullFields() = withTimeoutBlocking {
     val fullId = repository.createQuest(fullQuest()).getOrThrow()
@@ -121,8 +123,10 @@ class QuestRepositoryFirestoreTest {
     assertFalse("a null reward must be omitted", noReward.contains("reward"))
   }
 
-  // Bug: the caller's timestamps are kept, the clock is read once per field, or millis are
-  // converted to and from Timestamp with lost precision.
+  /**
+   * Bug: the caller's timestamps are kept, the clock is read once per field, or millis are
+   * converted to and from Timestamp with lost precision.
+   */
   @Test
   fun createQuest_setsBothTimestampsFromOneClockRead() = withTimeoutBlocking {
     var time = FIXED_NOW
@@ -138,7 +142,7 @@ class QuestRepositoryFirestoreTest {
     assertEquals(FIXED_NOW, stored.updatedAt)
   }
 
-  // Bug: the caller's id is used as the document id, so a second quest overwrites the first.
+  /** Bug: the caller's id is used as the document id, so a second quest overwrites the first. */
   @Test
   fun createQuest_generatesAFreshIdIgnoringTheCallers() = withTimeoutBlocking {
     val first = repository.createQuest(quest(id = "caller", title = "First")).getOrThrow()
@@ -150,8 +154,10 @@ class QuestRepositoryFirestoreTest {
     assertEquals("Second", getQuestFromServer(second)?.title)
   }
 
-  // Bug: createQuest awaits the server acknowledgement, so it hangs while the device is offline,
-  // or the offline write is lost instead of synced later.
+  /**
+   * Bug: createQuest awaits the server acknowledgement, so it hangs while the device is offline, or
+   * the offline write is lost instead of synced later.
+   */
   @Test
   fun createQuest_succeedsWhileOffline() = withTimeoutBlocking {
     db.disableNetwork().await()
@@ -165,7 +171,7 @@ class QuestRepositoryFirestoreTest {
     assertEquals("Offline", getQuestFromServer(id)?.title)
   }
 
-  // Bug: an exception escapes createQuest instead of becoming a failure.
+  /** Bug: an exception escapes createQuest instead of becoming a failure. */
   @Test
   fun createQuest_returnsFailureWhenTheWriteCannotBeIssued() = withTimeoutBlocking {
     // an exception thrown while building the write.
@@ -178,14 +184,16 @@ class QuestRepositoryFirestoreTest {
     assertTrue(result2.isFailure)
   }
 
-  // Bug: getQuest throws for an id with no document instead of returning null as KDoc promises.
+  /** Bug: getQuest throws for an id with no document instead of returning null as KDoc promises. */
   @Test
   fun getQuest_returnsNullForUnknownId() = withTimeoutBlocking {
     assertNull(repository.getQuest("unknown"))
   }
 
-  // Bug: observeActiveQuests does not filter on status, or filters on a string that differs from
-  // the stored enum name.
+  /**
+   * Bug: observeActiveQuests does not filter on status, or filters on a string that differs from
+   * the stored enum name.
+   */
   @Test
   fun observeActiveQuests_excludesDraftAndArchived() = withTimeoutBlocking {
     repository.createQuest(quest(status = QuestStatus.DRAFT)).getOrThrow()
@@ -198,7 +206,7 @@ class QuestRepositoryFirestoreTest {
     assertEquals(listOf(activeId), active.ownedBy(venueId).map { it.id })
   }
 
-  // Bug: the flow reads once (get()) instead of listening, so later quests never arrive.
+  /** Bug: the flow reads once (get()) instead of listening, so later quests never arrive. */
   @Test
   fun observeActiveQuests_emitsAQuestCreatedAfterSubscribing() = withTimeoutBlocking {
     val emissions = Channel<List<Quest>>(Channel.UNLIMITED)
@@ -222,7 +230,7 @@ class QuestRepositoryFirestoreTest {
     }
   }
 
-  // Bug: observeQuestsByVenue does not filter on venueId, or also filters on status.
+  /** Bug: observeQuestsByVenue does not filter on venueId, or also filters on status. */
   @Test
   fun observeQuestsByVenue_returnsAllOfThatVenuesQuestsWhateverTheirStatus() = withTimeoutBlocking {
     val ownIds =
@@ -237,8 +245,10 @@ class QuestRepositoryFirestoreTest {
     assertEquals(ownIds, quests.map { it.id }.toSet())
   }
 
-  // Bug: a document that cannot be mapped crashes the listener or ends the flow instead of being
-  // skipped. getQuest goes through the same mapper.
+  /**
+   * Bug: a document that cannot be mapped crashes the listener or ends the flow instead of being
+   * skipped. getQuest goes through the same mapper.
+   */
   @Test
   fun observeActiveQuests_skipsMalformedDocuments() = withTimeoutBlocking {
     db.collection(QUESTS)
@@ -296,11 +306,6 @@ class QuestRepositoryFirestoreTest {
           updatedAt = 1_000L,
       )
 
-  /** Runs [block] blocking, failing after [TIMEOUT_MS] instead of hanging on a missing emission. */
-  private fun withTimeoutBlocking(block: suspend CoroutineScope.() -> Unit) = runBlocking {
-    withTimeout(TIMEOUT_MS, block)
-  }
-
   /** The quests of this list that belong to [venueId]. */
   private fun List<Quest>.ownedBy(venueId: String) = filter { it.venueId == venueId }
 
@@ -337,72 +342,25 @@ class QuestRepositoryFirestoreTest {
   }
 
   private companion object {
+    /** The Firestore collection the repository stores quests in; some tests use it directly. */
     const val QUESTS = "quests"
-    const val READER_APP = "quest-test-reader"
-    const val OTHER_VENUE_APP = "quest-test-other-venue"
-    const val PASSWORD = "password123"
-    const val TIMEOUT_MS = 10_000L
 
-    /** Bounds setUp and tearDown; the first connection to the emulator can be slow on CI. */
-    const val SETUP_TIMEOUT_MS = 15_000L
+    /** The app of the reader that [getQuestFromServer] signs in, with an empty cache. */
+    const val READER_APP = "quest-test-reader"
+
+    /** The app of the second venue that [createQuestAsAnotherVenue] signs in. */
+    const val OTHER_VENUE_APP = "quest-test-other-venue"
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
+
+    /** When [fullQuest]'s reward expires, in epoch ms; the non-zero ms catch precision loss. */
     const val REWARD_EXPIRES_AT = 1_800_000_000_456L
 
+    /** The app of the venue that [setUp] signs in and every test acts as. */
     const val MAIN_APP = "quest-test"
+
+    /** The app whose client a test terminates on purpose, to make the write fail. */
     const val TERMINATED_APP = "quest-test-terminated"
-
-    /**
-     * Returns a client of the [FirebaseApp] named [appName] on the `demo-project` id, pointed at
-     * the emulator and caching in memory only. The app is created on first use.
-     *
-     * [FirebaseEmulator.connect] only configures the default app, while these tests need separate
-     * named apps (one is terminated on purpose, another acts as a second device), so this reuses
-     * its host and port instead.
-     */
-    fun emulatorClient(appName: String): FirebaseFirestore =
-        FirebaseFirestore.getInstance(emulatorApp(appName)).apply {
-          useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
-          firestoreSettings =
-              FirebaseFirestoreSettings.Builder()
-                  .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
-                  .build() // keep local cache in ram only
-        }
-
-    /**
-     * Creates a fresh user on the Auth emulator and signs them in on the app named [appName], so
-     * that app's Firestore client acts as them.
-     *
-     * @return the new user's uid.
-     */
-    suspend fun signInNewUser(appName: String): String {
-      val email = "quest-test-${UUID.randomUUID()}@around.test"
-      val auth = FirebaseAuth.getInstance(emulatorApp(appName))
-      return auth.createUserWithEmailAndPassword(email, PASSWORD).await().user!!.uid
-    }
-
-    /**
-     * Returns the [FirebaseApp] named [appName] on the `demo-project` id. On first use it creates
-     * the app and points its Auth at the emulator; Firestore is pointed per client, since a
-     * terminated client is replaced by a new one.
-     */
-    private fun emulatorApp(appName: String): FirebaseApp {
-      val context = InstrumentationRegistry.getInstrumentation().targetContext // get app context
-      return FirebaseApp.getApps(context).firstOrNull { it.name == appName }
-          ?: FirebaseApp.initializeApp(
-                  context,
-                  FirebaseOptions.Builder()
-                      .setProjectId("demo-project")
-                      .setApplicationId("1:1:android:1")
-                      .setApiKey("fake-api-key")
-                      .build(),
-                  appName,
-              )
-              .also {
-                FirebaseAuth.getInstance(it)
-                    .useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.AUTH_PORT)
-              }
-    }
   }
 }
