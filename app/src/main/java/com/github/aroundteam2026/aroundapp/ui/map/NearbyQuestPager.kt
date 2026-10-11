@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -15,18 +17,19 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -37,10 +40,22 @@ import com.github.aroundteam2026.aroundapp.ui.map.marker.CardLine
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerStyle
 import com.github.aroundteam2026.aroundapp.ui.map.marker.QuestChips
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import kotlinx.coroutines.launch
 
 /** The most dots the pager shows; past that, they slide along with the shown page. */
 private const val MAX_DOTS = 5
+
+// The pager's own geometry, from Figma (frame 2006:688); its gaps come from AroundSpacing
+private val AVATAR_SIZE = 60.dp
+private val LINE_SPACING = 3.dp
+private val TITLE_SPACING = 2.dp
+private val BUTTON_HEIGHT = 52.dp
+private val CHEVRON_SIZE = 20.dp
+private val DOT_SIZE = 6.dp
+private val SHOWN_DOT_WIDTH = 18.dp
 
 /**
  * The quests near the explorer, one per page, in the order of [quests]: each page shows its venue's
@@ -60,6 +75,7 @@ private const val MAX_DOTS = 5
  *   rather than by venue name.
  * @param onQuestClick Called with a page's quest when the explorer taps the page.
  * @param onViewQuest Called with the shown quest when the explorer taps "View quest".
+ * @param style How the pages look; by default, as in Figma, in the theme's colours.
  */
 @Composable
 fun NearbyQuestPager(
@@ -68,16 +84,17 @@ fun NearbyQuestPager(
     onQuestClick: (NearbyQuest) -> Unit,
     onViewQuest: (NearbyQuest) -> Unit,
     modifier: Modifier = Modifier,
-    style: MarkerStyle = MarkerDefaults.style(),
+    style: MarkerStyle = NearbyQuestPagerDefaults.style(),
 ) {
-  Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    Text(stringResource(R.string.map_nearby_title), style = MaterialTheme.typography.titleLarge)
+  Column(modifier, verticalArrangement = Arrangement.spacedBy(AroundSpacing.SectionGap)) {
     if (quests.isEmpty()) {
+      Title()
       LocationHint(locationOn)
       Text(
           stringResource(R.string.map_nearby_empty),
           Modifier.testTag(C.Tag.NEARBY_EMPTY),
-          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          style = AroundTextStyles.BodyMedium,
       )
     } else {
       Pages(quests, locationOn, onQuestClick, onViewQuest, style)
@@ -85,9 +102,60 @@ fun NearbyQuestPager(
   }
 }
 
+/** How the pager looks by default. */
+object NearbyQuestPagerDefaults {
+  /**
+   * The quest card's chips and avatar, sized and set as in Figma. The pager sits on the app's
+   * surface rather than on a card of its own, so it takes the theme's colours, light or dark.
+   */
+  @Composable
+  fun style(): MarkerStyle {
+    val colors = MaterialTheme.colorScheme
+    return MarkerDefaults.style(
+        colors =
+            MarkerDefaults.colors()
+                .copy(
+                    accent = colors.primary,
+                    onAccent = colors.onPrimary,
+                    secondary = colors.tertiary,
+                    onSecondary = colors.onTertiary,
+                    surface = colors.surface,
+                    onSurface = colors.onSurface,
+                    onSurfaceVariant = colors.onSurfaceVariant,
+                    outline = colors.outline,
+                ),
+        typography =
+            MarkerDefaults.typography()
+                .copy(
+                    questTitle = AroundTextStyles.CardTitle,
+                    venueName = AroundTextStyles.InlineBody,
+                    chip = AroundTextStyles.Badge,
+                    initials = AroundTextStyles.AvatarLarge,
+                ),
+        dimensions =
+            MarkerDefaults.dimensions.copy(
+                cardAvatarSize = AVATAR_SIZE,
+                cardGap = AroundSpacing.InsetPadding,
+                cardLineSpacing = LINE_SPACING,
+                chipVerticalPadding = AroundSpacing.ExtraSmall,
+            ),
+    )
+  }
+}
+
+/** "Nearby quests". */
+@Composable
+private fun Title() {
+  Text(
+      stringResource(R.string.map_nearby_title),
+      color = MaterialTheme.colorScheme.onSurface,
+      style = AroundTextStyles.OverlayTitle,
+  )
+}
+
 /**
- * The counter, the pages of [quests], their dots and the arrows. Composed only while there are
- * quests, so quests arriving after an empty list start again from the first.
+ * The title and counter, the pages of [quests], their dots and the arrows. Composed only while
+ * there are quests, so quests arriving after an empty list start again from the first.
  */
 @Composable
 private fun Pages(
@@ -101,11 +169,15 @@ private fun Pages(
   // For a frame after the list shrinks, the pager's page can still be past its end
   val shown = pagerState.currentPage.coerceAtMost(quests.lastIndex)
   val order = if (locationOn) R.string.map_nearby_closest_first else R.string.map_nearby_by_name
-  Text(
-      stringResource(order, shown + 1, quests.size),
-      Modifier.testTag(C.Tag.NEARBY_COUNTER),
-      style = MaterialTheme.typography.bodySmall,
-  )
+  Column(verticalArrangement = Arrangement.spacedBy(TITLE_SPACING)) {
+    Title()
+    Text(
+        stringResource(order, shown + 1, quests.size),
+        Modifier.testTag(C.Tag.NEARBY_COUNTER),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = AroundTextStyles.Caption,
+    )
+  }
   LocationHint(locationOn)
   // Keyed by quest, so the shown quest keeps its page when others come and go
   HorizontalPager(
@@ -127,15 +199,15 @@ private fun LocationHint(locationOn: Boolean) {
   Text(
       stringResource(R.string.map_nearby_location_off),
       Modifier.testTag(C.Tag.NEARBY_LOCATION_HINT),
-      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      style = AroundTextStyles.BodyMedium,
   )
 }
 
 /** One quest's page: its venue's avatar, then its title, its venue's name and its chips. */
 @Composable
 private fun QuestPage(quest: NearbyQuest, style: MarkerStyle, onClick: () -> Unit) {
-  // On the sheet, not on the card's own surface, so the text takes the theme's colours
-  val colors = MaterialTheme.colorScheme
+  val colors = style.colors
   Row(
       Modifier.testTag(C.Tag.NEARBY_PAGE)
           .fillMaxWidth()
@@ -164,27 +236,35 @@ private fun QuestPage(quest: NearbyQuest, style: MarkerStyle, onClick: () -> Uni
           style.typography.venueName,
           colors.onSurfaceVariant,
       )
-      QuestChips(quest.reward, quest.minPartySize, quest.distanceMeters, style = style)
+      QuestChips(
+          quest.reward,
+          quest.minPartySize,
+          quest.distanceMeters,
+          // Figma sets the chips a little further below the venue's name than the lines' gap
+          Modifier.padding(top = AroundSpacing.ExtraSmall),
+          style = style,
+      )
     }
   }
 }
 
-/** A dot for each page of the window around [current], which has the selected one. */
+/** A dot for each page of the window around [current]: a longer pill for the shown one. */
 @Composable
 private fun Dots(current: Int, count: Int) {
   Row(
       Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+      horizontalArrangement =
+          Arrangement.spacedBy(AroundSpacing.SegmentGap, Alignment.CenterHorizontally),
   ) {
     for (page in dotWindow(current, count)) {
       val selected = page == current
       Box(
           Modifier.testTag(C.Tag.NEARBY_DOT)
               .semantics { this.selected = selected }
-              .size(width = if (selected) 18.dp else 6.dp, height = 6.dp)
+              .size(width = if (selected) SHOWN_DOT_WIDTH else DOT_SIZE, height = DOT_SIZE)
               .background(
                   if (selected) MaterialTheme.colorScheme.primary
-                  else MaterialTheme.colorScheme.outlineVariant,
+                  else MaterialTheme.colorScheme.outline,
                   CircleShape,
               )
       )
@@ -201,24 +281,39 @@ private fun Navigation(pagerState: PagerState, onView: () -> Unit) {
     // From where a move under way is going, so quick taps each move a page
     scope.launch { pagerState.animateScrollToPage((pagerState.targetPage + step).mod(count)) }
   }
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    Arrow("‹", stringResource(R.string.map_nearby_previous), enabled = count > 1) { pageBy(-1) }
-    Button(onView, Modifier.testTag(C.Tag.NEARBY_VIEW).weight(1f)) {
-      Text(stringResource(R.string.map_nearby_view))
+  Row(
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Arrow(R.drawable.ic_chevron_left, R.string.map_nearby_previous, count > 1) { pageBy(-1) }
+    Button(
+        onView,
+        Modifier.testTag(C.Tag.NEARBY_VIEW).weight(1f).height(BUTTON_HEIGHT),
+        shape = AroundPillShape,
+    ) {
+      Text(stringResource(R.string.map_nearby_view), style = AroundTextStyles.Button)
     }
-    Arrow("›", stringResource(R.string.map_nearby_next), enabled = count > 1) { pageBy(1) }
+    Arrow(R.drawable.ic_chevron_right, R.string.map_nearby_next, count > 1) { pageBy(1) }
   }
 }
 
-/** An arrow button that screen readers announce as [description]. */
+/** A round, outlined arrow button showing [icon], which screen readers announce as [label]. */
 @Composable
-private fun Arrow(glyph: String, description: String, enabled: Boolean, onClick: () -> Unit) {
-  IconButton(
+private fun Arrow(icon: Int, label: Int, enabled: Boolean, onClick: () -> Unit) {
+  val colors = MaterialTheme.colorScheme
+  OutlinedIconButton(
       onClick,
-      Modifier.semantics { contentDescription = description },
+      Modifier.size(BUTTON_HEIGHT),
       enabled = enabled,
+      shape = CircleShape,
+      colors =
+          IconButtonDefaults.outlinedIconButtonColors(
+              containerColor = colors.background,
+              contentColor = colors.onSurface,
+          ),
+      border = BorderStroke(1.dp, colors.outline),
   ) {
-    Text(glyph, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.titleLarge)
+    Icon(painterResource(icon), stringResource(label), Modifier.size(CHEVRON_SIZE))
   }
 }
 
