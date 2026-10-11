@@ -60,5 +60,16 @@ object C {
     const val QUEST_CHIP_PARTY = "quest_chip_party"
     const val QUEST_CHIP_DISTANCE = "quest_chip_distance"
     const val QUEST_CARD_MORE = "quest_card_more"
+
+    const val NEARBY_COUNTER = "nearby_counter"
+    const val NEARBY_LOCATION_HINT = "nearby_location_hint"
+    const val NEARBY_EMPTY = "nearby_empty"
+    const val NEARBY_PAGES = "nearby_pages"
+    const val NEARBY_PAGE = "nearby_page"
+    const val NEARBY_AVATAR = "nearby_avatar"
+    const val NEARBY_QUEST_TITLE = "nearby_quest_title"
+    const val NEARBY_VENUE = "nearby_venue"
+    const val NEARBY_DOT = "nearby_dot"
+    const val NEARBY_VIEW = "nearby_view"
   }
 }

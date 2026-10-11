@@ -55,7 +55,7 @@ fun QuestCard(
             .border(dimensions.outlineWidth, colors.outline, style.cardShape)
             .padding(dimensions.cardPadding)
     ) {
-      CardAvatar(pin.avatar, style)
+      CardAvatar(pin.avatar, style, Modifier.testTag(C.Tag.QUEST_CARD_AVATAR))
       Column(
           Modifier.padding(start = dimensions.cardGap).weight(1f),
           verticalArrangement = Arrangement.spacedBy(dimensions.cardLineSpacing),
@@ -71,12 +71,12 @@ fun QuestCard(
   }
 }
 
-/** The venue's avatar on its round background, in the initials' text style. */
+/** A venue's avatar on its round background, in the initials' text style. */
 @Composable
-private fun CardAvatar(avatar: VenueAvatar, style: MarkerStyle) {
+internal fun CardAvatar(avatar: VenueAvatar, style: MarkerStyle, modifier: Modifier = Modifier) {
   val dimensions = style.dimensions
   Box(
-      Modifier.testTag(C.Tag.QUEST_CARD_AVATAR)
+      modifier
           .size(dimensions.cardAvatarSize)
           .background(style.colors.secondary, style.avatarShape)
           .padding(dimensions.cardAvatarPadding)
@@ -110,7 +110,7 @@ private fun CardText(pin: VenuePin, style: MarkerStyle) {
   }
 }
 
-/** One line of the card, cut off with an ellipsis past [maxLines]. */
+/** One line of a quest's text, cut off with an ellipsis past [maxLines]. */
 @Composable
 internal fun CardLine(
     text: String,
