@@ -21,11 +21,13 @@ jobs:
 
     # The emulator the team develops on, a Pixel 10a with API 37.1, so a test means the same thing
     # on CI as locally. The command-line tools have no pixel_10a profile; pixel_9 has the same
-    # screen (1080x2424, 420 dpi). Both emulator steps and the AVD cache key read these.
+    # screen (1080x2424, 420 dpi). The Pixel 10a AVD has 4 cores, as many as the runner has; the
+    # action's default is 2. Both emulator steps and the AVD cache key read these.
     env:
       AVD_API_LEVEL: "37.1"
       AVD_TARGET: google_apis_playstore_ps16k
       AVD_PROFILE: pixel_9
+      AVD_CORES: "4"
 
     steps:
       - name: Checkout
@@ -118,7 +120,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}
+          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores
 
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -127,6 +129,7 @@ jobs:
           api-level: ${{ env.AVD_API_LEVEL }}
           target: ${{ env.AVD_TARGET }}
           profile: ${{ env.AVD_PROFILE }}
+          cores: ${{ env.AVD_CORES }}
           arch: x86_64
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
@@ -187,6 +190,7 @@ jobs:
           api-level: ${{ env.AVD_API_LEVEL }}
           target: ${{ env.AVD_TARGET }}
           profile: ${{ env.AVD_PROFILE }}
+          cores: ${{ env.AVD_CORES }}
           arch: x86_64
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
