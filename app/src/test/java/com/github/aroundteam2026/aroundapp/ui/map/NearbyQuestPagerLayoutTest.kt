@@ -40,7 +40,7 @@ class NearbyQuestPagerLayoutTest {
               avatar = VenueAvatar.Initials("CL"),
               questId = "q$it",
               title = "Find the hidden fox",
-              reward = Reward("15% off hot drinks", terms = null, expiresAt = null),
+              reward = Reward.Other("15% off hot drinks"),
               minPartySize = 1,
               distanceMeters = 120.0,
           )
