@@ -7,6 +7,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
+/**
+ * Creates a bold Bricolage Grotesque heading using Figma text metrics.
+ *
+ * @param size Font size in sp.
+ * @param height Line height in sp; null preserves Figma Auto line height.
+ * @param tracking Letter spacing in sp; defaults to -3% of the font size.
+ */
 private fun heading(size: Int, height: Int? = null, tracking: Double = -size * 0.03) =
     TextStyle(
         fontFamily = AroundFonts.Title,
@@ -16,6 +23,13 @@ private fun heading(size: Int, height: Int? = null, tracking: Double = -size * 0
         letterSpacing = tracking.sp,
     )
 
+/**
+ * Creates an Instrument Sans body or control style with zero letter spacing.
+ *
+ * @param size Font size in sp.
+ * @param height Line height in sp; null preserves Figma Auto line height.
+ * @param weight Font weight for the text's role in the design.
+ */
 private fun body(size: Int, height: Int? = null, weight: FontWeight = FontWeight.Normal) =
     TextStyle(
         fontFamily = AroundFonts.Body,
