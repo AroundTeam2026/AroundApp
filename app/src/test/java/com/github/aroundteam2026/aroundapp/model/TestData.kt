@@ -16,7 +16,7 @@ fun testQuest(
     venueName: String = "Café Lumen",
     location: Location = Location(46.5220, 6.6330),
     title: String = "Order the secret menu",
-    reward: Reward? = Reward("Free coffee", terms = null, expiresAt = null),
+    reward: Reward? = Reward.FreeItem("Coffee", specifics = null),
     minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
     status: QuestStatus = QuestStatus.ACTIVE,
     createdAt: Long = 1_000L,
@@ -40,7 +40,7 @@ fun testQuest(
     )
 
 /** A reward that stops being valid at [expiresAt]. */
-fun rewardExpiringAt(expiresAt: Long) = Reward("Free dessert", terms = null, expiresAt = expiresAt)
+fun rewardExpiringAt(expiresAt: Long) = Reward.Other("Free dessert", expiresAt = expiresAt)
 
 /** Builds a placed venue; tests override only the fields they care about. */
 fun testVenue(

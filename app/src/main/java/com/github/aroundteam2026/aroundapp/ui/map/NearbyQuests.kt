@@ -8,7 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
-import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import java.text.Collator
 import java.util.Locale
 

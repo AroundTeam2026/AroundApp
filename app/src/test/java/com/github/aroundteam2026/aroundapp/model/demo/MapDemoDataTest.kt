@@ -3,8 +3,11 @@ package com.github.aroundteam2026.aroundapp.model.demo
 
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.contains
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit.CHF
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit.PERCENT
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
 import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
@@ -97,7 +100,13 @@ class MapDemoDataTest {
     assertTrue("No group quest", valid.any { it.minPartySize > 1 })
     assertTrue("No solo quest", valid.any { it.minPartySize == 1 })
     assertTrue("No quest without a reward", valid.any { it.reward == null })
-    assertTrue("No quest with a reward", valid.any { it.reward != null })
+    assertTrue(
+        "No discount in percent",
+        valid.any { (it.reward as? Reward.Discount)?.unit == PERCENT },
+    )
+    assertTrue("No discount in CHF", valid.any { (it.reward as? Reward.Discount)?.unit == CHF })
+    assertTrue("No free item", valid.any { it.reward is Reward.FreeItem })
+    assertTrue("No other reward", valid.any { it.reward is Reward.Other })
   }
 
   @Test

@@ -12,6 +12,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
+import java.util.Date
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -95,12 +96,12 @@ class QuestRepositoryFirestoreTest {
   @Test
   fun createQuest_storesSchemaTypesAndOmitsNullFields() = withTimeoutBlocking {
     val fullId = repository.createQuest(fullQuest()).getOrThrow()
-    val bareRewardId =
+    val freeItemId =
         repository
-            .createQuest(
-                fullQuest().copy(reward = Reward("Sticker", terms = null, expiresAt = null))
-            )
+            .createQuest(fullQuest().copy(reward = Reward.FreeItem("Coffee", specifics = null)))
             .getOrThrow()
+    val otherId =
+        repository.createQuest(fullQuest().copy(reward = Reward.Other("Sticker"))).getOrThrow()
     val noRewardId = repository.createQuest(fullQuest().copy(reward = null)).getOrThrow()
 
     // Only the stored representation is checked here; the values are checked by the round trip.
@@ -114,13 +115,75 @@ class QuestRepositoryFirestoreTest {
     assertEquals("DRAFT", full.get("status"))
     assertEquals("TEXT", full.get("proofType"))
     val reward = full.get("reward") as Map<*, *>
-    assertEquals(setOf("description", "terms", "expiresAt"), reward.keys)
+    assertEquals(setOf("type", "amount", "unit", "specifics", "expiresAt"), reward.keys)
+    assertEquals("DISCOUNT", reward["type"])
+    assertEquals("PERCENT", reward["unit"])
     assertTrue(reward["expiresAt"] is Timestamp)
     assertFalse("id must not be stored", full.contains("id"))
-    val bareReward = db.collection(QUESTS).document(bareRewardId).get(Source.SERVER).await()
-    assertEquals(setOf("description"), (bareReward.get("reward") as Map<*, *>).keys)
+    val freeItem =
+        db.collection(QUESTS).document(freeItemId).get(Source.SERVER).await().get("reward")
+    assertEquals(mapOf("type" to "FREE_ITEM", "name" to "Coffee"), freeItem)
+    val other = db.collection(QUESTS).document(otherId).get(Source.SERVER).await().get("reward")
+    assertEquals(mapOf("type" to "OTHER", "description" to "Sticker"), other)
     val noReward = db.collection(QUESTS).document(noRewardId).get(Source.SERVER).await()
     assertFalse("a null reward must be omitted", noReward.contains("reward"))
+  }
+
+  /**
+   * Bug: a reward type other than the one in fullQuest is mis-mapped on write or read (e.g. read
+   * back as another subtype, specifics or expiresAt dropped).
+   */
+  @Test
+  fun createQuest_thenGetQuest_roundTripsEveryRewardType() = withTimeoutBlocking {
+    val rewards =
+        listOf(
+            Reward.Discount(5.0, DiscountUnit.CHF, specifics = null),
+            Reward.FreeItem("Coffee", "Any size", expiresAt = REWARD_EXPIRES_AT),
+            Reward.Other("A hug", expiresAt = REWARD_EXPIRES_AT),
+        )
+    for (reward in rewards) {
+      val id = repository.createQuest(quest().copy(reward = reward)).getOrThrow()
+      assertEquals(reward, getQuestFromServer(id)!!.reward)
+    }
+  }
+
+  /**
+   * Bug: the amount is cast with `as Double`, so a whole amount stored as an integer (as the
+   * console or the web SDK would) is read back as a Long and the quest is skipped.
+   */
+  @Test
+  fun getQuest_readsAWholeAmountStoredAsAnInteger() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    db.collection(QUESTS)
+        .document(id)
+        .update("reward", mapOf("type" to "DISCOUNT", "amount" to 5L, "unit" to "CHF"))
+        .await()
+
+    assertEquals(
+        Reward.Discount(5.0, DiscountUnit.CHF, specifics = null),
+        getQuestFromServer(id)!!.reward,
+    )
+  }
+
+  /**
+   * Bug: a reward with a missing or unknown type, or a missing field, is read as no reward, so a
+   * quest whose reward has already expired never expires and shows up on the map again.
+   */
+  @Test
+  fun getQuest_skipsAQuestWithAnUnreadableReward() = withTimeoutBlocking {
+    val expired = Timestamp(Date(FIXED_NOW - 1))
+    val unreadableRewards =
+        listOf(
+            mapOf("type" to "MYSTERY", "description" to "Surprise", "expiresAt" to expired),
+            mapOf("description" to "No type", "expiresAt" to expired),
+            mapOf("type" to "DISCOUNT", "unit" to "CHF", "expiresAt" to expired),
+        )
+    for (reward in unreadableRewards) {
+      val id = repository.createQuest(quest()).getOrThrow()
+      db.collection(QUESTS).document(id).update("reward", reward).await()
+
+      assertNull("reward $reward", repository.getQuest(id))
+    }
   }
 
   /**
@@ -198,7 +261,7 @@ class QuestRepositoryFirestoreTest {
   fun observeActiveQuests_excludesDraftAndArchived() = withTimeoutBlocking {
     repository.createQuest(quest(status = QuestStatus.DRAFT)).getOrThrow()
     repository.createQuest(quest(status = QuestStatus.ARCHIVED)).getOrThrow()
-    val activeId = repository.createQuest(quest(status = QuestStatus.ACTIVE)).getOrThrow()
+    val activeId = repository.createQuest(quest()).getOrThrow()
 
     val active = repository.observeActiveQuests().first { list -> list.any { it.id == activeId } }
 
@@ -278,7 +341,13 @@ class QuestRepositoryFirestoreTest {
           requirements = "Photograph it.",
           proofType = ProofType.TEXT,
           minPartySize = 3,
-          reward = Reward("Free coffee", terms = "One per visit", expiresAt = REWARD_EXPIRES_AT),
+          reward =
+              Reward.Discount(
+                  12.5,
+                  DiscountUnit.PERCENT,
+                  "On drinks",
+                  expiresAt = REWARD_EXPIRES_AT,
+              ),
           status = QuestStatus.DRAFT,
           createdAt = 1L,
           updatedAt = 2L,

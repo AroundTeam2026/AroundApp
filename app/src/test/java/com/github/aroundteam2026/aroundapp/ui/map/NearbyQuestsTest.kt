@@ -12,8 +12,8 @@ import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
-import com.github.aroundteam2026.aroundapp.ui.map.marker.TestAvatar
-import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.TestAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,7 +32,7 @@ class NearbyQuestsTest {
       venueId: String = "v-$meters",
       venueName: String = "Venue $meters",
       createdAt: Long = 1_000L,
-      reward: Reward? = Reward("Free coffee", terms = null, expiresAt = null),
+      reward: Reward? = Reward.Other("Free coffee"),
       status: QuestStatus = QuestStatus.ACTIVE,
   ) =
       testQuest(
@@ -67,7 +67,7 @@ class NearbyQuestsTest {
             venueName = "Café Lumen",
             location = north(300.0),
             title = "Find the hidden fox",
-            reward = Reward("Free coffee", terms = "One per visit", expiresAt = null),
+            reward = Reward.Other("Free coffee"),
             minPartySize = 3,
         )
 
@@ -77,7 +77,7 @@ class NearbyQuestsTest {
     assertEquals("Café Lumen", row.venueName)
     assertEquals("fox", row.questId)
     assertEquals("Find the hidden fox", row.title)
-    assertEquals(Reward("Free coffee", terms = "One per visit", expiresAt = null), row.reward)
+    assertEquals(Reward.Other("Free coffee"), row.reward)
     assertEquals(3, row.minPartySize)
     assertEquals(300.0, row.distanceMeters!!, 0.01)
   }

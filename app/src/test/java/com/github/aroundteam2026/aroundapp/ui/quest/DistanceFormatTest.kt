@@ -1,8 +1,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-package com.github.aroundteam2026.aroundapp.ui.map.marker
+package com.github.aroundteam2026.aroundapp.ui.quest
 
-import com.github.aroundteam2026.aroundapp.ui.map.marker.DistanceUnit.KILOMETERS
-import com.github.aroundteam2026.aroundapp.ui.map.marker.DistanceUnit.METERS
+import com.github.aroundteam2026.aroundapp.ui.quest.DistanceUnit.KILOMETERS
+import com.github.aroundteam2026.aroundapp.ui.quest.DistanceUnit.METERS
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
