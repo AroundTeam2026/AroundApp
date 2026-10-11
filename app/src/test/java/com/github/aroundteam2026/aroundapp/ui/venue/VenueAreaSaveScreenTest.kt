@@ -60,8 +60,12 @@ class VenueAreaSaveScreenTest {
     composeTestRule.waitForIdle()
   }
 
-  private fun placeMarker() {
-    composeTestRule.runOnIdle { viewModel.onMarkerPlaced(placed) }
+  /** Places the marker and sets the radius to 120 m, as the venue would. */
+  private fun editArea() {
+    composeTestRule.runOnIdle {
+      viewModel.onMarkerPlaced(placed)
+      viewModel.onRadiusChanged(120)
+    }
     composeTestRule.waitForIdle()
   }
 
@@ -77,11 +81,30 @@ class VenueAreaSaveScreenTest {
   }
 
   @Test
-  fun saveIsDisabledUntilAMarkerIsPlaced() {
+  fun itsOwnViewModelOpensTheGivenVenuesSavedArea() {
+    // The app's venues start with the demo ones, each with a saved marker
+    composeTestRule.setContent { VenueAreaScreen(DEMO_VENUE_ID, onSaved = {}, onBack = {}) }
+    composeTestRule.waitForIdle()
+
+    save.assertIsEnabled()
+  }
+
+  @Test
+  fun itsOwnViewModelOpensAnUnknownVenueOnTheDefaults() {
+    composeTestRule.setContent { VenueAreaScreen("unknown", onSaved = {}, onBack = {}) }
+    composeTestRule.waitForIdle()
+
+    save.assertIsNotEnabled()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("50 m")
+  }
+
+  @Test
+  fun aVenueWithoutASavedAreaOpensOnTheDefaultsWithSaveDisabled() {
     show()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("50 m")
     save.assertIsNotEnabled()
 
-    placeMarker()
+    editArea()
 
     save.assertIsEnabled()
     save.assertTextEquals(composeTestRule.activity.getString(R.string.venue_area_save))
@@ -90,12 +113,12 @@ class VenueAreaSaveScreenTest {
   @Test
   fun pressingSaveSavesTheAreaAndTellsTheCallerOnce() {
     show()
-    placeMarker()
+    editArea()
 
     save.performClick()
     composeTestRule.waitForIdle()
 
-    assertEquals(placed, stored()?.location)
+    assertEquals(venue.copy(location = placed, radiusMeters = 120), stored())
     assertEquals(1, saves)
     assertEquals(0, backs)
     // Recomposing doesn't tell it again
@@ -108,7 +131,7 @@ class VenueAreaSaveScreenTest {
   fun whileSavingTheButtonShowsProgressAndCantBePressed() {
     venues.writeGate = CompletableDeferred()
     show()
-    placeMarker()
+    editArea()
 
     save.performClick()
     composeTestRule.waitForIdle()
@@ -135,7 +158,7 @@ class VenueAreaSaveScreenTest {
     venues.writeFailure = IllegalStateException("offline")
     show()
     composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_SAVE_ERROR).assertDoesNotExist()
-    placeMarker()
+    editArea()
 
     save.performClick()
     composeTestRule.waitForIdle()
@@ -145,6 +168,8 @@ class VenueAreaSaveScreenTest {
         .assertIsDisplayed()
         .assertTextEquals(composeTestRule.activity.getString(R.string.venue_area_save_failed))
     assertEquals(placed, viewModel.uiState.value.marker)
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("120 m")
+    assertEquals(venue, stored())
     assertEquals(0, saves)
     // It can be tried again
     save.assertIsEnabled()
@@ -167,5 +192,6 @@ class VenueAreaSaveScreenTest {
 
   private companion object {
     const val VENUE_ID = "venue"
+    const val DEMO_VENUE_ID = "demo-lumen"
   }
 }
