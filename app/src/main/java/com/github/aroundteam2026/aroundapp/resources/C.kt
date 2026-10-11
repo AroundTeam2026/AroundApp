@@ -6,6 +6,8 @@ package com.github.aroundteam2026.aroundapp.resources
 // Like R, but C
 object C {
   object Tag {
+    const val APP_LOADING = "app_loading"
+
     const val APP = "app"
     const val NAV_BAR = "nav_bar"
 

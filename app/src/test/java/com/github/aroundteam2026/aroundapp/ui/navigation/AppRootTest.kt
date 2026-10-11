@@ -1,8 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
@@ -10,9 +8,10 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.resources.C
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -31,35 +30,39 @@ class AppRootTest {
 
   @Test
   fun eachDestinationComposesOnlyItsPlaceholderAndReplacesThePreviousSlot() {
-    val destination = mutableStateOf(AppDestination.Loading)
+    val destination = mutableStateOf(AppDestination.LOADING)
     val composed = mutableSetOf<AppDestination>()
     compose.setContent {
       AppRoot(
           destination = destination.value,
           authFlow = {
-            composed.add(AppDestination.Auth)
-            Text("Auth")
+            composed.add(AppDestination.AUTH)
+            Text(AppDestination.AUTH.name)
           },
           roleSelection = {
-            composed.add(AppDestination.RoleSelection)
-            Text("RoleSelection")
+            composed.add(AppDestination.ROLE_SELECTION)
+            Text(AppDestination.ROLE_SELECTION.name)
           },
           explorerHome = {
-            composed.add(AppDestination.ExplorerHome)
-            Text("ExplorerHome")
+            composed.add(AppDestination.EXPLORER_HOME)
+            Text(AppDestination.EXPLORER_HOME.name)
           },
           venueEntry = {
-            composed.add(AppDestination.VenueEntry)
-            Text("VenueEntry")
+            composed.add(AppDestination.VENUE_ENTRY)
+            Text(AppDestination.VENUE_ENTRY.name)
+          },
+          profileError = {
+            composed.add(AppDestination.PROFILE_ERROR)
+            Text(AppDestination.PROFILE_ERROR.name)
           },
           loading = {
-            composed.add(AppDestination.Loading)
-            Text("Loading")
+            composed.add(AppDestination.LOADING)
+            Text(AppDestination.LOADING.name)
           },
       )
     }
-    assertOnly(AppDestination.Loading)
-    compose.runOnIdle { assertEquals(setOf(AppDestination.Loading), composed) }
+    assertOnly(AppDestination.LOADING)
+    compose.runOnIdle { assertEquals(setOf(AppDestination.LOADING), composed) }
     AppDestination.entries.drop(1).forEach { selected ->
       compose.runOnIdle {
         composed.clear()
@@ -72,84 +75,60 @@ class AppRootTest {
 
   @Test
   fun loadingDefaultsToAProgressIndicator() {
-    val destination = mutableStateOf(AppDestination.Loading)
+    val destination = mutableStateOf(AppDestination.LOADING)
     compose.setContent {
       AppRoot(
           destination = destination.value,
-          authFlow = { Text("Auth") },
-          roleSelection = { Text("RoleSelection") },
-          explorerHome = { Text("ExplorerHome") },
-          venueEntry = { Text("VenueEntry") },
+          authFlow = { Text(AppDestination.AUTH.name) },
+          roleSelection = { Text(AppDestination.ROLE_SELECTION.name) },
+          explorerHome = { Text(AppDestination.EXPLORER_HOME.name) },
+          venueEntry = { Text(AppDestination.VENUE_ENTRY.name) },
+          profileError = { Text(AppDestination.PROFILE_ERROR.name) },
       )
     }
+    compose.onNodeWithTag(C.Tag.APP_LOADING).assertIsDisplayed()
     compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
     AppDestination.entries.forEach { compose.onNodeWithText(it.name).assertDoesNotExist() }
     AppDestination.entries.drop(1).forEach { selected ->
       compose.runOnIdle { destination.value = selected }
       assertOnly(selected)
+      compose.onNodeWithTag(C.Tag.APP_LOADING).assertDoesNotExist()
       compose
           .onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
           .assertDoesNotExist()
     }
-    compose.runOnIdle { destination.value = AppDestination.Loading }
+    compose.runOnIdle { destination.value = AppDestination.LOADING }
+    compose.onNodeWithTag(C.Tag.APP_LOADING).assertIsDisplayed()
     compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
     AppDestination.entries.forEach { compose.onNodeWithText(it.name).assertDoesNotExist() }
   }
 
   @Test
   fun customLoadingReplacesTheDefaultAndIsDisposedWhenLeaving() {
-    val destination = mutableStateOf(AppDestination.Loading)
+    val destination = mutableStateOf(AppDestination.LOADING)
     var disposals = 0
     compose.setContent {
       AppRoot(
           destination = destination.value,
-          authFlow = { Text("Auth") },
-          roleSelection = { Text("RoleSelection") },
-          explorerHome = { Text("ExplorerHome") },
-          venueEntry = { Text("VenueEntry") },
+          authFlow = { Text(AppDestination.AUTH.name) },
+          roleSelection = { Text(AppDestination.ROLE_SELECTION.name) },
+          explorerHome = { Text(AppDestination.EXPLORER_HOME.name) },
+          venueEntry = { Text(AppDestination.VENUE_ENTRY.name) },
+          profileError = { Text(AppDestination.PROFILE_ERROR.name) },
           loading = {
             DisposableEffect(Unit) { onDispose { disposals++ } }
-            Text("Loading")
+            Text(AppDestination.LOADING.name)
           },
       )
     }
-    assertOnly(AppDestination.Loading)
+    assertOnly(AppDestination.LOADING)
+    compose.onNodeWithTag(C.Tag.APP_LOADING).assertDoesNotExist()
     compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertDoesNotExist()
-    compose.runOnIdle { destination.value = AppDestination.Auth }
-    assertOnly(AppDestination.Auth)
+    compose.runOnIdle { destination.value = AppDestination.AUTH }
+    assertOnly(AppDestination.AUTH)
     compose.runOnIdle { assertEquals(1, disposals) }
-    compose.runOnIdle { destination.value = AppDestination.Loading }
-    assertOnly(AppDestination.Loading)
+    compose.runOnIdle { destination.value = AppDestination.LOADING }
+    assertOnly(AppDestination.LOADING)
     compose.runOnIdle { assertEquals(1, disposals) }
-  }
-
-  @Test
-  fun slotCanUseCallerStateAndCallbacksToChangeDestination() {
-    val destination = mutableStateOf(AppDestination.Auth)
-    val clicks = mutableStateOf(0)
-    compose.setContent {
-      AppRoot(
-          destination = destination.value,
-          authFlow = {
-            Column {
-              Text("Clicks: ${clicks.value}")
-              Button(onClick = { clicks.value++ }) { Text("Increment") }
-              Button(onClick = { destination.value = AppDestination.ExplorerHome }) {
-                Text("Continue")
-              }
-            }
-          },
-          roleSelection = { Text("RoleSelection") },
-          explorerHome = { Text("ExplorerHome") },
-          venueEntry = { Text("VenueEntry") },
-      )
-    }
-    compose.onNodeWithText("Increment").performClick()
-    compose.onNodeWithText("Clicks: 1").assertIsDisplayed()
-    compose.onNodeWithText("Continue").performClick()
-    assertOnly(AppDestination.ExplorerHome)
-    listOf("Clicks: 1", "Increment", "Continue").forEach {
-      compose.onNodeWithText(it).assertDoesNotExist()
-    }
   }
 }

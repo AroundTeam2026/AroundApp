@@ -7,14 +7,19 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.github.aroundteam2026.aroundapp.resources.C
 
 /** Root destinations selected by the caller; session and role decisions live outside [AppRoot]. */
 enum class AppDestination {
-  Loading,
-  Auth,
-  RoleSelection,
-  ExplorerHome,
-  VenueEntry,
+  LOADING,
+  AUTH,
+  ROLE_SELECTION,
+  EXPLORER_HOME,
+  VENUE_ENTRY,
+
+  /** A failed profile read; distinct from a missing role that needs role selection. */
+  PROFILE_ERROR,
 }
 
 /**
@@ -26,6 +31,7 @@ enum class AppDestination {
  * @param roleSelection content for choosing a user role.
  * @param explorerHome content for the explorer's home, including tab navigation.
  * @param venueEntry content for entering the venue flow.
+ * @param profileError content for a failed profile read; the caller supplies retry and sign-out.
  * @param loading content while the caller resolves the destination; defaults to a centered spinner.
  */
 @Composable
@@ -35,17 +41,19 @@ fun AppRoot(
     roleSelection: @Composable () -> Unit,
     explorerHome: @Composable () -> Unit,
     venueEntry: @Composable () -> Unit,
+    profileError: @Composable () -> Unit,
     loading: @Composable () -> Unit = {
-      Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+      Box(Modifier.fillMaxSize().testTag(C.Tag.APP_LOADING), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
       }
     },
 ) {
   when (destination) {
-    AppDestination.Loading -> loading()
-    AppDestination.Auth -> authFlow()
-    AppDestination.RoleSelection -> roleSelection()
-    AppDestination.ExplorerHome -> explorerHome()
-    AppDestination.VenueEntry -> venueEntry()
+    AppDestination.LOADING -> loading()
+    AppDestination.AUTH -> authFlow()
+    AppDestination.ROLE_SELECTION -> roleSelection()
+    AppDestination.EXPLORER_HOME -> explorerHome()
+    AppDestination.VENUE_ENTRY -> venueEntry()
+    AppDestination.PROFILE_ERROR -> profileError()
   }
 }
