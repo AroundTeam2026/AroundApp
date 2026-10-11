@@ -1,20 +1,18 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
+import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
+import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
+import com.github.aroundteam2026.aroundapp.testing.emulatorClient
+import com.github.aroundteam2026.aroundapp.testing.signInNewUser
+import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.FirebaseFirestoreSettings
-import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.Source
-import java.util.UUID
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -37,12 +35,12 @@ import org.junit.runner.RunWith
  * `firebase emulators:start --only auth,firestore --project demo-project`, so firestore.rules
  * apply.
  *
- * Two clients take part, each on its own named [FirebaseApp] on the `demo-project` id, never the
- * default app, so the tests cannot reach the real project: the explorer creates reservations and
- * the venue answers them. Each client has its own empty cache, so what the venue reads has been
- * accepted by the server. Each test signs in fresh users and uses the venue's uid as the venue id,
- * as the rules require, so tests never see each other's reservations. Each comment above a test
- * names the production bug it catches.
+ * Two clients take part, each from [emulatorClient] on its own named [FirebaseApp] on the
+ * `demo-project` id, never the default app, so the tests cannot reach the real project: the
+ * explorer creates reservations and the venue answers them. Each client has its own empty cache, so
+ * what the venue reads has been accepted by the server. Each test signs in fresh users and uses the
+ * venue's uid as the venue id, as the rules require, so tests never see each other's reservations.
+ * Each test's KDoc names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class ReservationRepositoryFirestoreTest {
@@ -53,7 +51,10 @@ class ReservationRepositoryFirestoreTest {
    */
   @get:Rule val timeout: Timeout = Timeout.millis(RULE_TIMEOUT_MS)
 
+  /** The signed-in explorer's client, created by [setUp] and terminated by [tearDown]. */
   private lateinit var explorerDb: FirebaseFirestore
+
+  /** The signed-in venue's client, created by [setUp] and terminated by [tearDown]. */
   private lateinit var venueDb: FirebaseFirestore
 
   /** Repository used by the signed-in explorer. */
@@ -62,7 +63,10 @@ class ReservationRepositoryFirestoreTest {
   /** Repository used by the signed-in venue, which owns the reservations the tests create. */
   private lateinit var venueRepository: ReservationRepositoryFirestore
 
+  /** Uid of the explorer signed in by [setUp], a member of every party [reservation] builds. */
   private lateinit var explorerUid: String
+
+  /** Uid of the venue signed in by [setUp], used as the venue id of every reservation. */
   private lateinit var venueId: String
 
   /** Signs in a fresh explorer and a fresh venue, each on their own client of the emulator. */
@@ -89,9 +93,10 @@ class ReservationRepositoryFirestoreTest {
         }
       }
 
-  // Bug: a field is dropped or mis-mapped on write or read (e.g. slotStart and createdAt swapped,
-  // a party member lost, the status mapped to the wrong enum, the id not taken from the document
-  // id).
+  /**
+   * Bug: a field is dropped or mis-mapped on write or read (e.g. slotStart and createdAt swapped, a
+   * party member lost, the status mapped to the wrong enum, the id not taken from the document id).
+   */
   @Test
   fun createReservation_thenObserveForVenue_roundTripsEveryField() = withTimeoutBlocking {
     val id = createAndSync()
@@ -112,9 +117,11 @@ class ReservationRepositoryFirestoreTest {
     )
   }
 
-  // Bug: the document does not follow the schema (a time stored as a Long, the status stored as
-  // an ordinal, the party stored as a map) or the id is also stored as a field. A round trip
-  // cannot see any of these.
+  /**
+   * Bug: the document does not follow the schema (a time stored as a Long, the status stored as an
+   * ordinal, the party stored as a map) or the id is also stored as a field. A round trip cannot
+   * see any of these.
+   */
   @Test
   fun createReservation_storesSchemaTypes() = withTimeoutBlocking {
     val id = createAndSync()
@@ -131,8 +138,10 @@ class ReservationRepositoryFirestoreTest {
     assertEquals(listOf(explorerUid, FRIEND_UID), document.get("explorerUids"))
   }
 
-  // Bug: the caller's id, status or creation time are kept, so a second reservation overwrites the
-  // first, a caller can create an already approved one, or the clock is not used.
+  /**
+   * Bug: the caller's id, status or creation time are kept, so a second reservation overwrites the
+   * first, a caller can create an already approved one, or the clock is not used.
+   */
   @Test
   fun createReservation_ignoresTheCallersIdStatusAndCreatedAt() = withTimeoutBlocking {
     val input =
@@ -149,9 +158,11 @@ class ReservationRepositoryFirestoreTest {
     assertEquals(second, fetchAsVenue(second).id)
   }
 
-  // Bug: a reservation the rules refuse is stored anyway, or createReservation reports the refusal
-  // as a failure although, like createQuest, it must not wait for the server. The rules only let an
-  // explorer reserve for a party they belong to.
+  /**
+   * Bug: a reservation the rules refuse is stored anyway, or createReservation reports the refusal
+   * as a failure although, like createQuest, it must not wait for the server. The rules only let an
+   * explorer reserve for a party they belong to.
+   */
   @Test
   fun createReservation_whenTheSignedInUserIsNotInTheParty_succeedsButTheServerRejectsTheWrite() =
       withTimeoutBlocking {
@@ -162,7 +173,9 @@ class ReservationRepositoryFirestoreTest {
         assertTrue(stored.none { it.id == id })
       }
 
-  // Bug: createReservation waits for the server, so it hangs or fails while the device is offline.
+  /**
+   * Bug: createReservation waits for the server, so it hangs or fails while the device is offline.
+   */
   @Test
   fun createReservation_whileOffline_succeedsAndIsSentOnceBackOnline() = withTimeoutBlocking {
     explorerDb.disableNetwork().await()
@@ -177,7 +190,7 @@ class ReservationRepositoryFirestoreTest {
     assertEquals(id, fetchAsVenue(id).id)
   }
 
-  // Bug: an exception escapes createReservation instead of becoming a failure.
+  /** Bug: an exception escapes createReservation instead of becoming a failure. */
   @Test
   fun createReservation_returnsFailureWhenTheClientIsTerminated() = withTimeoutBlocking {
     val terminated = emulatorClient(TERMINATED_APP)
@@ -188,7 +201,7 @@ class ReservationRepositoryFirestoreTest {
     assertTrue(result.isFailure)
   }
 
-  // Bug: observeForVenue does not filter on the venue, or also filters on the status.
+  /** Bug: observeForVenue does not filter on the venue, or also filters on the status. */
   @Test
   fun observeForVenue_returnsEveryReservationOfThatVenueWhateverTheirStatus() =
       withTimeoutBlocking {
@@ -209,7 +222,7 @@ class ReservationRepositoryFirestoreTest {
         )
       }
 
-  // Bug: the flow reads once (get()) instead of listening, so later reservations never arrive.
+  /** Bug: the flow reads once (get()) instead of listening, so later reservations never arrive. */
   @Test
   fun observeForVenue_emitsAReservationCreatedAfterSubscribing() = withTimeoutBlocking {
     val emissions = Channel<List<Reservation>>(Channel.UNLIMITED)
@@ -233,8 +246,10 @@ class ReservationRepositoryFirestoreTest {
     }
   }
 
-  // Bug: observeForExplorer matches the party with equality instead of array-contains, so a
-  // reservation whose party has two members is missed.
+  /**
+   * Bug: observeForExplorer matches the party with equality instead of array-contains, so a
+   * reservation whose party has two members is missed.
+   */
   @Test
   fun observeForExplorer_returnsEveryReservationWhosePartyIncludesTheExplorer() =
       withTimeoutBlocking {
@@ -250,8 +265,10 @@ class ReservationRepositoryFirestoreTest {
         assertEquals(expected, reservations.map { it.id }.toSet())
       }
 
-  // Bug: observeForVenue or observeForExplorer lets a malformed document crash the listener or
-  // end the flow instead of skipping it.
+  /**
+   * Bug: observeForVenue or observeForExplorer lets a malformed document crash the listener or end
+   * the flow instead of skipping it.
+   */
   @Test
   fun observe_skipsMalformedDocuments() = withTimeoutBlocking {
     // No questId, slotStart or createdAt; the rules only check the party and the status.
@@ -279,8 +296,10 @@ class ReservationRepositoryFirestoreTest {
     assertEquals(listOf(validId), forExplorer.map { it.id })
   }
 
-  // Bug: updateStatus writes more than the status (the rules refuse that), or writes a different
-  // status than asked.
+  /**
+   * Bug: updateStatus writes more than the status (the rules refuse that), or writes a different
+   * status than asked.
+   */
   @Test
   fun updateStatus_byTheVenue_changesOnlyTheStatus() = withTimeoutBlocking {
     val id = createAndSync()
@@ -292,8 +311,10 @@ class ReservationRepositoryFirestoreTest {
     assertEquals(before.copy(status = ReservationStatus.APPROVED), after)
   }
 
-  // Bug: updateStatus does not check canTransition, so a final status can be reopened, or it
-  // reports the refusal with the wrong exception.
+  /**
+   * Bug: updateStatus does not check canTransition, so a final status can be reopened, or it
+   * reports the refusal with the wrong exception.
+   */
   @Test
   fun updateStatus_refusesAForbiddenTransitionAndLeavesTheStatusUnchanged() = withTimeoutBlocking {
     val id = createAndSync()
@@ -305,9 +326,11 @@ class ReservationRepositoryFirestoreTest {
     assertEquals("CANCELLED", storedStatus(id))
   }
 
-  // Bug: updateStatus throws or hangs for an id with no document instead of returning a failure.
-  // The read rule cannot evaluate a missing document, so the server answers PERMISSION_DENIED
-  // rather than the transaction seeing a missing reservation.
+  /**
+   * Bug: updateStatus throws or hangs for an id with no document instead of returning a failure.
+   * The read rule cannot evaluate a missing document, so the server answers PERMISSION_DENIED
+   * rather than the transaction seeing a missing reservation.
+   */
   @Test
   fun updateStatus_forAnUnknownId_failsWithPermissionDenied() = withTimeoutBlocking {
     val result = venueRepository.updateStatus("unknown", ReservationStatus.APPROVED)
@@ -315,8 +338,10 @@ class ReservationRepositoryFirestoreTest {
     assertPermissionDenied(result)
   }
 
-  // Bug: updateStatus changes a document that cannot be mapped to a Reservation, or reports it
-  // with another exception than NoSuchElementException.
+  /**
+   * Bug: updateStatus changes a document that cannot be mapped to a Reservation, or reports it with
+   * another exception than NoSuchElementException.
+   */
   @Test
   fun updateStatus_forAMalformedDocument_failsWithNoSuchElement() = withTimeoutBlocking {
     val document = explorerDb.collection(RESERVATIONS).document()
@@ -338,9 +363,11 @@ class ReservationRepositoryFirestoreTest {
     assertEquals("PENDING", storedStatus(document.id))
   }
 
-  // Bug: the KDoc and the rules disagree: an explorer cancelling their own reservation is refused
-  // by the rules, so it must come back as a failure and leave the reservation untouched. This test
-  // is the one to change when E21 lets explorers cancel.
+  /**
+   * Bug: the KDoc and the rules disagree: an explorer cancelling their own reservation is refused
+   * by the rules, so it must come back as a failure and leave the reservation untouched. This test
+   * is the one to change when E21 lets explorers cancel.
+   */
   @Test
   fun updateStatus_byTheExplorer_isRefusedByTheRules() = withTimeoutBlocking {
     val id = createAndSync()
@@ -377,11 +404,6 @@ class ReservationRepositoryFirestoreTest {
     return id
   }
 
-  /** Runs [block] blocking, failing after [TIMEOUT_MS] instead of hanging on a missing emission. */
-  private fun withTimeoutBlocking(block: suspend CoroutineScope.() -> Unit) = runBlocking {
-    withTimeout(TIMEOUT_MS, block)
-  }
-
   /**
    * Reads the reservation with [id] through the venue's client, once [until] accepts it. The venue
    * client has no local copy of the explorer's writes, so the reservation comes from the server.
@@ -411,78 +433,33 @@ class ReservationRepositoryFirestoreTest {
   }
 
   private companion object {
+    /**
+     * The Firestore collection the repository stores reservations in; some tests use it directly.
+     */
     const val RESERVATIONS = "reservations"
+
+    /** The app of the explorer that [setUp] signs in. */
     const val EXPLORER_APP = "reservation-test-explorer"
+
+    /** The app of the venue that [setUp] signs in. */
     const val VENUE_APP = "reservation-test-venue"
+
+    /** The app whose client a test terminates on purpose, to make the write fail. */
     const val TERMINATED_APP = "reservation-test-terminated"
-    const val PASSWORD = "password123"
+
+    /** The id of the quest every reservation is for; the rules don't check that it exists. */
     const val QUEST_ID = "quest-1"
 
     /** A party member who never signs in; only the explorer's own uid matters to the rules. */
     const val FRIEND_UID = "friend-uid"
-
-    const val TIMEOUT_MS = 10_000L
-
-    /** Bounds setUp and tearDown; the first connection to the emulator can be slow on CI. */
-    const val SETUP_TIMEOUT_MS = 15_000L
 
     /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
     const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
+
+    /** When every reservation's slot starts, in epoch ms; the non-zero ms catch precision loss. */
     const val SLOT_START = 1_800_000_000_456L
-
-    /**
-     * Returns a client of the [FirebaseApp] named [appName] on the `demo-project` id, pointed at
-     * the emulator and caching in memory only. The app is created on first use.
-     *
-     * [FirebaseEmulator.connect] only configures the default app, while these tests need separate
-     * named apps (an explorer, a venue and one terminated on purpose), so this reuses its host and
-     * port instead.
-     */
-    fun emulatorClient(appName: String): FirebaseFirestore =
-        FirebaseFirestore.getInstance(emulatorApp(appName)).apply {
-          useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
-          firestoreSettings =
-              FirebaseFirestoreSettings.Builder()
-                  .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
-                  .build() // keep local cache in ram only
-        }
-
-    /**
-     * Creates a fresh user on the Auth emulator and signs them in on the app named [appName], so
-     * that app's Firestore client acts as them.
-     *
-     * @return the new user's uid.
-     */
-    suspend fun signInNewUser(appName: String): String {
-      val email = "reservation-test-${UUID.randomUUID()}@around.test"
-      val auth = FirebaseAuth.getInstance(emulatorApp(appName))
-      return auth.createUserWithEmailAndPassword(email, PASSWORD).await().user!!.uid
-    }
-
-    /**
-     * Returns the [FirebaseApp] named [appName] on the `demo-project` id. On first use it creates
-     * the app and points its Auth at the emulator; Firestore is pointed per client, since a
-     * terminated client is replaced by a new one.
-     */
-    private fun emulatorApp(appName: String): FirebaseApp {
-      val context = InstrumentationRegistry.getInstrumentation().targetContext // get app context
-      return FirebaseApp.getApps(context).firstOrNull { it.name == appName }
-          ?: FirebaseApp.initializeApp(
-                  context,
-                  FirebaseOptions.Builder()
-                      .setProjectId("demo-project")
-                      .setApplicationId("1:1:android:1")
-                      .setApiKey("fake-api-key")
-                      .build(),
-                  appName,
-              )
-              .also {
-                FirebaseAuth.getInstance(it)
-                    .useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.AUTH_PORT)
-              }
-    }
   }
 }
