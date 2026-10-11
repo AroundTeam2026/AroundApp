@@ -181,7 +181,9 @@ jobs:
           # To run the CI with debug information, add --info
           ./gradlew check --parallel --build-cache
 
-      # Run connected (instrumented) tests on the emulator
+      # Run connected (instrumented) tests on the emulator. When they fail, print the device's crash
+      # log and its process deaths before the emulator shuts down: Gradle can't fetch the logcat of
+      # a test whose process crashed, so this is the only trace of why.
       - name: Run instrumented tests
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
@@ -195,7 +197,9 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./gradlew connectedCheck --parallel --build-cache
+          script: >-
+            ./gradlew connectedCheck --parallel --build-cache ||
+            { adb logcat -d -b crash; adb logcat -d -b system | grep -E 'has died|Killing|lmkd|ANR in'; exit 1; }
 
       # When the instrumented tests fail, show what the Maps SDK saw. Google rejects a build whose key
       # or signing certificate isn't registered, and the map then never moves: the device log names
