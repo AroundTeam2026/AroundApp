@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import java.util.Locale
@@ -42,7 +43,7 @@ fun QuestChips(
       verticalArrangement = spacing,
   ) {
     reward?.let {
-      Chip(it.description, C.Tag.QUEST_CHIP_REWARD, colors.accent, colors.onAccent, style)
+      Chip(rewardText(it), C.Tag.QUEST_CHIP_REWARD, colors.accent, colors.onAccent, style)
     }
     partySize?.let {
       Chip(
@@ -106,3 +107,18 @@ private fun distanceText(meters: Double): String {
 
 /** The app's language, which decides the distance's decimal separator; recomposes if it changes. */
 @Composable private fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
+
+/** What a [reward] chip says, e.g. "10% off", "CHF 5 off" or "Free coffee". */
+@Composable
+private fun rewardText(reward: Reward): String =
+    when (reward) {
+      is Reward.Discount -> {
+        val amount = formatRewardAmount(reward.amount, reward.unit, currentLocale())
+        when (reward.unit) {
+          DiscountUnit.PERCENT -> stringResource(R.string.map_card_reward_percent_off, amount)
+          DiscountUnit.CHF -> stringResource(R.string.map_card_reward_chf_off, amount)
+        }
+      }
+      is Reward.FreeItem -> stringResource(R.string.map_card_reward_free_item, reward.name)
+      is Reward.Other -> reward.description
+    }

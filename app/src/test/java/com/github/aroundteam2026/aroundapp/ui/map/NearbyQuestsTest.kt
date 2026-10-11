@@ -32,7 +32,7 @@ class NearbyQuestsTest {
       venueId: String = "v-$meters",
       venueName: String = "Venue $meters",
       createdAt: Long = 1_000L,
-      reward: Reward? = Reward("Free coffee", terms = null, expiresAt = null),
+      reward: Reward? = Reward.Other("Free coffee"),
       status: QuestStatus = QuestStatus.ACTIVE,
   ) =
       testQuest(
@@ -67,7 +67,7 @@ class NearbyQuestsTest {
             venueName = "Café Lumen",
             location = north(300.0),
             title = "Find the hidden fox",
-            reward = Reward("Free coffee", terms = "One per visit", expiresAt = null),
+            reward = Reward.Other("Free coffee"),
             minPartySize = 3,
         )
 
@@ -77,7 +77,7 @@ class NearbyQuestsTest {
     assertEquals("Café Lumen", row.venueName)
     assertEquals("fox", row.questId)
     assertEquals("Find the hidden fox", row.title)
-    assertEquals(Reward("Free coffee", terms = "One per visit", expiresAt = null), row.reward)
+    assertEquals(Reward.Other("Free coffee"), row.reward)
     assertEquals(3, row.minPartySize)
     assertEquals(300.0, row.distanceMeters!!, 0.01)
   }

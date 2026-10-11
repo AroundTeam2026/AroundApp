@@ -25,4 +25,13 @@ object QuestLimits {
 
   /** Largest allowed [Quest.radiusMeters]. */
   const val MAX_RADIUS_METERS = 200
+
+  /**
+   * Smallest allowed [Reward.Discount.amount], in either unit: one cent or 0.01 %. A check written
+   * as `amount >= MIN_DISCOUNT_AMOUNT` also rejects negative amounts and `NaN`.
+   */
+  const val MIN_DISCOUNT_AMOUNT = 0.01
+
+  /** Largest allowed [Reward.Discount.amount] in [DiscountUnit.PERCENT]: the whole price. */
+  const val MAX_PERCENT_DISCOUNT = 100.0
 }

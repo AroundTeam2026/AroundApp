@@ -119,7 +119,7 @@ class NearbyQuestPagerTest {
                 "fox",
                 title = "Find the hidden fox",
                 venueName = "Café Lumen",
-                reward = Reward("Free coffee", terms = null, expiresAt = null),
+                reward = Reward.Other("Free coffee"),
                 minPartySize = 3,
                 distanceMeters = 120.0,
             )
