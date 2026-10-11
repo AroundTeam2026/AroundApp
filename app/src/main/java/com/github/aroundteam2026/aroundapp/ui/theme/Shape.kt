@@ -6,10 +6,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
-/** Shared Figma corners: progress segments, fields, buttons, cards and sheets. */
+/** Shared Figma corners: fields, buttons, cards and sheets. */
 val AroundShapes =
     Shapes(
-        extraSmall = RoundedCornerShape(2.dp),
+        extraSmall = RoundedCornerShape(14.dp),
         small = RoundedCornerShape(14.dp),
         medium = RoundedCornerShape(16.dp),
         large = RoundedCornerShape(20.dp),
@@ -21,6 +21,7 @@ val AroundPillShape = CircleShape
 
 /** Inset reward fields and segmented-control options. */
 object AroundCorners {
+  val ProgressSegment = RoundedCornerShape(2.dp)
   val InsetField = RoundedCornerShape(12.dp)
   val SegmentedOption = RoundedCornerShape(9.dp)
   val FilterOption = RoundedCornerShape(10.dp)

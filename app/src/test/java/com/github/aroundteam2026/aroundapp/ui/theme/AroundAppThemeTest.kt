@@ -52,6 +52,20 @@ class AroundAppThemeTest {
     assertEquals(Color(0xFF62BAAD), colors.secondary)
     assertEquals(Color(0xFFA3312A), colors.error)
     assertEquals(colors.surface, colors.surfaceContainer)
+    assertEquals(Color(0xFFF3E8FF), colors.primaryContainer)
+    assertEquals(Color(0xFF4D0092), colors.onPrimaryContainer)
+    assertEquals(Color(0xFFDDF1EE), colors.secondaryContainer)
+    assertEquals(Color(0xFF3E8C80), colors.onSecondaryContainer)
+    assertEquals(Color(0xFFF6F8DE), colors.tertiaryContainer)
+    assertEquals(Color(0xFF3E8C80), colors.onTertiaryContainer)
+    assertEquals(Color(0xFFF6F8DE), colors.errorContainer)
+    assertEquals(Color(0xFFA3312A), colors.onErrorContainer)
+    assertEquals(Color(0xFF2D2D2D), colors.inverseSurface)
+    assertEquals(Color(0xFFFDFFE8), colors.inverseOnSurface)
+    assertEquals(Color(0xFFF3E8FF), colors.inversePrimary)
+    assertEquals(Color(0xFF2D2D2D), colors.scrim)
+    assertEquals(Color(0xFFFFFFF6), colors.surfaceBright)
+    assertEquals(Color(0xFFF6F8DE), colors.surfaceDim)
   }
 
   @Test
@@ -70,14 +84,46 @@ class AroundAppThemeTest {
     assertEquals(Color(0xFF62BAAD), colors.secondary)
     assertEquals(Color(0xFFE5736B), colors.error)
     assertEquals(colors.surface, colors.surfaceContainer)
+    assertEquals(Color(0xFF3F2E52), colors.primaryContainer)
+    assertEquals(Color(0xFFFDFFE8), colors.onPrimaryContainer)
+    assertEquals(Color(0xFF2F4744), colors.secondaryContainer)
+    assertEquals(Color(0xFF62BAAD), colors.onSecondaryContainer)
+    assertEquals(Color(0xFF333333), colors.tertiaryContainer)
+    assertEquals(Color(0xFF62BAAD), colors.onTertiaryContainer)
+    assertEquals(Color(0xFF333333), colors.errorContainer)
+    assertEquals(Color(0xFFE5736B), colors.onErrorContainer)
+    assertEquals(Color(0xFFFFFFF6), colors.inverseSurface)
+    assertEquals(Color(0xFF2D2D2D), colors.inverseOnSurface)
+    assertEquals(Color(0xFF4D0092), colors.inversePrimary)
+    assertEquals(Color(0xFF2D2D2D), colors.scrim)
+    assertEquals(Color(0xFF383838), colors.surfaceBright)
+    assertEquals(Color(0xFF2D2D2D), colors.surfaceDim)
+  }
+
+  @Test
+  fun fixedRolesUseTheSameFigmaTokensInBothModes() {
+    listOf(LightColorScheme, DarkColorScheme).forEach { colors ->
+      assertEquals(Color(0xFFF3E8FF), colors.primaryFixed)
+      assertEquals(Color(0xFF4D0092), colors.primaryFixedDim)
+      assertEquals(Color(0xFF4D0092), colors.onPrimaryFixed)
+      assertEquals(Color(0xFF36006A), colors.onPrimaryFixedVariant)
+      assertEquals(Color(0xFFDDF1EE), colors.secondaryFixed)
+      assertEquals(Color(0xFF62BAAD), colors.secondaryFixedDim)
+      assertEquals(Color(0xFF2D2D2D), colors.onSecondaryFixed)
+      assertEquals(Color(0xFF3E8C80), colors.onSecondaryFixedVariant)
+      assertEquals(Color(0xFFF6F8DE), colors.tertiaryFixed)
+      assertEquals(Color(0xFF5EA89D), colors.tertiaryFixedDim)
+      assertEquals(Color(0xFF2D2D2D), colors.onTertiaryFixed)
+      assertEquals(Color(0xFF3E8C80), colors.onTertiaryFixedVariant)
+    }
   }
 
   @Test
   fun lightExtendedColorsMatchFigma() {
     val colors = extendedPalette(false)
     assertEquals(Color(0xFF4D0092), colors.accentText)
-    assertEquals(Color(0xFFF6F8DE), colors.paper)
-    assertEquals(Color(0xFFF3E8FF), colors.cream)
+    assertEquals(Color(0xFFF6F8DE), colors.panel)
+    assertEquals(Color(0xFFF3E8FF), colors.lavender)
     assertEquals(Color(0xFF3E8C80), colors.sage)
     assertEquals(Color(0xFFDDF1EE), colors.babyBlue)
     assertEquals(Color(0xFF8A7560), colors.mapLabel)
@@ -87,8 +133,8 @@ class AroundAppThemeTest {
   fun darkExtendedColorsMatchFigma() {
     val colors = extendedPalette(true)
     assertEquals(Color(0xFFFDFFE8), colors.accentText)
-    assertEquals(Color(0xFF333333), colors.paper)
-    assertEquals(Color(0xFF3F2E52), colors.cream)
+    assertEquals(Color(0xFF333333), colors.panel)
+    assertEquals(Color(0xFF3F2E52), colors.lavender)
     assertEquals(Color(0xFF62BAAD), colors.sage)
     assertEquals(Color(0xFF2F4744), colors.babyBlue)
     assertEquals(Color(0xFFC9B8A4), colors.mapLabel)
@@ -136,46 +182,36 @@ class AroundAppThemeTest {
   fun sharedTextStylesPreserveFigmaAutoLineHeights() {
     val autoStyles =
         listOf(
-            AroundTextStyles.PageTitle,
-            AroundTextStyles.OverlayTitle,
-            AroundTextStyles.AvatarLarge,
-            AroundTextStyles.AvatarSmall,
-            AroundTextStyles.FieldValue,
-            AroundTextStyles.Body,
-            AroundTextStyles.InlineBody,
-            AroundTextStyles.Caption,
-            AroundTextStyles.Small,
-            AroundTextStyles.Button,
-            AroundTextStyles.CardTitle,
-            AroundTextStyles.Subtitle,
-            AroundTextStyles.FieldLabel,
-            AroundTextStyles.Helper,
-            AroundTextStyles.Badge,
-            AroundTextStyles.Chip,
-            AroundTextStyles.FilterChip,
-            AroundTextStyles.MapLabel,
-            AroundTextStyles.MapWaterLabel,
+            Triple(AroundTextStyles.PageTitle, AroundFonts.Title, FontWeight.Bold),
+            Triple(AroundTextStyles.OverlayTitle, AroundFonts.Title, FontWeight.Bold),
+            Triple(AroundTextStyles.AvatarLarge, AroundFonts.Title, FontWeight.Bold),
+            Triple(AroundTextStyles.AvatarSmall, AroundFonts.Title, FontWeight.Bold),
+            Triple(AroundTextStyles.FieldValue, AroundFonts.Body, FontWeight.Normal),
+            Triple(AroundTextStyles.Body, AroundFonts.Body, FontWeight.Normal),
+            Triple(AroundTextStyles.InlineBody, AroundFonts.Body, FontWeight.Normal),
+            Triple(AroundTextStyles.Caption, AroundFonts.Body, FontWeight.Normal),
+            Triple(AroundTextStyles.Small, AroundFonts.Body, FontWeight.Normal),
+            Triple(AroundTextStyles.Button, AroundFonts.Body, FontWeight.SemiBold),
+            Triple(AroundTextStyles.CardTitle, AroundFonts.Body, FontWeight.SemiBold),
+            Triple(AroundTextStyles.Subtitle, AroundFonts.Body, FontWeight.SemiBold),
+            Triple(AroundTextStyles.FieldLabel, AroundFonts.Body, FontWeight.SemiBold),
+            Triple(AroundTextStyles.Helper, AroundFonts.Body, FontWeight.SemiBold),
+            Triple(AroundTextStyles.Badge, AroundFonts.Body, FontWeight.SemiBold),
+            Triple(AroundTextStyles.Chip, AroundFonts.Body, FontWeight.Medium),
+            Triple(AroundTextStyles.FilterChip, AroundFonts.Body, FontWeight.Medium),
+            Triple(AroundTextStyles.MapLabel, AroundFonts.Title, FontWeight.Medium),
+            Triple(AroundTextStyles.MapWaterLabel, AroundFonts.Title, FontWeight.Medium),
         )
-    autoStyles.forEachIndexed { index, style ->
+    autoStyles.forEach { (style, family, weight) ->
       assertEquals(TextUnit.Unspecified, style.lineHeight)
-      assertEquals(
-          if (index < 4 || index >= 17) AroundFonts.Title else AroundFonts.Body,
-          style.fontFamily,
-      )
-      val weight =
-          when {
-            index < 4 -> FontWeight.Bold
-            index < 9 -> FontWeight.Normal
-            index < 15 -> FontWeight.SemiBold
-            else -> FontWeight.Medium
-          }
+      assertEquals(family, style.fontFamily)
       assertEquals(weight, style.fontWeight)
     }
     assertEquals(
         listOf(30, 22, 20, 13, 16, 15, 14, 13, 12, 16, 17, 15, 14, 13, 12, 14, 13, 11, 13).map {
           it.sp
         },
-        autoStyles.map { it.fontSize },
+        autoStyles.map { it.first.fontSize },
     )
     assertEquals(0.sp, AroundTextStyles.OverlayTitle.letterSpacing)
     assertEquals(0.sp, AroundTextStyles.AvatarLarge.letterSpacing)
@@ -249,7 +285,8 @@ class AroundAppThemeTest {
     assertEquals(RoundedCornerShape(28.dp), AroundShapes.extraLarge)
     assertEquals(RoundedCornerShape(12.dp), AroundCorners.InsetField)
     assertEquals(RoundedCornerShape(9.dp), AroundCorners.SegmentedOption)
-    assertEquals(RoundedCornerShape(2.dp), AroundShapes.extraSmall)
+    assertEquals(RoundedCornerShape(14.dp), AroundShapes.extraSmall)
+    assertEquals(RoundedCornerShape(2.dp), AroundCorners.ProgressSegment)
     assertEquals(RoundedCornerShape(50), AroundPillShape)
     assertEquals(
         listOf(4.dp, 8.dp, 12.dp, 16.dp, 24.dp),
@@ -288,6 +325,7 @@ class AroundAppThemeTest {
         assertEquals(expected.background, actual.background)
         assertEquals(expected.surface, actual.surface)
         assertEquals(expected.onSurface, actual.onSurface)
+        assertEquals(if (darkTheme) DarkThemeColors else LightThemeColors, AroundTheme.colors)
       }
     }
   }

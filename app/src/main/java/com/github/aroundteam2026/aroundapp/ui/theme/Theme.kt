@@ -10,6 +10,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 
+/**
+ * Provides shared typography, shapes and the light or dark brand palette.
+ *
+ * Opting into dynamic colors on Android 12+ changes Material colors only. [AroundTheme.colors]
+ * continues to provide the brand palette for the selected light or dark mode.
+ */
 @Composable
 fun AroundAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
