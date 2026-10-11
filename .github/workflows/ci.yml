@@ -105,6 +105,11 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      # The runner's command-line tools (12.0) predate the pixel_9 profile, so avdmanager rejects it.
+      # When the runner has none, android-emulator-runner installs the newer ones it bundles.
+      - name: Remove the runner's outdated Android command-line tools
+        run: rm -rf "$ANDROID_HOME/cmdline-tools"
+
       # Cache the Emulator, if the cache does not hit, create the emulator
       - name: AVD cache
         uses: actions/cache@v4
