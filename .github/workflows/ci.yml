@@ -19,6 +19,14 @@ jobs:
     name: CI
     runs-on: ubuntu-latest
 
+    # The emulator the team develops on, a Pixel 10a with API 37.1, so a test means the same thing
+    # on CI as locally. The command-line tools have no pixel_10a profile; pixel_9 has the same
+    # screen (1080x2424, 420 dpi). Both emulator steps and the AVD cache key read these.
+    env:
+      AVD_API_LEVEL: "37.1"
+      AVD_TARGET: google_apis_playstore_ps16k
+      AVD_PROFILE: pixel_9
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -105,14 +113,15 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-34
+          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}
 
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
-          target: google_apis
+          api-level: ${{ env.AVD_API_LEVEL }}
+          target: ${{ env.AVD_TARGET }}
+          profile: ${{ env.AVD_PROFILE }}
           arch: x86_64
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
@@ -170,8 +179,9 @@ jobs:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
-          target: google_apis
+          api-level: ${{ env.AVD_API_LEVEL }}
+          target: ${{ env.AVD_TARGET }}
+          profile: ${{ env.AVD_PROFILE }}
           arch: x86_64
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
