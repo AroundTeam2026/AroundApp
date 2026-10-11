@@ -74,7 +74,11 @@ class NearbyQuestPagerTest {
 
   private fun rows(count: Int) = (1..count).map { row("q$it") }
 
-  private fun show(shown: List<NearbyQuest>, locationOn: Boolean = true) {
+  private fun show(
+      shown: List<NearbyQuest>,
+      locationOn: Boolean = true,
+      onClose: (() -> Unit)? = null,
+  ) {
     quests = shown
     composeTestRule.setContent {
       NearbyQuestPager(
@@ -82,9 +86,13 @@ class NearbyQuestPagerTest {
           locationOn = locationOn,
           onQuestClick = { clicked += it },
           onViewQuest = { viewed += it },
+          onClose = onClose,
       )
     }
   }
+
+  private fun close() =
+      composeTestRule.onNodeWithContentDescription(context.getString(R.string.map_nearby_close))
 
   private fun node(tag: String): SemanticsNodeInteraction =
       composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
@@ -139,6 +147,34 @@ class NearbyQuestPagerTest {
         .assertTextEquals(context.getString(R.string.map_card_party_size, 3))
     node(C.Tag.QUEST_CHIP_DISTANCE)
         .assertTextEquals(context.getString(R.string.map_card_distance_meters, "120"))
+  }
+
+  @Test
+  fun theCloseButtonClosesThePager() {
+    var closed = 0
+    show(rows(2), onClose = { closed++ })
+
+    close().performClick()
+
+    assertEquals(1, closed)
+  }
+
+  @Test
+  fun withNothingToCloseThereIsNoCloseButton() {
+    show(rows(2))
+
+    close().assertDoesNotExist()
+  }
+
+  @Test
+  fun anEmptyPagerCanStillBeClosed() {
+    // The empty state has its own header, so the button must be there too
+    var closed = 0
+    show(emptyList(), onClose = { closed++ })
+
+    close().performClick()
+
+    assertEquals(1, closed)
   }
 
   @Test

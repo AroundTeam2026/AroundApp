@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -54,6 +55,7 @@ private val LINE_SPACING = 3.dp
 private val TITLE_SPACING = 2.dp
 private val BUTTON_HEIGHT = 52.dp
 private val CHEVRON_SIZE = 20.dp
+private val CLOSE_SIZE = 36.dp
 private val DOT_SIZE = 6.dp
 private val SHOWN_DOT_WIDTH = 18.dp
 
@@ -76,6 +78,7 @@ private val SHOWN_DOT_WIDTH = 18.dp
  * @param onQuestClick Called with a page's quest when the explorer taps the page.
  * @param onViewQuest Called with the shown quest when the explorer taps "View quest".
  * @param style How the pages look; by default, as in Figma, in the theme's colours.
+ * @param onClose Called when the explorer taps the close button, which shows only when given.
  */
 @Composable
 fun NearbyQuestPager(
@@ -85,10 +88,11 @@ fun NearbyQuestPager(
     onViewQuest: (NearbyQuest) -> Unit,
     modifier: Modifier = Modifier,
     style: MarkerStyle = NearbyQuestPagerDefaults.style(),
+    onClose: (() -> Unit)? = null,
 ) {
   Column(modifier, verticalArrangement = Arrangement.spacedBy(AroundSpacing.SectionGap)) {
     if (quests.isEmpty()) {
-      Title()
+      Header(counter = null, onClose)
       LocationHint(locationOn)
       Text(
           stringResource(R.string.map_nearby_empty),
@@ -97,7 +101,7 @@ fun NearbyQuestPager(
           style = AroundTextStyles.BodyMedium,
       )
     } else {
-      Pages(quests, locationOn, onQuestClick, onViewQuest, style)
+      Pages(quests, locationOn, onQuestClick, onViewQuest, style, onClose)
     }
   }
 }
@@ -143,14 +147,40 @@ object NearbyQuestPagerDefaults {
   }
 }
 
-/** "Nearby quests". */
+/**
+ * "Nearby quests" over [counter] when there is one, and the close button when [onClose] is given.
+ */
 @Composable
-private fun Title() {
-  Text(
-      stringResource(R.string.map_nearby_title),
-      color = MaterialTheme.colorScheme.onSurface,
-      style = AroundTextStyles.OverlayTitle,
-  )
+private fun Header(counter: String?, onClose: (() -> Unit)?) {
+  Row(
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TITLE_SPACING)) {
+      Text(
+          stringResource(R.string.map_nearby_title),
+          color = MaterialTheme.colorScheme.onSurface,
+          style = AroundTextStyles.OverlayTitle,
+      )
+      counter?.let {
+        Text(
+            it,
+            Modifier.testTag(C.Tag.NEARBY_COUNTER),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AroundTextStyles.Caption,
+        )
+      }
+    }
+    onClose?.let {
+      RoundButton(
+          R.drawable.ic_close,
+          R.string.map_nearby_close,
+          CLOSE_SIZE,
+          CLOSE_SIZE,
+          onClick = it,
+      )
+    }
+  }
 }
 
 /**
@@ -164,20 +194,13 @@ private fun Pages(
     onQuestClick: (NearbyQuest) -> Unit,
     onViewQuest: (NearbyQuest) -> Unit,
     style: MarkerStyle,
+    onClose: (() -> Unit)?,
 ) {
   val pagerState = rememberPagerState { quests.size }
   // For a frame after the list shrinks, the pager's page can still be past its end
   val shown = pagerState.currentPage.coerceAtMost(quests.lastIndex)
   val order = if (locationOn) R.string.map_nearby_closest_first else R.string.map_nearby_by_name
-  Column(verticalArrangement = Arrangement.spacedBy(TITLE_SPACING)) {
-    Title()
-    Text(
-        stringResource(order, shown + 1, quests.size),
-        Modifier.testTag(C.Tag.NEARBY_COUNTER),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = AroundTextStyles.Caption,
-    )
-  }
+  Header(stringResource(order, shown + 1, quests.size), onClose)
   LocationHint(locationOn)
   // Keyed by quest, so the shown quest keeps its page when others come and go
   HorizontalPager(
@@ -285,7 +308,15 @@ private fun Navigation(pagerState: PagerState, onView: () -> Unit) {
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    Arrow(R.drawable.ic_chevron_left, R.string.map_nearby_previous, count > 1) { pageBy(-1) }
+    RoundButton(
+        R.drawable.ic_chevron_left,
+        R.string.map_nearby_previous,
+        BUTTON_HEIGHT,
+        CHEVRON_SIZE,
+        enabled = count > 1,
+    ) {
+      pageBy(-1)
+    }
     Button(
         onView,
         Modifier.testTag(C.Tag.NEARBY_VIEW).weight(1f).height(BUTTON_HEIGHT),
@@ -293,17 +324,35 @@ private fun Navigation(pagerState: PagerState, onView: () -> Unit) {
     ) {
       Text(stringResource(R.string.map_nearby_view), style = AroundTextStyles.Button)
     }
-    Arrow(R.drawable.ic_chevron_right, R.string.map_nearby_next, count > 1) { pageBy(1) }
+    RoundButton(
+        R.drawable.ic_chevron_right,
+        R.string.map_nearby_next,
+        BUTTON_HEIGHT,
+        CHEVRON_SIZE,
+        enabled = count > 1,
+    ) {
+      pageBy(1)
+    }
   }
 }
 
-/** A round, outlined arrow button showing [icon], which screen readers announce as [label]. */
+/**
+ * A round, outlined [size] button showing [icon] at [iconSize], which screen readers announce as
+ * [label]: the arrows and the close button.
+ */
 @Composable
-private fun Arrow(icon: Int, label: Int, enabled: Boolean, onClick: () -> Unit) {
+private fun RoundButton(
+    icon: Int,
+    label: Int,
+    size: Dp,
+    iconSize: Dp,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
   val colors = MaterialTheme.colorScheme
   OutlinedIconButton(
       onClick,
-      Modifier.size(BUTTON_HEIGHT),
+      Modifier.size(size),
       enabled = enabled,
       shape = CircleShape,
       colors =
@@ -313,7 +362,7 @@ private fun Arrow(icon: Int, label: Int, enabled: Boolean, onClick: () -> Unit) 
           ),
       border = BorderStroke(1.dp, colors.outline),
   ) {
-    Icon(painterResource(icon), stringResource(label), Modifier.size(CHEVRON_SIZE))
+    Icon(painterResource(icon), stringResource(label), Modifier.size(iconSize))
   }
 }
 

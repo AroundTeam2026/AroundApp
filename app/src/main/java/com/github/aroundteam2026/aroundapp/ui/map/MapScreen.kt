@@ -1,13 +1,16 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
@@ -15,6 +18,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.ComposeMapColorScheme
@@ -29,6 +33,9 @@ import com.google.maps.android.compose.MapUiSettings
  *
  * It marks each venue on screen that has valid quests with a pin. Tapping a pin opens it into a
  * card, tapping the card opens the venue's page, and tapping the map closes the card.
+ *
+ * A "Nearby quests" pill opens the quests near the explorer over the map, in place of itself. Back
+ * closes them before it leaves the map, and so does opening a card, which they would hide.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
@@ -61,7 +68,7 @@ fun MapScreen(
                 isMyLocationEnabled = state.showsUserLocation,
                 mapStyleOptions = mapStyle,
             ),
-        uiSettings = MapUiSettings(myLocationButtonEnabled = state.showsUserLocation),
+        uiSettings = mapUiSettings(state.showsUserLocation),
         // Whatever the style leaves uncoloured follows the theme too, where the device's Maps
         // renderer has dark colours; it uses the light ones unless told otherwise
         mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
@@ -83,5 +90,27 @@ fun MapScreen(
           onCardClick = { onOpenVenue(it.venueId, it.venueName) },
       )
     }
+    if (state.showsNearby) {
+      NearbyQuestOverlay(
+          state.nearby,
+          locationOn = state.showsUserLocation,
+          onClose = viewModel::onNearbyClose,
+          modifier = Modifier.align(Alignment.BottomCenter),
+      )
+    } else {
+      NearbyQuestsButton(
+          viewModel::onNearbyOpen,
+          Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Large),
+      )
+    }
   }
+  BackHandler(enabled = state.showsNearby, onBack = viewModel::onNearbyClose)
 }
+
+/**
+ * The map's own buttons: the my-location one only with [showsUserLocation], which needs the
+ * permission, and no zoom buttons, which would sit under the "Nearby quests" pill. Pinching and
+ * double-tapping still zoom.
+ */
+internal fun mapUiSettings(showsUserLocation: Boolean) =
+    MapUiSettings(myLocationButtonEnabled = showsUserLocation, zoomControlsEnabled = false)
