@@ -125,14 +125,14 @@ class QuestCardTest {
   fun showsTheRewardAsAChip() {
     show(pin(reward = Reward("Free coffee", terms = null, expiresAt = null)))
 
-    node(C.Tag.QUEST_CARD_REWARD).assertTextEquals("Free coffee")
+    node(C.Tag.QUEST_CHIP_REWARD).assertTextEquals("Free coffee")
   }
 
   @Test
   fun aQuestWithoutARewardHasNoRewardChip() {
     show(pin(reward = null))
 
-    node(C.Tag.QUEST_CARD_REWARD).assertDoesNotExist()
+    node(C.Tag.QUEST_CHIP_REWARD).assertDoesNotExist()
   }
 
   @Test
@@ -141,14 +141,14 @@ class QuestCardTest {
 
     val text = context.getString(R.string.map_card_party_size, 6)
     assertTrue("$text doesn't give the size", text.contains("6"))
-    node(C.Tag.QUEST_CARD_PARTY).assertTextEquals(text)
+    node(C.Tag.QUEST_CHIP_PARTY).assertTextEquals(text)
   }
 
   @Test
   fun aPartyOfTwoIsAlreadyAGroup() {
     show(pin(minPartySize = 2))
 
-    node(C.Tag.QUEST_CARD_PARTY)
+    node(C.Tag.QUEST_CHIP_PARTY)
         .assertTextEquals(context.getString(R.string.map_card_party_size, 2))
   }
 
@@ -156,7 +156,7 @@ class QuestCardTest {
   fun aSoloQuestHasNoPartyChip() {
     show(pin(minPartySize = 1))
 
-    node(C.Tag.QUEST_CARD_PARTY).assertDoesNotExist()
+    node(C.Tag.QUEST_CHIP_PARTY).assertDoesNotExist()
   }
 
   @Test
@@ -164,7 +164,7 @@ class QuestCardTest {
     show(pin(distanceMeters = 1_234.0))
 
     // Robolectric runs in English
-    node(C.Tag.QUEST_CARD_DISTANCE)
+    node(C.Tag.QUEST_CHIP_DISTANCE)
         .assertTextEquals(context.getString(R.string.map_card_distance_kilometers, "1.2"))
   }
 
@@ -172,7 +172,7 @@ class QuestCardTest {
   fun saysShortDistancesInMetres() {
     show(pin(distanceMeters = 347.0))
 
-    node(C.Tag.QUEST_CARD_DISTANCE)
+    node(C.Tag.QUEST_CHIP_DISTANCE)
         .assertTextEquals(context.getString(R.string.map_card_distance_meters, "350"))
   }
 
@@ -181,7 +181,22 @@ class QuestCardTest {
     // The explorer's position is unknown without the permission
     show(pin(distanceMeters = null))
 
-    node(C.Tag.QUEST_CARD_DISTANCE).assertDoesNotExist()
+    node(C.Tag.QUEST_CHIP_DISTANCE).assertDoesNotExist()
+  }
+
+  @Test
+  fun aQuestWithNothingToChipHasNoChipRow() {
+    // An empty row would still take the gap between the card's lines, under the venue's name
+    show(pin(reward = null, minPartySize = 1, distanceMeters = null))
+
+    node(C.Tag.QUEST_CHIPS).assertDoesNotExist()
+  }
+
+  @Test
+  fun anyOneChipMakesTheRow() {
+    show(pin(reward = null, minPartySize = 1, distanceMeters = 300.0))
+
+    node(C.Tag.QUEST_CHIPS).assertExists()
   }
 
   @Test
@@ -189,9 +204,9 @@ class QuestCardTest {
     show(pin(minPartySize = 2, distanceMeters = 300.0))
 
     val venue = bounds(C.Tag.QUEST_CARD_VENUE)
-    val reward = bounds(C.Tag.QUEST_CARD_REWARD)
-    val party = bounds(C.Tag.QUEST_CARD_PARTY)
-    val distance = bounds(C.Tag.QUEST_CARD_DISTANCE)
+    val reward = bounds(C.Tag.QUEST_CHIP_REWARD)
+    val party = bounds(C.Tag.QUEST_CHIP_PARTY)
+    val distance = bounds(C.Tag.QUEST_CHIP_DISTANCE)
     assertTrue("The chips aren't under the venue", reward.top >= venue.bottom)
     assertDpEquals("party beside reward", reward.top, party.top)
     assertTrue("Chips overlap", party.left >= reward.right && distance.left >= party.right)
@@ -209,7 +224,7 @@ class QuestCardTest {
 
     node(C.Tag.QUEST_CARD).assertWidthIsEqualTo(MarkerDefaults.dimensions.cardWidth)
     val card = bounds(C.Tag.QUEST_CARD_BODY)
-    listOf(C.Tag.QUEST_CARD_REWARD, C.Tag.QUEST_CARD_PARTY, C.Tag.QUEST_CARD_DISTANCE).forEach {
+    listOf(C.Tag.QUEST_CHIP_REWARD, C.Tag.QUEST_CHIP_PARTY, C.Tag.QUEST_CHIP_DISTANCE).forEach {
       node(it).assertIsDisplayed()
       assertTrue("$it sticks out of the card", bounds(it).right <= card.right)
     }

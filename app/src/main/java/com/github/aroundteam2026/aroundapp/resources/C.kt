@@ -55,9 +55,10 @@ object C {
     const val QUEST_CARD_AVATAR = "quest_card_avatar"
     const val QUEST_CARD_VENUE = "quest_card_venue"
     const val QUEST_CARD_TITLE = "quest_card_title"
-    const val QUEST_CARD_REWARD = "quest_card_reward"
-    const val QUEST_CARD_PARTY = "quest_card_party"
-    const val QUEST_CARD_DISTANCE = "quest_card_distance"
+    const val QUEST_CHIPS = "quest_chips"
+    const val QUEST_CHIP_REWARD = "quest_chip_reward"
+    const val QUEST_CHIP_PARTY = "quest_chip_party"
+    const val QUEST_CHIP_DISTANCE = "quest_chip_distance"
     const val QUEST_CARD_MORE = "quest_card_more"
   }
 }
