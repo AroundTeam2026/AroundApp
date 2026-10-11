@@ -35,7 +35,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.map.marker.TestAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.TestAvatar
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -119,7 +119,7 @@ class NearbyQuestPagerTest {
                 "fox",
                 title = "Find the hidden fox",
                 venueName = "Café Lumen",
-                reward = Reward("Free coffee", terms = null, expiresAt = null),
+                reward = Reward.Other("Free coffee"),
                 minPartySize = 3,
                 distanceMeters = 120.0,
             )

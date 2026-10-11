@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-package com.github.aroundteam2026.aroundapp.ui.map.marker
+package com.github.aroundteam2026.aroundapp.ui.quest
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon
@@ -17,8 +17,8 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import java.util.Locale
 
 /**
- * What a venue's pin and card show for it. Each kind draws itself, so adding one, such as an image
- * the venue uploads, needs no change to the pin or the card.
+ * What a venue's pin, card and nearby page show for it. Each kind draws itself, so adding one, such
+ * as an image the venue uploads, needs no change to them.
  *
  * Implementations must be immutable with a meaningful `equals`: the map redraws a marker only when
  * its avatar stops being equal.
@@ -28,7 +28,10 @@ interface VenueAvatar {
   /** Draws the avatar to fill [modifier]; [tint] is the colour for single-colour avatars. */
   @Composable fun Content(tint: Color, modifier: Modifier)
 
-  /** A venue's [initials] in the current text style, as the card shows until venues have images. */
+  /**
+   * A venue's [initials] in the current text style, as the card and the pager show until venues
+   * have images.
+   */
   data class Initials(val initials: String) : VenueAvatar {
     @Composable
     override fun Content(tint: Color, modifier: Modifier) {

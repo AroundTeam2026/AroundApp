@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
 /**
  * A venue's closed marker: [icon] on a light circle in a ring, whose pointer's tip, at the bottom

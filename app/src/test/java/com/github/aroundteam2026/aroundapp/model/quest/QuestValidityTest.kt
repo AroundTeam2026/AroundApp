@@ -16,7 +16,7 @@ class QuestValidityTest {
 
   @Test
   fun anActiveQuestWithARewardThatNeverExpiresIsValid() {
-    assertTrue(testQuest(reward = Reward("Free coffee", null, expiresAt = null)).isValidAt(now))
+    assertTrue(testQuest(reward = Reward.Other("Free coffee", expiresAt = null)).isValidAt(now))
   }
 
   @Test
@@ -50,7 +50,7 @@ class QuestValidityTest {
         listOf(
             testQuest(id = "later", reward = rewardExpiringAt(now + 500)),
             testQuest(id = "sooner", reward = rewardExpiringAt(now + 100)),
-            testQuest(id = "never", reward = Reward("Free coffee", null, null)),
+            testQuest(id = "never", reward = Reward.Other("Free coffee")),
             testQuest(id = "none", reward = null),
         )
 
@@ -83,7 +83,7 @@ class QuestValidityTest {
 
   @Test
   fun thereIsNoNextChangeWhenNoRewardWillExpire() {
-    val quests = listOf(testQuest(reward = null), testQuest(reward = Reward("Coffee", null, null)))
+    val quests = listOf(testQuest(reward = null), testQuest(reward = Reward.Other("Coffee")))
 
     assertNull(quests.nextExpiryAfter(now))
     assertNull(emptyList<Quest>().nextExpiryAfter(now))

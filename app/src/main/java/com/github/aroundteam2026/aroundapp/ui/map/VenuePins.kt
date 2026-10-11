@@ -6,8 +6,8 @@ import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
-import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
-import com.github.aroundteam2026.aroundapp.ui.map.marker.initialsOf
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 
 /**
  * A venue's marker on the map: a pin that opens into a card showing one of its quests.

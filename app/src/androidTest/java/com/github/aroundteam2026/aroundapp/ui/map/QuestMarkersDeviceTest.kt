@@ -258,7 +258,7 @@ class QuestMarkersDeviceTest {
           description = "Description",
           requirements = "Requirements",
           proofType = ProofType.PHOTO,
-          reward = Reward("Free coffee", terms = null, expiresAt = null),
+          reward = Reward.Other("Free coffee"),
           status = QuestStatus.ACTIVE,
           createdAt = 1_000L,
           updatedAt = 1_000L,

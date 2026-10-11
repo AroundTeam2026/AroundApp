@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-package com.github.aroundteam2026.aroundapp.ui.map.marker
+package com.github.aroundteam2026.aroundapp.ui.quest
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -10,11 +10,11 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import java.util.Locale
@@ -29,63 +29,50 @@ fun QuestChips(
     reward: Reward?,
     minPartySize: Int,
     distanceMeters: Double?,
+    style: QuestChipStyle,
     modifier: Modifier = Modifier,
-    style: MarkerStyle = MarkerDefaults.style(),
 ) {
   val partySize = minPartySize.takeIf { it > 1 }
   if (reward == null && partySize == null && distanceMeters == null) return
-  val colors = style.colors
-  val spacing = Arrangement.spacedBy(style.dimensions.chipSpacing)
+  val spacing = Arrangement.spacedBy(style.spacing)
   FlowRow(
       modifier.testTag(C.Tag.QUEST_CHIPS),
       horizontalArrangement = spacing,
       verticalArrangement = spacing,
   ) {
-    reward?.let {
-      Chip(it.description, C.Tag.QUEST_CHIP_REWARD, colors.accent, colors.onAccent, style)
-    }
+    reward?.let { Chip(rewardText(it), C.Tag.QUEST_CHIP_REWARD, style.reward, style) }
     partySize?.let {
       Chip(
           stringResource(R.string.map_card_party_size, it),
           C.Tag.QUEST_CHIP_PARTY,
-          colors.surface,
-          colors.onSurface,
+          style.party,
           style,
-          BorderStroke(style.dimensions.outlineWidth, colors.outline),
       )
     }
     distanceMeters?.let {
       Chip(
           distanceText(it),
           C.Tag.QUEST_CHIP_DISTANCE,
-          colors.secondary,
-          colors.onSecondary,
+          style.distance,
           style,
       )
     }
   }
 }
 
-/** A one-line pill of [text] on [container], with an optional [border]. */
+/** A one-line chip of [text] in [colors], ringed when they have an outline. */
 @Composable
-private fun Chip(
-    text: String,
-    tag: String,
-    container: Color,
-    content: Color,
-    style: MarkerStyle,
-    border: BorderStroke? = null,
-) {
-  val dimensions = style.dimensions
+private fun Chip(text: String, tag: String, colors: ChipColors, style: QuestChipStyle) {
   Box(
-      Modifier.background(container, style.chipShape)
-          .then(border?.let { Modifier.border(it, style.chipShape) } ?: Modifier)
-          .padding(
-              horizontal = dimensions.chipHorizontalPadding,
-              vertical = dimensions.chipVerticalPadding,
+      Modifier.background(colors.container, style.shape)
+          .then(
+              colors.outline?.let {
+                Modifier.border(BorderStroke(style.outlineWidth, it), style.shape)
+              } ?: Modifier
           )
+          .padding(horizontal = style.horizontalPadding, vertical = style.verticalPadding)
   ) {
-    CardLine(text, tag, style.typography.chip, content)
+    QuestLine(text, tag, style.textStyle, colors.content)
   }
 }
 
@@ -106,3 +93,18 @@ private fun distanceText(meters: Double): String {
 
 /** The app's language, which decides the distance's decimal separator; recomposes if it changes. */
 @Composable private fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
+
+/** What a [reward] chip says, e.g. "10% off", "CHF 5 off" or "Free coffee". */
+@Composable
+private fun rewardText(reward: Reward): String =
+    when (reward) {
+      is Reward.Discount -> {
+        val amount = formatRewardAmount(reward.amount, reward.unit, currentLocale())
+        when (reward.unit) {
+          DiscountUnit.PERCENT -> stringResource(R.string.map_card_reward_percent_off, amount)
+          DiscountUnit.CHF -> stringResource(R.string.map_card_reward_chf_off, amount)
+        }
+      }
+      is Reward.FreeItem -> stringResource(R.string.map_card_reward_free_item, reward.name)
+      is Reward.Other -> reward.description
+    }
