@@ -70,7 +70,15 @@ class VenueAreaScreenDeviceTest {
 
   /** Shows the screen and waits until it framed the device, as it does when opened. */
   private fun show() {
-    composeTestRule.setContent { VenueAreaScreen("venue", viewModel, camera) }
+    composeTestRule.setContent {
+      VenueAreaScreen(
+          "venue",
+          onSaved = {},
+          onBack = {},
+          viewModel = viewModel,
+          cameraPositionState = camera,
+      )
+    }
     awaitCameraAt(here)
   }
 

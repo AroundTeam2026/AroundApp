@@ -84,7 +84,9 @@ class VenueAreaScreenTest {
   private val drops = mutableListOf<Location>()
 
   private fun show() {
-    composeTestRule.setContent { VenueAreaScreen("venue", viewModel) }
+    composeTestRule.setContent {
+      VenueAreaScreen("venue", onSaved = {}, onBack = {}, viewModel = viewModel)
+    }
     composeTestRule.waitForIdle()
   }
 
@@ -226,7 +228,7 @@ class VenueAreaScreenTest {
     shadowOf(ApplicationProvider.getApplicationContext<Application>())
         .grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
 
-    composeTestRule.setContent { VenueAreaScreen("venue") }
+    composeTestRule.setContent { VenueAreaScreen("venue", onSaved = {}, onBack = {}) }
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).assertIsDisplayed()
   }

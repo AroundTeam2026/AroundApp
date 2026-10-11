@@ -11,14 +11,19 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -36,7 +41,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntSize
@@ -69,18 +76,30 @@ import kotlinx.coroutines.flow.filter
  * Where a venue places its marker, by tapping the map, dragging the marker or searching its
  * address, and sets the radius in which a visit counts. It asks for the location permission once
  * per visit; with it, the map shows the device's position and frames it. It opens on the venue's
- * saved marker and radius.
+ * saved marker and radius, and "Save location" saves them.
  *
  * @param venueId Id of the venue whose area this edits.
+ * @param onSaved Called once each time the area is saved; the caller decides what follows.
+ * @param onBack Called when the venue presses the back arrow.
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  */
 @Composable
 fun VenueAreaScreen(
     venueId: String,
+    onSaved: () -> Unit,
+    onBack: () -> Unit,
     viewModel: VenueAreaViewModel = viewModel(factory = VenueAreaViewModel.factory(venueId)),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
 ) {
   val state by viewModel.uiState.collectAsState()
+  // The effect below outlives a composition; this keeps it calling the latest callback
+  val currentOnSaved by rememberUpdatedState(onSaved)
+  LaunchedEffect(state.isSaved) {
+    if (state.isSaved) {
+      currentOnSaved()
+      viewModel.onSaveHandled()
+    }
+  }
   RequestLocationPermission(viewModel::onLocationPermissionResult)
   val focusManager = LocalFocusManager.current
 
@@ -106,7 +125,12 @@ fun VenueAreaScreen(
           )
         }
       }
-      RadiusPanel(state.radiusMeters, viewModel::onRadiusChanged)
+      AreaPanel(
+          state = state,
+          onRadiusChanged = viewModel::onRadiusChanged,
+          onSave = viewModel::onSave,
+          onBack = onBack,
+      )
     }
     // Over the whole screen and above the keyboard, so the suggestions scroll rather than hide
     // behind it. Taps beside the bar reach the map.
@@ -240,15 +264,35 @@ internal suspend fun reportDrops(
       .collect { onDropped(position().toLocation()) }
 }
 
-/** The title, then the visit radius with its value, above a slider bounded by [VenueLimits]. */
+/**
+ * The back arrow and the title, then the visit radius with its value, above a slider bounded by
+ * [VenueLimits], and "Save location" with the error of a failed save.
+ */
 @Composable
-private fun RadiusPanel(radiusMeters: Int, onRadiusChanged: (Int) -> Unit) {
+private fun AreaPanel(
+    state: VenueAreaUiState,
+    onRadiusChanged: (Int) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+) {
+  val radiusMeters = state.radiusMeters
   Surface(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), shadowElevation = 8.dp) {
     Column(Modifier.fillMaxWidth().padding(24.dp)) {
-      Text(
-          stringResource(R.string.venue_area_title),
-          style = MaterialTheme.typography.headlineSmall,
-      )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.padding(end = 4.dp).testTag(C.Tag.VENUE_AREA_BACK),
+        ) {
+          Icon(
+              painterResource(R.drawable.venue_setup_back),
+              contentDescription = stringResource(R.string.venue_area_back),
+          )
+        }
+        Text(
+            stringResource(R.string.venue_area_title),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+      }
       Text(
           stringResource(R.string.venue_area_hint),
           style = MaterialTheme.typography.bodyMedium,
@@ -287,6 +331,43 @@ private fun RadiusPanel(radiusMeters: Int, onRadiusChanged: (Int) -> Unit) {
           )
         }
       }
+      if (state.saveFailed) {
+        Text(
+            stringResource(R.string.venue_area_save_failed),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium,
+            // TalkBack reads it out as it appears
+            modifier =
+                Modifier.padding(top = 16.dp).testTag(C.Tag.VENUE_AREA_SAVE_ERROR).semantics {
+                  liveRegion = LiveRegionMode.Polite
+                },
+        )
+      }
+      Spacer(Modifier.height(16.dp))
+      SaveButton(isSaving = state.isSaving, enabled = state.canSave, onClick = onSave)
+    }
+  }
+}
+
+/** "Save location", or a spinner while saving. */
+@Composable
+private fun SaveButton(isSaving: Boolean, enabled: Boolean, onClick: () -> Unit) {
+  Button(
+      onClick = onClick,
+      enabled = enabled,
+      modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(C.Tag.VENUE_AREA_SAVE),
+  ) {
+    if (isSaving) {
+      val saving = stringResource(R.string.venue_area_saving)
+      CircularProgressIndicator(
+          modifier =
+              Modifier.size(20.dp).testTag(C.Tag.VENUE_AREA_SAVE_PROGRESS).semantics {
+                contentDescription = saving
+              },
+          strokeWidth = 2.dp,
+      )
+    } else {
+      Text(stringResource(R.string.venue_area_save))
     }
   }
 }
