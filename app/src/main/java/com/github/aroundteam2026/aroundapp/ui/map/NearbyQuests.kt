@@ -8,14 +8,16 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
+import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
 import java.text.Collator
 import java.util.Locale
 
 /**
- * A row of the list of quests near the explorer: one valid quest and its venue.
+ * A quest near the explorer, as the nearby quest pager shows it: one valid quest and its venue.
  *
  * @property venueId Id of the quest's venue.
  * @property venueName The venue's name.
+ * @property avatar What the pager shows for the venue.
  * @property questId Id of the quest.
  * @property title The quest's title.
  * @property reward The quest's reward, or null when it has none.
@@ -26,6 +28,7 @@ import java.util.Locale
 data class NearbyQuest(
     val venueId: String,
     val venueName: String,
+    val avatar: VenueAvatar,
     val questId: String,
     val title: String,
     val reward: Reward?,
@@ -38,7 +41,7 @@ data class NearbyQuest(
  *
  * Each row shows its venue as the venue's pin does (see [shownVenue]): its name and location from
  * [venues] when known there, else from the venue's featured quest, so every quest of a venue gets
- * the same name and distance.
+ * the same name, avatar and distance.
  *
  * With the explorer's position [from], it lists the quests within [NEARBY_RADIUS_METERS] of it,
  * nearest first. Without it, there is nothing to measure from: it lists every valid quest, by venue
@@ -49,6 +52,8 @@ data class NearbyQuest(
  * @param venues The known venues, by id; venues missing from it are drawn from their quests.
  * @param from The explorer's position, or null when unknown.
  * @param locale The language whose rules sort venue names when [from] is unknown.
+ * @param avatarOf What the pager shows for a venue, given its record when known and its name, as
+ *   for its pin.
  */
 fun nearbyQuests(
     quests: List<Quest>,
@@ -56,19 +61,23 @@ fun nearbyQuests(
     now: Long,
     from: Location?,
     locale: Locale = Locale.getDefault(),
+    avatarOf: (Venue?, venueName: String) -> VenueAvatar = INITIALS_AVATAR,
 ): List<NearbyQuest> {
   val rows =
       quests
           .filter { it.isValidAt(now) }
           .groupBy { it.venueId }
           .flatMap { (venueId, own) ->
-            val shown = shownVenue(own, venues[venueId])
+            val venue = venues[venueId]
+            val shown = shownVenue(own, venue)
             val distance = from?.distanceTo(shown.location)
             if (distance != null && distance > NEARBY_RADIUS_METERS) return@flatMap emptyList()
+            val avatar = avatarOf(venue, shown.name)
             own.sortedWith(NEWEST_FIRST).map { quest ->
               NearbyQuest(
                   venueId = venueId,
                   venueName = shown.name,
+                  avatar = avatar,
                   questId = quest.id,
                   title = quest.title,
                   reward = quest.reward,

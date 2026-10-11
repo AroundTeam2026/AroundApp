@@ -54,9 +54,7 @@ fun buildVenuePins(
     now: Long,
     from: Location? = null,
     iconOf: (Venue?) -> VenueAvatar = { VenueAvatar.QuestFlag },
-    avatarOf: (Venue?, venueName: String) -> VenueAvatar = { _, name ->
-      VenueAvatar.Initials(initialsOf(name))
-    },
+    avatarOf: (Venue?, venueName: String) -> VenueAvatar = INITIALS_AVATAR,
 ): List<VenuePin> =
     quests
         .filter { it.isValidAt(now) }
@@ -77,6 +75,14 @@ fun buildVenuePins(
               areaRadiusMeters = venue?.radiusMeters ?: shown.featured.radiusMeters,
           )
         }
+
+/**
+ * What the map shows for a venue until venues have images: its name's initials. The pins and the
+ * nearby pager both default to it, so a venue looks the same in both.
+ */
+internal val INITIALS_AVATAR: (Venue?, venueName: String) -> VenueAvatar = { _, name ->
+  VenueAvatar.Initials(initialsOf(name))
+}
 
 /** Newest first, ties going to the smallest id, so the order never depends on the repository's. */
 internal val NEWEST_FIRST: Comparator<Quest> =

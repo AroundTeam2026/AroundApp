@@ -12,6 +12,8 @@ import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel.Companion.NEARBY_RADIUS_METERS
+import com.github.aroundteam2026.aroundapp.ui.map.marker.TestAvatar
+import com.github.aroundteam2026.aroundapp.ui.map.marker.VenueAvatar
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -78,6 +80,59 @@ class NearbyQuestsTest {
     assertEquals(Reward("Free coffee", terms = "One per visit", expiresAt = null), row.reward)
     assertEquals(3, row.minPartySize)
     assertEquals(300.0, row.distanceMeters!!, 0.01)
+  }
+
+  @Test
+  fun aRowShowsItsVenuesInitialsByDefault() {
+    val row = nearby(listOf(questAt(300.0, venueName = "Café Lumen"))).single()
+
+    assertEquals(VenueAvatar.Initials("CL"), row.avatar)
+  }
+
+  @Test
+  fun eachRowGetsTheAvatarChosenForItsVenue() {
+    // Where venue images plug in later, as for the pins
+    val cafe = testVenue(id = "cafe", name = "Café Lumen", location = north(100.0))
+    val asked = mutableListOf<Pair<Venue?, String>>()
+    val quests =
+        listOf(
+            questAt(100.0, id = "coffee", venueId = "cafe", venueName = "Old name"),
+            questAt(200.0, id = "cocktail", venueId = "bar", venueName = "Bar Nocturne"),
+        )
+
+    val rows =
+        nearbyQuests(
+                quests,
+                mapOf("cafe" to cafe),
+                now,
+                here,
+                avatarOf = { venue, name ->
+                  asked += venue to name
+                  TestAvatar(name)
+                },
+            )
+            .associateBy { it.questId }
+
+    assertEquals(setOf(cafe to "Café Lumen", null to "Bar Nocturne"), asked.toSet())
+    assertEquals(TestAvatar("Café Lumen"), rows.getValue("coffee").avatar)
+    assertEquals(TestAvatar("Bar Nocturne"), rows.getValue("cocktail").avatar)
+  }
+
+  @Test
+  fun everyQuestOfAVenueGetsTheSameAvatar() {
+    // Without the record, each quest's copy of the name may differ; the featured one's wins
+    val quests =
+        listOf(
+            questAt(300.0, id = "new", venueId = "bar", venueName = "Bar Nocturne", createdAt = 2),
+            questAt(300.0, id = "old", venueId = "bar", venueName = "Nocturne", createdAt = 1),
+        )
+
+    val rows = nearby(quests)
+
+    assertEquals(
+        listOf(VenueAvatar.Initials("BN"), VenueAvatar.Initials("BN")),
+        rows.map { it.avatar },
+    )
   }
 
   @Test
