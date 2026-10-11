@@ -5,6 +5,7 @@ import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -23,6 +24,8 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
@@ -34,6 +37,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -54,27 +58,30 @@ class VenueAreaScreenDeviceTest {
   private val here = Location(47.3769, 8.5417)
   private val elsewhere = Location(47.45, 8.70)
 
-  private val viewModel =
-      VenueAreaViewModel(
-          "venue",
-          FakeVenueRepository(),
-          object : LocationRepository {
-            override suspend fun currentLocation() = here
-          },
-          object : AddressSearchRepository {
-            override suspend fun search(query: String, near: GeoBounds?) =
-                AddressSearchResult.Found(listOf(AddressSuggestion("Seefeldstrasse 1", null, here)))
-          },
-      )
+  private val locations =
+      object : LocationRepository {
+        override suspend fun currentLocation() = here
+      }
+  private val addresses =
+      object : AddressSearchRepository {
+        override suspend fun search(query: String, near: GeoBounds?) =
+            AddressSearchResult.Found(listOf(AddressSuggestion("Seefeldstrasse 1", null, here)))
+      }
+
+  // A venue that hasn't placed its marker yet
+  private val venues = FakeVenueRepository(listOf(venue(id = "venue", location = null)))
+  private val viewModel = VenueAreaViewModel("venue", venues, locations, addresses)
   private val camera = CameraPositionState()
+  private var saves = 0
+  private var backs = 0
 
   /** Shows the screen and waits until it framed the device, as it does when opened. */
   private fun show() {
     composeTestRule.setContent {
       VenueAreaScreen(
           "venue",
-          onSaved = {},
-          onBack = {},
+          onSaved = { saves++ },
+          onBack = { backs++ },
           viewModel = viewModel,
           cameraPositionState = camera,
       )
@@ -185,6 +192,63 @@ class VenueAreaScreenDeviceTest {
     assertFalse("zoom buttons", composeTestRule.runOnUiThread { settings.isZoomControlsEnabled })
     assertFalse("map toolbar", composeTestRule.runOnUiThread { settings.isMapToolbarEnabled })
   }
+
+  @Test
+  fun opensOnTheSavedMarkerAndRadiusFramingThem() {
+    val saved = venue(id = "saved", location = elsewhere, radiusMeters = 120)
+    val viewModel =
+        VenueAreaViewModel("saved", FakeVenueRepository(listOf(saved)), locations, addresses)
+
+    composeTestRule.setContent {
+      VenueAreaScreen(
+          "saved",
+          onSaved = {},
+          onBack = {},
+          viewModel = viewModel,
+          cameraPositionState = camera,
+      )
+    }
+
+    // The saved marker, not the device, is framed
+    awaitCameraAt(elsewhere)
+    assertEquals(elsewhere, viewModel.uiState.value.marker)
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("120 m")
+  }
+
+  @Test
+  fun savingWritesTheMarkerAndRadiusAndTellsTheCaller() {
+    show()
+    val marker = placeMarkerByTapping()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_SAVE).performClick()
+
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { saves == 1 }
+    val stored = runBlocking { venues.getVenue("venue") }
+    assertEquals(marker, stored?.location)
+    assertEquals(DEFAULT_RADIUS_METERS, stored?.radiusMeters)
+    assertEquals(0, backs)
+  }
+
+  @Test
+  fun theBackArrowCallsTheCallersBack() {
+    show()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_BACK).performClick()
+
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { backs == 1 }
+    assertEquals(0, saves)
+  }
+
+  /** A venue with [id] whose area is [location] and [radiusMeters]. */
+  private fun venue(id: String, location: Location?, radiusMeters: Int = DEFAULT_RADIUS_METERS) =
+      Venue(
+          id = id,
+          name = "Café Lumen",
+          location = location,
+          radiusMeters = radiusMeters,
+          address = null,
+          createdAt = 1_000L,
+      )
 
   /** Waits until the camera rests at [location]. */
   private fun awaitCameraAt(location: Location) {
