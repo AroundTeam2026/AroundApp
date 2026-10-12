@@ -285,7 +285,7 @@ private fun AreaPanel(
         ) {
           Icon(
               painterResource(R.drawable.venue_setup_back),
-              contentDescription = stringResource(R.string.venue_area_back),
+              contentDescription = stringResource(R.string.back),
           )
         }
         Text(

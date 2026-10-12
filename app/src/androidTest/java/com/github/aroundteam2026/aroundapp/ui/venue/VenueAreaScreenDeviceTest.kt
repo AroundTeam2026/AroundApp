@@ -77,8 +77,12 @@ class VenueAreaScreenDeviceTest {
   private val camera = CameraPositionState()
 
   /** Shows the screen and waits until it framed [framed]: the device, unless a marker is saved. */
-  private fun show(viewModel: VenueAreaViewModel = this.viewModel, framed: Location = here) {
-    composeTestRule.setContent { VenueAreaScreen("venue", {}, {}, viewModel, camera) }
+  private fun show(
+      viewModel: VenueAreaViewModel = this.viewModel,
+      venueId: String = "venue",
+      framed: Location = here,
+  ) {
+    composeTestRule.setContent { VenueAreaScreen(venueId, {}, {}, viewModel, camera) }
     awaitCameraAt(framed)
   }
 
@@ -188,7 +192,7 @@ class VenueAreaScreenDeviceTest {
 
   @Test
   fun opensFramingTheSavedMarkerRatherThanTheDevice() {
-    show(areaViewModel("saved"), framed = elsewhere)
+    show(areaViewModel("saved"), "saved", framed = elsewhere)
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("120 m")
   }

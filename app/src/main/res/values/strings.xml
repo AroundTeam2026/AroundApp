@@ -10,7 +10,7 @@
     <string name="venue_area_radius">Visit radius</string>
     <string name="venue_area_meters">%1$d m</string>
     <string name="use_my_location">Use my location</string>
-    <string name="venue_area_back">Back</string>
+    <string name="back">Back</string>
     <string name="venue_area_save">Save location</string>
     <string name="venue_area_saving">Saving…</string>
     <string name="venue_area_save_failed">Couldn\'t save your location. Check your connection and try again.</string>
