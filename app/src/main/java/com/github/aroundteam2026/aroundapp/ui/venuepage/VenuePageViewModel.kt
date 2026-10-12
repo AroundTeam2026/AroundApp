@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -84,12 +85,17 @@ class VenuePageViewModel(
               delay(nextExpiry - now)
             }
           }
-          .catch { mutableUiState.value = VenuePageUiState(status = VenuePageStatus.FAILED) }
+          .catch {
+            Log.w(TAG, "Listening to venue $venueId failed", it)
+            mutableUiState.value = VenuePageUiState(status = VenuePageStatus.FAILED)
+          }
           .collect { (venue, quests) -> mutableUiState.update { it.showing(venue, quests) } }
     }
   }
 
   companion object {
+    private const val TAG = "VenuePageViewModel"
+
     /** Builds the [VenuePageViewModel] of the venue [venueId] with the app's repositories. */
     fun factory(venueId: String): ViewModelProvider.Factory = viewModelFactory {
       initializer {
