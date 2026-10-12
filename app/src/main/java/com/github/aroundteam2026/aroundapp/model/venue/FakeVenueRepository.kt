@@ -12,9 +12,9 @@ import kotlinx.coroutines.flow.map
  * In-memory [VenueRepository] for unit tests and for running the app without Firestore.
  *
  * Creating a venue is atomic: of several concurrent calls with the same id, exactly one succeeds.
- * Setting an area is atomic too: the stored venue always holds the location and radius of a single
- * call. [observeVenue] and [observeVenues] emit again only when their venues change, not on every
- * write.
+ * Setting an area is atomic too: the stored venue always holds the location, radius and address of
+ * a single call. [observeVenue] and [observeVenues] emit again only when their venues change, not
+ * on every write.
  *
  * @param initialVenues Venues stored from the start exactly as given; their ids must be unique.
  */
@@ -46,19 +46,24 @@ class FakeVenueRepository(initialVenues: List<Venue> = emptyList()) : VenueRepos
   }
 
   /**
-   * Replaces the location and radius of the venue with [venueId] in one atomic step, deciding the
-   * result from the state before the write. Fails with [IllegalArgumentException] if the venue does
-   * not exist, without creating it. Does not check [radiusMeters] against [VenueLimits].
+   * Replaces the location, radius and address of the venue with [venueId] in one atomic step,
+   * deciding the result from the state before the write. Fails with [IllegalArgumentException] if
+   * the venue does not exist, without creating it. Does not check [radiusMeters] against
+   * [VenueLimits].
    */
   override suspend fun setArea(
       venueId: String,
       location: Location,
       radiusMeters: Int,
+      address: String?,
   ): Result<Unit> {
     val previous = venues.getAndUpdate { current ->
       val venue = current[venueId]
       if (venue == null) current
-      else current + (venueId to venue.copy(location = location, radiusMeters = radiusMeters))
+      else {
+        val area = venue.copy(location = location, radiusMeters = radiusMeters, address = address)
+        current + (venueId to area)
+      }
     }
     return if (venueId in previous) {
       Result.success(Unit)

@@ -417,7 +417,7 @@ class VenueAreaAddressSearchTest {
   }
 
   @Test
-  fun clearingEmptiesTheFieldAndSuggestionsButKeepsTheMarkerAndAddress() = test {
+  fun clearingEmptiesTheFieldAndSuggestionsKeepsTheMarkerAndForgetsTheAddress() = test {
     viewModel.onAddressPicked(bourg)
     viewModel.onAddressQueryChanged("Place")
     advanceUntilIdle()
@@ -428,6 +428,15 @@ class VenueAreaAddressSearchTest {
     assertEquals(emptyList<AddressSuggestion>(), search.suggestions)
     assertEquals(AddressSearchStatus.IDLE, search.status)
     assertEquals(bourg.location, state.marker)
-    assertEquals("Rue de Bourg 12, 1003 Lausanne", state.address)
+    assertNull(state.address)
+  }
+
+  @Test
+  fun typingOverThePickedAddressForgetsIt() {
+    viewModel.onAddressPicked(bourg)
+
+    viewModel.onAddressQueryChanged("Rue de Bourg 1")
+
+    assertNull(state.address)
   }
 }
