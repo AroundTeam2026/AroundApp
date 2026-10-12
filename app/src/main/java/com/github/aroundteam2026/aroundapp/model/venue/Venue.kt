@@ -16,7 +16,8 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  *   [VenueLimits.MAX_RADIUS_METERS]; the repository does not enforce this, the ViewModel that edits
  *   it will. A caller creating a venue that has not defined its area yet should pass
  *   [VenueLimits.DEFAULT_RADIUS_METERS].
- * @property address Street address, or null if the venue did not give one.
+ * @property address Street address, or null if the venue did not give one. The app sets it only
+ *   through [VenueRepository.setArea], together with [location], and creates venues without one.
  * @property createdAt Creation time, in epoch milliseconds, set by the caller.
  * @property featuredQuestId Id of the quest the venue wants shown first, or null for no preference.
  *   Nothing checks that it names one of the venue's quests, or one that is still valid.
