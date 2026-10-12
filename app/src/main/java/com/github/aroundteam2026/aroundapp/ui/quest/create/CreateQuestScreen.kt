@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -31,7 +32,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -66,7 +71,7 @@ fun CreateQuestScreen(
   )
 }
 
-/** Stateless form, also used by the preview. */
+/** Stateless form. */
 @Composable
 fun CreateQuestContent(
     state: CreateQuestUiState,
@@ -129,26 +134,27 @@ internal fun FieldLabel(text: String) {
   Text(text, style = AroundTextStyles.FieldLabel, color = MaterialTheme.colorScheme.onSurface)
 }
 
+/**
+ * The real form on fakes, so it can be filled in when the preview runs on a device: a signed-in
+ * venue with a location, which shows the radius map.
+ */
 // Tall enough for the whole form, as a preview can't scroll
 @Preview(widthDp = 413, heightDp = 1500)
 @Composable
 private fun CreateQuestPreview() {
-  AroundAppTheme {
-    CreateQuestContent(
-        state =
-            CreateQuestUiState(
-                title = "Find the hidden fox",
-                description =
-                    "A tiny ceramic fox hides somewhere in the café. Spot it and snap a photo.",
-                requirements = "Order any drink. One photo per party.",
-                minPartySize = 4,
-                venueLocation = Location(46.5220, 6.6330),
-            ),
-        onTitleChange = {},
-        onDescriptionChange = {},
-        onRequirementsChange = {},
-        completionActions = QuestCompletionActions(),
-        onClose = {},
-    )
+  val viewModel = remember {
+    val venue =
+        Venue(
+            id = PREVIEW_VENUE_ID,
+            name = "Café Lumière",
+            location = Location(46.5220, 6.6330),
+            radiusMeters = QuestLimits.DEFAULT_RADIUS_METERS,
+            address = null,
+            createdAt = 0L,
+        )
+    CreateQuestViewModel(FakeAuthRepository(PREVIEW_VENUE_ID), FakeVenueRepository(listOf(venue)))
   }
+  AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}) }
 }
+
+private const val PREVIEW_VENUE_ID = "preview-venue"
