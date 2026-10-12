@@ -15,4 +15,34 @@
         <item quantity="one">Use %1$d character or fewer.</item>
         <item quantity="other">Use %1$d characters or fewer.</item>
     </plurals>
+    <string name="create_quest_proof_type">Proof</string>
+    <string name="create_quest_proof_photo">Photo</string>
+    <string name="create_quest_proof_photo_hint">Snap it on the spot. You approve it.</string>
+    <string name="create_quest_proof_text">Text answer</string>
+    <string name="create_quest_proof_text_hint">A word, a name or a short reply.</string>
+    <string name="create_quest_explorers_see">Explorers see:</string>
+    <!-- Placeholder until the explorer's quest view exists -->
+    <string name="create_quest_explorer_preview">Will come back to this once explorer view is done</string>
+    <string name="create_quest_radius">Unlock radius</string>
+    <string name="create_quest_radius_hint">Explorers can submit proof once they are this close.</string>
+    <string name="create_quest_meters">%1$d m</string>
+    <string name="create_quest_radius_inside">Inside</string>
+    <string name="create_quest_radius_door">At the door</string>
+    <string name="create_quest_radius_street">On the street</string>
+    <string name="create_quest_radius_map">Map of the %1$d m unlock radius around your venue</string>
+    <string name="create_quest_walk_time">≈ %1$d min walk</string>
+    <string name="create_quest_radius_custom">Custom</string>
+    <string name="create_quest_radius_range">%1$d–%2$d m</string>
+    <string name="create_quest_party_size">Minimum party</string>
+    <string name="create_quest_party_per_visit">per visit</string>
+    <string name="create_quest_party_extra">+%1$d</string>
+    <string name="create_quest_party_increment">Increase party size</string>
+    <string name="create_quest_party_decrement">Decrease party size</string>
+    <string name="create_quest_party_at_least">At least %1$d</string>
+    <string name="create_quest_party_at_least_hint">Bigger groups welcome</string>
+    <string name="create_quest_party_exactly">Exactly %1$d</string>
+    <plurals name="create_quest_party_exactly_hint">
+        <item quantity="one">Only solo visits</item>
+        <item quantity="other">Only parties of %1$d</item>
+    </plurals>
 </resources>

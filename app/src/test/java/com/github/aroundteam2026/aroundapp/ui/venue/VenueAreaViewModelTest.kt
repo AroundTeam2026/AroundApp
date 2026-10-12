@@ -6,6 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
@@ -38,7 +39,9 @@ class VenueAreaViewModelTest {
   private val aroundZurich = zurich.boundsWithin(FRAMED_RADIUS_METERS)
 
   private val locations = FakeLocationRepository(zurich)
-  private val viewModel by lazy { VenueAreaViewModel(locations, FakeAddressSearchRepository()) }
+  private val viewModel by lazy {
+    VenueAreaViewModel("venue", FakeVenueRepository(), locations, FakeAddressSearchRepository())
+  }
 
   private val state
     get() = viewModel.uiState.value
@@ -218,7 +221,8 @@ class VenueAreaViewModelTest {
   @Test
   fun useMyLocationDuringTheOpeningLookupFramesTheDeviceOnlyOnce() = test {
     val lookups = AnsweredInAnyOrder()
-    val viewModel = VenueAreaViewModel(lookups, FakeAddressSearchRepository())
+    val viewModel =
+        VenueAreaViewModel("venue", FakeVenueRepository(), lookups, FakeAddressSearchRepository())
     viewModel.onLocationPermissionResult(granted = true)
     advanceUntilIdle()
     viewModel.onUseMyLocation()

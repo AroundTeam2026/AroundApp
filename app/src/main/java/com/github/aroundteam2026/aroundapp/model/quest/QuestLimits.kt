@@ -26,6 +26,9 @@ object QuestLimits {
   /** Largest allowed [Quest.radiusMeters]. */
   const val MAX_RADIUS_METERS = 200
 
+  /** [Quest.radiusMeters] a new quest starts with until its venue's radius is known. */
+  const val DEFAULT_RADIUS_METERS = 50
+
   /**
    * Smallest allowed [Reward.Discount.amount], in either unit: one cent or 0.01 %. A check written
    * as `amount >= MIN_DISCOUNT_AMOUNT` also rejects negative amounts and `NaN`.

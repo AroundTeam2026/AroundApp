@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.ADDRESS_DRIFT_METERS
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.SEARCH_DELAY_MILLIS
@@ -45,7 +46,9 @@ class VenueAreaAddressSearchTest {
   private val addresses = FakeAddressSearchRepository { query ->
     AddressSearchResult.Found(listOf(bourg, gare).filter { it.title.contains(query, true) })
   }
-  private val viewModel by lazy { VenueAreaViewModel(locations, addresses) }
+  private val viewModel by lazy {
+    VenueAreaViewModel("venue", FakeVenueRepository(), locations, addresses)
+  }
 
   private val state
     get() = viewModel.uiState.value

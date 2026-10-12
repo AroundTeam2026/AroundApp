@@ -5,14 +5,13 @@ import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsNotFocused
-import androidx.compose.ui.test.click
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepository
@@ -22,10 +21,13 @@ import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
 import com.github.aroundteam2026.aroundapp.ui.map.isNear
+import com.github.aroundteam2026.aroundapp.ui.map.tapMapUntil
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLngBounds
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
@@ -53,8 +55,14 @@ class VenueAreaScreenDeviceTest {
   private val here = Location(47.3769, 8.5417)
   private val elsewhere = Location(47.45, 8.70)
 
-  private val viewModel =
+  // "venue" has no saved area, "saved" has one
+  private val venues =
+      FakeVenueRepository(listOf(Venue("saved", "Lumen", elsewhere, 120, null, 0L)))
+
+  private fun areaViewModel(venueId: String) =
       VenueAreaViewModel(
+          venueId,
+          venues,
           object : LocationRepository {
             override suspend fun currentLocation() = here
           },
@@ -63,12 +71,18 @@ class VenueAreaScreenDeviceTest {
                 AddressSearchResult.Found(listOf(AddressSuggestion("Seefeldstrasse 1", null, here)))
           },
       )
+
+  private val viewModel = areaViewModel("venue")
   private val camera = CameraPositionState()
 
-  /** Shows the screen and waits until it framed the device, as it does when opened. */
-  private fun show() {
-    composeTestRule.setContent { VenueAreaScreen(viewModel, camera) }
-    awaitCameraAt(here)
+  /** Shows the screen and waits until it framed [framed]: the device, unless a marker is saved. */
+  private fun show(
+      viewModel: VenueAreaViewModel = this.viewModel,
+      venueId: String = "venue",
+      framed: Location = here,
+  ) {
+    composeTestRule.setContent { VenueAreaScreen(venueId, {}, {}, viewModel, camera) }
+    awaitCameraAt(framed)
   }
 
   @Test
@@ -86,14 +100,10 @@ class VenueAreaScreenDeviceTest {
 
   /** Taps the middle of the map until the tap places the marker, and returns where it is. */
   private fun placeMarkerByTapping(): Location {
-    // Taps before the map has drawn are ignored, so tap again until one counts, as a user would.
-    // Taps closer together than a double tap would zoom instead.
-    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
-      composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_MAP).performTouchInput { click(center) }
-      Thread.sleep(500)
-      viewModel.uiState.value.marker != null
+    composeTestRule.tapMapUntil(C.Tag.VENUE_AREA_MAP) { viewModel.uiState.value.marker != null }
+    return checkNotNull(viewModel.uiState.value.marker) {
+      "Tapping the map never placed the marker"
     }
-    return viewModel.uiState.value.marker!!
   }
 
   @Test
@@ -173,6 +183,13 @@ class VenueAreaScreenDeviceTest {
     )
     assertFalse("zoom buttons", composeTestRule.runOnUiThread { settings.isZoomControlsEnabled })
     assertFalse("map toolbar", composeTestRule.runOnUiThread { settings.isMapToolbarEnabled })
+  }
+
+  @Test
+  fun opensFramingTheSavedMarkerRatherThanTheDevice() {
+    show(areaViewModel("saved"), "saved", framed = elsewhere)
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("120 m")
   }
 
   /** Waits until the camera rests at [location]. */
