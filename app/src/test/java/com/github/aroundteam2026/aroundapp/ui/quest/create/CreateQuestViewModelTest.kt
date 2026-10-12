@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -127,5 +128,26 @@ class CreateQuestViewModelTest {
   fun tooLongShowsBeforeTheFieldIsTouched() {
     val state = CreateQuestUiState(title = "a".repeat(QuestLimits.TITLE_MAX_LENGTH + 1))
     assertEquals(QuestTextError.TOO_LONG, state.titleError)
+  }
+
+  @Test
+  fun proofDefaultsToAPhoto() {
+    assertEquals(ProofType.PHOTO, state.proofType)
+  }
+
+  @Test
+  fun updateProofTypeSelectsIt() {
+    viewModel.updateProofType(ProofType.TEXT)
+    assertEquals(ProofType.TEXT, state.proofType)
+    viewModel.updateProofType(ProofType.PHOTO)
+    assertEquals(ProofType.PHOTO, state.proofType)
+  }
+
+  @Test
+  fun proofTypeDoesNotChangeWhetherTheFormCanBeSubmitted() {
+    viewModel.updateProofType(ProofType.TEXT)
+    assertFalse(state.canSubmit)
+    fillValid()
+    assertTrue(state.canSubmit)
   }
 }

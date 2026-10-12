@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 
 /** Why a text field of the quest form is invalid. */
@@ -31,7 +32,10 @@ private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
  * [QuestTextError.BLANK] error is only shown once its field has been edited, so the form doesn't
  * open full of errors; [QuestTextError.TOO_LONG] shows at once.
  *
+ * The completion rules always hold a valid value, so they never block [canSubmit].
+ *
  * @property titleTouched Whether [title] has been edited; likewise for the other `Touched` flags.
+ * @property proofType The kind of proof explorers submit.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -40,6 +44,7 @@ data class CreateQuestUiState(
     val titleTouched: Boolean = false,
     val descriptionTouched: Boolean = false,
     val requirementsTouched: Boolean = false,
+    val proofType: ProofType = ProofType.PHOTO,
 ) {
   /** The error shown under the title, or null. */
   val titleError: QuestTextError?

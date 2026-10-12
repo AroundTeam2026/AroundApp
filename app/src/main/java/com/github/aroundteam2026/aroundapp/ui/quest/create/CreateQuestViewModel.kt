@@ -2,14 +2,15 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.lifecycle.ViewModel
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Holds the quest form of a venue. Values are kept as typed, untrimmed, so editing never moves the
- * cursor; they are trimmed when the quest is saved.
+ * Holds the quest form of the signed-in venue. Values are kept as typed, untrimmed, so editing
+ * never moves the cursor; they are trimmed when the quest is saved.
  */
 class CreateQuestViewModel : ViewModel() {
   private val mutableUiState = MutableStateFlow(CreateQuestUiState())
@@ -29,5 +30,10 @@ class CreateQuestViewModel : ViewModel() {
   /** Sets the requirements to [value] and marks them as edited. */
   fun updateRequirements(value: String) {
     mutableUiState.update { it.copy(requirements = value, requirementsTouched = true) }
+  }
+
+  /** Sets the kind of proof explorers submit to [type]. */
+  fun updateProofType(type: ProofType) {
+    mutableUiState.update { it.copy(proofType = type) }
   }
 }

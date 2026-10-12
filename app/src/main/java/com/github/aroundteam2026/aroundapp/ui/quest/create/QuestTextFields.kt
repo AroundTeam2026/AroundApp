@@ -101,7 +101,7 @@ private fun QuestTextField(
     counterTag: String,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small)) {
-    Text(label, style = AroundTextStyles.FieldLabel, color = MaterialTheme.colorScheme.onSurface)
+    FieldLabel(label)
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,

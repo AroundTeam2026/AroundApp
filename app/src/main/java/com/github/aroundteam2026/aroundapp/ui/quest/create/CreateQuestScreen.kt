@@ -50,6 +50,10 @@ fun CreateQuestScreen(
       onTitleChange = viewModel::updateTitle,
       onDescriptionChange = viewModel::updateDescription,
       onRequirementsChange = viewModel::updateRequirements,
+      completionActions =
+          QuestCompletionActions(
+              onProofTypeChange = viewModel::updateProofType,
+          ),
       onClose = onClose,
       modifier = modifier,
   )
@@ -62,6 +66,7 @@ fun CreateQuestContent(
     onTitleChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onRequirementsChange: (String) -> Unit,
+    completionActions: QuestCompletionActions,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -77,6 +82,8 @@ fun CreateQuestContent(
     CreateQuestHeader(onClose)
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
     QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
+    Spacer(Modifier.height(AroundSpacing.Medium))
+    QuestCompletionRules(state, completionActions)
   }
 }
 
@@ -109,7 +116,14 @@ private fun CreateQuestHeader(onClose: () -> Unit) {
   }
 }
 
-@Preview(widthDp = 413, heightDp = 917)
+/** The label above a form section. */
+@Composable
+internal fun FieldLabel(text: String) {
+  Text(text, style = AroundTextStyles.FieldLabel, color = MaterialTheme.colorScheme.onSurface)
+}
+
+// Tall enough for the whole form, as a preview can't scroll
+@Preview(widthDp = 413, heightDp = 1500)
 @Composable
 private fun CreateQuestPreview() {
   AroundAppTheme {
@@ -124,6 +138,7 @@ private fun CreateQuestPreview() {
         onTitleChange = {},
         onDescriptionChange = {},
         onRequirementsChange = {},
+        completionActions = QuestCompletionActions(),
         onClose = {},
     )
   }

@@ -92,5 +92,8 @@ object C {
     const val CREATE_QUEST_REQUIREMENTS = "create_quest_requirements"
     const val CREATE_QUEST_REQUIREMENTS_COUNTER = "create_quest_requirements_counter"
     const val CREATE_QUEST_REQUIREMENTS_ERROR = "create_quest_requirements_error"
+    const val CREATE_QUEST_PROOF_PHOTO = "create_quest_proof_photo"
+    const val CREATE_QUEST_PROOF_TEXT = "create_quest_proof_text"
+    const val CREATE_QUEST_EXPLORER_PREVIEW = "create_quest_explorer_preview"
   }
 }
