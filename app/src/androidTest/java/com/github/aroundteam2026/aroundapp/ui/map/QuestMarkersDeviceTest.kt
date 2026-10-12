@@ -3,7 +3,6 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
-import android.view.ViewConfiguration
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -113,19 +112,17 @@ class QuestMarkersDeviceTest {
     camera.projection!!.toScreenLocation(location.toLatLng())
   }
 
-  /** Taps the map [dpAbove] above where [location] is on screen. */
-  private fun tapAbove(location: Location, dpAbove: Float) {
+  /** Where on the map [dpAbove] above [location] is. */
+  private fun pointAbove(location: Location, dpAbove: Float): Offset {
     val point = screenPoint(location)
     val density = composeTestRule.activity.resources.displayMetrics.density
-    composeTestRule.onNodeWithTag(C.Tag.MAP).performTouchInput {
-      click(Offset(point.x.toFloat(), point.y - dpAbove * density))
-    }
+    return Offset(point.x.toFloat(), point.y - dpAbove * density)
   }
 
-  /** Taps the middle of a venue's round pin, which stands on its location. */
-  private fun tapPin(quest: Quest) {
-    val dimensions = MarkerDefaults.dimensions
-    tapAbove(quest.location, (dimensions.pointerHeight + dimensions.pinDiameter / 2).value)
+  /** Taps the map [dpAbove] above where [location] is on screen. */
+  private fun tapAbove(location: Location, dpAbove: Float) {
+    val point = pointAbove(location, dpAbove)
+    composeTestRule.onNodeWithTag(C.Tag.MAP).performTouchInput { click(point) }
   }
 
   /** Taps an open card just above its pointer. */
@@ -133,30 +130,13 @@ class QuestMarkersDeviceTest {
     tapAbove(quest.location, (MarkerDefaults.dimensions.pointerHeight.value + 16f))
   }
 
-  /**
-   * Taps [quest]'s pin until its card opens. The view model lists a pin before the map has drawn
-   * its marker, and a tap until then lands on the bare map; so the test taps again, after the pause
-   * that keeps two taps from reading as a double-tap zoom.
-   */
+  /** Taps the middle of [quest]'s round pin, which stands on its location, until its card opens. */
   private fun openCard(quest: Quest) {
-    val deadline = System.currentTimeMillis() + MAP_TIMEOUT_MILLIS
-    while (state.selectedVenueId != quest.venueId && System.currentTimeMillis() < deadline) {
-      tapPin(quest)
-      pauseBeforeTappingAgain { state.selectedVenueId == quest.venueId }
-    }
+    val dimensions = MarkerDefaults.dimensions
+    val pin =
+        pointAbove(quest.location, (dimensions.pointerHeight + dimensions.pinDiameter / 2).value)
+    composeTestRule.tapMapUntil(C.Tag.MAP, { pin }) { state.selectedVenueId == quest.venueId }
     awaitSelected(quest.venueId)
-    // The next tap may be on the same spot, like the card's
-    pauseBeforeTappingAgain()
-  }
-
-  /**
-   * Waits out the double-tap timeout, or until [done]: the Maps SDK turns two taps on one spot
-   * within it into a zoom, and never hands the second to the marker. Frames keep coming meanwhile,
-   * so the map redraws.
-   */
-  private fun pauseBeforeTappingAgain(done: () -> Boolean = { false }) {
-    val end = System.currentTimeMillis() + ViewConfiguration.getDoubleTapTimeout() + 200
-    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { done() || System.currentTimeMillis() >= end }
   }
 
   @Test
