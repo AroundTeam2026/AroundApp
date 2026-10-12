@@ -83,17 +83,7 @@ fun RewardFields(reward: RewardFormState, actions: QuestRewardActions) {
   Column {
     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     Spacer(Modifier.height(AroundSpacing.SectionGap))
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-      FieldLabel(stringResource(R.string.create_quest_reward_type))
-      Text(
-          stringResource(R.string.create_quest_reward_optional),
-          style = AroundTextStyles.Small,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
+    OptionalLabel(stringResource(R.string.create_quest_reward_type))
     Spacer(Modifier.height(AroundSpacing.Small))
     NoRewardOption(selected = reward.type == null, onClick = { actions.onTypeSelect(null) })
     Spacer(Modifier.height(AroundSpacing.Small))
@@ -102,6 +92,22 @@ fun RewardFields(reward: RewardFormState, actions: QuestRewardActions) {
       Spacer(Modifier.height(AroundSpacing.Medium))
       RewardDetails(reward, it, actions)
     }
+  }
+}
+
+/** A field label followed by a muted "Optional". */
+@Composable
+private fun OptionalLabel(text: String) {
+  Row(
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
+      verticalAlignment = Alignment.Bottom,
+  ) {
+    FieldLabel(text)
+    Text(
+        stringResource(R.string.create_quest_reward_optional),
+        style = AroundTextStyles.Small,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
 
@@ -353,17 +359,7 @@ private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate
   var picking by rememberSaveable { mutableStateOf(false) }
   val muted = MaterialTheme.colorScheme.onSurfaceVariant
   Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small)) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-      FieldLabel(stringResource(R.string.create_quest_reward_expires))
-      Text(
-          stringResource(R.string.create_quest_reward_optional),
-          style = AroundTextStyles.Small,
-          color = muted,
-      )
-    }
+    OptionalLabel(stringResource(R.string.create_quest_reward_expires))
     Surface(
         onClick = { picking = true },
         shape = AroundCorners.InsetField,
