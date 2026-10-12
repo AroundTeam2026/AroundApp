@@ -237,7 +237,7 @@ private fun DiscountAmount(reward: RewardFormState, actions: QuestRewardActions)
           singleLine = true,
           isError = error != null,
           placeholder = { Text(stringResource(R.string.create_quest_reward_amount_hint)) },
-          shape = AroundCorners.InsetField,
+          shape = MaterialTheme.shapes.small,
           textStyle = AroundTextStyles.FieldValue,
           colors = questFieldColors(),
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
