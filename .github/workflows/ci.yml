@@ -19,6 +19,18 @@ jobs:
     name: CI
     runs-on: ubuntu-latest
 
+    # The emulator the team develops on, a Pixel 10a with API 37.1, so a test means the same thing
+    # on CI as locally. The command-line tools have no pixel_10a profile; pixel_9 has the same
+    # screen (1080x2424, 420 dpi). The Pixel 10a AVD has 4 cores, as many as the runner has; the
+    # action's default is 2. Unlike the Pixel 10a AVD, the image has no Play Store: CI boots it
+    # fresh every run, and the Play Store would update Google Play services mid-run, which kills
+    # the app under test. Both emulator steps and the AVD cache key read these.
+    env:
+      AVD_API_LEVEL: "37.1"
+      AVD_TARGET: google_apis_ps16k
+      AVD_PROFILE: pixel_9
+      AVD_CORES: "4"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -97,6 +109,12 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      # The runner's command-line tools (12.0) predate the pixel_9 profile, so avdmanager rejects it.
+      # When the runner has none, android-emulator-runner installs the newer ones it bundles. That
+      # behaviour is the action's own, so both emulator steps pin its exact version.
+      - name: Remove the runner's outdated Android command-line tools
+        run: rm -rf "$ANDROID_HOME/cmdline-tools"
+
       # Cache the Emulator, if the cache does not hit, create the emulator
       - name: AVD cache
         uses: actions/cache@v4
@@ -105,14 +123,16 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-34
+          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores
 
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
-          api-level: 34
-          target: google_apis
+          api-level: ${{ env.AVD_API_LEVEL }}
+          target: ${{ env.AVD_TARGET }}
+          profile: ${{ env.AVD_PROFILE }}
+          cores: ${{ env.AVD_CORES }}
           arch: x86_64
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
@@ -164,19 +184,26 @@ jobs:
           # To run the CI with debug information, add --info
           ./gradlew check --parallel --build-cache
 
-      # Run connected (instrumented) tests on the emulator
+      # Run connected (instrumented) tests on the emulator. When they fail, print the device's crash
+      # log and its process deaths before the emulator shuts down: Gradle can't fetch the logcat of
+      # a test whose process crashed, so this is the only trace of why. The log is cleared first, so
+      # it only holds this run, not the snapshot's boot.
       - name: Run instrumented tests
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
-          api-level: 34
-          target: google_apis
+          api-level: ${{ env.AVD_API_LEVEL }}
+          target: ${{ env.AVD_TARGET }}
+          profile: ${{ env.AVD_PROFILE }}
+          cores: ${{ env.AVD_CORES }}
           arch: x86_64
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./gradlew connectedCheck --parallel --build-cache
+          script: |
+            adb logcat -c
+            ./gradlew connectedCheck --parallel --build-cache || { adb logcat -d -b crash; adb logcat -d -b system | grep -E 'has died|Killing|lmkd|ANR in'; exit 1; }
 
       # When the instrumented tests fail, show what the Maps SDK saw. Google rejects a build whose key
       # or signing certificate isn't registered, and the map then never moves: the device log names
