@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -43,6 +44,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import java.text.NumberFormat
 
 /** What the reward fields do when the venue changes them; each does nothing by default. */
 class QuestRewardActions(
@@ -272,7 +274,9 @@ private fun discountErrorText(error: DiscountAmountError) =
       DiscountAmountError.TOO_SMALL ->
           stringResource(
               R.string.create_quest_reward_amount_too_small,
-              QuestLimits.MIN_DISCOUNT_AMOUNT.toString(),
+              // In the phone's decimal separator, which the amount field also accepts
+              NumberFormat.getNumberInstance(LocalConfiguration.current.locales[0])
+                  .format(QuestLimits.MIN_DISCOUNT_AMOUNT),
           )
       DiscountAmountError.TOO_LARGE ->
           stringResource(
