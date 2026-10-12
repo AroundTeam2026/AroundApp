@@ -307,4 +307,34 @@ class VenueAreaSaveLoadTest {
     advanceUntilIdle()
     assertNull(stored?.address)
   }
+
+  @Test
+  fun textClearedBeforeLoadingFinishesKeepsTheSavedAddressOut() {
+    readGate = CompletableDeferred()
+    test {
+      viewModel.onAddressQueryChanged("Pl")
+      viewModel.onAddressCleared()
+      readGate.complete(Unit)
+      advanceUntilIdle()
+      assertEquals("", viewModel.addressQuery)
+      assertNull(state.address)
+
+      viewModel.onSave()
+      advanceUntilIdle()
+      assertNull(stored?.address)
+    }
+  }
+
+  @Test
+  fun textDeletedBeforeLoadingFinishesKeepsTheSavedAddressOut() {
+    readGate = CompletableDeferred()
+    test {
+      viewModel.onAddressQueryChanged("P")
+      viewModel.onAddressQueryChanged("")
+      readGate.complete(Unit)
+      advanceUntilIdle()
+      assertEquals("", viewModel.addressQuery)
+      assertNull(state.address)
+    }
+  }
 }

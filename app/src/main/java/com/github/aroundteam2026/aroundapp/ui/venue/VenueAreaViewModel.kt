@@ -122,6 +122,7 @@ class VenueAreaViewModel(
   private var visibleArea: GeoBounds? = null
   private var addressLocation: Location? = null
   private var radiusChosen = false
+  private var addressEdited = false
 
   /**
    * What the address field shows. It is Compose state rather than part of [uiState], so the field
@@ -137,10 +138,11 @@ class VenueAreaViewModel(
 
   /**
    * Shows the venue's saved area, framing its marker, with the radius clamped to [VenueLimits]. The
-   * saved address comes with the marker and fills the field, unless the venue typed in it: the
-   * field then doesn't show the address, so it isn't kept. A marker placed or a radius chosen while
-   * it loads is kept, as the venue's latest choice; a placed marker keeps its own address too. A
-   * venue that is unknown, has no saved marker or can't be read keeps the defaults.
+   * saved address comes with the marker and fills the field, unless the venue already edited or
+   * cleared the field: it then doesn't show the address, so it isn't kept. A marker placed or a
+   * radius chosen while it loads is kept, as the venue's latest choice; a placed marker keeps its
+   * own address too. A venue that is unknown, has no saved marker or can't be read keeps the
+   * defaults.
    */
   private suspend fun loadArea() {
     val venue =
@@ -152,7 +154,7 @@ class VenueAreaViewModel(
           null
         }
     val saved = venue?.location ?: return
-    val address = venue.address?.takeIf { addressQuery.isEmpty() }
+    val address = venue.address?.takeIf { !addressEdited }
     val before = _uiState.getAndUpdate {
       val marked =
           if (it.marker != null) it
@@ -237,6 +239,7 @@ class VenueAreaViewModel(
    * query other than the kept address forgets it, as the field no longer shows it.
    */
   fun onAddressQueryChanged(query: String) {
+    addressEdited = true
     addressLookup?.cancel()
     addressQuery = query
     val forgets = query != _uiState.value.address
@@ -290,6 +293,7 @@ class VenueAreaViewModel(
 
   /** Called when the venue clears the field: the marker stays, the address is forgotten. */
   fun onAddressCleared() {
+    addressEdited = true
     addressQuery = ""
     addressLocation = null
     _uiState.update { it.copy(address = null) }
