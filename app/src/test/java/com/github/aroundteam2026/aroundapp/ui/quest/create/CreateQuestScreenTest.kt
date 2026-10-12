@@ -47,17 +47,23 @@ class CreateQuestScreenTest {
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_TITLE_COUNTER)
         .assertTextEquals("0 / ${QuestLimits.TITLE_MAX_LENGTH}")
+    listOf(
+            C.Tag.CREATE_QUEST_TITLE_ERROR,
+            C.Tag.CREATE_QUEST_DESCRIPTION_ERROR,
+            C.Tag.CREATE_QUEST_REQUIREMENTS_ERROR,
+        )
+        .forEach { compose.onNodeWithTag(it).assertDoesNotExist() }
   }
 
   @Test
   fun typingUpdatesTheStateAndTheCounters() {
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).performTextInput("Find the hidden fox")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).performTextInput("  Fox ")
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_DESCRIPTION).performTextInput("A fox.")
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REQUIREMENTS).performTextInput("A drink.")
 
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_TITLE_COUNTER)
-        .assertTextEquals("19 / ${QuestLimits.TITLE_MAX_LENGTH}")
+        .assertTextEquals("3 / ${QuestLimits.TITLE_MAX_LENGTH}")
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_DESCRIPTION_COUNTER)
         .performScrollTo()
@@ -67,7 +73,7 @@ class CreateQuestScreenTest {
         .performScrollTo()
         .assertTextEquals("8 / ${QuestLimits.REQUIREMENTS_MAX_LENGTH}")
     val state = viewModel.uiState.value
-    assertEquals("Find the hidden fox", state.title)
+    assertEquals("  Fox ", state.title)
     assertEquals("A fox.", state.description)
     assertEquals("A drink.", state.requirements)
   }
