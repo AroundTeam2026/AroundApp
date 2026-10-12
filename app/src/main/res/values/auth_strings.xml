@@ -20,5 +20,4 @@
     <string name="auth_email_taken">An account already exists with this email.</string>
     <string name="auth_network_error">Could not connect. Check your connection and try again.</string>
     <string name="auth_unknown_error">Something went wrong. Please try again.</string>
-    <string name="auth_sign_out">Sign out</string>
 </resources>
