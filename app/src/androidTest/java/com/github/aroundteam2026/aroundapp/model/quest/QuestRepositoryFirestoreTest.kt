@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
@@ -114,6 +115,7 @@ class QuestRepositoryFirestoreTest {
     assertTrue(full.get("updatedAt") is Timestamp)
     assertEquals("DRAFT", full.get("status"))
     assertEquals("TEXT", full.get("proofType"))
+    assertEquals(true, full.get("exactPartySize"))
     val reward = full.get("reward") as Map<*, *>
     assertEquals(setOf("type", "amount", "unit", "specifics", "expiresAt"), reward.keys)
     assertEquals("DISCOUNT", reward["type"])
@@ -163,6 +165,18 @@ class QuestRepositoryFirestoreTest {
         Reward.Discount(5.0, DiscountUnit.CHF, specifics = null),
         getQuestFromServer(id)!!.reward,
     )
+  }
+
+  /**
+   * Bug: exactPartySize is read as required, so every quest saved before the field existed is
+   * skipped, or a missing value is read as exactly instead of at least.
+   */
+  @Test
+  fun getQuest_readsAMissingExactPartySizeAsAtLeast() = withTimeoutBlocking {
+    val id = repository.createQuest(quest().copy(exactPartySize = true)).getOrThrow()
+    db.collection(QUESTS).document(id).update("exactPartySize", FieldValue.delete()).await()
+
+    assertEquals(false, getQuestFromServer(id)?.exactPartySize)
   }
 
   /**
@@ -341,6 +355,7 @@ class QuestRepositoryFirestoreTest {
           requirements = "Photograph it.",
           proofType = ProofType.TEXT,
           minPartySize = 3,
+          exactPartySize = true,
           reward =
               Reward.Discount(
                   12.5,
