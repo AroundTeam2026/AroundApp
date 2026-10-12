@@ -33,4 +33,16 @@
     <string name="create_quest_walk_time">≈ %1$d min walk</string>
     <string name="create_quest_radius_custom">Custom</string>
     <string name="create_quest_radius_range">%1$d–%2$d m</string>
+    <string name="create_quest_party_size">Minimum party</string>
+    <string name="create_quest_party_per_visit">per visit</string>
+    <string name="create_quest_party_extra">+%1$d</string>
+    <string name="create_quest_party_increment">Increase party size</string>
+    <string name="create_quest_party_decrement">Decrease party size</string>
+    <string name="create_quest_party_at_least">At least %1$d</string>
+    <string name="create_quest_party_at_least_hint">Bigger groups welcome</string>
+    <string name="create_quest_party_exactly">Exactly %1$d</string>
+    <plurals name="create_quest_party_exactly_hint">
+        <item quantity="one">Only solo visits</item>
+        <item quantity="other">Only parties of %1$d</item>
+    </plurals>
 </resources>

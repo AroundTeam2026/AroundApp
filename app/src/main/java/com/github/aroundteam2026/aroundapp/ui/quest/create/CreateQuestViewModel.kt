@@ -75,6 +75,23 @@ class CreateQuestViewModel(
     mutableUiState.update { it.copy(radiusMeters = clampRadius(meters)) }
   }
 
+  /** Raises the party size by one. */
+  fun incrementPartySize() {
+    mutableUiState.update { it.copy(minPartySize = it.minPartySize + 1) }
+  }
+
+  /** Lowers the party size by one, never below [QuestLimits.MIN_PARTY_SIZE]. */
+  fun decrementPartySize() {
+    mutableUiState.update {
+      it.copy(minPartySize = (it.minPartySize - 1).coerceAtLeast(QuestLimits.MIN_PARTY_SIZE))
+    }
+  }
+
+  /** Sets whether the party must have exactly, rather than at least, the party size. */
+  fun updateExactPartySize(exact: Boolean) {
+    mutableUiState.update { it.copy(exactPartySize = exact) }
+  }
+
   /**
    * Reads the signed-in venue: its location for the radius map, and its radius as the starting one,
    * unless the venue has already chosen one.

@@ -102,5 +102,12 @@ object C {
     const val CREATE_QUEST_RADIUS_SLIDER = "create_quest_radius_slider"
     const val CREATE_QUEST_RADIUS_MAP = "create_quest_radius_map"
     const val CREATE_QUEST_WALK_TIME = "create_quest_walk_time"
+    const val CREATE_QUEST_PARTY_SIZE = "create_quest_party_size"
+    const val CREATE_QUEST_PARTY_INCREMENT = "create_quest_party_increment"
+    const val CREATE_QUEST_PARTY_DECREMENT = "create_quest_party_decrement"
+    const val CREATE_QUEST_PARTY_SEAT_FILLED = "create_quest_party_seat_filled"
+    const val CREATE_QUEST_PARTY_EXTRA = "create_quest_party_extra"
+    const val CREATE_QUEST_PARTY_AT_LEAST = "create_quest_party_at_least"
+    const val CREATE_QUEST_PARTY_EXACTLY = "create_quest_party_exactly"
   }
 }
