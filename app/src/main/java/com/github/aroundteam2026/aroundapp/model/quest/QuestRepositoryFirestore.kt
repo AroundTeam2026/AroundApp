@@ -84,6 +84,7 @@ class QuestRepositoryFirestore(
     put(REQUIREMENTS, requirements)
     put(PROOF_TYPE, proofType.name)
     put(MIN_PARTY_SIZE, minPartySize)
+    put(EXACT_PARTY_SIZE, exactPartySize)
     reward?.let { put(REWARD, it.toFirestore()) }
     put(STATUS, status.name)
     put(CREATED_AT, time)
@@ -127,6 +128,8 @@ class QuestRepositoryFirestore(
           requirements = required(REQUIREMENTS) { getString(it) },
           proofType = ProofType.valueOf(required(PROOF_TYPE) { getString(it) }),
           minPartySize = required(MIN_PARTY_SIZE) { getLong(it) }.toInt(),
+          // Quests written before the field existed take any party of at least minPartySize
+          exactPartySize = getBoolean(EXACT_PARTY_SIZE) ?: false,
           reward = (get(REWARD) as Map<*, *>?)?.toReward(),
           status = QuestStatus.valueOf(required(STATUS) { getString(it) }),
           createdAt = required(CREATED_AT) { getTimestamp(it) }.toDate().time,
@@ -180,6 +183,7 @@ class QuestRepositoryFirestore(
     const val REQUIREMENTS = "requirements"
     const val PROOF_TYPE = "proofType"
     const val MIN_PARTY_SIZE = "minPartySize"
+    const val EXACT_PARTY_SIZE = "exactPartySize"
     const val REWARD = "reward"
     const val STATUS = "status"
     const val CREATED_AT = "createdAt"

@@ -50,6 +50,8 @@ import kotlinx.coroutines.launch
  * @property nearby The valid quests for the list: those within [MapViewModel.NEARBY_RADIUS_METERS]
  *   of the explorer, nearest first, or, while their position is unknown, every valid quest by venue
  *   name, with no distance.
+ * @property showsNearby Whether the nearby quests are open over the map. They and a card are never
+ *   open together.
  */
 data class MapUiState(
     val areaToFrame: GeoBounds?,
@@ -57,6 +59,7 @@ data class MapUiState(
     val pins: List<VenuePin> = emptyList(),
     val selectedVenueId: String? = null,
     val nearby: List<NearbyQuest> = emptyList(),
+    val showsNearby: Boolean = false,
 )
 
 /**
@@ -159,11 +162,24 @@ class MapViewModel(
   fun onPinClick(venueId: String) {
     if (content.value.pins.none { it.venueId == venueId }) return
     selectedVenueId.value = venueId
+    // The card must stay in sight
+    _uiState.update { it.copy(showsNearby = false) }
   }
 
-  /** Called when the explorer taps the map itself: closes the open card. */
+  /** Called when the explorer taps the map itself: closes the open card, not the nearby quests. */
   fun onMapClick() {
     selectedVenueId.value = null
+  }
+
+  /** Called when the explorer opens the nearby quests: shows them, closing the open card. */
+  fun onNearbyOpen() {
+    selectedVenueId.value = null
+    _uiState.update { it.copy(showsNearby = true) }
+  }
+
+  /** Called when the explorer closes the nearby quests. */
+  fun onNearbyClose() {
+    _uiState.update { it.copy(showsNearby = false) }
   }
 
   /**

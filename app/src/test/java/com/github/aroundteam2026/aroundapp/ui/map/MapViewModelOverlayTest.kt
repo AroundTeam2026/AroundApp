@@ -1,0 +1,121 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+package com.github.aroundteam2026.aroundapp.ui.map
+
+import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
+import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+/** Tests the nearby quest overlay of [MapViewModel]: when it opens, and how it and a card share. */
+@OptIn(ExperimentalCoroutinesApi::class)
+class MapViewModelOverlayTest {
+
+  private val dispatcher = StandardTestDispatcher()
+
+  private val cafe =
+      testQuest(
+          id = "cafe-1",
+          venueId = "cafe",
+          venueName = "Café Lumen",
+          location = Location(46.5220, 6.6330),
+      )
+  private val lausanne = GeoBounds(south = 46.50, west = 6.60, north = 46.55, east = 6.66)
+
+  private val viewModel by lazy {
+    MapViewModel(
+        FakeLocationRepository(null),
+        ScriptedQuestRepository.of(MutableStateFlow(listOf(cafe))),
+        FakeVenueRepository(),
+        clock = { 1_000L },
+    )
+  }
+
+  private val state
+    get() = viewModel.uiState.value
+
+  @Before fun setUp() = Dispatchers.setMain(dispatcher)
+
+  @After fun tearDown() = Dispatchers.resetMain()
+
+  private fun test(body: suspend TestScope.() -> Unit) =
+      runTest(dispatcher) {
+        viewModel.onVisibleAreaChanged(lausanne)
+        runCurrent()
+        body()
+      }
+
+  @Test
+  fun theOverlayOpensOnlyWhenAsked() = test {
+    assertFalse("closed when the map opens", state.showsNearby)
+
+    viewModel.onNearbyOpen()
+    runCurrent()
+
+    assertTrue(state.showsNearby)
+  }
+
+  @Test
+  fun closingTheOverlayHidesIt() = test {
+    viewModel.onNearbyOpen()
+    runCurrent()
+
+    viewModel.onNearbyClose()
+    runCurrent()
+
+    assertFalse(state.showsNearby)
+  }
+
+  @Test
+  fun openingTheOverlayClosesTheOpenCard() = test {
+    viewModel.onPinClick("cafe")
+    runCurrent()
+    assertEquals("cafe", state.selectedVenueId)
+
+    viewModel.onNearbyOpen()
+    runCurrent()
+
+    assertNull(state.selectedVenueId)
+  }
+
+  @Test
+  fun openingACardClosesTheOverlay() = test {
+    viewModel.onNearbyOpen()
+    runCurrent()
+
+    viewModel.onPinClick("cafe")
+    runCurrent()
+
+    assertFalse(state.showsNearby)
+    assertEquals("cafe", state.selectedVenueId)
+  }
+
+  @Test
+  fun tappingTheMapLeavesTheOverlayOpen() = test {
+    // The map stays usable behind the overlay; only a card closes on a tap beside the pins
+    viewModel.onNearbyOpen()
+    runCurrent()
+
+    viewModel.onMapClick()
+    runCurrent()
+
+    assertTrue(state.showsNearby)
+  }
+}
