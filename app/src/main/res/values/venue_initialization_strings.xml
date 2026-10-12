@@ -8,7 +8,6 @@
     <string name="venue_initialization_name_hint">Café Lumière</string>
     <string name="venue_initialization_continue">Continue</string>
     <string name="venue_initialization_saving">Saving…</string>
-    <string name="venue_initialization_back">Back</string>
     <string name="venue_initialization_empty_name">Enter your business name.</string>
     <plurals name="venue_initialization_name_too_long">
         <item quantity="one">Use %1$d character or fewer for your business name.</item>

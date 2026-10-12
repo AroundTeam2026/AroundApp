@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import androidx.activity.compose.BackHandler
@@ -137,7 +138,7 @@ fun VenueInitializationContent(
             Box(contentAlignment = Alignment.Center) {
               Image(
                   painterResource(R.drawable.venue_setup_back),
-                  stringResource(R.string.venue_initialization_back),
+                  stringResource(R.string.back),
                   Modifier.size(22.dp),
               )
             }

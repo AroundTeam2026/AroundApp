@@ -5,6 +5,7 @@ import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -22,6 +23,8 @@ import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
@@ -53,8 +56,14 @@ class VenueAreaScreenDeviceTest {
   private val here = Location(47.3769, 8.5417)
   private val elsewhere = Location(47.45, 8.70)
 
-  private val viewModel =
+  // "venue" has no saved area, "saved" has one
+  private val venues =
+      FakeVenueRepository(listOf(Venue("saved", "Lumen", elsewhere, 120, null, 0L)))
+
+  private fun areaViewModel(venueId: String) =
       VenueAreaViewModel(
+          venueId,
+          venues,
           object : LocationRepository {
             override suspend fun currentLocation() = here
           },
@@ -63,12 +72,18 @@ class VenueAreaScreenDeviceTest {
                 AddressSearchResult.Found(listOf(AddressSuggestion("Seefeldstrasse 1", null, here)))
           },
       )
+
+  private val viewModel = areaViewModel("venue")
   private val camera = CameraPositionState()
 
-  /** Shows the screen and waits until it framed the device, as it does when opened. */
-  private fun show() {
-    composeTestRule.setContent { VenueAreaScreen(viewModel, camera) }
-    awaitCameraAt(here)
+  /** Shows the screen and waits until it framed [framed]: the device, unless a marker is saved. */
+  private fun show(
+      viewModel: VenueAreaViewModel = this.viewModel,
+      venueId: String = "venue",
+      framed: Location = here,
+  ) {
+    composeTestRule.setContent { VenueAreaScreen(venueId, {}, {}, viewModel, camera) }
+    awaitCameraAt(framed)
   }
 
   @Test
@@ -173,6 +188,13 @@ class VenueAreaScreenDeviceTest {
     )
     assertFalse("zoom buttons", composeTestRule.runOnUiThread { settings.isZoomControlsEnabled })
     assertFalse("map toolbar", composeTestRule.runOnUiThread { settings.isMapToolbarEnabled })
+  }
+
+  @Test
+  fun opensFramingTheSavedMarkerRatherThanTheDevice() {
+    show(areaViewModel("saved"), "saved", framed = elsewhere)
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_RADIUS).assertTextEquals("120 m")
   }
 
   /** Waits until the camera rests at [location]. */
