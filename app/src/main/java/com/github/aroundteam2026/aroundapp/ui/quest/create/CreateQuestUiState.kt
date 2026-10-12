@@ -4,6 +4,18 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 
+/** The radii offered as one-tap choices, each with the place it reaches. */
+enum class RadiusPreset(val meters: Int) {
+  INSIDE(25),
+  AT_THE_DOOR(50),
+  ON_THE_STREET(100);
+
+  companion object {
+    /** Whether [meters] is one of the presets. */
+    fun isPreset(meters: Int) = entries.any { it.meters == meters }
+  }
+}
+
 /** Why a text field of the quest form is invalid. */
 enum class QuestTextError {
   /** Empty or whitespace only. */
@@ -36,6 +48,9 @@ private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
  *
  * @property titleTouched Whether [title] has been edited; likewise for the other `Touched` flags.
  * @property proofType The kind of proof explorers submit.
+ * @property radiusMeters Distance within which a visit counts, always within [QuestLimits].
+ * @property customRadius Whether the venue chose a custom radius rather than one of [RadiusPreset],
+ *   which shows the radius slider.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -45,7 +60,13 @@ data class CreateQuestUiState(
     val descriptionTouched: Boolean = false,
     val requirementsTouched: Boolean = false,
     val proofType: ProofType = ProofType.PHOTO,
+    val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
+    val customRadius: Boolean = false,
 ) {
+  /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
+  val selectedRadiusPreset: Int?
+    get() = radiusMeters.takeIf { !customRadius && RadiusPreset.isPreset(it) }
+
   /** The error shown under the title, or null. */
   val titleError: QuestTextError?
     get() = shownError(title, QuestLimits.TITLE_MAX_LENGTH, titleTouched)

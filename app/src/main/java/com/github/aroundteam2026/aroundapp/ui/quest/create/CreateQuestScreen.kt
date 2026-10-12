@@ -53,6 +53,9 @@ fun CreateQuestScreen(
       completionActions =
           QuestCompletionActions(
               onProofTypeChange = viewModel::updateProofType,
+              onRadiusPresetSelect = viewModel::selectRadiusPreset,
+              onCustomRadiusSelect = viewModel::selectCustomRadius,
+              onRadiusChange = viewModel::updateRadius,
           ),
       onClose = onClose,
       modifier = modifier,
