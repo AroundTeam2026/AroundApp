@@ -35,7 +35,10 @@ import org.junit.Test
 class VenueAreaSaveLoadTest {
   private val dispatcher = StandardTestDispatcher()
   private val entrance = Location(46.5191, 6.6335)
+  // About 340 m from the entrance, farther than the saved address may drift
   private val placed = Location(46.5210, 6.6300)
+  // About 55 m from the entrance, close enough to keep the saved address
+  private val nearby = Location(46.5196, 6.6335)
   private val gare =
       AddressSuggestion("Place de la Gare 9", "1003 Lausanne", Location(46.517, 6.629))
   private val venue =
@@ -207,6 +210,73 @@ class VenueAreaSaveLoadTest {
 
     assertTrue(state.saveFailed)
     assertFalse(state.isSaving)
+  }
+
+  @Test
+  fun itOpensOnTheSavedAddressAndShowsItInTheField() = test {
+    assertEquals("Rue de Bourg 12", state.address)
+    assertEquals("Rue de Bourg 12", viewModel.addressQuery)
+  }
+
+  @Test
+  fun aVenueWithoutASavedAddressOpensWithoutOne() {
+    stored = venue.copy(address = null)
+    test {
+      assertEquals(entrance, state.marker)
+      assertNull(state.address)
+      assertEquals("", viewModel.addressQuery)
+    }
+  }
+
+  @Test
+  fun anAddressPickedBeforeLoadingFinishesIsKept() {
+    readGate = CompletableDeferred()
+    test {
+      viewModel.onAddressPicked(gare)
+      readGate.complete(Unit)
+      advanceUntilIdle()
+      assertEquals(gare.location, state.marker)
+      assertEquals(gare.address, state.address)
+      assertEquals(gare.address, viewModel.addressQuery)
+    }
+  }
+
+  @Test
+  fun textTypedBeforeLoadingFinishesStaysInTheField() {
+    readGate = CompletableDeferred()
+    test {
+      viewModel.onAddressQueryChanged("Pl")
+      readGate.complete(Unit)
+      advanceUntilIdle()
+      assertEquals("Pl", viewModel.addressQuery)
+      assertEquals("Rue de Bourg 12", state.address)
+    }
+  }
+
+  @Test
+  fun savingAgainKeepsTheSavedAddress() = test {
+    viewModel.onSave()
+    advanceUntilIdle()
+    assertEquals("Rue de Bourg 12", stored?.address)
+  }
+
+  @Test
+  fun aMarkerMovedNearTheSavedAddressSavesTheAddress() = test {
+    viewModel.onMarkerPlaced(nearby)
+    viewModel.onSave()
+    advanceUntilIdle()
+    assertEquals(nearby, stored?.location)
+    assertEquals("Rue de Bourg 12", stored?.address)
+  }
+
+  @Test
+  fun aMarkerMovedFarFromTheSavedAddressClearsItWhenSaved() = test {
+    viewModel.onMarkerPlaced(placed)
+    assertEquals("", viewModel.addressQuery)
+    viewModel.onSave()
+    advanceUntilIdle()
+    assertEquals(placed, stored?.location)
+    assertNull(stored?.address)
   }
 
   @Test

@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,10 +42,11 @@ import kotlinx.coroutines.launch
  * @property radiusMeters Radius of the circle around [marker], always within [VenueLimits].
  * @property areaToFrame The area the camera must move to, or null once the map framed it.
  * @property showsUserLocation Whether to draw the device's position, which needs the permission.
- * @property address The street address the venue last picked from the search, or null until it
- *   picks one. It is saved with the marker. Moving the marker up to
+ * @property address The street address the venue last picked from the search, or its saved one, or
+ *   null until it has one. It is saved with the marker. Moving the marker up to
  *   [VenueAreaViewModel.ADDRESS_DRIFT_METERS] from it keeps it, as the marker only refines the
- *   entrance; moving it farther forgets it, as it no longer says where the marker is.
+ *   entrance; moving it farther forgets it, as it no longer says where the marker is. A saved
+ *   address is measured from the saved marker.
  * @property addressSearch What the address search found.
  * @property isSaving Whether the marker, radius and address are being saved.
  * @property saveFailed Whether the latest save failed; the edits stay, to try again.
@@ -94,10 +96,11 @@ enum class AddressSearchStatus {
 }
 
 /**
- * Holds the marker a venue places on the map and the radius in which a visit counts. It opens on
- * the venue's saved marker and radius, framing them, or on the defaults when there are none. The
- * map starts on [DEFAULT_MAP_CENTER], then frames the device once its position is known, unless a
- * marker is already placed. The venue can also search its address, which places the marker there.
+ * Holds the marker a venue places on the map, the radius in which a visit counts and the venue's
+ * street address. It opens on the venue's saved marker, radius and address, framing them, or on the
+ * defaults when there are none. The map starts on [DEFAULT_MAP_CENTER], then frames the device once
+ * its position is known, unless a marker is already placed. The venue can also search its address,
+ * which places the marker there.
  *
  * @param venueId Id of the venue whose area this edits.
  */
@@ -132,9 +135,11 @@ class VenueAreaViewModel(
   }
 
   /**
-   * Shows the venue's saved area, framing its marker, with the radius clamped to [VenueLimits]. A
-   * marker placed or a radius chosen while it loads is kept, as the venue's latest choice. A venue
-   * that is unknown, has no saved marker or can't be read keeps the defaults.
+   * Shows the venue's saved area, framing its marker, with the radius clamped to [VenueLimits]. The
+   * saved address comes with the marker, and fills the field unless the venue typed in it. A marker
+   * placed or a radius chosen while it loads is kept, as the venue's latest choice; a placed marker
+   * keeps its own address too. A venue that is unknown, has no saved marker or can't be read keeps
+   * the defaults.
    */
   private suspend fun loadArea() {
     val venue =
@@ -146,11 +151,21 @@ class VenueAreaViewModel(
           null
         }
     val saved = venue?.location ?: return
-    _uiState.update {
+    val before = _uiState.getAndUpdate {
       val marked =
           if (it.marker != null) it
-          else it.copy(marker = saved, areaToFrame = saved.boundsWithin(FRAMED_RADIUS_METERS))
+          else
+              it.copy(
+                  marker = saved,
+                  areaToFrame = saved.boundsWithin(FRAMED_RADIUS_METERS),
+                  address = venue.address,
+              )
       if (radiusChosen) marked else marked.copy(radiusMeters = clampRadius(venue.radiusMeters))
+    }
+    val address = venue.address
+    if (before.marker == null && address != null) {
+      addressLocation = saved
+      if (addressQuery.isEmpty()) addressQuery = address
     }
   }
 
