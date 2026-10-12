@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.theme
 
 import androidx.compose.material3.Typography
@@ -8,41 +9,44 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
 /**
- * Creates a bold Bricolage Grotesque heading using Figma text metrics.
- *
- * @param size Font size in sp.
- * @param height Line height in sp; null preserves Figma Auto line height.
- * @param tracking Letter spacing in sp; defaults to -3% of the font size.
- */
-private fun heading(size: Int, height: Int? = null, tracking: Double = -size * 0.03) =
-    TextStyle(
-        fontFamily = AroundFonts.Title,
-        fontWeight = FontWeight.Bold,
-        fontSize = size.sp,
-        lineHeight = height?.sp ?: TextUnit.Unspecified,
-        letterSpacing = tracking.sp,
-    )
-
-/**
- * Creates an Instrument Sans body or control style with zero letter spacing.
- *
- * @param size Font size in sp.
- * @param height Line height in sp; null preserves Figma Auto line height.
- * @param weight Font weight for the text's role in the design.
- */
-private fun body(size: Int, height: Int? = null, weight: FontWeight = FontWeight.Normal) =
-    TextStyle(
-        fontFamily = AroundFonts.Body,
-        fontWeight = weight,
-        fontSize = size.sp,
-        lineHeight = height?.sp ?: TextUnit.Unspecified,
-        letterSpacing = 0.sp,
-    )
-
-/**
  * Shared UI styles read from the light and dark mockups; unspecified line height means Figma Auto.
+ *
+ * The helpers that build them live in here, not beside [Typography]: else reading a style before
+ * the theme ever ran would build [Typography] from styles that don't exist yet.
  */
 object AroundTextStyles {
+  /**
+   * Creates a bold Bricolage Grotesque heading using Figma text metrics.
+   *
+   * @param size Font size in sp.
+   * @param height Line height in sp; null preserves Figma Auto line height.
+   * @param tracking Letter spacing in sp; defaults to -3% of the font size.
+   */
+  private fun heading(size: Int, height: Int? = null, tracking: Double = -size * 0.03) =
+      TextStyle(
+          fontFamily = AroundFonts.Title,
+          fontWeight = FontWeight.Bold,
+          fontSize = size.sp,
+          lineHeight = height?.sp ?: TextUnit.Unspecified,
+          letterSpacing = tracking.sp,
+      )
+
+  /**
+   * Creates an Instrument Sans body or control style with zero letter spacing.
+   *
+   * @param size Font size in sp.
+   * @param height Line height in sp; null preserves Figma Auto line height.
+   * @param weight Font weight for the text's role in the design.
+   */
+  private fun body(size: Int, height: Int? = null, weight: FontWeight = FontWeight.Normal) =
+      TextStyle(
+          fontFamily = AroundFonts.Body,
+          fontWeight = weight,
+          fontSize = size.sp,
+          lineHeight = height?.sp ?: TextUnit.Unspecified,
+          letterSpacing = 0.sp,
+      )
+
   val Hero = heading(38, 41)
   val SetupTitle = heading(32, 35)
   val PageTitle = heading(30)
