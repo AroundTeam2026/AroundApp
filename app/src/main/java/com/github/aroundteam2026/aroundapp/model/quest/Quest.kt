@@ -21,6 +21,8 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  *   [QuestLimits.REQUIREMENTS_MAX_LENGTH] characters.
  * @property proofType The kind of proof explorers submit.
  * @property minPartySize Smallest party allowed to take the quest; defaults to a solo visit.
+ * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
+ *   least that many; defaults to at least.
  * @property reward What explorers get on completion, or null if there is none.
  * @property status Lifecycle state; only [QuestStatus.ACTIVE] quests are visible to explorers.
  * @property createdAt Creation time, in epoch milliseconds. Set by [QuestRepository.createQuest].
@@ -38,6 +40,7 @@ data class Quest(
     val requirements: String,
     val proofType: ProofType,
     val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
+    val exactPartySize: Boolean = false,
     val reward: Reward?,
     val status: QuestStatus,
     val createdAt: Long,
