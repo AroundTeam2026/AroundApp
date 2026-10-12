@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
-    <string name="create_quest_title">New quest</string>
+    <string name="create_quest_heading">New quest</string>
     <string name="create_quest_close">Close</string>
     <string name="create_quest_field_title">Title</string>
     <string name="create_quest_field_title_hint">Find the hidden fox</string>

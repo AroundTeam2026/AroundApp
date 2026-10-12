@@ -149,7 +149,7 @@ private fun CreateQuestHeader(onClose: () -> Unit) {
       }
     }
     Text(
-        stringResource(R.string.create_quest_title),
+        stringResource(R.string.create_quest_heading),
         style = AroundTextStyles.CardTitle,
         color = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.semantics { heading() },
