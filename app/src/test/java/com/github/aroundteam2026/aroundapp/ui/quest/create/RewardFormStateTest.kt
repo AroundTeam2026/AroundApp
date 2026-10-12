@@ -4,6 +4,8 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import java.time.LocalDate
+import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -109,5 +111,22 @@ class RewardFormStateTest {
     )
     assertEquals(QuestTextError.BLANK, untouched.copy(itemNameTouched = true).itemNameError)
     assertEquals(QuestTextError.BLANK, untouched.copy(descriptionTouched = true).descriptionError)
+  }
+
+  @Test
+  fun rewardExpiresAtTheMidnightThatEndsItsLastDay() {
+    val lastDay = LocalDate.of(2026, 12, 31)
+    val endOfDay = LocalDate.of(2027, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    assertEquals(
+        Reward.Other("A tour", endOfDay),
+        other.copy(expiryDate = lastDay).toReward(ZoneOffset.UTC),
+    )
+    assertNull(other.toReward(ZoneOffset.UTC)?.expiresAt)
+  }
+
+  @Test
+  fun anExpiryThatHasPassedBlocksAnyRewardButNotNoReward() {
+    assertFalse(other.copy(expiryInPast = true).isValid)
+    assertTrue(RewardFormState(expiryInPast = true).isValid)
   }
 }

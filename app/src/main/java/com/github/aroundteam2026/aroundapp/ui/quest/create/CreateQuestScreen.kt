@@ -74,6 +74,7 @@ fun CreateQuestScreen(
               onItemNameChange = viewModel::updateRewardItemName,
               onSpecificsChange = viewModel::updateRewardSpecifics,
               onDescriptionChange = viewModel::updateRewardDescription,
+              onExpiryDateChange = viewModel::updateExpiryDate,
           ),
       onClose = onClose,
       modifier = modifier,

@@ -26,6 +26,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -328,5 +329,35 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
         .performScrollTo()
         .assertTextEquals("Enter at least 0,01.")
+  }
+
+  @Test
+  fun pickingAnExpiryShowsItAndClearingRemovesIt() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CONFIRM).performClick()
+    assertEquals(LocalDate.now(), viewModel.uiState.value.reward.expiryDate)
+
+    viewModel.updateExpiryDate(LocalDate.of(2099, 12, 31))
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("31 Dec 2099")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_HINT)
+        .performScrollTo()
+        .assertTextEquals("Explorers see “Valid until 31 Dec” on their reward.")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CLEAR).performClick()
+    assertNull(viewModel.uiState.value.reward.expiryDate)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("No end date")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_HINT).assertDoesNotExist()
+  }
+
+  @Test
+  fun aPastExpiryShowsItsErrorInsteadOfTheHint() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    viewModel.updateExpiryDate(LocalDate.now().minusDays(1))
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR)
+        .performScrollTo()
+        .assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_HINT).assertDoesNotExist()
   }
 }

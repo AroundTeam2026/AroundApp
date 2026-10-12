@@ -4,6 +4,8 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import java.time.LocalDate
+import java.time.ZoneId
 
 /** The kinds of reward a venue can pick, in the picker's order. */
 enum class RewardType {
@@ -39,6 +41,8 @@ enum class DiscountAmountError {
  * @property itemName The free item, for [RewardType.FREE_ITEM].
  * @property specifics Optional details about the reward.
  * @property description The reward itself, for [RewardType.OTHER].
+ * @property expiryDate The last day the reward can be used, or null if it never expires.
+ * @property expiryInPast Whether [expiryDate] had already passed when it was picked.
  * @property discountAmountTouched Whether [discountAmount] has been edited; likewise for the other
  *   `Touched` flags.
  */
@@ -49,6 +53,8 @@ data class RewardFormState(
     val itemName: String = "",
     val specifics: String = "",
     val description: String = "",
+    val expiryDate: LocalDate? = null,
+    val expiryInPast: Boolean = false,
     val discountAmountTouched: Boolean = false,
     val itemNameTouched: Boolean = false,
     val descriptionTouched: Boolean = false,
@@ -95,8 +101,14 @@ data class RewardFormState(
             descriptionTouched,
         )
 
-  /** Whether the fields of [type] are valid, touched or not; no reward is always valid. */
+  /**
+   * Whether the fields of [type] and the expiry are valid, touched or not; no reward is always
+   * valid.
+   */
   val isValid: Boolean
+    get() = type == null || (!expiryInPast && fieldsValid)
+
+  private val fieldsValid: Boolean
     get() =
         when (type) {
           null -> true
@@ -111,17 +123,18 @@ data class RewardFormState(
   /**
    * The reward to save, trimmed, or null for no reward. Only call it when [isValid]: a discount
    * whose amount isn't a number throws.
+   *
+   * It expires at the midnight that ends [expiryDate] in [zone], so it can be used all that day.
    */
-  fun toReward(): Reward? =
-      when (type) {
-        null -> null
-        RewardType.DISCOUNT ->
-            Reward.Discount(
-                requireNotNull(parsedAmount),
-                discountUnit,
-                specifics.trim().ifEmpty { null },
-            )
-        RewardType.FREE_ITEM -> Reward.FreeItem(itemName.trim(), specifics.trim().ifEmpty { null })
-        RewardType.OTHER -> Reward.Other(description.trim())
-      }
+  fun toReward(zone: ZoneId = ZoneId.systemDefault()): Reward? {
+    val expiresAt = expiryDate?.plusDays(1)?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
+    val details = specifics.trim().ifEmpty { null }
+    return when (type) {
+      null -> null
+      RewardType.DISCOUNT ->
+          Reward.Discount(requireNotNull(parsedAmount), discountUnit, details, expiresAt)
+      RewardType.FREE_ITEM -> Reward.FreeItem(itemName.trim(), details, expiresAt)
+      RewardType.OTHER -> Reward.Other(description.trim(), expiresAt)
+    }
+  }
 }
