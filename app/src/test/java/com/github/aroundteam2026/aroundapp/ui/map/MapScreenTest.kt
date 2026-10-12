@@ -201,7 +201,7 @@ class MapScreenTest {
 }
 
 /** Stands in for the system permission dialog: records requests and answers with [answer]. */
-private class PermissionDialog(private val answer: Map<String, Boolean>?) :
+internal class PermissionDialog(private val answer: Map<String, Boolean>?) :
     ActivityResultRegistryOwner {
   val requests = mutableListOf<Array<String>>()
 
