@@ -307,4 +307,26 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
         .assertTextEquals("Enter a number.")
   }
+
+  @Test
+  fun aClearedDiscountAmountIsRequired() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().performTextInput("5")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextClearance()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("This field is required.")
+  }
+
+  @Test
+  @Config(qualifiers = "+fr")
+  fun tooSmallAmountShowsTheMinimumWithThePhonesDecimalSeparator() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().performTextInput("0")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Enter at least 0,01.")
+  }
 }
