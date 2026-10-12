@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
@@ -95,6 +96,16 @@ class CreateQuestViewModel(
   /** Picks [type] as the reward, or no reward if it is null. */
   fun selectRewardType(type: RewardType?) {
     updateReward { it.copy(type = type) }
+  }
+
+  /** Sets the discount amount to [value], as typed, and marks it as edited. */
+  fun updateDiscountAmount(value: String) {
+    updateReward { it.copy(discountAmount = value, discountAmountTouched = true) }
+  }
+
+  /** Sets whether the discount is in percent or francs to [unit]. */
+  fun updateDiscountUnit(unit: DiscountUnit) {
+    updateReward { it.copy(discountUnit = unit) }
   }
 
   /** Sets the free item to [value] and marks it as edited. */

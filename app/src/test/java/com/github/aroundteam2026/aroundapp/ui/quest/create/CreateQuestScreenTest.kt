@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -274,5 +275,30 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM_ERROR)
         .performScrollTo()
         .assertTextEquals("This field is required.")
+  }
+
+  @Test
+  fun discountShowsTheAmountErrorOfItsUnit() {
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DISCOUNT).performScrollTo().performClick()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT)
+        .performScrollTo()
+        .performTextInput("120")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Use 100 % or less.")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_UNIT_PERCENT).assertIsSelected()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_UNIT_CHF).performClick().assertIsSelected()
+    assertEquals(DiscountUnit.CHF, viewModel.uiState.value.reward.discountUnit)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).assertExists()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextClearance()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextInput("abc")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .assertTextEquals("Enter a number.")
   }
 }
