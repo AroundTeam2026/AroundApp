@@ -362,7 +362,7 @@ private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate
     OptionalLabel(stringResource(R.string.create_quest_reward_expires))
     Surface(
         onClick = { picking = true },
-        shape = AroundCorners.InsetField,
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY),
