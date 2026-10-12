@@ -29,6 +29,8 @@
     <string name="create_quest_radius_inside">Inside</string>
     <string name="create_quest_radius_door">At the door</string>
     <string name="create_quest_radius_street">On the street</string>
+    <string name="create_quest_radius_map">Map of the %1$d m unlock radius around your venue</string>
+    <string name="create_quest_walk_time">≈ %1$d min walk</string>
     <string name="create_quest_radius_custom">Custom</string>
     <string name="create_quest_radius_range">%1$d–%2$d m</string>
 </resources>

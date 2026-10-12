@@ -292,6 +292,10 @@ private fun UnlockRadius(state: CreateQuestUiState, actions: QuestCompletionActi
       style = AroundTextStyles.Caption,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
   )
+  state.venueLocation?.let {
+    Spacer(Modifier.height(AroundSpacing.CompactGap))
+    QuestRadiusMap(it, state.radiusMeters, state.walkMinutes)
+  }
   Spacer(Modifier.height(AroundSpacing.CompactGap))
   Row(
       Modifier.fillMaxWidth().height(IntrinsicSize.Min),

@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -137,6 +138,7 @@ private fun CreateQuestPreview() {
                 description =
                     "A tiny ceramic fox hides somewhere in the café. Spot it and snap a photo.",
                 requirements = "Order any drink. One photo per party.",
+                venueLocation = Location(46.5220, 6.6330),
             ),
         onTitleChange = {},
         onDescriptionChange = {},

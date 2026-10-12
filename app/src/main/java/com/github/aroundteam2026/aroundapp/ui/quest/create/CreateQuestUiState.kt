@@ -1,8 +1,13 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
+import kotlin.math.ceil
+
+/** An average walking pace, about 5 km/h. */
+private const val WALKING_METERS_PER_MINUTE = 80.0
 
 /** The radii offered as one-tap choices, each with the place it reaches. */
 enum class RadiusPreset(val meters: Int) {
@@ -51,6 +56,8 @@ private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
  * @property radiusMeters Distance within which a visit counts, always within [QuestLimits].
  * @property customRadius Whether the venue chose a custom radius rather than one of [RadiusPreset],
  *   which shows the radius slider.
+ * @property venueLocation Where the venue is, to centre the radius map; null until it is loaded, or
+ *   if the venue has no location.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -62,10 +69,15 @@ data class CreateQuestUiState(
     val proofType: ProofType = ProofType.PHOTO,
     val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
     val customRadius: Boolean = false,
+    val venueLocation: Location? = null,
 ) {
   /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
   val selectedRadiusPreset: Int?
     get() = radiusMeters.takeIf { !customRadius && RadiusPreset.isPreset(it) }
+
+  /** About how many minutes it takes to walk across [radiusMeters], never less than one. */
+  val walkMinutes: Int
+    get() = ceil(radiusMeters / WALKING_METERS_PER_MINUTE).toInt().coerceAtLeast(1)
 
   /** The error shown under the title, or null. */
   val titleError: QuestTextError?

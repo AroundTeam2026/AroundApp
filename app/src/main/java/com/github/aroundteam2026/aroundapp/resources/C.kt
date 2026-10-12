@@ -100,5 +100,7 @@ object C {
     const val CREATE_QUEST_RADIUS_PRESET = "create_quest_radius_preset"
     const val CREATE_QUEST_RADIUS_CUSTOM = "create_quest_radius_custom"
     const val CREATE_QUEST_RADIUS_SLIDER = "create_quest_radius_slider"
+    const val CREATE_QUEST_RADIUS_MAP = "create_quest_radius_map"
+    const val CREATE_QUEST_WALK_TIME = "create_quest_walk_time"
   }
 }

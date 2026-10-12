@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
  *
  * The radius starts at the venue's own radius once it is loaded, unless the venue has already
  * chosen one; until then, or if the venue can't be read, it is [QuestLimits.DEFAULT_RADIUS_METERS].
+ * The venue's location, once loaded, centres the radius map.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
@@ -33,7 +34,7 @@ class CreateQuestViewModel(
   private var radiusChosen = false
 
   init {
-    viewModelScope.launch { loadVenueRadius() }
+    viewModelScope.launch { loadVenue() }
   }
 
   /** Sets the title to [value] and marks it as edited. */
@@ -74,8 +75,11 @@ class CreateQuestViewModel(
     mutableUiState.update { it.copy(radiusMeters = clampRadius(meters)) }
   }
 
-  /** Starts the radius at the signed-in venue's, unless the venue has already chosen one. */
-  private suspend fun loadVenueRadius() {
+  /**
+   * Reads the signed-in venue: its location for the radius map, and its radius as the starting one,
+   * unless the venue has already chosen one.
+   */
+  private suspend fun loadVenue() {
     val venueId = authRepository.currentUserId.value ?: return
     val venue =
         try {
@@ -86,13 +90,15 @@ class CreateQuestViewModel(
           // The default radius still makes a valid quest, so the form stays usable
           null
         } ?: return
-    if (radiusChosen) return
     val radius = clampRadius(venue.radiusMeters)
     mutableUiState.update {
-      it.copy(
-          radiusMeters = radius,
-          customRadius = !RadiusPreset.isPreset(radius),
-      )
+      if (radiusChosen) it.copy(venueLocation = venue.location)
+      else
+          it.copy(
+              venueLocation = venue.location,
+              radiusMeters = radius,
+              customRadius = !RadiusPreset.isPreset(radius),
+          )
     }
   }
 
