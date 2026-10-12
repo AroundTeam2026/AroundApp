@@ -208,11 +208,20 @@ class CreateQuestViewModelTest {
   }
 
   @Test
-  fun venueRadiusDoesNotOverwriteARadiusAlreadyChosen() {
+  fun venueRadiusDoesNotOverwriteARadiusAlreadyChosenButItsLocationLoads() {
     viewModel = newViewModelWithVenueRadius(100)
     viewModel.selectRadiusPreset(25)
     loadVenue()
     assertEquals(25, state.radiusMeters)
+    assertEquals(venue(100).location, state.venueLocation)
+  }
+
+  @Test
+  fun venueLocationIsUnknownUntilTheVenueLoads() {
+    viewModel = newViewModelWithVenueRadius(100)
+    assertNull(state.venueLocation)
+    loadVenue()
+    assertEquals(venue(100).location, state.venueLocation)
   }
 
   @Test

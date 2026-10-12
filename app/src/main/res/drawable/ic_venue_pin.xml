@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The venue's pin on the quest form's radius map, from Figma; drawn as is, in its own colours -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="50dp"
+    android:viewportWidth="40"
+    android:viewportHeight="50">
+    <path
+        android:pathData="M20 0C9 0 0 8.66667 0 19.3333C0 32 16 47 18.5 49.3333C18.9034 49.7204 19.4409 49.9365 20 49.9365C20.5591 49.9365 21.0966 49.7204 21.5 49.3333C24 47 40 32 40 19.3333C40 8.66667 31 0 20 0Z"
+        android:fillColor="#4D0092"
+        android:strokeWidth="2.5"
+        android:strokeColor="#FDFFE8" />
+    <path
+        android:pathData="M20 25.8333C23.6819 25.8333 26.6667 22.8486 26.6667 19.1667C26.6667 15.4848 23.6819 12.5 20 12.5C16.3181 12.5 13.3333 15.4848 13.3333 19.1667C13.3333 22.8486 16.3181 25.8333 20 25.8333Z"
+        android:fillColor="#62BAAD" />
+</vector>
