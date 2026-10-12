@@ -245,14 +245,14 @@ class VenueAreaSaveLoadTest {
   }
 
   @Test
-  fun textTypedBeforeLoadingFinishesStaysInTheField() {
+  fun textTypedBeforeLoadingFinishesStaysInTheFieldInsteadOfTheSavedAddress() {
     readGate = CompletableDeferred()
     test {
       viewModel.onAddressQueryChanged("Pl")
       readGate.complete(Unit)
       advanceUntilIdle()
       assertEquals("Pl", viewModel.addressQuery)
-      assertEquals("Rue de Bourg 12", state.address)
+      assertNull(state.address)
     }
   }
 
@@ -289,5 +289,22 @@ class VenueAreaSaveLoadTest {
     advanceUntilIdle()
     assertEquals(gare.location, stored?.location)
     assertEquals("Place de la Gare 9, 1003 Lausanne", stored?.address)
+  }
+
+  @Test
+  fun clearingTheFieldThenSavingClearsTheAddress() = test {
+    viewModel.onAddressCleared()
+    viewModel.onSave()
+    advanceUntilIdle()
+    assertEquals(entrance, stored?.location)
+    assertNull(stored?.address)
+  }
+
+  @Test
+  fun typingOverTheSavedAddressThenSavingClearsIt() = test {
+    viewModel.onAddressQueryChanged("Rue de Bourg 1")
+    viewModel.onSave()
+    advanceUntilIdle()
+    assertNull(stored?.address)
   }
 }

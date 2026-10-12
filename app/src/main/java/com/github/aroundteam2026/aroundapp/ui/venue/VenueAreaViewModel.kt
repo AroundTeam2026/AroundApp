@@ -43,7 +43,8 @@ import kotlinx.coroutines.launch
  * @property areaToFrame The area the camera must move to, or null once the map framed it.
  * @property showsUserLocation Whether to draw the device's position, which needs the permission.
  * @property address The street address the venue last picked from the search, or its saved one, or
- *   null until it has one. It is saved with the marker. Moving the marker up to
+ *   null until it has one. It is saved with the marker, so it is kept only while the address field
+ *   shows it: clearing the field or typing over it forgets it. Moving the marker up to
  *   [VenueAreaViewModel.ADDRESS_DRIFT_METERS] from it keeps it, as the marker only refines the
  *   entrance; moving it farther forgets it, as it no longer says where the marker is. A saved
  *   address is measured from the saved marker.
@@ -136,10 +137,10 @@ class VenueAreaViewModel(
 
   /**
    * Shows the venue's saved area, framing its marker, with the radius clamped to [VenueLimits]. The
-   * saved address comes with the marker, and fills the field unless the venue typed in it. A marker
-   * placed or a radius chosen while it loads is kept, as the venue's latest choice; a placed marker
-   * keeps its own address too. A venue that is unknown, has no saved marker or can't be read keeps
-   * the defaults.
+   * saved address comes with the marker and fills the field, unless the venue typed in it: the
+   * field then doesn't show the address, so it isn't kept. A marker placed or a radius chosen while
+   * it loads is kept, as the venue's latest choice; a placed marker keeps its own address too. A
+   * venue that is unknown, has no saved marker or can't be read keeps the defaults.
    */
   private suspend fun loadArea() {
     val venue =
@@ -151,6 +152,7 @@ class VenueAreaViewModel(
           null
         }
     val saved = venue?.location ?: return
+    val address = venue.address?.takeIf { addressQuery.isEmpty() }
     val before = _uiState.getAndUpdate {
       val marked =
           if (it.marker != null) it
@@ -158,14 +160,13 @@ class VenueAreaViewModel(
               it.copy(
                   marker = saved,
                   areaToFrame = saved.boundsWithin(FRAMED_RADIUS_METERS),
-                  address = venue.address,
+                  address = address,
               )
       if (radiusChosen) marked else marked.copy(radiusMeters = clampRadius(venue.radiusMeters))
     }
-    val address = venue.address
     if (before.marker == null && address != null) {
       addressLocation = saved
-      if (addressQuery.isEmpty()) addressQuery = address
+      addressQuery = address
     }
   }
 
@@ -232,17 +233,21 @@ class VenueAreaViewModel(
   /**
    * Called as the venue types [query] in the address field. Once the trimmed query has at least
    * [MIN_QUERY_LENGTH] characters, it is searched after [SEARCH_DELAY_MILLIS] without typing,
-   * around the area the map shows; each new query replaces the search still pending or running.
+   * around the area the map shows; each new query replaces the search still pending or running. A
+   * query other than the kept address forgets it, as the field no longer shows it.
    */
   fun onAddressQueryChanged(query: String) {
     addressLookup?.cancel()
     addressQuery = query
+    val forgets = query != _uiState.value.address
+    if (forgets) addressLocation = null
     val searches = query.trim().length >= MIN_QUERY_LENGTH
     _uiState.update {
       it.copy(
+          address = if (forgets) null else it.address,
           addressSearch =
               if (searches) it.addressSearch.copy(status = AddressSearchStatus.SEARCHING)
-              else AddressSearchUiState()
+              else AddressSearchUiState(),
       )
     }
     if (searches) addressLookup = searchAddress(query, delayMillis = SEARCH_DELAY_MILLIS)
@@ -283,9 +288,11 @@ class VenueAreaViewModel(
     }
   }
 
-  /** Called when the venue clears the field; the marker and the picked address stay. */
+  /** Called when the venue clears the field: the marker stays, the address is forgotten. */
   fun onAddressCleared() {
     addressQuery = ""
+    addressLocation = null
+    _uiState.update { it.copy(address = null) }
     onAddressSearchDismissed()
   }
 
