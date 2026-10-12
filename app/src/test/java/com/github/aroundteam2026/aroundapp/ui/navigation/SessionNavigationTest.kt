@@ -7,6 +7,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
@@ -133,6 +137,42 @@ class SessionNavigationTest {
     compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
     submit()
+  }
+
+  private fun assertFreshAuthFormAfterSignOut(repo: FakeAuthRepository) {
+    compose.runOnIdle { repo.signOut() }
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    compose
+        .onNodeWithTag(C.Tag.AUTH_EMAIL)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+    compose
+        .onNodeWithTag(C.Tag.AUTH_PASSWORD)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+    compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+    compose
+        .onNodeWithTag(C.Tag.AUTH_CONFIRMATION)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+  }
+
+  @Test
+  fun signOutAfterSignInReturnsToAnEmptyAuthForm() {
+    val repo = FakeAuthRepository()
+    repo.addAccount("ada@around.test", "123456")
+    launch(repo)
+    submit()
+    assertFreshAuthFormAfterSignOut(repo)
+  }
+
+  @Test
+  fun sessionLossAfterSignUpReturnsToAnEmptyAuthForm() {
+    val repo = FakeAuthRepository()
+    launch(repo)
+    compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
+    submit()
+    assertFreshAuthFormAfterSignOut(repo)
   }
 
   @Test

@@ -2,8 +2,12 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
@@ -31,10 +35,7 @@ fun SessionNavigation(
       }
   AppRoot(
       destination = destination,
-      authFlow = {
-        val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(repository))
-        AuthScreen(authViewModel)
-      },
+      authFlow = { SessionAuthFlow(repository) },
       explorerHome = {
         val session = state as SessionState.SignedIn
         savedFlows.SaveableStateProvider(session.userId) { mainScreen() }
@@ -43,4 +44,18 @@ fun SessionNavigation(
       venueEntry = {},
       profileError = {},
   )
+}
+
+/** Owns form state only while the auth slot is present; leaving it clears credentials and jobs. */
+@Composable
+private fun SessionAuthFlow(repository: AuthRepository) {
+  val owner = remember {
+    object : ViewModelStoreOwner {
+      override val viewModelStore = ViewModelStore()
+    }
+  }
+  DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
+  val authViewModel: AuthViewModel =
+      viewModel(viewModelStoreOwner = owner, factory = AuthViewModel.factory(repository))
+  AuthScreen(authViewModel)
 }
