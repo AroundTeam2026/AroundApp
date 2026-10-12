@@ -66,9 +66,9 @@
     <string name="create_quest_reward_description">Describe the reward</string>
     <string name="create_quest_reward_description_hint">Free mini croissant with any coffee. One per visit.</string>
     <string name="create_quest_reward_expires">Expires</string>
-    <string name="create_quest_reward_no_expiry">No end date</string>
+    <string name="create_quest_reward_no_expiry">No expiry</string>
+    <string name="create_quest_reward_set_date">Set date</string>
     <string name="create_quest_reward_expiry_clear">Remove the end date</string>
-    <string name="create_quest_reward_valid_until">Explorers see “Valid until %1$s” on their reward.</string>
     <string name="create_quest_reward_expiry_past">Pick today or a later date.</string>
     <string name="create_quest_reward_expiry_confirm">OK</string>
     <string name="create_quest_reward_expiry_cancel">Cancel</string>

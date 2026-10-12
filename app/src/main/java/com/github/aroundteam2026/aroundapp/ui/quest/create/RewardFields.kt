@@ -345,8 +345,8 @@ private fun DiscountUnitToggle(selected: DiscountUnit, onSelect: (DiscountUnit) 
 }
 
 /**
- * The optional last day of the reward: a field that opens a date picker, a button to clear it, and
- * what explorers will see, or an error if the day has passed.
+ * The optional last day of the reward: a field that opens a date picker, "Set date" while empty or a
+ * button to clear it once set, and an error if the day has passed.
  */
 @Composable
 private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate?) -> Unit) {
@@ -389,7 +389,13 @@ private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate
             color = if (date == null) muted else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
-        if (date != null) {
+        if (date == null) {
+          Text(
+              stringResource(R.string.create_quest_reward_set_date),
+              style = AroundTextStyles.FieldLabel,
+              color = AroundTheme.colors.accentText,
+          )
+        } else {
           Surface(
               onClick = { onChange(null) },
               shape = CircleShape,
@@ -416,16 +422,6 @@ private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate
               Modifier.testTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR).semantics {
                 liveRegion = LiveRegionMode.Polite
               },
-      )
-    } else if (date != null) {
-      Text(
-          stringResource(
-              R.string.create_quest_reward_valid_until,
-              date.format(DateTimeFormatter.ofPattern(SHORT_DATE_PATTERN)),
-          ),
-          style = AroundTextStyles.Small,
-          color = muted,
-          modifier = Modifier.testTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_HINT),
       )
     }
   }
@@ -509,6 +505,5 @@ private val UNIT_HEIGHT: Dp = 36.dp
 private val EXPIRY_HEIGHT: Dp = 46.dp
 private val CLEAR_SIZE: Dp = 28.dp
 
-/** The expiry as in Figma, e.g. "31 Dec 2026", and as explorers see it, e.g. "31 Dec". */
+/** The expiry as in Figma, e.g. "31 Dec 2026". */
 private const val DATE_PATTERN = "d MMM yyyy"
-private const val SHORT_DATE_PATTERN = "d MMM"

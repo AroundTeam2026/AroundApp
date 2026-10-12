@@ -340,24 +340,24 @@ class CreateQuestScreenTest {
 
     viewModel.updateExpiryDate(LocalDate.of(2099, 12, 31))
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("31 Dec 2099")
-    compose
-        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_HINT)
-        .performScrollTo()
-        .assertTextEquals("Explorers see “Valid until 31 Dec” on their reward.")
+    compose.onNodeWithText("Set date").assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CLEAR).performClick()
     assertNull(viewModel.uiState.value.reward.expiryDate)
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("No end date")
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_HINT).assertDoesNotExist()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY)
+        .assertTextContains("No expiry")
+        .assertTextContains("Set date")
   }
 
   @Test
-  fun aPastExpiryShowsItsErrorInsteadOfTheHint() {
+  fun aPastExpiryShowsItsError() {
     viewModel.selectRewardType(RewardType.OTHER)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR).assertDoesNotExist()
     viewModel.updateExpiryDate(LocalDate.now().minusDays(1))
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR)
         .performScrollTo()
-        .assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_HINT).assertDoesNotExist()
+        .assertTextEquals("Pick today or a later date.")
   }
 }
