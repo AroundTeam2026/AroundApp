@@ -2,6 +2,9 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -10,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -112,5 +116,22 @@ class CreateQuestScreenTest {
   fun closeButtonCallsOnClose() {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
     assertEquals(1, closeCalls)
+  }
+
+  @Test
+  fun showsThePhotoProofByDefault() {
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_PHOTO).performScrollTo().assertIsSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_TEXT).assertIsNotSelected()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_EXPLORER_PREVIEW)
+        .assertTextContains("Will come back to this once explorer view is done", substring = true)
+  }
+
+  @Test
+  fun tappingAProofTypeSelectsIt() {
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_TEXT).performScrollTo().performClick()
+    assertEquals(ProofType.TEXT, viewModel.uiState.value.proofType)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_TEXT).assertIsSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_PHOTO).assertIsNotSelected()
   }
 }

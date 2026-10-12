@@ -15,4 +15,12 @@
         <item quantity="one">Use %1$d character or fewer.</item>
         <item quantity="other">Use %1$d characters or fewer.</item>
     </plurals>
+    <string name="create_quest_proof_type">Proof</string>
+    <string name="create_quest_proof_photo">Photo</string>
+    <string name="create_quest_proof_photo_hint">Snap it on the spot. You approve it.</string>
+    <string name="create_quest_proof_text">Text answer</string>
+    <string name="create_quest_proof_text_hint">A word, a name or a short reply.</string>
+    <string name="create_quest_explorers_see">Explorers see:</string>
+    <!-- Placeholder until the explorer's quest view exists -->
+    <string name="create_quest_explorer_preview">Will come back to this once explorer view is done</string>
 </resources>
