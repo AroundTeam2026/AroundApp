@@ -70,6 +70,4 @@
     <string name="create_quest_reward_set_date">Set date</string>
     <string name="create_quest_reward_expiry_clear">Remove the end date</string>
     <string name="create_quest_reward_expiry_past">Pick today or a later date.</string>
-    <string name="create_quest_reward_expiry_confirm">OK</string>
-    <string name="create_quest_reward_expiry_cancel">Cancel</string>
 </resources>

@@ -461,12 +461,12 @@ private fun ExpiryDatePicker(
             enabled = state.selectedDateMillis != null,
             modifier = Modifier.testTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CONFIRM),
         ) {
-          Text(stringResource(R.string.create_quest_reward_expiry_confirm))
+          Text(stringResource(android.R.string.ok))
         }
       },
       dismissButton = {
         TextButton(onClick = onDismiss) {
-          Text(stringResource(R.string.create_quest_reward_expiry_cancel))
+          Text(stringResource(android.R.string.cancel))
         }
       },
   ) {
