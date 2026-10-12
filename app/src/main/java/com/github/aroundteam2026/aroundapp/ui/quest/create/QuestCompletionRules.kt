@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,7 +32,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -88,61 +86,6 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
     PartyCard(state, actions)
   }
-}
-
-/** A card that shows whether it is [selected], in the light purple of a chosen option. */
-@Composable
-internal fun SelectableOption(
-    selected: Boolean,
-    onClick: () -> Unit,
-    tag: String,
-    shape: Shape,
-    padding: PaddingValues,
-    modifier: Modifier = Modifier,
-    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-  Surface(
-      selected = selected,
-      onClick = onClick,
-      shape = shape,
-      color =
-          if (selected) MaterialTheme.colorScheme.primaryContainer
-          else MaterialTheme.colorScheme.surface,
-      border =
-          if (selected) BorderStroke(SELECTED_BORDER, MaterialTheme.colorScheme.primary)
-          else BorderStroke(BORDER, MaterialTheme.colorScheme.outline),
-      modifier = modifier.testTag(tag),
-  ) {
-    Column(
-        Modifier.padding(padding),
-        verticalArrangement = Arrangement.spacedBy(OPTION_TEXT_GAP),
-        horizontalAlignment = horizontalAlignment,
-    ) {
-      content()
-    }
-  }
-}
-
-/** The title and hint of a [SelectableOption], in the accent colour when it is selected. */
-@Composable
-internal fun OptionText(
-    title: String,
-    hint: String,
-    selected: Boolean,
-    hintStyle: TextStyle = AroundTextStyles.Small,
-) {
-  val accent = AroundTheme.colors.accentText
-  Text(
-      title,
-      style = AroundTextStyles.Subtitle,
-      color = if (selected) accent else MaterialTheme.colorScheme.onSurface,
-  )
-  Text(
-      hint,
-      style = hintStyle,
-      color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-  )
 }
 
 /** One card per [ProofType], side by side and as tall as each other. */
@@ -580,8 +523,6 @@ private fun RowScope.PartyRule(
 
 private val BORDER: Dp = 1.dp
 private val RING_BORDER: Dp = 1.5.dp
-private val SELECTED_BORDER: Dp = 2.dp
-internal val OPTION_TEXT_GAP: Dp = 2.dp
 private val CHECK_ICON_SIZE: Dp = 14.dp
 private val SMALL_ICON_SIZE: Dp = 16.dp
 private val ICON_SIZE: Dp = 20.dp
