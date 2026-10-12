@@ -322,6 +322,45 @@ class CreateQuestViewModelTest {
     assertTrue(state.canSubmit)
   }
 
+  @Test
+  fun rewardStartsEmptyAndPickingTheSameTypeAgainRemovesIt() {
+    assertNull(state.reward.type)
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    assertEquals(RewardType.FREE_ITEM, state.reward.type)
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    assertNull(state.reward.type)
+  }
+
+  @Test
+  fun switchingRewardTypeKeepsWhatWasTyped() {
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    viewModel.updateRewardItemName("Coffee ")
+    viewModel.updateRewardSpecifics("Any size")
+    viewModel.selectRewardType(RewardType.OTHER)
+    viewModel.updateRewardDescription("A tour")
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    assertEquals(
+        RewardFormState(
+            type = RewardType.FREE_ITEM,
+            itemName = "Coffee ",
+            specifics = "Any size",
+            description = "A tour",
+            itemNameTouched = true,
+            descriptionTouched = true,
+        ),
+        state.reward,
+    )
+  }
+
+  @Test
+  fun anIncompleteRewardBlocksSubmitUntilItIsFilledIn() {
+    fillValid()
+    viewModel.selectRewardType(RewardType.OTHER)
+    assertFalse(state.canSubmit)
+    viewModel.updateRewardDescription("A tour")
+    assertTrue(state.canSubmit)
+  }
+
   private companion object {
     const val VENUE_ID = "venue-1"
   }

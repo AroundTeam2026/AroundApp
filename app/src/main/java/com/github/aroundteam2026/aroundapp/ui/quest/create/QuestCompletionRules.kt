@@ -92,7 +92,7 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
 
 /** A card that shows whether it is [selected], in the light purple of a chosen option. */
 @Composable
-private fun SelectableOption(
+internal fun SelectableOption(
     selected: Boolean,
     onClick: () -> Unit,
     tag: String,

@@ -225,4 +225,51 @@ class CreateQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXACTLY).assertIsSelected()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_AT_LEAST).assertIsNotSelected()
   }
+
+  @Test
+  fun rewardFieldsShowOnlyForThePickedType() {
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).performScrollTo()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).performClick().assertIsSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo().assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).assertExists()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_OTHER).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).assertIsNotSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertExists()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_OTHER).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertDoesNotExist()
+  }
+
+  @Test
+  fun typingInTheRewardFieldsUpdatesTheReward() {
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo().performTextInput("Tea")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).performScrollTo()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).performTextInput("Any size")
+    viewModel.selectRewardType(RewardType.OTHER)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).performScrollTo()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).performTextInput("A tour")
+
+    val reward = viewModel.uiState.value.reward
+    assertEquals(
+        listOf("Tea", "Any size", "A tour"),
+        listOf(reward.itemName, reward.specifics, reward.description),
+    )
+  }
+
+  @Test
+  fun clearingTheItemShowsItsError() {
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo().performTextInput("Tea")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performTextClearance()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM_ERROR)
+        .performScrollTo()
+        .assertTextEquals("This field is required.")
+  }
 }

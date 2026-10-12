@@ -66,6 +66,13 @@ fun CreateQuestScreen(
               onDecrementPartySize = viewModel::decrementPartySize,
               onExactPartySizeChange = viewModel::updateExactPartySize,
           ),
+      rewardActions =
+          QuestRewardActions(
+              onTypeSelect = viewModel::selectRewardType,
+              onItemNameChange = viewModel::updateRewardItemName,
+              onSpecificsChange = viewModel::updateRewardSpecifics,
+              onDescriptionChange = viewModel::updateRewardDescription,
+          ),
       onClose = onClose,
       modifier = modifier,
   )
@@ -79,6 +86,7 @@ fun CreateQuestContent(
     onDescriptionChange: (String) -> Unit,
     onRequirementsChange: (String) -> Unit,
     completionActions: QuestCompletionActions,
+    rewardActions: QuestRewardActions,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -96,6 +104,8 @@ fun CreateQuestContent(
     QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
     Spacer(Modifier.height(AroundSpacing.Medium))
     QuestCompletionRules(state, completionActions)
+    Spacer(Modifier.height(AroundSpacing.SetupGap))
+    RewardFields(state.reward, rewardActions)
   }
 }
 
@@ -139,7 +149,7 @@ internal fun FieldLabel(text: String) {
  * venue with a location, which shows the radius map.
  */
 // Tall enough for the whole form, as a preview can't scroll
-@Preview(widthDp = 413, heightDp = 1500)
+@Preview(widthDp = 413, heightDp = 1800)
 @Composable
 private fun CreateQuestPreview() {
   val viewModel = remember {
