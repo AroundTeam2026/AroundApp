@@ -2,12 +2,16 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,6 +26,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -139,6 +144,17 @@ class CreateQuestScreenTest {
     preset(QuestLimits.DEFAULT_RADIUS_METERS).assertIsSelected()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS_CUSTOM).assertIsNotSelected()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS_SLIDER).assertDoesNotExist()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_SIZE)
+        .performScrollTo()
+        .assertTextEquals("${QuestLimits.MIN_PARTY_SIZE}")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_DECREMENT).assertIsNotEnabled()
+    compose.onAllNodesWithTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED).assertCountEquals(1)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_AT_LEAST).assertIsSelected()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXACTLY)
+        .assertIsNotSelected()
+        .assertTextContains("Only solo visits")
   }
 
   @Test
@@ -168,5 +184,36 @@ class CreateQuestScreenTest {
         .performSemanticsAction(SemanticsActions.SetProgress) { it(120.6f) }
     assertEquals(121, viewModel.uiState.value.radiusMeters)
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS).assertTextEquals("121 m")
+  }
+
+  @Test
+  fun stepperChangesThePartySizeItsSeatsAndRules() {
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_DECREMENT).assertIsEnabled().performClick()
+    assertEquals(QuestLimits.MIN_PARTY_SIZE + 1, viewModel.uiState.value.minPartySize)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_SIZE).assertTextEquals("2")
+    compose.onAllNodesWithTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED).assertCountEquals(2)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_AT_LEAST).assertTextContains("At least 2")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXACTLY)
+        .assertTextContains("Exactly 2")
+        .assertTextContains("Only parties of 2")
+  }
+
+  @Test
+  fun partiesLargerThanTheSeatsFillThemAll() {
+    repeat(10) { viewModel.incrementPartySize() }
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).performScrollTo().assertIsEnabled()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_SIZE).assertTextEquals("11")
+    compose.onAllNodesWithTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED).assertCountEquals(8)
+  }
+
+  @Test
+  fun tappingExactlySelectsIt() {
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXACTLY).performScrollTo().performClick()
+    assertTrue(viewModel.uiState.value.exactPartySize)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXACTLY).assertIsSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_AT_LEAST).assertIsNotSelected()
   }
 }

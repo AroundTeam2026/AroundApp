@@ -58,6 +58,9 @@ private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
  *   which shows the radius slider.
  * @property venueLocation Where the venue is, to centre the radius map; null until it is loaded, or
  *   if the venue has no location.
+ * @property minPartySize Smallest party allowed, never below [QuestLimits.MIN_PARTY_SIZE].
+ * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
+ *   least that many.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -70,6 +73,8 @@ data class CreateQuestUiState(
     val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
     val customRadius: Boolean = false,
     val venueLocation: Location? = null,
+    val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
+    val exactPartySize: Boolean = false,
 ) {
   /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
   val selectedRadiusPreset: Int?

@@ -173,12 +173,14 @@ class CreateQuestViewModelTest {
   }
 
   @Test
-  fun completionRulesDefaultToAPhotoAtTheDefaultRadius() {
+  fun completionRulesDefaultToAPhotoAtTheDefaultRadiusForASoloVisitOfAtLeastOne() {
     loadVenue()
     assertEquals(ProofType.PHOTO, state.proofType)
     assertEquals(QuestLimits.DEFAULT_RADIUS_METERS, state.radiusMeters)
     assertEquals(QuestLimits.DEFAULT_RADIUS_METERS, state.selectedRadiusPreset)
     assertFalse(state.customRadius)
+    assertEquals(QuestLimits.MIN_PARTY_SIZE, state.minPartySize)
+    assertFalse(state.exactPartySize)
   }
 
   @Test
@@ -280,10 +282,41 @@ class CreateQuestViewModelTest {
   }
 
   @Test
+  fun partySizeStepsUpAndDownByOne() {
+    viewModel.incrementPartySize()
+    viewModel.incrementPartySize()
+    assertEquals(QuestLimits.MIN_PARTY_SIZE + 2, state.minPartySize)
+    viewModel.decrementPartySize()
+    assertEquals(QuestLimits.MIN_PARTY_SIZE + 1, state.minPartySize)
+  }
+
+  @Test
+  fun partySizeNeverGoesBelowTheMinimum() {
+    viewModel.decrementPartySize()
+    assertEquals(QuestLimits.MIN_PARTY_SIZE, state.minPartySize)
+  }
+
+  @Test
+  fun partySizeHasNoUpperLimit() {
+    repeat(20) { viewModel.incrementPartySize() }
+    assertEquals(QuestLimits.MIN_PARTY_SIZE + 20, state.minPartySize)
+  }
+
+  @Test
+  fun updateExactPartySizeSetsIt() {
+    viewModel.updateExactPartySize(true)
+    assertTrue(state.exactPartySize)
+    viewModel.updateExactPartySize(false)
+    assertFalse(state.exactPartySize)
+  }
+
+  @Test
   fun completionRulesDoNotChangeWhetherTheFormCanBeSubmitted() {
     viewModel.updateProofType(ProofType.TEXT)
     viewModel.selectCustomRadius()
     viewModel.updateRadius(QuestLimits.MAX_RADIUS_METERS)
+    viewModel.incrementPartySize()
+    viewModel.updateExactPartySize(true)
     assertFalse(state.canSubmit)
     fillValid()
     assertTrue(state.canSubmit)

@@ -57,6 +57,9 @@ fun CreateQuestScreen(
               onRadiusPresetSelect = viewModel::selectRadiusPreset,
               onCustomRadiusSelect = viewModel::selectCustomRadius,
               onRadiusChange = viewModel::updateRadius,
+              onIncrementPartySize = viewModel::incrementPartySize,
+              onDecrementPartySize = viewModel::decrementPartySize,
+              onExactPartySizeChange = viewModel::updateExactPartySize,
           ),
       onClose = onClose,
       modifier = modifier,
@@ -138,6 +141,7 @@ private fun CreateQuestPreview() {
                 description =
                     "A tiny ceramic fox hides somewhere in the café. Spot it and snap a photo.",
                 requirements = "Order any drink. One photo per party.",
+                minPartySize = 4,
                 venueLocation = Location(46.5220, 6.6330),
             ),
         onTitleChange = {},

@@ -29,10 +29,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,6 +48,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
@@ -61,9 +67,12 @@ class QuestCompletionActions(
     val onRadiusPresetSelect: (Int) -> Unit = {},
     val onCustomRadiusSelect: () -> Unit = {},
     val onRadiusChange: (Int) -> Unit = {},
+    val onIncrementPartySize: () -> Unit = {},
+    val onDecrementPartySize: () -> Unit = {},
+    val onExactPartySizeChange: (Boolean) -> Unit = {},
 )
 
-/** How explorers complete the quest: the proof they submit and the unlock radius. */
+/** How explorers complete the quest: the proof they submit, the unlock radius and the party. */
 @Composable
 fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActions) {
   Column {
@@ -76,6 +85,8 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
     ExplorerPreview()
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
     UnlockRadius(state, actions)
+    Spacer(Modifier.height(AroundSpacing.ExtraLarge))
+    PartyCard(state, actions)
   }
 }
 
@@ -369,6 +380,180 @@ private fun RowScope.RadiusOption(
   }
 }
 
+/** The party size with its stepper, a seat filled per member, and at least or exactly. */
+@Composable
+private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions) {
+  val size = state.minPartySize
+  Row(
+      Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    FieldLabel(stringResource(R.string.create_quest_party_size))
+    Text(
+        stringResource(R.string.create_quest_party_per_visit),
+        style = AroundTextStyles.Caption,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+  Spacer(Modifier.height(AroundSpacing.CompactGap))
+  Surface(
+      shape = MaterialTheme.shapes.medium,
+      color = MaterialTheme.colorScheme.surface,
+      border = BorderStroke(BORDER, MaterialTheme.colorScheme.outline),
+  ) {
+    Column(
+        Modifier.padding(AroundSpacing.Large),
+        verticalArrangement = Arrangement.spacedBy(AroundSpacing.InsetPadding),
+    ) {
+      Row(
+          Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+            size.toString(),
+            style = AroundTextStyles.Subtitle.copy(fontSize = PARTY_COUNT_FONT_SIZE),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.testTag(C.Tag.CREATE_QUEST_PARTY_SIZE),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap)) {
+          StepperButton(
+              icon = R.drawable.ic_minus,
+              description = stringResource(R.string.create_quest_party_decrement),
+              enabled = size > QuestLimits.MIN_PARTY_SIZE,
+              filled = false,
+              onClick = actions.onDecrementPartySize,
+              tag = C.Tag.CREATE_QUEST_PARTY_DECREMENT,
+          )
+          StepperButton(
+              icon = R.drawable.ic_plus,
+              description = stringResource(R.string.create_quest_party_increment),
+              filled = true,
+              onClick = actions.onIncrementPartySize,
+              tag = C.Tag.CREATE_QUEST_PARTY_INCREMENT,
+          )
+        }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap)) {
+        repeat(SEAT_COUNT) { Seat(filled = it < size) }
+      }
+      Row(
+          Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+          horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
+      ) {
+        PartyRule(
+            title = stringResource(R.string.create_quest_party_at_least, size),
+            hint = stringResource(R.string.create_quest_party_at_least_hint),
+            selected = !state.exactPartySize,
+            onClick = { actions.onExactPartySizeChange(false) },
+            tag = C.Tag.CREATE_QUEST_PARTY_AT_LEAST,
+        )
+        PartyRule(
+            title = stringResource(R.string.create_quest_party_exactly, size),
+            hint = pluralStringResource(R.plurals.create_quest_party_exactly_hint, size, size),
+            selected = state.exactPartySize,
+            onClick = { actions.onExactPartySizeChange(true) },
+            tag = C.Tag.CREATE_QUEST_PARTY_EXACTLY,
+        )
+      }
+    }
+  }
+}
+
+/** A round stepper button: purple when [filled], outlined if not, faded when disabled. */
+@Composable
+private fun StepperButton(
+    @DrawableRes icon: Int,
+    description: String,
+    filled: Boolean,
+    onClick: () -> Unit,
+    tag: String,
+    enabled: Boolean = true,
+) {
+  Surface(
+      onClick = onClick,
+      enabled = enabled,
+      shape = CircleShape,
+      color = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+      border = if (filled) null else BorderStroke(RING_BORDER, MaterialTheme.colorScheme.outline),
+      modifier =
+          Modifier.size(STEPPER_SIZE).alpha(if (enabled) 1f else DISABLED_ALPHA).testTag(tag),
+  ) {
+    Box(contentAlignment = Alignment.Center) {
+      Icon(
+          painterResource(icon),
+          contentDescription = description,
+          tint =
+              if (filled) MaterialTheme.colorScheme.onPrimary
+              else MaterialTheme.colorScheme.onSurface,
+          modifier = Modifier.size(ICON_SIZE),
+      )
+    }
+  }
+}
+
+/** A party member's seat: a sage circle with a person when [filled], a dashed ring if not. */
+@Composable
+private fun Seat(filled: Boolean) {
+  if (filled) {
+    Box(
+        Modifier.size(SEAT_SIZE)
+            .background(AroundTheme.colors.sage, CircleShape)
+            .testTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED),
+        contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+          painterResource(R.drawable.ic_user),
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.onPrimary,
+          modifier = Modifier.size(SMALL_ICON_SIZE),
+      )
+    }
+  } else {
+    val line = MaterialTheme.colorScheme.outline
+    Box(
+        Modifier.size(SEAT_SIZE).drawBehind {
+          val stroke = RING_BORDER.toPx()
+          drawCircle(
+              color = line,
+              radius = (size.minDimension - stroke) / 2,
+              style =
+                  Stroke(
+                      width = stroke,
+                      pathEffect =
+                          PathEffect.dashPathEffect(
+                              floatArrayOf(SEAT_DASH.toPx(), SEAT_GAP.toPx())
+                          ),
+                  ),
+          )
+        }
+    )
+  }
+}
+
+/** At least or exactly the party size, half of the row wide. */
+@Composable
+private fun RowScope.PartyRule(
+    title: String,
+    hint: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    tag: String,
+) {
+  SelectableOption(
+      selected = selected,
+      onClick = onClick,
+      tag = tag,
+      shape = MaterialTheme.shapes.small,
+      padding =
+          PaddingValues(horizontal = AroundSpacing.InsetPadding, vertical = AroundSpacing.Medium),
+      modifier = Modifier.weight(1f).fillMaxHeight(),
+  ) {
+    OptionText(title, hint, selected)
+  }
+}
+
 private val BORDER: Dp = 1.dp
 private val RING_BORDER: Dp = 1.5.dp
 private val SELECTED_BORDER: Dp = 2.dp
@@ -378,6 +563,17 @@ private val SMALL_ICON_SIZE: Dp = 16.dp
 private val ICON_SIZE: Dp = 20.dp
 private val SELECTION_MARK_SIZE: Dp = 22.dp
 private val ICON_TILE_SIZE: Dp = 40.dp
+private val STEPPER_SIZE: Dp = 44.dp
+private val SEAT_SIZE: Dp = 34.dp
+private val SEAT_DASH: Dp = 4.dp
+private val SEAT_GAP: Dp = 3.dp
+private val PARTY_COUNT_FONT_SIZE: TextUnit = 38.sp
 
 /** The radius hints are smaller, as four choices share the row. */
 private val RADIUS_HINT_STYLE: TextStyle = AroundTextStyles.Small.copy(fontSize = 11.sp)
+
+/** Seats the party card shows; larger parties fill them all. */
+private const val SEAT_COUNT = 8
+
+/** Opacity of a stepper button that can't be pressed. */
+private const val DISABLED_ALPHA = 0.38f
