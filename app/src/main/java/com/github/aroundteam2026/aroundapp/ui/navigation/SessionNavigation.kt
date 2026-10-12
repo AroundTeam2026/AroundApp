@@ -2,8 +2,13 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
@@ -12,8 +17,9 @@ import com.github.aroundteam2026.aroundapp.ui.auth.AuthViewModel
 
 /**
  * Selects loading, auth or the existing tabs from the repository session. Saved tab state survives
- * a new ViewModel checking the same session after recreation. Role routing and account-transition
- * back-stack policy are separate integration tasks.
+ * a new ViewModel checking the same session after recreation, but is discarded on sign-out or an
+ * account change. AppRoot disposes the inactive flow and its Back handlers; no root back stack is
+ * retained. Role routing is a separate integration task.
  */
 @Composable
 fun SessionNavigation(
@@ -23,6 +29,16 @@ fun SessionNavigation(
 ) {
   val state by sessionViewModel.uiState.collectAsStateWithLifecycle()
   val savedFlows = rememberSaveableStateHolder()
+  var savedUserId by rememberSaveable { mutableStateOf<String?>(null) }
+  if (state != SessionState.Checking) {
+    val userId = (state as? SessionState.SignedIn)?.userId
+    SideEffect {
+      if (savedUserId != userId) {
+        savedUserId?.let(savedFlows::removeState)
+        savedUserId = userId
+      }
+    }
+  }
   val destination =
       when (state) {
         SessionState.Checking -> AppDestination.LOADING
@@ -37,7 +53,7 @@ fun SessionNavigation(
       },
       explorerHome = {
         val session = state as SessionState.SignedIn
-        savedFlows.SaveableStateProvider(session.userId) { mainScreen() }
+        key(session.userId) { savedFlows.SaveableStateProvider(session.userId) { mainScreen() } }
       },
       roleSelection = {},
       venueEntry = {},

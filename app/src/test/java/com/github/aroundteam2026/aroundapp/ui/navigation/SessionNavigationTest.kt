@@ -2,15 +2,22 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -30,6 +37,7 @@ import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Rule
@@ -45,9 +53,40 @@ class SessionNavigationTest {
       AroundAppTheme {
         SessionNavigation(
             repo,
-            mainScreen = { AroundApp(screen = { Text(it.route, Modifier.testTag(it.screenTag)) }) },
+            mainScreen = {
+              AroundApp(
+                  screen = {
+                    var count by rememberSaveable { mutableIntStateOf(0) }
+                    Text("$count", Modifier.testTag(it.screenTag).clickable { count++ })
+                  }
+              )
+            },
         )
       }
+    }
+  }
+
+  private fun assertBackLeavesFlow() {
+    compose.waitForIdle()
+    // A callback installed before the flow models the activity's fallback. A stale NavHost
+    // would consume Back instead; reaching this callback proves the flow cannot pop to auth/tabs.
+    val fallbackCalls = compose.runOnIdle { backFallbackCalls }
+    compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    compose.runOnIdle { assertEquals(fallbackCalls + 1, backFallbackCalls) }
+  }
+
+  private var backFallbackCalls = 0
+
+  private fun installBackFallback() {
+    compose.runOnUiThread {
+      compose.activity.onBackPressedDispatcher.addCallback(
+          compose.activity,
+          object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+              backFallbackCalls++
+            }
+          },
+      )
     }
   }
 
@@ -124,19 +163,25 @@ class SessionNavigationTest {
   }
 
   @Test
-  fun successfulSignInOpensTabs() {
+  fun successfulSignInLeavesNoAuthBackStack() {
     val repo = FakeAuthRepository()
     repo.addAccount("ada@around.test", "123456")
+    installBackFallback()
     launch(repo)
     submit()
+    assertBackLeavesFlow()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
   }
 
   @Test
-  fun accountCreationOpensTabs() {
+  fun accountCreationLeavesNoAuthBackStack() {
+    installBackFallback()
     launch(FakeAuthRepository())
     compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
     submit()
+    assertBackLeavesFlow()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
   }
 
   @Test
@@ -262,6 +307,59 @@ class SessionNavigationTest {
     compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertDoesNotExist()
   }
 
+  @Test
+  fun backAfterSignOutCannotReopenSelectedOrSavedTabs() {
+    val repo = FakeAuthRepository("existing")
+    installBackFallback()
+    launch(repo)
+    compose.onNodeWithTag(C.Tag.MAP_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertIsDisplayed()
+    compose.runOnIdle { repo.signOut() }
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    assertBackLeavesFlow()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
+  }
+
+  @Test
+  fun signingOutDiscardsSavedTabsEvenWhenTheSameAccountReturns() {
+    val repo = FakeAuthRepository()
+    repo.addAccount("ada@around.test", "123456")
+    runBlocking { repo.signInWithEmail("ada@around.test", "123456") }
+    launch(repo)
+    compose.onNodeWithTag(C.Tag.MAP_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.MAP_SCREEN).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertIsDisplayed()
+    compose.runOnIdle { repo.signOut() }
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    submit()
+    compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.MAP_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.MAP_SCREEN).assertTextEquals("0")
+  }
+
+  @Test
+  fun switchingAccountsDiscardsThePreviousAccountsSavedFlow() {
+    val repo = FakeAuthRepository()
+    runBlocking { repo.signInWithGoogle("first") }
+    launch(repo)
+    compose.onNodeWithTag(C.Tag.MAP_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.MAP_SCREEN).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertIsDisplayed()
+    compose.runOnIdle { runBlocking { repo.signInWithGoogle("second") } }
+    compose.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertIsDisplayed()
+    compose.runOnIdle { runBlocking { repo.signInWithGoogle("first") } }
+    compose.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.MAP_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.MAP_SCREEN).assertTextEquals("0")
+  }
+
   @OptIn(InternalCoroutinesApi::class, ExperimentalForInheritanceCoroutinesApi::class)
   @Test
   fun restoredTabSurvivesANewViewModelCheckingTheSession() {
@@ -303,5 +401,6 @@ class SessionNavigationTest {
     }
     compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.APP_LOADING).assertDoesNotExist()
+    compose.runOnIdle { assertEquals("existing", auth.currentUserId.value) }
   }
 }
