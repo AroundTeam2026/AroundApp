@@ -334,9 +334,13 @@ class CreateQuestScreenTest {
   @Test
   fun pickingAnExpiryShowsItAndClearingRemovesIt() {
     viewModel.selectRewardType(RewardType.OTHER)
+    val today = LocalDate.now()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CONFIRM).performClick()
-    assertEquals(LocalDate.now(), viewModel.uiState.value.reward.expiryDate)
+    // The picker starts at the day it opened, which is today unless midnight just passed
+    assertTrue(
+        viewModel.uiState.value.reward.expiryDate in listOf(today, today.plusDays(1))
+    )
 
     viewModel.updateExpiryDate(LocalDate.of(2099, 12, 31))
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("31 Dec 2099")
