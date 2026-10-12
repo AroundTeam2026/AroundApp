@@ -186,7 +186,7 @@ class MapViewModelNearbyTest {
     venueRepository = venues
     located()
 
-    venues.setArea("cafe", museumLocation.copy(lat = museumLocation.lat - 0.002), 50)
+    venues.setArea("cafe", museumLocation.copy(lat = museumLocation.lat - 0.002), 50, null)
     runCurrent()
 
     assertEquals(listOf("bar-1", "cafe-1"), nearbyIds)
@@ -198,7 +198,7 @@ class MapViewModelNearbyTest {
     venueRepository = venues
     located()
 
-    venues.setArea("cafe", genevaLocation, 50)
+    venues.setArea("cafe", genevaLocation, 50, null)
     runCurrent()
 
     assertEquals(listOf("bar-1"), nearbyIds)

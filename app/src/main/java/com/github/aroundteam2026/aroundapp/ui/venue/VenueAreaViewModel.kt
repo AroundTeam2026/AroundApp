@@ -42,11 +42,11 @@ import kotlinx.coroutines.launch
  * @property areaToFrame The area the camera must move to, or null once the map framed it.
  * @property showsUserLocation Whether to draw the device's position, which needs the permission.
  * @property address The street address the venue last picked from the search, or null until it
- *   picks one. Moving the marker up to [VenueAreaViewModel.ADDRESS_DRIFT_METERS] from it keeps it,
- *   as the marker only refines the entrance; moving it farther forgets it, as it no longer says
- *   where the marker is.
+ *   picks one. It is saved with the marker. Moving the marker up to
+ *   [VenueAreaViewModel.ADDRESS_DRIFT_METERS] from it keeps it, as the marker only refines the
+ *   entrance; moving it farther forgets it, as it no longer says where the marker is.
  * @property addressSearch What the address search found.
- * @property isSaving Whether the marker and radius are being saved.
+ * @property isSaving Whether the marker, radius and address are being saved.
  * @property saveFailed Whether the latest save failed; the edits stay, to try again.
  * @property isSaved Whether a save succeeded and its caller wasn't told yet.
  */
@@ -290,10 +290,10 @@ class VenueAreaViewModel(
   }
 
   /**
-   * Called when the venue presses "Save location": saves the marker and radius with
-   * [VenueRepository.setArea], which changes nothing else. Does nothing unless
-   * [VenueAreaUiState.canSave]. A success sets [VenueAreaUiState.isSaved]; a failure sets
-   * [VenueAreaUiState.saveFailed] and keeps the edits.
+   * Called when the venue presses "Save location": saves the marker, radius and address with
+   * [VenueRepository.setArea], which changes nothing else; no address clears the saved one. Does
+   * nothing unless [VenueAreaUiState.canSave]. A success sets [VenueAreaUiState.isSaved]; a failure
+   * sets [VenueAreaUiState.saveFailed] and keeps the edits.
    */
   fun onSave() {
     val state = _uiState.value
@@ -302,7 +302,7 @@ class VenueAreaViewModel(
     viewModelScope.launch {
       val saved =
           try {
-            venueRepository.setArea(venueId, marker, state.radiusMeters).isSuccess
+            venueRepository.setArea(venueId, marker, state.radiusMeters, state.address).isSuccess
           } catch (cancelled: CancellationException) {
             throw cancelled
           } catch (_: Exception) {

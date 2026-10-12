@@ -218,7 +218,7 @@ class MapViewModelPinsTest {
     venueRepository = venues
     showing()
 
-    venues.setArea("cafe", Location(46.53, 6.64), radiusMeters = 50)
+    venues.setArea("cafe", Location(46.53, 6.64), radiusMeters = 50, address = null)
     runCurrent()
 
     assertEquals(Location(46.53, 6.64), state.pins.single { it.venueId == "cafe" }.location)
@@ -542,6 +542,10 @@ private class RecordingVenueRepository(
 
   override suspend fun createVenue(venue: Venue) = Result.success(Unit)
 
-  override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
-      Result.success(Unit)
+  override suspend fun setArea(
+      venueId: String,
+      location: Location,
+      radiusMeters: Int,
+      address: String?,
+  ) = Result.success(Unit)
 }

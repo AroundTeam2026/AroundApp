@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
+import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
@@ -29,12 +30,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Tests how [VenueAreaViewModel] loads and saves the venue's marker and radius. */
+/** Tests how [VenueAreaViewModel] loads and saves the venue's marker, radius and address. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VenueAreaSaveLoadTest {
   private val dispatcher = StandardTestDispatcher()
   private val entrance = Location(46.5191, 6.6335)
   private val placed = Location(46.5210, 6.6300)
+  private val gare =
+      AddressSuggestion("Place de la Gare 9", "1003 Lausanne", Location(46.517, 6.629))
   private val venue =
       testVenue(location = entrance, address = "Rue de Bourg 12")
           .copy(radiusMeters = MAX_RADIUS_METERS + 5)
@@ -54,12 +57,22 @@ class VenueAreaSaveLoadTest {
           return stored?.takeIf { it.id == venueId }
         }
 
-        override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
+        override suspend fun setArea(
+            venueId: String,
+            location: Location,
+            radiusMeters: Int,
+            address: String?,
+        ) =
             write().also {
               writes++
               writeGate.await()
               if (it.isSuccess)
-                  stored = stored?.copy(location = location, radiusMeters = radiusMeters)
+                  stored =
+                      stored?.copy(
+                          location = location,
+                          radiusMeters = radiusMeters,
+                          address = address,
+                      )
             }
       }
   private val viewModel by lazy {
@@ -145,7 +158,7 @@ class VenueAreaSaveLoadTest {
   }
 
   @Test
-  fun savingRunsOnceAndWritesOnlyTheMarkerAndRadiusThenIsReportedUntilHandled() = test {
+  fun savingRunsOnceAndWritesOnlyTheAreaThenIsReportedUntilHandled() = test {
     writeGate = CompletableDeferred()
     viewModel.onMarkerPlaced(placed)
     viewModel.onRadiusChanged(80)
@@ -158,7 +171,7 @@ class VenueAreaSaveLoadTest {
     writeGate.complete(Unit)
     advanceUntilIdle()
     assertFalse(state.isSaving)
-    assertEquals(venue.copy(location = placed, radiusMeters = 80), stored)
+    assertEquals(venue.copy(location = placed, radiusMeters = 80, address = null), stored)
     assertTrue(state.isSaved)
     viewModel.onSaveHandled()
     assertFalse(state.isSaved)
@@ -194,5 +207,14 @@ class VenueAreaSaveLoadTest {
 
     assertTrue(state.saveFailed)
     assertFalse(state.isSaving)
+  }
+
+  @Test
+  fun savingAPickedAddressWritesIt() = test {
+    viewModel.onAddressPicked(gare)
+    viewModel.onSave()
+    advanceUntilIdle()
+    assertEquals(gare.location, stored?.location)
+    assertEquals("Place de la Gare 9, 1003 Lausanne", stored?.address)
   }
 }
