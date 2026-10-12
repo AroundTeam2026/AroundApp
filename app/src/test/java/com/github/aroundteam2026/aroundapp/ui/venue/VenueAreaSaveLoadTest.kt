@@ -145,6 +145,9 @@ class VenueAreaSaveLoadTest {
       advanceUntilIdle()
       assertEquals(placed, state.marker)
       assertEquals(MAX_RADIUS_METERS, state.radiusMeters)
+      // The saved address describes the saved marker, not the one placed
+      assertNull(state.address)
+      assertEquals("", viewModel.addressQuery)
     }
   }
 
