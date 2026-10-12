@@ -23,4 +23,12 @@
     <string name="create_quest_explorers_see">Explorers see:</string>
     <!-- Placeholder until the explorer's quest view exists -->
     <string name="create_quest_explorer_preview">Will come back to this once explorer view is done</string>
+    <string name="create_quest_radius">Unlock radius</string>
+    <string name="create_quest_radius_hint">Explorers can submit proof once they are this close.</string>
+    <string name="create_quest_meters">%1$d m</string>
+    <string name="create_quest_radius_inside">Inside</string>
+    <string name="create_quest_radius_door">At the door</string>
+    <string name="create_quest_radius_street">On the street</string>
+    <string name="create_quest_radius_custom">Custom</string>
+    <string name="create_quest_radius_range">%1$d–%2$d m</string>
 </resources>

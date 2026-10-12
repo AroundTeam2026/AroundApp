@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,26 +36,34 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import kotlin.math.roundToInt
 
 /** What the completion rules do when the venue changes them; each does nothing by default. */
 class QuestCompletionActions(
     val onProofTypeChange: (ProofType) -> Unit = {},
+    val onRadiusPresetSelect: (Int) -> Unit = {},
+    val onCustomRadiusSelect: () -> Unit = {},
+    val onRadiusChange: (Int) -> Unit = {},
 )
 
-/** How explorers complete the quest: the proof they submit. */
+/** How explorers complete the quest: the proof they submit and the unlock radius. */
 @Composable
 fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActions) {
   Column {
@@ -64,6 +74,8 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
     ProofOptions(state.proofType, actions.onProofTypeChange)
     Spacer(Modifier.height(AroundSpacing.Small))
     ExplorerPreview()
+    Spacer(Modifier.height(AroundSpacing.ExtraLarge))
+    UnlockRadius(state, actions)
   }
 }
 
@@ -76,6 +88,7 @@ private fun SelectableOption(
     shape: Shape,
     padding: PaddingValues,
     modifier: Modifier = Modifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     content: @Composable ColumnScope.() -> Unit,
 ) {
   Surface(
@@ -93,6 +106,7 @@ private fun SelectableOption(
     Column(
         Modifier.padding(padding),
         verticalArrangement = Arrangement.spacedBy(OPTION_TEXT_GAP),
+        horizontalAlignment = horizontalAlignment,
     ) {
       content()
     }
@@ -101,7 +115,12 @@ private fun SelectableOption(
 
 /** The title and hint of a [SelectableOption], in the accent colour when it is selected. */
 @Composable
-private fun OptionText(title: String, hint: String, selected: Boolean) {
+private fun OptionText(
+    title: String,
+    hint: String,
+    selected: Boolean,
+    hintStyle: TextStyle = AroundTextStyles.Small,
+) {
   val accent = AroundTheme.colors.accentText
   Text(
       title,
@@ -110,7 +129,7 @@ private fun OptionText(title: String, hint: String, selected: Boolean) {
   )
   Text(
       hint,
-      style = AroundTextStyles.Small,
+      style = hintStyle,
       color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
   )
 }
@@ -249,6 +268,103 @@ private fun ExplorerPreview() {
   }
 }
 
+/** The radius with its value, a preset per row, and the slider once Custom is chosen. */
+@Composable
+private fun UnlockRadius(state: CreateQuestUiState, actions: QuestCompletionActions) {
+  val label = stringResource(R.string.create_quest_radius)
+  val value = stringResource(R.string.create_quest_meters, state.radiusMeters)
+  Row(
+      Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    FieldLabel(label)
+    Text(
+        value,
+        style = AroundTextStyles.Subtitle,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.testTag(C.Tag.CREATE_QUEST_RADIUS),
+    )
+  }
+  Spacer(Modifier.height(AroundSpacing.ExtraSmall))
+  Text(
+      stringResource(R.string.create_quest_radius_hint),
+      style = AroundTextStyles.Caption,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  Spacer(Modifier.height(AroundSpacing.CompactGap))
+  Row(
+      Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
+  ) {
+    RadiusPreset.entries.forEach { preset ->
+      val meters = preset.meters
+      val hint =
+          when (preset) {
+            RadiusPreset.INSIDE -> R.string.create_quest_radius_inside
+            RadiusPreset.AT_THE_DOOR -> R.string.create_quest_radius_door
+            RadiusPreset.ON_THE_STREET -> R.string.create_quest_radius_street
+          }
+      RadiusOption(
+          title = stringResource(R.string.create_quest_meters, meters),
+          hint = stringResource(hint),
+          selected = state.selectedRadiusPreset == meters,
+          onClick = { actions.onRadiusPresetSelect(meters) },
+          tag = "${C.Tag.CREATE_QUEST_RADIUS_PRESET}_$meters",
+      )
+    }
+    RadiusOption(
+        title = stringResource(R.string.create_quest_radius_custom),
+        hint =
+            stringResource(
+                R.string.create_quest_radius_range,
+                QuestLimits.MIN_RADIUS_METERS,
+                QuestLimits.MAX_RADIUS_METERS,
+            ),
+        selected = state.customRadius,
+        onClick = actions.onCustomRadiusSelect,
+        tag = C.Tag.CREATE_QUEST_RADIUS_CUSTOM,
+    )
+  }
+  if (state.customRadius) {
+    Slider(
+        value = state.radiusMeters.toFloat(),
+        onValueChange = { actions.onRadiusChange(it.roundToInt()) },
+        valueRange =
+            QuestLimits.MIN_RADIUS_METERS.toFloat()..QuestLimits.MAX_RADIUS_METERS.toFloat(),
+        // TalkBack would otherwise read an unnamed slider, in percent
+        modifier =
+            Modifier.fillMaxWidth().testTag(C.Tag.CREATE_QUEST_RADIUS_SLIDER).semantics {
+              contentDescription = label
+              stateDescription = value
+            },
+    )
+  }
+}
+
+/** One of the radius choices, a quarter of the row wide. */
+@Composable
+private fun RowScope.RadiusOption(
+    title: String,
+    hint: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    tag: String,
+) {
+  SelectableOption(
+      selected = selected,
+      onClick = onClick,
+      tag = tag,
+      shape = MaterialTheme.shapes.small,
+      padding =
+          PaddingValues(horizontal = AroundSpacing.ExtraSmall, vertical = AroundSpacing.CompactGap),
+      modifier = Modifier.weight(1f).fillMaxHeight(),
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    OptionText(title, hint, selected, hintStyle = RADIUS_HINT_STYLE)
+  }
+}
+
 private val BORDER: Dp = 1.dp
 private val RING_BORDER: Dp = 1.5.dp
 private val SELECTED_BORDER: Dp = 2.dp
@@ -258,3 +374,6 @@ private val SMALL_ICON_SIZE: Dp = 16.dp
 private val ICON_SIZE: Dp = 20.dp
 private val SELECTION_MARK_SIZE: Dp = 22.dp
 private val ICON_TILE_SIZE: Dp = 40.dp
+
+/** The radius hints are smaller, as four choices share the row. */
+private val RADIUS_HINT_STYLE: TextStyle = AroundTextStyles.Small.copy(fontSize = 11.sp)
