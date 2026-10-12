@@ -6,14 +6,12 @@ import android.Manifest.permission.ACCESS_FINE_LOCATION
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepository
@@ -29,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
 import com.github.aroundteam2026.aroundapp.ui.map.isNear
+import com.github.aroundteam2026.aroundapp.ui.map.tapMapUntil
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLngBounds
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
@@ -101,14 +100,10 @@ class VenueAreaScreenDeviceTest {
 
   /** Taps the middle of the map until the tap places the marker, and returns where it is. */
   private fun placeMarkerByTapping(): Location {
-    // Taps before the map has drawn are ignored, so tap again until one counts, as a user would.
-    // Taps closer together than a double tap would zoom instead.
-    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
-      composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_MAP).performTouchInput { click(center) }
-      Thread.sleep(500)
-      viewModel.uiState.value.marker != null
+    composeTestRule.tapMapUntil(C.Tag.VENUE_AREA_MAP) { viewModel.uiState.value.marker != null }
+    return checkNotNull(viewModel.uiState.value.marker) {
+      "Tapping the map never placed the marker"
     }
-    return viewModel.uiState.value.marker!!
   }
 
   @Test
