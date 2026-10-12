@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.rewardExpiringAt
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -17,6 +18,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -147,7 +149,8 @@ class VenuePageViewModelTest {
     shown.value = null
     runCurrent()
 
-    assertEquals(VenuePageStatus.NOT_FOUND, state.status)
+    // Nothing of the venue that was shown is left
+    assertEquals(VenuePageUiState(status = VenuePageStatus.NOT_FOUND), state)
   }
 
   @Test
@@ -262,6 +265,30 @@ class VenuePageViewModelTest {
 
     assertEquals(VenuePageStatus.LOADED, state.status)
     assertEquals(listOf("a"), ids())
+  }
+
+  @Test
+  fun aLoadedPageThatFailsIsClearedAndRetriesWithNothingPicked() = test {
+    // Null stands for the connection dropping while the page is shown
+    val live = MutableStateFlow<List<Quest>?>(quests.value)
+    questRepository =
+        ScriptedQuestRepository(
+            questsByVenue = { live.map { it ?: throw IOException("connection lost") } }
+        )
+    viewModel
+    runCurrent()
+    viewModel.onQuestSelected("a")
+
+    live.value = null
+    runCurrent()
+    assertEquals(VenuePageUiState(status = VenuePageStatus.FAILED), state)
+
+    live.value = quests.value
+    viewModel.onRetry()
+    runCurrent()
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertEquals(listOf("a"), ids())
+    assertNull(state.selectedQuestId)
   }
 
   @Test
