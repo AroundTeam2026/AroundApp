@@ -62,6 +62,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /** What the reward fields do when the venue changes them; each does nothing by default. */
 class QuestRewardActions(
@@ -351,8 +352,8 @@ private fun DiscountUnitToggle(selected: DiscountUnit, onSelect: (DiscountUnit) 
 }
 
 /**
- * The optional last day of the reward: a field that opens a date picker, "Set date" while empty or a
- * button to clear it once set, and an error if the day has passed.
+ * The optional last day of the reward: a field that opens a date picker, "Set date" while empty or
+ * a button to clear it once set, and an error if the day has passed.
  */
 @Composable
 private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate?) -> Unit) {
@@ -379,8 +380,10 @@ private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate
             tint = MaterialTheme.colorScheme.primary,
         )
         Text(
-            date?.format(DateTimeFormatter.ofPattern(DATE_PATTERN))
-                ?: stringResource(R.string.create_quest_reward_no_expiry),
+            date?.format(
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+                    .withLocale(LocalConfiguration.current.locales[0])
+            ) ?: stringResource(R.string.create_quest_reward_no_expiry),
             style = AroundTextStyles.Body,
             color = if (date == null) muted else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
@@ -465,9 +468,7 @@ private fun ExpiryDatePicker(
         }
       },
       dismissButton = {
-        TextButton(onClick = onDismiss) {
-          Text(stringResource(android.R.string.cancel))
-        }
+        TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
       },
   ) {
     DatePicker(state)
@@ -500,6 +501,3 @@ private fun RewardSpecifics(reward: RewardFormState, hint: String, onChange: (St
 private val UNIT_HEIGHT: Dp = 36.dp
 private val EXPIRY_HEIGHT: Dp = 46.dp
 private val CLEAR_SIZE: Dp = 28.dp
-
-/** The expiry as in Figma, e.g. "31 Dec 2026". */
-private const val DATE_PATTERN = "d MMM yyyy"

@@ -338,12 +338,11 @@ class CreateQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CONFIRM).performClick()
     // The picker starts at the day it opened, which is today unless midnight just passed
-    assertTrue(
-        viewModel.uiState.value.reward.expiryDate in listOf(today, today.plusDays(1))
-    )
+    assertTrue(viewModel.uiState.value.reward.expiryDate in listOf(today, today.plusDays(1)))
 
     viewModel.updateExpiryDate(LocalDate.of(2099, 12, 31))
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("31 Dec 2099")
+    // In the phone's own order: month first in US English
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("Dec 31, 2099")
     compose.onNodeWithText("Set date").assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CLEAR).performClick()
     assertNull(viewModel.uiState.value.reward.expiryDate)
@@ -363,5 +362,16 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR)
         .performScrollTo()
         .assertTextEquals("Pick today or a later date.")
+  }
+
+  @Test
+  @Config(qualifiers = "+en-rGB")
+  fun expiryFollowsTheDayFirstOrderOfABritishPhone() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    viewModel.updateExpiryDate(LocalDate.of(2099, 12, 31))
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY)
+        .performScrollTo()
+        .assertTextContains("31 Dec 2099")
   }
 }
