@@ -231,10 +231,16 @@ class CreateQuestScreenTest {
   @Test
   fun rewardFieldsShowOnlyForThePickedType() {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).performScrollTo().assertIsSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DISCOUNT).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).assertIsNotSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).assertDoesNotExist()
 
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).performScrollTo().performClick()
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).assertIsNotSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DISCOUNT).assertIsNotSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).assertExists()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertDoesNotExist()
