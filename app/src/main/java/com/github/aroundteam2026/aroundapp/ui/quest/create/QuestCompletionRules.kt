@@ -380,7 +380,10 @@ private fun RowScope.RadiusOption(
   }
 }
 
-/** The party size with its stepper, a seat filled per member, and at least or exactly. */
+/**
+ * The party size with its stepper, a seat filled per member, and at least or exactly. A party too
+ * big for the seats fills all but the last, which counts the rest, e.g. "+4".
+ */
 @Composable
 private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions) {
   val size = state.minPartySize
@@ -436,7 +439,12 @@ private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions
         }
       }
       Row(horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap)) {
-        repeat(SEAT_COUNT) { Seat(filled = it < size) }
+        if (size > SEAT_COUNT) {
+          repeat(SEAT_COUNT - 1) { Seat(filled = true) }
+          ExtraSeats(size - (SEAT_COUNT - 1))
+        } else {
+          repeat(SEAT_COUNT) { Seat(filled = it < size) }
+        }
       }
       Row(
           Modifier.fillMaxWidth().height(IntrinsicSize.Min),
@@ -532,6 +540,22 @@ private fun Seat(filled: Boolean) {
   }
 }
 
+/** The last seat of a party too big for the seats: how many more members there are. */
+@Composable
+private fun ExtraSeats(count: Int) {
+  Box(
+      Modifier.size(SEAT_SIZE).background(AroundTheme.colors.sage, CircleShape),
+      contentAlignment = Alignment.Center,
+  ) {
+    Text(
+        stringResource(R.string.create_quest_party_extra, count),
+        style = AroundTextStyles.Badge,
+        color = MaterialTheme.colorScheme.onPrimary,
+        modifier = Modifier.testTag(C.Tag.CREATE_QUEST_PARTY_EXTRA),
+    )
+  }
+}
+
 /** At least or exactly the party size, half of the row wide. */
 @Composable
 private fun RowScope.PartyRule(
@@ -572,7 +596,7 @@ private val PARTY_COUNT_FONT_SIZE: TextUnit = 38.sp
 /** The radius hints are smaller, as four choices share the row. */
 private val RADIUS_HINT_STYLE: TextStyle = AroundTextStyles.Small.copy(fontSize = 11.sp)
 
-/** Seats the party card shows; larger parties fill them all. */
+/** Seats the party card shows; the last counts the members of a larger party. */
 private const val SEAT_COUNT = 8
 
 /** Opacity of a stepper button that can't be pressed. */

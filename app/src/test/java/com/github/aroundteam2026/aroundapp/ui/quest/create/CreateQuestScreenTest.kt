@@ -202,11 +202,20 @@ class CreateQuestScreenTest {
   }
 
   @Test
-  fun partiesLargerThanTheSeatsFillThemAll() {
+  fun aPartyThatFillsTheSeatsShowsNoExtraCount() {
+    repeat(7) { viewModel.incrementPartySize() }
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_SIZE).performScrollTo().assertTextEquals("8")
+    compose.onAllNodesWithTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED).assertCountEquals(8)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXTRA).assertDoesNotExist()
+  }
+
+  @Test
+  fun aLargerPartyCountsTheRestOnTheLastSeat() {
     repeat(10) { viewModel.incrementPartySize() }
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).performScrollTo().assertIsEnabled()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_SIZE).assertTextEquals("11")
-    compose.onAllNodesWithTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED).assertCountEquals(8)
+    compose.onAllNodesWithTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED).assertCountEquals(7)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXTRA).assertTextEquals("+4")
   }
 
   @Test
