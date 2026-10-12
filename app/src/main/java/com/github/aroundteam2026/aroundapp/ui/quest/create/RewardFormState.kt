@@ -6,7 +6,9 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 
 /** The kinds of reward a venue can pick, in the picker's order. */
 enum class RewardType {
+  /** An item given for free, with optional specifics. */
   FREE_ITEM,
+  /** A reward the venue describes in its own words. */
   OTHER,
 }
 

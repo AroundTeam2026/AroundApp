@@ -109,6 +109,7 @@ object C {
     const val CREATE_QUEST_PARTY_EXTRA = "create_quest_party_extra"
     const val CREATE_QUEST_PARTY_AT_LEAST = "create_quest_party_at_least"
     const val CREATE_QUEST_PARTY_EXACTLY = "create_quest_party_exactly"
+    const val CREATE_QUEST_REWARD_NONE = "create_quest_reward_none"
     const val CREATE_QUEST_REWARD_FREE_ITEM = "create_quest_reward_free_item"
     const val CREATE_QUEST_REWARD_OTHER = "create_quest_reward_other"
     const val CREATE_QUEST_REWARD_ITEM = "create_quest_reward_item"

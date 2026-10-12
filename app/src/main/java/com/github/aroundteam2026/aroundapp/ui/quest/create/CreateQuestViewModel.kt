@@ -92,9 +92,9 @@ class CreateQuestViewModel(
     mutableUiState.update { it.copy(exactPartySize = exact) }
   }
 
-  /** Picks [type] as the reward, or removes the reward if [type] is already picked. */
-  fun selectRewardType(type: RewardType) {
-    updateReward { it.copy(type = if (it.type == type) null else type) }
+  /** Picks [type] as the reward, or no reward if it is null. */
+  fun selectRewardType(type: RewardType?) {
+    updateReward { it.copy(type = type) }
   }
 
   /** Sets the free item to [value] and marks it as edited. */

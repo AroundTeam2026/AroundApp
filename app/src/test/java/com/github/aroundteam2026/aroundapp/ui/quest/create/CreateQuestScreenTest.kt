@@ -26,6 +26,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -228,10 +229,11 @@ class CreateQuestScreenTest {
 
   @Test
   fun rewardFieldsShowOnlyForThePickedType() {
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).performScrollTo()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).performScrollTo().assertIsSelected()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).assertDoesNotExist()
 
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).performClick().assertIsSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).assertIsNotSelected()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).assertExists()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertDoesNotExist()
@@ -241,7 +243,8 @@ class CreateQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertExists()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).assertDoesNotExist()
 
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_OTHER).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).performScrollTo().performClick()
+    assertNull(viewModel.uiState.value.reward.type)
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertDoesNotExist()
   }
 

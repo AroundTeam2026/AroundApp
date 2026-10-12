@@ -323,15 +323,6 @@ class CreateQuestViewModelTest {
   }
 
   @Test
-  fun rewardStartsEmptyAndPickingTheSameTypeAgainRemovesIt() {
-    assertNull(state.reward.type)
-    viewModel.selectRewardType(RewardType.FREE_ITEM)
-    assertEquals(RewardType.FREE_ITEM, state.reward.type)
-    viewModel.selectRewardType(RewardType.FREE_ITEM)
-    assertNull(state.reward.type)
-  }
-
-  @Test
   fun switchingRewardTypeKeepsWhatWasTyped() {
     viewModel.selectRewardType(RewardType.FREE_ITEM)
     viewModel.updateRewardItemName("Coffee ")

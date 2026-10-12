@@ -46,12 +46,14 @@
         <item quantity="other">Only parties of %1$d</item>
     </plurals>
     <string name="create_quest_reward_type">Reward type</string>
+    <string name="create_quest_reward_optional">Optional</string>
+    <string name="create_quest_reward_none">No reward</string>
+    <string name="create_quest_reward_none_hint">Explorers still earn points and rank</string>
     <string name="create_quest_reward_free_item">Free item</string>
     <string name="create_quest_reward_other">Other</string>
-    <string name="create_quest_reward_item">Item</string>
-    <string name="create_quest_reward_item_hint">A small coffee</string>
+    <string name="create_quest_reward_item_hint">Mini croissant</string>
     <string name="create_quest_reward_specifics">Specifics</string>
-    <string name="create_quest_reward_specifics_hint">Any hot drink. One per visit.</string>
-    <string name="create_quest_reward_description">Reward</string>
-    <string name="create_quest_reward_description_hint">A tour of the kitchen</string>
+    <string name="create_quest_reward_specifics_hint">With any coffee. One per visit, while stocks last.</string>
+    <string name="create_quest_reward_description">Describe the reward</string>
+    <string name="create_quest_reward_description_hint">Free mini croissant with any coffee. One per visit.</string>
 </resources>

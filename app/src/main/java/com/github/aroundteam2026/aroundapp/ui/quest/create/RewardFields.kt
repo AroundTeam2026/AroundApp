@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
@@ -28,22 +30,34 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /** What the reward fields do when the venue changes them; each does nothing by default. */
 class QuestRewardActions(
-    val onTypeSelect: (RewardType) -> Unit = {},
+    val onTypeSelect: (RewardType?) -> Unit = {},
     val onItemNameChange: (String) -> Unit = {},
     val onSpecificsChange: (String) -> Unit = {},
     val onDescriptionChange: (String) -> Unit = {},
 )
 
 /**
- * The reward explorers get: one option per [RewardType], and the picked type's fields in a card.
- * Tapping the picked option again removes the reward.
+ * The optional reward explorers get: no reward, or one option per [RewardType] with the picked
+ * type's fields in a card.
  */
 @Composable
 fun RewardFields(reward: RewardFormState, actions: QuestRewardActions) {
   Column {
     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     Spacer(Modifier.height(AroundSpacing.SectionGap))
-    FieldLabel(stringResource(R.string.create_quest_reward_type))
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+      FieldLabel(stringResource(R.string.create_quest_reward_type))
+      Text(
+          stringResource(R.string.create_quest_reward_optional),
+          style = AroundTextStyles.Small,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    Spacer(Modifier.height(AroundSpacing.Small))
+    NoRewardOption(selected = reward.type == null, onClick = { actions.onTypeSelect(null) })
     Spacer(Modifier.height(AroundSpacing.Small))
     RewardTypeOptions(reward.type, actions.onTypeSelect)
     reward.type?.let {
@@ -53,9 +67,43 @@ fun RewardFields(reward: RewardFormState, actions: QuestRewardActions) {
   }
 }
 
+/** The full-width option for a quest without a reward, with its trophy. */
+@Composable
+private fun NoRewardOption(selected: Boolean, onClick: () -> Unit) {
+  SelectableOption(
+      selected = selected,
+      onClick = onClick,
+      tag = C.Tag.CREATE_QUEST_REWARD_NONE,
+      shape = MaterialTheme.shapes.small,
+      padding =
+          PaddingValues(horizontal = AroundSpacing.InsetPadding, vertical = AroundSpacing.Medium),
+      modifier = Modifier.fillMaxWidth(),
+  ) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(
+          painterResource(R.drawable.ic_trophy),
+          contentDescription = null,
+          tint =
+              if (selected) AroundTheme.colors.accentText
+              else MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Column(verticalArrangement = Arrangement.spacedBy(OPTION_TEXT_GAP)) {
+        OptionText(
+            stringResource(R.string.create_quest_reward_none),
+            stringResource(R.string.create_quest_reward_none_hint),
+            selected,
+        )
+      }
+    }
+  }
+}
+
 /** One option per [RewardType], side by side. */
 @Composable
-private fun RewardTypeOptions(selected: RewardType?, onSelect: (RewardType) -> Unit) {
+private fun RewardTypeOptions(selected: RewardType?, onSelect: (RewardType?) -> Unit) {
   Row(
       Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
@@ -109,7 +157,7 @@ private fun RewardDetails(
       when (type) {
         RewardType.FREE_ITEM -> {
           QuestTextField(
-              label = stringResource(R.string.create_quest_reward_item),
+              label = stringResource(R.string.create_quest_reward_free_item),
               hint = stringResource(R.string.create_quest_reward_item_hint),
               value = reward.itemName,
               onValueChange = actions.onItemNameChange,

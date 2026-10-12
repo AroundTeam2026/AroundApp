@@ -126,7 +126,7 @@ internal fun SelectableOption(
 
 /** The title and hint of a [SelectableOption], in the accent colour when it is selected. */
 @Composable
-private fun OptionText(
+internal fun OptionText(
     title: String,
     hint: String,
     selected: Boolean,
@@ -581,7 +581,7 @@ private fun RowScope.PartyRule(
 private val BORDER: Dp = 1.dp
 private val RING_BORDER: Dp = 1.5.dp
 private val SELECTED_BORDER: Dp = 2.dp
-private val OPTION_TEXT_GAP: Dp = 2.dp
+internal val OPTION_TEXT_GAP: Dp = 2.dp
 private val CHECK_ICON_SIZE: Dp = 14.dp
 private val SMALL_ICON_SIZE: Dp = 16.dp
 private val ICON_SIZE: Dp = 20.dp
