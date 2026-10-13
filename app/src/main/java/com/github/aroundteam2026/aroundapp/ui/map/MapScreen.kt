@@ -37,10 +37,7 @@ import com.google.maps.android.compose.MapUiSettings
  * A "Nearby quests" pill opens the quests near the explorer over the map, in place of itself. Back
  * closes them before it leaves the map, and so does opening a card, which they would hide.
  *
- * @param cameraPositionState Where the camera is; tests pass their own to read it.
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
- *     * @param onOpenVenue Opens the page of the venue with this id and name, when its card is
- *       tapped.
  */
 @Composable
 fun MapScreen(
