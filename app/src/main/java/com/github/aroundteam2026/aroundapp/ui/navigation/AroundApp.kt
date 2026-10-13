@@ -27,7 +27,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.dashboardDestination
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
+import com.github.aroundteam2026.aroundapp.ui.overview.overviewDestination
+import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
+import com.github.aroundteam2026.aroundapp.ui.venuepage.venuePageDestination
 
 /** The app's top-level destinations, one per tab of the bottom bar. */
 enum class Tab(
@@ -90,6 +94,10 @@ fun AroundApp(
         modifier = Modifier.padding(innerPadding),
     ) {
       Tab.entries.forEach { tab -> composable(tab.route) { screen(tab) } }
+      venuePageDestination()
+      createQuestDestination()
+      dashboardDestination()
+      overviewDestination()
     }
   }
 }

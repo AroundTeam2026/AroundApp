@@ -109,5 +109,9 @@ object C {
     const val CREATE_QUEST_PARTY_EXTRA = "create_quest_party_extra"
     const val CREATE_QUEST_PARTY_AT_LEAST = "create_quest_party_at_least"
     const val CREATE_QUEST_PARTY_EXACTLY = "create_quest_party_exactly"
+    const val VENUE_PAGE_STUB = "venue_page_stub"
+    const val CREATE_QUEST_STUB = "create_quest_stub"
+    const val DASHBOARD_STUB = "dashboard_stub"
+    const val OVERVIEW_STUB = "overview_stub"
   }
 }
