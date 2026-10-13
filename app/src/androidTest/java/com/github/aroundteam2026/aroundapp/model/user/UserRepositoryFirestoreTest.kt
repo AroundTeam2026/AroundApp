@@ -23,6 +23,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -108,19 +109,22 @@ class UserRepositoryFirestoreTest {
 
   /**
    * Bug: createUser checks and writes in separate steps, so of concurrent creations, e.g. from two
-   * devices finishing sign-up, several succeed and the last overwrites the others.
+   * devices finishing sign-up, several succeed and the last overwrites the others, or a loser gets
+   * the rules' refusal of a changed role instead of IllegalStateException.
    */
   @Test
   fun createUser_concurrently_exactlyOneSucceeds() = withTimeoutBlocking {
-    val results =
-        (1..CONCURRENT_CALLS)
-            .map { i -> async { repository.createUser(user().copy(displayName = "User $i")) } }
-            .awaitAll()
+    val users =
+        (1..CONCURRENT_CALLS).map {
+          user().copy(displayName = "User $it", role = Role.entries[it % Role.entries.size])
+        }
+
+    val results = users.map { async { repository.createUser(it) } }.awaitAll()
 
     val winners = results.withIndex().filter { it.value.isSuccess }
     assertEquals(1, winners.size)
     assertTrue(results.all { it.isSuccess || it.exceptionOrNull() is IllegalStateException })
-    assertEquals("User ${winners.single().index + 1}", repository.getUser(uid)!!.displayName)
+    assertEquals(users[winners.single().index], repository.getUser(uid))
   }
 
   /**
@@ -177,6 +181,56 @@ class UserRepositoryFirestoreTest {
     db.collection(USERS).document(uid).set(mapOf("role" to "EXPLORER")).await()
 
     assertNull(repository.getUser(uid))
+  }
+
+  /** Bug: setRole writes fields other than the role, or writes another role than asked. */
+  @Test
+  fun setRole_onAProfileWithoutRole_setsOnlyTheRole() = withTimeoutBlocking {
+    repository.createUser(user()).getOrThrow()
+
+    repository.setRole(uid, Role.VENUE).getOrThrow()
+
+    assertEquals(user().copy(role = Role.VENUE), repository.getUser(uid))
+  }
+
+  /**
+   * Bug: setRole replaces a role already set, or reports it with an exception other than
+   * IllegalStateException, which ProfileSetup reads as "set by another device".
+   */
+  @Test
+  fun setRole_whenARoleIsSet_failsAndKeepsIt() = withTimeoutBlocking {
+    repository.createUser(user().copy(role = Role.EXPLORER)).getOrThrow()
+
+    val result = repository.setRole(uid, Role.VENUE)
+
+    assertTrue(result.exceptionOrNull() is IllegalStateException)
+    assertEquals(Role.EXPLORER, repository.getUser(uid)!!.role)
+  }
+
+  /** Bug: setRole on a missing profile creates a partial one, or does not report the failure. */
+  @Test
+  fun setRole_forAMissingUser_failsWithoutCreatingIt() = withTimeoutBlocking {
+    val result = repository.setRole(uid, Role.VENUE)
+
+    assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    assertFalse(storedProfile().exists())
+  }
+
+  /**
+   * Bug: setRole checks and writes in separate steps, so of two devices choosing different roles at
+   * once, both succeed, or the loser gets the rules' refusal instead of IllegalStateException.
+   */
+  @Test
+  fun setRole_concurrently_exactlyOneSucceeds() = withTimeoutBlocking {
+    repository.createUser(user()).getOrThrow()
+    val roles = (1..CONCURRENT_CALLS).map { Role.entries[it % Role.entries.size] }
+
+    val results = roles.map { async { repository.setRole(uid, it) } }.awaitAll()
+
+    val winners = results.withIndex().filter { it.value.isSuccess }
+    assertEquals(1, winners.size)
+    assertTrue(results.all { it.isSuccess || it.exceptionOrNull() is IllegalStateException })
+    assertEquals(roles[winners.single().index], repository.getUser(uid)!!.role)
   }
 
   /** A profile without a role for the signed-in user, as ProfileSetup creates it. */

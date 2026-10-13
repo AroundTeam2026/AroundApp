@@ -6,6 +6,8 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.Transaction
 import java.util.Date
 import kotlin.coroutines.cancellation.CancellationException
@@ -43,36 +45,75 @@ class UserRepositoryFirestore(private val db: FirebaseFirestore) : UserRepositor
   override suspend fun getUser(uid: String): User? = users.document(uid).get().await().toUser()
 
   /**
-   * Reads and writes in one transaction, so of two creations with the same uid only one succeeds.
-   * Needs a connection: a transaction fails while the device is offline.
+   * Checks the uid is free and writes in one transaction, so of two creations with the same uid
+   * only one succeeds. Needs a connection: a transaction fails while the device is offline.
    */
-  override suspend fun createUser(user: User): Result<Unit> = transaction {
-    val document = users.document(user.uid)
-    if (it.get(document).exists()) {
-      IllegalStateException("User ${user.uid} already exists")
-    } else {
-      it.set(document, user.toFirestore())
-      null
-    }
-  }
-
-  override suspend fun setRole(uid: String, role: Role): Result<Unit> =
-      TODO("Set in the next commit")
+  override suspend fun createUser(user: User): Result<Unit> =
+      write(
+          user.uid,
+          refusal = { stored ->
+            if (stored.exists()) IllegalStateException("User ${user.uid} already exists") else null
+          },
+      ) { transaction, document ->
+        transaction.set(document, user.toFirestore())
+      }
 
   /**
-   * Runs [block] in a transaction. [block] returns the reason for refusing instead of throwing it,
-   * so the caller gets that exact exception rather than one wrapped by Firestore. Other exceptions,
-   * e.g. the rules refusing the write, are returned as a failure too.
+   * Checks the stored role and writes only `role` in one transaction, so of two devices choosing at
+   * once only one succeeds and the other fails with [IllegalStateException]. The stored role is
+   * read on its own, so a profile whose other fields are malformed still keeps its role. Needs a
+   * connection: a transaction fails while the device is offline.
    */
-  private suspend fun transaction(block: (Transaction) -> Exception?): Result<Unit> =
-      try {
-        val refusal = db.runTransaction<Exception?> { block(it) }.await()
-        if (refusal == null) Result.success(Unit) else Result.failure(refusal)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        Result.failure(e)
+  override suspend fun setRole(uid: String, role: Role): Result<Unit> =
+      write(
+          uid,
+          refusal = { stored ->
+            when {
+              !stored.exists() -> IllegalArgumentException("No user with uid $uid")
+              stored.get(ROLE) != null -> IllegalStateException("User $uid already has a role")
+              else -> null
+            }
+          },
+      ) { transaction, document ->
+        transaction.update(document, ROLE, role.name)
       }
+
+  /**
+   * Reads the profile of [uid] and, unless [refusal] returns a reason to refuse, writes it with
+   * [apply], in one transaction. The caller gets [refusal]'s exception as it is, rather than one
+   * wrapped by Firestore, and any other exception as a failure.
+   *
+   * A write that lost a race can be refused by the rules rather than retried: the server checks the
+   * rules against the winner's profile, which e.g. no longer lets the role change, and answers
+   * `PERMISSION_DENIED`. The profile is then read again, and if [refusal] now refuses it, that
+   * reason is returned instead, so the loser learns what the winner did.
+   */
+  private suspend fun write(
+      uid: String,
+      refusal: (DocumentSnapshot) -> Exception?,
+      apply: (Transaction, DocumentReference) -> Unit,
+  ): Result<Unit> {
+    val document = users.document(uid)
+    return try {
+      val refused =
+          db.runTransaction<Exception?> { transaction ->
+                refusal(transaction.get(document)).also {
+                  if (it == null) apply(transaction, document)
+                }
+              }
+              .await()
+      if (refused == null) Result.success(Unit) else Result.failure(refused)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: FirebaseFirestoreException) {
+      val lostRace =
+          if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) null
+          else runCatching { refusal(document.get(Source.SERVER).await()) }.getOrNull()
+      Result.failure(lostRace ?: e)
+    } catch (e: Exception) {
+      Result.failure(e)
+    }
+  }
 
   /** Turns Firestore's callback-style listener into a Flow of this document's profile. */
   private fun DocumentReference.observe(): Flow<User?> = callbackFlow {
