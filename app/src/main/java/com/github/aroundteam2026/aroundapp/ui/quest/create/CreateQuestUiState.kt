@@ -1,7 +1,25 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
+import kotlin.math.ceil
+
+/** An average walking pace, about 5 km/h. */
+private const val WALKING_METERS_PER_MINUTE = 80.0
+
+/** The radii offered as one-tap choices, each with the place it reaches. */
+enum class RadiusPreset(val meters: Int) {
+  INSIDE(25),
+  AT_THE_DOOR(50),
+  ON_THE_STREET(100);
+
+  companion object {
+    /** Whether [meters] is one of the presets. */
+    fun isPreset(meters: Int) = entries.any { it.meters == meters }
+  }
+}
 
 /** Why a text field of the quest form is invalid. */
 enum class QuestTextError {
@@ -31,7 +49,18 @@ private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
  * [QuestTextError.BLANK] error is only shown once its field has been edited, so the form doesn't
  * open full of errors; [QuestTextError.TOO_LONG] shows at once.
  *
+ * The completion rules always hold a valid value, so they never block [canSubmit].
+ *
  * @property titleTouched Whether [title] has been edited; likewise for the other `Touched` flags.
+ * @property proofType The kind of proof explorers submit.
+ * @property radiusMeters Distance within which a visit counts, always within [QuestLimits].
+ * @property customRadius Whether the venue chose a custom radius rather than one of [RadiusPreset],
+ *   which shows the radius slider.
+ * @property venueLocation Where the venue is, to centre the radius map; null until it is loaded, or
+ *   if the venue has no location.
+ * @property minPartySize Smallest party allowed, never below [QuestLimits.MIN_PARTY_SIZE].
+ * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
+ *   least that many.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -40,7 +69,21 @@ data class CreateQuestUiState(
     val titleTouched: Boolean = false,
     val descriptionTouched: Boolean = false,
     val requirementsTouched: Boolean = false,
+    val proofType: ProofType = ProofType.PHOTO,
+    val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
+    val customRadius: Boolean = false,
+    val venueLocation: Location? = null,
+    val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
+    val exactPartySize: Boolean = false,
 ) {
+  /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
+  val selectedRadiusPreset: Int?
+    get() = radiusMeters.takeIf { !customRadius && RadiusPreset.isPreset(it) }
+
+  /** About how many minutes it takes to walk across [radiusMeters], never less than one. */
+  val walkMinutes: Int
+    get() = ceil(radiusMeters / WALKING_METERS_PER_MINUTE).toInt().coerceAtLeast(1)
+
   /** The error shown under the title, or null. */
   val titleError: QuestTextError?
     get() = shownError(title, QuestLimits.TITLE_MAX_LENGTH, titleTouched)

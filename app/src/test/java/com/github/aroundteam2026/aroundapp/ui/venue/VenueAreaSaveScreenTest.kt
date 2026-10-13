@@ -33,8 +33,15 @@ class VenueAreaSaveScreenTest {
   private var writeResult: Result<Unit>? = null
   private val venues =
       object : VenueRepository by stored {
-        override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
-            writeGate.await().let { writeResult ?: stored.setArea(venueId, location, radiusMeters) }
+        override suspend fun setArea(
+            venueId: String,
+            location: Location,
+            radiusMeters: Int,
+            address: String?,
+        ) =
+            writeGate.await().let {
+              writeResult ?: stored.setArea(venueId, location, radiusMeters, address)
+            }
       }
   private val viewModel =
       VenueAreaViewModel(

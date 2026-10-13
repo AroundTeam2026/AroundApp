@@ -71,7 +71,7 @@ class ObserveVenuesTest(private val implementation: String) {
     val repository = repository(cafe, bar)
     val emissions = record(repository.observeVenues(setOf("cafe")))
 
-    repository.setArea("cafe", Location(46.60, 6.70), radiusMeters = 80)
+    repository.setArea("cafe", Location(46.60, 6.70), radiusMeters = 80, address = null)
     runCurrent()
 
     assertEquals(2, emissions.size)
@@ -95,7 +95,7 @@ class ObserveVenuesTest(private val implementation: String) {
     val repository = repository(cafe, bar)
     val emissions = record(repository.observeVenues(setOf("cafe")))
 
-    repository.setArea("bar", Location(46.60, 6.70), radiusMeters = 80)
+    repository.setArea("bar", Location(46.60, 6.70), radiusMeters = 80, address = null)
     repository.createVenue(brasserie)
     runCurrent()
 
@@ -118,6 +118,10 @@ private class OnlyObserveVenue(private val venues: FakeVenueRepository) : VenueR
 
   override suspend fun createVenue(venue: Venue) = venues.createVenue(venue)
 
-  override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
-      venues.setArea(venueId, location, radiusMeters)
+  override suspend fun setArea(
+      venueId: String,
+      location: Location,
+      radiusMeters: Int,
+      address: String?,
+  ) = venues.setArea(venueId, location, radiusMeters, address)
 }
