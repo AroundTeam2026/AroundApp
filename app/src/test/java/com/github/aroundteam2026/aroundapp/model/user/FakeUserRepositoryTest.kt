@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
 package com.github.aroundteam2026.aroundapp.model.user
 
@@ -26,7 +27,6 @@ class FakeUserRepositoryTest {
     val user =
         User(
             uid = "user-1",
-            email = "user@example.com",
             displayName = "Test User",
             role = null,
             createdAt = 1_000L,
@@ -44,7 +44,6 @@ class FakeUserRepositoryTest {
     val originalUser =
         User(
             uid = "user-1",
-            email = "original@example.com",
             displayName = "Original User",
             role = Role.EXPLORER,
             createdAt = 1_000L,
@@ -52,7 +51,6 @@ class FakeUserRepositoryTest {
     val replacementUser =
         User(
             uid = "user-1",
-            email = "replacement@example.com",
             displayName = "Replacement User",
             role = null,
             createdAt = 2_000L,
@@ -81,7 +79,6 @@ class FakeUserRepositoryTest {
     val user =
         User(
             uid = "user-1",
-            email = "user@example.com",
             displayName = "Test User",
             role = null,
             createdAt = 1_000L,
@@ -100,7 +97,6 @@ class FakeUserRepositoryTest {
     val user =
         User(
             uid = "user-1",
-            email = "user@example.com",
             displayName = "Test User",
             role = Role.EXPLORER,
             createdAt = 1_000L,
@@ -130,7 +126,6 @@ class FakeUserRepositoryTest {
     val user =
         User(
             uid = "user-1",
-            email = "user@example.com",
             displayName = "Test User",
             role = null,
             createdAt = 1_000L,
@@ -147,7 +142,6 @@ class FakeUserRepositoryTest {
     val user =
         User(
             uid = "user-1",
-            email = "user@example.com",
             displayName = "Test User",
             role = null,
             createdAt = 1_000L,
@@ -173,7 +167,6 @@ class FakeUserRepositoryTest {
     val userA =
         User(
             uid = "user-a",
-            email = "a@example.com",
             displayName = "User A",
             role = null,
             createdAt = 1_000L,
@@ -181,7 +174,6 @@ class FakeUserRepositoryTest {
     val userB =
         User(
             uid = "user-b",
-            email = "b@example.com",
             displayName = "User B",
             role = null,
             createdAt = 2_000L,
@@ -215,7 +207,7 @@ class FakeUserRepositoryTest {
   fun concurrentCreateUser_onlyOneCallSucceeds() = runBlocking {
     repeat(1_000) {
       val repository = FakeUserRepository()
-      val user = User("user-1", "user@example.com", "Test", null, 1_000L)
+      val user = User("user-1", "Test", null, 1_000L)
       val barrier = CyclicBarrier(2)
       val calls =
           List(2) {
@@ -235,7 +227,7 @@ class FakeUserRepositoryTest {
   fun concurrentSetRole_onlyOneRoleIsAssigned() = runBlocking {
     repeat(1_000) {
       val repository = FakeUserRepository()
-      val user = User("user-1", "user@example.com", "Test", null, 1_000L)
+      val user = User("user-1", "Test", null, 1_000L)
       repository.createUser(user)
       val barrier = CyclicBarrier(2)
       val roles = listOf(Role.EXPLORER, Role.VENUE)
@@ -259,7 +251,7 @@ class FakeUserRepositoryTest {
   fun setRoleRacingCreateUser_resultMatchesStoredRole() = runBlocking {
     repeat(1_000) {
       val repository = FakeUserRepository()
-      val user = User("user-1", "user@example.com", "Test", null, 1_000L)
+      val user = User("user-1", "Test", null, 1_000L)
       val barrier = CyclicBarrier(2)
       val creation =
           async(Dispatchers.IO) {

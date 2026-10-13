@@ -10,6 +10,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthError
 import com.github.aroundteam2026.aroundapp.model.auth.AuthInputValidation
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.RegistrationChoice
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +34,8 @@ enum class AuthFormError {
   EMAIL_TAKEN,
   /** Authentication failed because the service could not be reached. */
   NETWORK,
+  /** The registration choice could not be recorded; authentication must not start. */
+  ACCOUNT_SETUP,
   /** Authentication failed for an unrecognized reason. */
   UNKNOWN,
 }
@@ -44,6 +48,7 @@ enum class AuthFormError {
  * @property passwordConfirmation Repeated password, checked only for sign-up.
  * @property isLoading Whether an authentication request is in progress.
  * @property error Current validation or repository error, or null.
+ * @property accountSetupComplete A signed-in account's choice is saved; the router can finish it.
  */
 data class AuthUiState(
     val email: String = "",
@@ -51,16 +56,23 @@ data class AuthUiState(
     val passwordConfirmation: String = "",
     val isLoading: Boolean = false,
     val error: AuthFormError? = null,
+    val accountSetupComplete: Boolean = false,
 )
 
 /**
  * Holds the sign-in/sign-up form and talks to [AuthRepository].
  *
  * Input is checked locally first, so obviously invalid forms never reach the repository. While a
- * request runs, further submits are ignored. On success nothing changes here: the repository's
+ * request runs, further submits are ignored. Success clears the form state; the repository's
  * `currentUserId` updates, and navigation reacts to that.
  */
-class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
+class AuthViewModel(
+    private val repository: AuthRepository,
+    private val registration: RegistrationChoice? = null,
+) : ViewModel() {
+
+  /** Registration paths need [registration]; auth-only callers keep the existing form. */
+  val supportsRegistration: Boolean = registration != null
 
   private val _uiState = MutableStateFlow(AuthUiState())
   /** Observable form state; successful authentication updates [AuthRepository.currentUserId]. */
@@ -92,11 +104,15 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
               else -> null
             }
           },
+          // Clear before auth emits a uid: the router may immediately call ProfileSetup.finish().
+          prepare = { registration?.discardChoice() ?: Result.success(Unit) },
           call = repository::signInWithEmail,
       )
 
-  /** Validates email, password length and confirmation before creating an account. */
-  fun signUp() =
+  /**
+   * Validates the form, durably records [role], then creates the account for the router to finish.
+   */
+  fun signUp(role: Role = Role.EXPLORER) =
       submit(
           validate = { state ->
             when {
@@ -107,11 +123,38 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
               else -> null
             }
           },
+          prepare = { registration?.choose(role) ?: Result.success(Unit) },
           call = repository::signUpWithEmail,
       )
 
+  /**
+   * Records an existing account's choice without authenticating again. The router owns finish().
+   */
+  fun completeRegistration(role: Role) {
+    if (_uiState.value.isLoading || _uiState.value.accountSetupComplete) return
+    if (repository.currentUserId.value == null || registration == null) {
+      _uiState.update { it.copy(error = AuthFormError.ACCOUNT_SETUP) }
+      return
+    }
+    _uiState.update { it.copy(isLoading = true, error = null) }
+    viewModelScope.launch {
+      val result = registration.choose(role)
+      _uiState.update {
+        it.copy(
+            isLoading = false,
+            accountSetupComplete = result.isSuccess,
+            error = if (result.isFailure) AuthFormError.ACCOUNT_SETUP else null,
+        )
+      }
+    }
+  }
+
+  /** Acknowledges the notification after the router has been asked to resolve the profile again. */
+  fun onAccountSetupHandled() = _uiState.update { it.copy(accountSetupComplete = false) }
+
   private fun submit(
       validate: (AuthUiState) -> AuthFormError?,
+      prepare: suspend () -> Result<Unit>,
       call: suspend (email: String, password: String) -> Result<String>,
   ) {
     val state = _uiState.value
@@ -123,9 +166,14 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
     _uiState.update { it.copy(isLoading = true, error = null) }
     viewModelScope.launch {
+      if (prepare().isFailure) {
+        _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
+        return@launch
+      }
       val result = call(state.email.trim(), state.password)
       _uiState.update {
-        it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
+        if (result.isSuccess) AuthUiState()
+        else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
       }
     }
   }
@@ -142,8 +190,11 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         }
 
     /** Builds the ViewModel with its repository, for `viewModel(factory = ...)` in Compose. */
-    fun factory(repository: AuthRepository): ViewModelProvider.Factory = viewModelFactory {
-      initializer { AuthViewModel(repository) }
+    fun factory(
+        repository: AuthRepository,
+        registration: RegistrationChoice? = null,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer { AuthViewModel(repository, registration) }
     }
   }
 }

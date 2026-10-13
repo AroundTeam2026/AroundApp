@@ -1,6 +1,7 @@
 // Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.ui.auth
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.AnyRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -37,18 +39,39 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthInputValidation
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
  * Minimal email/password form backed by [viewModel].
  *
  * Account creation requires confirmation. The navigation owner observes
- * AuthRepository.currentUserId for success and decides the destination.
+ * AuthRepository.currentUserId for success and decides the destination. Create account registers an
+ * Explorer and the venue link a Venue. [completeRegistration] offers the same two choices without
+ * asking for credentials. Use [RegistrationFlow] to provide profile setup and receive
+ * account-completion notifications.
  */
 @Composable
-fun AuthScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
+fun AuthScreen(
+    viewModel: AuthViewModel,
+    modifier: Modifier = Modifier,
+    completeRegistration: Boolean = false,
+) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  var isCreatingAccount by rememberSaveable { mutableStateOf(false) }
+  var isCreatingAccount by
+      rememberSaveable(completeRegistration) { mutableStateOf(completeRegistration) }
+  val title =
+      when {
+        completeRegistration -> R.string.auth_complete_registration
+        isCreatingAccount -> R.string.auth_create_account
+        else -> R.string.auth_sign_in
+      }
+  val register = { role: Role ->
+    if (completeRegistration) viewModel.completeRegistration(role) else viewModel.signUp(role)
+  }
+  // Leaving mid-request would drop the form while the account choice is being recorded.
+  BackHandler(enabled = state.isLoading) {}
   Surface(modifier = modifier.fillMaxSize()) {
     Column(
         modifier =
@@ -61,41 +84,42 @@ fun AuthScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
     ) {
       Text(stringResource(R.string.auth_welcome), style = MaterialTheme.typography.headlineMedium)
       Text(
-          stringResource(
-              if (isCreatingAccount) R.string.auth_create_account else R.string.auth_sign_in
-          ),
+          stringResource(title),
           style = MaterialTheme.typography.titleLarge,
+          modifier = Modifier.testTag(C.Tag.AUTH_TITLE),
       )
-      OutlinedTextField(
-          value = state.email,
-          onValueChange = viewModel::onEmailChange,
-          label = { Text(stringResource(R.string.auth_email)) },
-          singleLine = true,
-          enabled = !state.isLoading,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-          modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_EMAIL),
-      )
-      OutlinedTextField(
-          value = state.password,
-          onValueChange = viewModel::onPasswordChange,
-          label = { Text(stringResource(R.string.auth_password)) },
-          singleLine = true,
-          enabled = !state.isLoading,
-          visualTransformation = PasswordVisualTransformation(),
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-          modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_PASSWORD),
-      )
-      if (isCreatingAccount) {
+      if (!completeRegistration) {
         OutlinedTextField(
-            value = state.passwordConfirmation,
-            onValueChange = viewModel::onPasswordConfirmationChange,
-            label = { Text(stringResource(R.string.auth_confirm_password)) },
+            value = state.email,
+            onValueChange = viewModel::onEmailChange,
+            label = { Text(stringResource(R.string.auth_email)) },
+            singleLine = true,
+            enabled = !state.isLoading,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_EMAIL),
+        )
+        OutlinedTextField(
+            value = state.password,
+            onValueChange = viewModel::onPasswordChange,
+            label = { Text(stringResource(R.string.auth_password)) },
             singleLine = true,
             enabled = !state.isLoading,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_CONFIRMATION),
+            modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_PASSWORD),
         )
+        if (isCreatingAccount) {
+          OutlinedTextField(
+              value = state.passwordConfirmation,
+              onValueChange = viewModel::onPasswordConfirmationChange,
+              label = { Text(stringResource(R.string.auth_confirm_password)) },
+              singleLine = true,
+              enabled = !state.isLoading,
+              visualTransformation = PasswordVisualTransformation(),
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+              modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_CONFIRMATION),
+          )
+        }
       }
       state.error?.let { error ->
         Text(
@@ -116,8 +140,19 @@ fun AuthScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
       if (state.isLoading) {
         CircularProgressIndicator(Modifier.testTag(C.Tag.AUTH_LOADING))
       }
+      if (viewModel.supportsRegistration && isCreatingAccount) {
+        TextButton(
+            onClick = { register(Role.VENUE) },
+            enabled = !state.isLoading,
+            modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_VENUE_LINK),
+            // The default primary colour is unreadable on the dark background.
+            colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
+        ) {
+          Text(stringResource(R.string.auth_venue_link))
+        }
+      }
       Button(
-          onClick = { if (isCreatingAccount) viewModel.signUp() else viewModel.signIn() },
+          onClick = { if (isCreatingAccount) register(Role.EXPLORER) else viewModel.signIn() },
           enabled = !state.isLoading,
           modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_SUBMIT),
       ) {
@@ -127,19 +162,21 @@ fun AuthScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             )
         )
       }
-      TextButton(
-          onClick = {
-            isCreatingAccount = !isCreatingAccount
-            viewModel.onModeChange()
-          },
-          enabled = !state.isLoading,
-          modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_SWITCH_MODE),
-      ) {
-        Text(
-            stringResource(
-                if (isCreatingAccount) R.string.auth_have_account else R.string.auth_need_account
-            )
-        )
+      if (!completeRegistration) {
+        TextButton(
+            onClick = {
+              isCreatingAccount = !isCreatingAccount
+              viewModel.onModeChange()
+            },
+            enabled = !state.isLoading,
+            modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_SWITCH_MODE),
+        ) {
+          Text(
+              stringResource(
+                  if (isCreatingAccount) R.string.auth_have_account else R.string.auth_need_account
+              )
+          )
+        }
       }
     }
   }
@@ -156,5 +193,6 @@ internal fun AuthFormError.messageResource(): Int =
       AuthFormError.WRONG_CREDENTIALS -> R.string.auth_wrong_credentials
       AuthFormError.EMAIL_TAKEN -> R.string.auth_email_taken
       AuthFormError.NETWORK -> R.string.auth_network_error
+      AuthFormError.ACCOUNT_SETUP -> R.string.auth_account_setup_error
       AuthFormError.UNKNOWN -> R.string.auth_unknown_error
     }
