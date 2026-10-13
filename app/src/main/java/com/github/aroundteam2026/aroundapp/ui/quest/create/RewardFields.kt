@@ -36,7 +36,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.quest.formatRewardAmount
+import com.github.aroundteam2026.aroundapp.ui.quest.formatRewardAmountInput
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -268,7 +268,7 @@ private fun discountErrorText(error: DiscountAmountError, unit: DiscountUnit): S
     DiscountAmountError.TOO_SMALL ->
         stringResource(
             R.string.create_quest_reward_amount_too_small,
-            formatRewardAmount(QuestLimits.MIN_DISCOUNT_AMOUNT, unit, locale),
+            formatRewardAmountInput(QuestLimits.MIN_DISCOUNT_AMOUNT, unit, locale),
         )
     DiscountAmountError.TOO_LARGE ->
         stringResource(
@@ -276,7 +276,7 @@ private fun discountErrorText(error: DiscountAmountError, unit: DiscountUnit): S
               DiscountUnit.PERCENT -> R.string.create_quest_reward_amount_too_large_percent
               DiscountUnit.CHF -> R.string.create_quest_reward_amount_too_large_chf
             },
-            formatRewardAmount(QuestLimits.maxDiscountAmount(unit), unit, locale),
+            formatRewardAmountInput(QuestLimits.maxDiscountAmount(unit), unit, locale),
         )
   }
 }

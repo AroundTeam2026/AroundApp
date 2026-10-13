@@ -39,11 +39,21 @@ class RewardAmountFormatTest {
     assertEquals("2,50", formatRewardAmount(2.5, DiscountUnit.CHF, Locale.FRENCH))
   }
 
-  // The amount field accepts only ASCII digits and a point or comma, so the minimum shown in its
-  // error must be written that way too.
   @Test
-  fun writesOnlyWhatTheAmountFieldAccepts() {
-    assertEquals("2.50", formatRewardAmount(2.5, DiscountUnit.CHF, Locale.forLanguageTag("ar-EG")))
-    assertEquals("1000", formatRewardAmount(1000.0, DiscountUnit.CHF, Locale.forLanguageTag("fa")))
+  fun cardsUseTheDigitsOfTheLanguage() {
+    assertEquals("٢٫٥٠", formatRewardAmount(2.5, DiscountUnit.CHF, EGYPTIAN_ARABIC))
+  }
+
+  // The amount field accepts only ASCII digits and a point or comma, so the limits shown in its
+  // errors must be written that way too.
+  @Test
+  fun inputWritesOnlyWhatTheAmountFieldAccepts() {
+    assertEquals("2.50", formatRewardAmountInput(2.5, DiscountUnit.CHF, EGYPTIAN_ARABIC))
+    assertEquals("2,50", formatRewardAmountInput(2.5, DiscountUnit.CHF, Locale.FRENCH))
+    assertEquals("12.5", formatRewardAmountInput(12.5, DiscountUnit.PERCENT, Locale.US))
+  }
+
+  private companion object {
+    val EGYPTIAN_ARABIC: Locale = Locale.forLanguageTag("ar-EG")
   }
 }
