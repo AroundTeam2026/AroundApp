@@ -38,4 +38,12 @@ class RewardAmountFormatTest {
   fun followsTheLanguagesDecimalSeparator() {
     assertEquals("2,50", formatRewardAmount(2.5, DiscountUnit.CHF, Locale.FRENCH))
   }
+
+  // The amount field accepts only ASCII digits and a point or comma, so the minimum shown in its
+  // error must be written that way too.
+  @Test
+  fun writesOnlyWhatTheAmountFieldAccepts() {
+    assertEquals("2.50", formatRewardAmount(2.5, DiscountUnit.CHF, Locale.forLanguageTag("ar-EG")))
+    assertEquals("1000", formatRewardAmount(1000.0, DiscountUnit.CHF, Locale.forLanguageTag("fa")))
+  }
 }
