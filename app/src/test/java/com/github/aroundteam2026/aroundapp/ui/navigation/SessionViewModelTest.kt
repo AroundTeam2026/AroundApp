@@ -1,6 +1,8 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -11,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -73,5 +76,23 @@ class SessionViewModelTest {
         repo.signOut()
         advanceUntilIdle()
         assertEquals(SessionState.SignedOut, vm.uiState.value)
+      }
+
+  @Test
+  fun clearingSessionViewModelClearsItsChildStores() =
+      runTest(dispatcher) {
+        val vm = SessionViewModel(FakeAuthRepository("existing"))
+        val rootStore = ViewModelStore()
+        rootStore.put("session", vm)
+        var childCleared = false
+        val child =
+            object : ViewModel() {
+              override fun onCleared() {
+                childCleared = true
+              }
+            }
+        vm.signedInStoreOwner("existing").viewModelStore.put("child", child)
+        rootStore.clear()
+        assertTrue(childCleared)
       }
 }
