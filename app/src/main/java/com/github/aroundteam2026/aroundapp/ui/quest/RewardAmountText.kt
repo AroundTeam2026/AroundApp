@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.quest
 
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 import kotlin.math.roundToLong
 
@@ -9,6 +10,9 @@ import kotlin.math.roundToLong
  * Writes a discount [amount] in [unit] for [locale], rounded to two decimals: none when the rounded
  * amount is whole, otherwise two in CHF (2.50) and only those needed in percent (12.5). The
  * decimals are chosen on the rounded value, so 9.999 reads 10 rather than 10.00.
+ *
+ * It writes only what the amount field accepts: ASCII digits, and a comma where [locale] uses one
+ * as its decimal separator, a point otherwise.
  */
 internal fun formatRewardAmount(amount: Double, unit: DiscountUnit, locale: Locale): String {
   val hundredths = (amount * 100).roundToLong()
@@ -18,5 +22,7 @@ internal fun formatRewardAmount(amount: Double, unit: DiscountUnit, locale: Loca
         unit == DiscountUnit.CHF || hundredths % 10 != 0L -> 2
         else -> 1
       }
-  return String.format(locale, "%.${decimals}f", hundredths / 100.0)
+  val text = String.format(Locale.ROOT, "%.${decimals}f", hundredths / 100.0)
+  val usesComma = DecimalFormatSymbols.getInstance(locale).decimalSeparator == ','
+  return if (usesComma) text.replace('.', ',') else text
 }

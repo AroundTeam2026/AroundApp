@@ -58,8 +58,9 @@ sealed interface Reward {
   /**
    * A discount, e.g. 10 % or 5 CHF off.
    *
-   * @property amount Size of the discount, in [unit], at least [QuestLimits.MIN_DISCOUNT_AMOUNT]
-   *   and, in percent, at most [QuestLimits.MAX_PERCENT_DISCOUNT].
+   * @property amount Size of the discount, in [unit], at least [QuestLimits.MIN_DISCOUNT_AMOUNT],
+   *   at most [QuestLimits.maxDiscountAmount] of [unit], with at most
+   *   [QuestLimits.MAX_DISCOUNT_DECIMALS] decimals.
    * @property specifics What the discount applies to, or null if not specified.
    */
   data class Discount(

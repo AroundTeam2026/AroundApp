@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasImeAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.input.ImeAction
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -373,5 +375,41 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY)
         .performScrollTo()
         .assertTextContains("31 Dec 2099")
+  }
+
+  // Egyptian Arabic writes numbers in Arabic-Indic digits, which the amount field rejects.
+  @Test
+  @Config(qualifiers = "+ar-rEG")
+  fun tooSmallAmountShowsTheMinimumInDigitsTheFieldAccepts() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().performTextInput("0")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Enter at least 0.01.")
+  }
+
+  @Test
+  fun discountAmountMovesToTheNextFieldFromTheKeyboard() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT)
+        .performScrollTo()
+        .assert(hasImeAction(ImeAction.Next))
+  }
+
+  @Test
+  fun francsShowTheirOwnMaximumAndTheDecimalLimit() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    viewModel.updateDiscountUnit(DiscountUnit.CHF)
+    val amount = compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo()
+    val error = compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+
+    amount.performTextInput("1000.01")
+    error.performScrollTo().assertTextEquals("Use CHF 1000 or less.")
+
+    amount.performTextClearance()
+    amount.performTextInput("0.015")
+    error.assertTextEquals("Use at most 2 decimals.")
   }
 }

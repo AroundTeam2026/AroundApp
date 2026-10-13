@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -21,13 +22,18 @@ enum class RewardType {
 enum class DiscountAmountError {
   /** Empty or whitespace only. */
   BLANK,
-  /** Not a finite number. */
+  /** Not digits with an optional decimal point or comma, e.g. "1e3", "+5" or "-5". */
   NOT_A_NUMBER,
+  /** More than [QuestLimits.MAX_DISCOUNT_DECIMALS] decimals, e.g. "0.015" or "1,000". */
+  TOO_MANY_DECIMALS,
   /** Below [QuestLimits.MIN_DISCOUNT_AMOUNT]. */
   TOO_SMALL,
-  /** Over [QuestLimits.MAX_PERCENT_DISCOUNT] in [DiscountUnit.PERCENT]. */
+  /** Over [QuestLimits.maxDiscountAmount] of the unit. */
   TOO_LARGE,
 }
+
+/** What the amount field accepts: ASCII digits, then optionally a point or comma and digits. */
+private val AMOUNT_FORMAT = Regex("""\d+([.,]\d+)?""")
 
 /**
  * The reward part of the quest form. No [type] means the quest has no reward.
@@ -36,7 +42,7 @@ enum class DiscountAmountError {
  * follow the text fields: [QuestTextError.BLANK] only once the field has been edited.
  *
  * @property discountAmount The discount as typed, for [RewardType.DISCOUNT]; a comma counts as a
- *   decimal point.
+ *   decimal point, and there is no thousands separator.
  * @property discountUnit Whether [discountAmount] is in percent or francs.
  * @property itemName The free item, for [RewardType.FREE_ITEM].
  * @property specifics Optional details about the reward.
@@ -59,9 +65,12 @@ data class RewardFormState(
     val itemNameTouched: Boolean = false,
     val descriptionTouched: Boolean = false,
 ) {
-  /** [discountAmount] as a number, or null if it isn't one. */
-  private val parsedAmount: Double?
-    get() = discountAmount.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
+  /** [discountAmount] as an exact decimal, or null if it doesn't match [AMOUNT_FORMAT]. */
+  private val parsedAmount: BigDecimal?
+    get() {
+      val amount = discountAmount.trim()
+      return if (AMOUNT_FORMAT.matches(amount)) amount.replace(',', '.').toBigDecimal() else null
+    }
 
   /** Why [discountAmount] is invalid in [discountUnit], or null if it is valid. */
   private val amountError: DiscountAmountError?
@@ -70,8 +79,9 @@ data class RewardFormState(
       return when {
         discountAmount.isBlank() -> DiscountAmountError.BLANK
         amount == null -> DiscountAmountError.NOT_A_NUMBER
-        amount < QuestLimits.MIN_DISCOUNT_AMOUNT -> DiscountAmountError.TOO_SMALL
-        discountUnit == DiscountUnit.PERCENT && amount > QuestLimits.MAX_PERCENT_DISCOUNT ->
+        amount.scale() > QuestLimits.MAX_DISCOUNT_DECIMALS -> DiscountAmountError.TOO_MANY_DECIMALS
+        amount < QuestLimits.MIN_DISCOUNT_AMOUNT.toBigDecimal() -> DiscountAmountError.TOO_SMALL
+        amount > QuestLimits.maxDiscountAmount(discountUnit).toBigDecimal() ->
             DiscountAmountError.TOO_LARGE
         else -> null
       }
@@ -132,7 +142,12 @@ data class RewardFormState(
     return when (type) {
       null -> null
       RewardType.DISCOUNT ->
-          Reward.Discount(requireNotNull(parsedAmount), discountUnit, details, expiresAt)
+          Reward.Discount(
+              requireNotNull(parsedAmount).toDouble(),
+              discountUnit,
+              details,
+              expiresAt,
+          )
       RewardType.FREE_ITEM -> Reward.FreeItem(itemName.trim(), details, expiresAt)
       RewardType.OTHER -> Reward.Other(description.trim(), expiresAt)
     }

@@ -46,4 +46,17 @@ object QuestLimits {
 
   /** Largest allowed [Reward.Discount.amount] in [DiscountUnit.PERCENT]: the whole price. */
   const val MAX_PERCENT_DISCOUNT = 100.0
+
+  /** Largest allowed [Reward.Discount.amount] in [DiscountUnit.CHF]; a placeholder for now. */
+  const val MAX_CHF_DISCOUNT = 1000.0
+
+  /** Most decimals a [Reward.Discount.amount] may have: cents, or hundredths of a percent. */
+  const val MAX_DISCOUNT_DECIMALS = 2
+
+  /** Largest allowed [Reward.Discount.amount] in [unit]. */
+  fun maxDiscountAmount(unit: DiscountUnit): Double =
+      when (unit) {
+        DiscountUnit.PERCENT -> MAX_PERCENT_DISCOUNT
+        DiscountUnit.CHF -> MAX_CHF_DISCOUNT
+      }
 }

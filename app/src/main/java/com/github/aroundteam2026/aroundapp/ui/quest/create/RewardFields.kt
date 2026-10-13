@@ -23,7 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,10 +41,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -53,11 +49,11 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.formatRewardAmount
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -259,57 +255,57 @@ private fun DiscountAmount(reward: RewardFormState, actions: QuestRewardActions)
         horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-      OutlinedTextField(
+      QuestInputField(
+          label = label,
+          hint = stringResource(R.string.create_quest_reward_amount_hint),
           value = reward.discountAmount,
           onValueChange = actions.onDiscountAmountChange,
-          singleLine = true,
           isError = error != null,
-          placeholder = { Text(stringResource(R.string.create_quest_reward_amount_hint)) },
-          shape = MaterialTheme.shapes.small,
-          textStyle = AroundTextStyles.FieldValue,
-          colors = questFieldColors(),
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-          modifier =
-              Modifier.weight(1f).testTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).semantics {
-                contentDescription = label
-              },
+          singleLine = true,
+          keyboardOptions =
+              KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+          modifier = Modifier.weight(1f).testTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT),
       )
       DiscountUnitToggle(reward.discountUnit, actions.onDiscountUnitChange)
     }
     error?.let {
-      Text(
-          discountErrorText(it),
-          style = AroundTextStyles.Caption,
-          color = MaterialTheme.colorScheme.error,
-          modifier =
-              Modifier.testTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR).semantics {
-                liveRegion = LiveRegionMode.Polite
-              },
+      QuestFieldError(
+          discountErrorText(it, reward.discountUnit),
+          C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR,
       )
     }
   }
 }
 
-/** What [error] tells the venue to fix in the discount amount. */
+/** What [error] tells the venue to fix in the discount amount, in [unit]. */
 @Composable
-private fun discountErrorText(error: DiscountAmountError) =
-    when (error) {
-      DiscountAmountError.BLANK -> stringResource(R.string.create_quest_blank)
-      DiscountAmountError.NOT_A_NUMBER ->
-          stringResource(R.string.create_quest_reward_amount_not_a_number)
-      DiscountAmountError.TOO_SMALL ->
-          stringResource(
-              R.string.create_quest_reward_amount_too_small,
-              // In the phone's decimal separator, which the amount field also accepts
-              NumberFormat.getNumberInstance(LocalConfiguration.current.locales[0])
-                  .format(QuestLimits.MIN_DISCOUNT_AMOUNT),
-          )
-      DiscountAmountError.TOO_LARGE ->
-          stringResource(
-              R.string.create_quest_reward_amount_too_large,
-              QuestLimits.MAX_PERCENT_DISCOUNT.toInt(),
-          )
-    }
+private fun discountErrorText(error: DiscountAmountError, unit: DiscountUnit): String {
+  // Written as the amount field accepts it, so the venue can type the limit back in
+  val locale = LocalConfiguration.current.locales[0]
+  return when (error) {
+    DiscountAmountError.BLANK -> stringResource(R.string.create_quest_blank)
+    DiscountAmountError.NOT_A_NUMBER ->
+        stringResource(R.string.create_quest_reward_amount_not_a_number)
+    DiscountAmountError.TOO_MANY_DECIMALS ->
+        stringResource(
+            R.string.create_quest_reward_amount_too_many_decimals,
+            QuestLimits.MAX_DISCOUNT_DECIMALS.toString(),
+        )
+    DiscountAmountError.TOO_SMALL ->
+        stringResource(
+            R.string.create_quest_reward_amount_too_small,
+            formatRewardAmount(QuestLimits.MIN_DISCOUNT_AMOUNT, unit, locale),
+        )
+    DiscountAmountError.TOO_LARGE ->
+        stringResource(
+            when (unit) {
+              DiscountUnit.PERCENT -> R.string.create_quest_reward_amount_too_large_percent
+              DiscountUnit.CHF -> R.string.create_quest_reward_amount_too_large_chf
+            },
+            formatRewardAmount(QuestLimits.maxDiscountAmount(unit), unit, locale),
+        )
+  }
+}
 
 /** Percent or francs, as a segmented control: the chosen unit is filled in purple. */
 @Composable
@@ -413,14 +409,9 @@ private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate
       }
     }
     if (inPast) {
-      Text(
+      QuestFieldError(
           stringResource(R.string.create_quest_reward_expiry_past),
-          style = AroundTextStyles.Caption,
-          color = MaterialTheme.colorScheme.error,
-          modifier =
-              Modifier.testTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR).semantics {
-                liveRegion = LiveRegionMode.Polite
-              },
+          C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR,
       )
     }
   }
