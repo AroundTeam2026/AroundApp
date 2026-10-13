@@ -24,10 +24,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
@@ -36,6 +38,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.quest.formatRewardAmountInput
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -255,7 +258,7 @@ private fun DiscountAmount(reward: RewardFormState, actions: QuestRewardActions)
 @Composable
 private fun discountErrorText(error: DiscountAmountError, unit: DiscountUnit): String {
   // Written as the amount field accepts it, so the venue can type the limit back in
-  val locale = LocalConfiguration.current.locales[0]
+  val locale = currentLocale()
   return when (error) {
     DiscountAmountError.BLANK -> stringResource(R.string.create_quest_blank)
     DiscountAmountError.NOT_A_NUMBER ->
@@ -305,7 +308,8 @@ private fun DiscountUnitToggle(selected: DiscountUnit, onSelect: (DiscountUnit) 
           onClick = { onSelect(unit) },
           shape = AroundCorners.SegmentedOption,
           color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-          modifier = Modifier.height(UNIT_HEIGHT).testTag(tag),
+          modifier =
+              Modifier.height(UNIT_HEIGHT).testTag(tag).semantics { role = Role.RadioButton },
       ) {
         Box(Modifier.padding(horizontal = AroundSpacing.InsetPadding), Alignment.Center) {
           Text(

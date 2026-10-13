@@ -1,7 +1,10 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -271,7 +274,7 @@ class CreateQuestScreenTest {
     val reward = viewModel.uiState.value.reward
     assertEquals(
         listOf("Tea", "Any size", "A tour"),
-        listOf(reward.itemName, reward.specifics, reward.description),
+        listOf(reward.itemName, reward.itemSpecifics, reward.description),
     )
   }
 
@@ -352,6 +355,17 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT)
         .performScrollTo()
         .assert(hasImeAction(ImeAction.Next))
+  }
+
+  @Test
+  fun eachUnitIsARadioButton() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    listOf(C.Tag.CREATE_QUEST_REWARD_UNIT_PERCENT, C.Tag.CREATE_QUEST_REWARD_UNIT_CHF).forEach {
+      compose
+          .onNodeWithTag(it)
+          .performScrollTo()
+          .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+    }
   }
 
   @Test
