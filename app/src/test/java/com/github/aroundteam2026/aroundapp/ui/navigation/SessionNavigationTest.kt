@@ -139,6 +139,79 @@ class SessionNavigationTest {
     submit()
   }
 
+  @Test
+  fun authFieldsSurviveConfigurationRecreation() {
+    val restoration = StateRestorationTester(compose)
+    val repo = FakeAuthRepository()
+    restoration.setContent { SessionNavigation(repo) }
+    compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
+    compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
+    restoration.emulateSavedInstanceStateRestore()
+    compose
+        .onNodeWithTag(C.Tag.AUTH_EMAIL)
+        .assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.InputText,
+                AnnotatedString("ada@around.test"),
+            )
+        )
+    compose
+        .onNodeWithTag(C.Tag.AUTH_PASSWORD)
+        .assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.InputText, AnnotatedString("123456"))
+        )
+    compose
+        .onNodeWithTag(C.Tag.AUTH_CONFIRMATION)
+        .assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.InputText, AnnotatedString("123456"))
+        )
+  }
+
+  @Test
+  fun pendingAuthRequestSurvivesConfigurationRecreation() {
+    val auth = FakeAuthRepository()
+    auth.addAccount("ada@around.test", "123456")
+    val gate = CompletableDeferred<Unit>()
+    var calls = 0
+    var cancelled = false
+    val delayed =
+        object : AuthRepository by auth {
+          override suspend fun signInWithEmail(email: String, password: String): Result<String> {
+            calls++
+            try {
+              gate.await()
+              return auth.signInWithEmail(email, password)
+            } catch (error: kotlinx.coroutines.CancellationException) {
+              cancelled = true
+              throw error
+            }
+          }
+        }
+    val restoration = StateRestorationTester(compose)
+    restoration.setContent {
+      SessionNavigation(
+          delayed,
+          mainScreen = { Text("home", Modifier.testTag(C.Tag.QUESTS_SCREEN)) },
+      )
+    }
+    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
+    compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
+    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertIsDisplayed()
+    restoration.emulateSavedInstanceStateRestore()
+    compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertIsDisplayed()
+    compose.runOnIdle {
+      assertEquals(1, calls)
+      assertEquals(false, cancelled)
+      gate.complete(Unit)
+    }
+    compose.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
+    compose.runOnIdle { assertEquals(false, cancelled) }
+  }
+
   private fun assertFreshAuthFormAfterSignOut(repo: FakeAuthRepository) {
     compose.runOnIdle { repo.signOut() }
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()

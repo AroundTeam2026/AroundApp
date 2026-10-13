@@ -57,7 +57,7 @@ data class AuthUiState(
  * Holds the sign-in/sign-up form and talks to [AuthRepository].
  *
  * Input is checked locally first, so obviously invalid forms never reach the repository. While a
- * request runs, further submits are ignored. On success nothing changes here: the repository's
+ * request runs, further submits are ignored. Success clears the form state; the repository's
  * `currentUserId` updates, and navigation reacts to that.
  */
 class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
@@ -125,7 +125,8 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     viewModelScope.launch {
       val result = call(state.email.trim(), state.password)
       _uiState.update {
-        it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
+        if (result.isSuccess) AuthUiState()
+        else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
       }
     }
   }

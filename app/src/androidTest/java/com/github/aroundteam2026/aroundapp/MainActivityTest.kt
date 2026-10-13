@@ -2,12 +2,16 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.AnnotatedString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.e2e.E2eRule
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -83,6 +87,30 @@ class MainActivityTest : TestCase() {
       profileTab { assertIsSelected() }
       profileScreen { assertIsDisplayed() }
     }
+  }
+
+  @Test
+  fun activityRecreationKeepsUnsubmittedAuthFields() {
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("typing@around.test")
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
+    composeTestRule.activityRule.scenario.recreate()
+    listOf(
+            C.Tag.AUTH_EMAIL to "typing@around.test",
+            C.Tag.AUTH_PASSWORD to "123456",
+            C.Tag.AUTH_CONFIRMATION to "123456",
+        )
+        .forEach { (tag, value) ->
+          composeTestRule
+              .onNodeWithTag(tag)
+              .assert(
+                  SemanticsMatcher.expectValue(
+                      SemanticsProperties.InputText,
+                      AnnotatedString(value),
+                  )
+              )
+        }
   }
 
   @Test
