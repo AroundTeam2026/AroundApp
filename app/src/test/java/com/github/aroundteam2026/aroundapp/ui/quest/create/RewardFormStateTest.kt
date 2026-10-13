@@ -30,11 +30,11 @@ class RewardFormStateTest {
   fun freeItemIsTrimmedAndBlankSpecificsAreDropped() {
     assertEquals(
         Reward.FreeItem("Coffee", null),
-        freeItem.copy(itemName = " Coffee ", specifics = "  ").toReward(),
+        freeItem.copy(itemName = " Coffee ", itemSpecifics = "  ").toReward(),
     )
     assertEquals(
         Reward.FreeItem("Coffee", "Any size"),
-        freeItem.copy(specifics = " Any size ").toReward(),
+        freeItem.copy(itemSpecifics = " Any size ").toReward(),
     )
   }
 
@@ -47,7 +47,7 @@ class RewardFormStateTest {
             .copy(
                 discountAmount = " 12,5 ",
                 discountUnit = DiscountUnit.CHF,
-                specifics = "Hot drinks ",
+                discountSpecifics = "Hot drinks ",
             )
             .toReward(),
     )
@@ -77,12 +77,23 @@ class RewardFormStateTest {
     assertAmountError(DiscountUnit.CHF, "0.015", TOO_MANY_DECIMALS)
     assertAmountError(DiscountUnit.PERCENT, "99,996", TOO_MANY_DECIMALS)
     assertAmountError(DiscountUnit.CHF, "0,99", null)
-    // Trailing zeros don't count
-    listOf("5.000", "0.010", "100.000").forEach {
-      assertAmountError(DiscountUnit.PERCENT, it, null)
+    // Some phones read these as a thousand or half a franc, so none is taken at face value
+    listOf("1,000", "1.000", "0,500").forEach {
+      assertAmountError(DiscountUnit.CHF, it, TOO_MANY_DECIMALS)
     }
-    // Read by some as a thousand, so it isn't taken as 1
-    assertAmountError(DiscountUnit.CHF, "1,000", TOO_MANY_DECIMALS)
+  }
+
+  @Test
+  fun eachTypeKeepsItsOwnSpecifics() {
+    val typed = discount.withSpecifics("Hot drinks")
+    assertEquals("Hot drinks", typed.specifics)
+
+    val item = typed.copy(type = RewardType.FREE_ITEM, itemName = "Coffee")
+    assertEquals("", item.specifics)
+    assertEquals(Reward.FreeItem("Coffee", null), item.toReward())
+
+    assertEquals("Hot drinks", item.copy(type = RewardType.DISCOUNT).specifics)
+    assertEquals(other, other.withSpecifics("Ignored"))
   }
 
   @Test
@@ -119,7 +130,8 @@ class RewardFormStateTest {
 
   @Test
   fun tooLongSpecificsShowAtOnceAndBlockTheFreeItem() {
-    val reward = freeItem.copy(specifics = "x".repeat(QuestLimits.REWARD_SPECIFICS_MAX_LENGTH + 1))
+    val reward =
+        freeItem.copy(itemSpecifics = "x".repeat(QuestLimits.REWARD_SPECIFICS_MAX_LENGTH + 1))
     assertEquals(QuestTextError.TOO_LONG, reward.specificsError)
     assertFalse(reward.isValid)
   }

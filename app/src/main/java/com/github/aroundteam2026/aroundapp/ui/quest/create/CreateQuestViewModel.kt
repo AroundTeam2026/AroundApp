@@ -113,9 +113,9 @@ class CreateQuestViewModel(
     updateReward { it.copy(itemName = value, itemNameTouched = true) }
   }
 
-  /** Sets the reward's specifics to [value]. */
+  /** Sets the specifics of the picked reward type to [value]. */
   fun updateRewardSpecifics(value: String) {
-    updateReward { it.copy(specifics = value) }
+    updateReward { it.withSpecifics(value) }
   }
 
   /** Sets the description of an other reward to [value] and marks it as edited. */
