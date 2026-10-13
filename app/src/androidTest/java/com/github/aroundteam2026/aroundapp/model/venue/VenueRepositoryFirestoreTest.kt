@@ -188,6 +188,19 @@ class VenueRepositoryFirestoreTest {
     assertEquals(listOf(readerUid), observed.map { it.id })
   }
 
+  /**
+   * Bug: an id Firestore refuses makes observeVenue or observeVenues throw when called, before the
+   * caller's catch on the flow can see it, instead of failing the flow.
+   */
+  @Test
+  fun observe_withAnInvalidId_failsTheFlowInsteadOfThrowing() = withTimeoutBlocking {
+    val venue = readerRepository.observeVenue(INVALID_ID)
+    val venues = readerRepository.observeVenues(setOf(INVALID_ID))
+
+    assertTrue(runCatching { venue.first() }.exceptionOrNull() is IllegalArgumentException)
+    assertTrue(runCatching { venues.first() }.exceptionOrNull() is IllegalArgumentException)
+  }
+
   /** Bug: observeVenues queries Firestore with no ids, which it refuses, instead of emitting. */
   @Test
   fun observeVenues_withNoIds_emitsAnEmptyList() = withTimeoutBlocking {
@@ -283,5 +296,8 @@ class VenueRepositoryFirestoreTest {
 
     /** The most ids Firestore takes in one `in` query. */
     const val MAX_IDS_PER_QUERY = 30
+
+    /** An id Firestore refuses: a slash makes it a path instead of a document id. */
+    const val INVALID_ID = "a/b"
   }
 }

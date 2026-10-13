@@ -18,6 +18,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 
@@ -38,7 +40,13 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
   private val venues
     get() = db.collection(VENUES)
 
-  override fun observeVenue(venueId: String): Flow<Venue?> = venues.document(venueId).observe()
+  /**
+   * The document is built once the flow is collected, so an id Firestore refuses fails the flow
+   * instead of throwing here; [observeVenues] does the same.
+   */
+  override fun observeVenue(venueId: String): Flow<Venue?> = flow {
+    emitAll(venues.document(venueId).observe())
+  }
 
   /**
    * Watches the venues with one `in` query per [MAX_IDS_PER_QUERY] ids, the most Firestore takes in
@@ -47,12 +55,12 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
   override fun observeVenues(venueIds: Set<String>): Flow<List<Venue>> =
       if (venueIds.isEmpty()) flowOf(emptyList())
       else
-          combine(
-              venueIds.chunked(MAX_IDS_PER_QUERY).map { ids ->
-                venues.whereIn(FieldPath.documentId(), ids).observe()
-              }
-          ) { chunks ->
-            chunks.flatMap { it }
+          flow {
+            val chunks =
+                venueIds.chunked(MAX_IDS_PER_QUERY).map { ids ->
+                  venues.whereIn(FieldPath.documentId(), ids).observe()
+                }
+            emitAll(combine(chunks) { lists -> lists.flatMap { it } })
           }
 
   override suspend fun getVenue(venueId: String): Venue? =
