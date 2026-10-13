@@ -171,6 +171,27 @@ class SessionNavigationTest {
   }
 
   @Test
+  fun profileSignOutReturnsToAuthAndAllowsSigningInAgain() {
+    val repo = FakeAuthRepository()
+    repo.addAccount("ada@around.test", "123456")
+    installBackFallback()
+    compose.setContent { AroundAppTheme { SessionNavigation(repo) } }
+    submit()
+    compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).assertIsDisplayed().performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
+    compose.runOnIdle { assertEquals(null, repo.currentUserId.value) }
+    assertBackLeavesFlow()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PROFILE_SCREEN).assertDoesNotExist()
+    submit()
+    compose.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).assertIsDisplayed()
+  }
+
+  @Test
   fun successfulSignInLeavesNoAuthBackStack() {
     val repo = FakeAuthRepository()
     repo.addAccount("ada@around.test", "123456")

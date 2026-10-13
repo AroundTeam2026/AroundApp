@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.ui.auth.AuthScreen
 import com.github.aroundteam2026.aroundapp.ui.auth.AuthViewModel
+import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 
 /**
  * Selects loading, auth or the existing tabs from the repository session. Saved tab state survives
@@ -28,7 +29,11 @@ import com.github.aroundteam2026.aroundapp.ui.auth.AuthViewModel
 fun SessionNavigation(
     repository: AuthRepository,
     sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.factory(repository)),
-    mainScreen: @Composable () -> Unit = { AroundApp() },
+    mainScreen: @Composable () -> Unit = {
+      val profileViewModel: ProfileViewModel =
+          viewModel(factory = ProfileViewModel.factory(repository))
+      AroundApp(onSignOut = profileViewModel::signOut)
+    },
 ) {
   val state by sessionViewModel.uiState.collectAsStateWithLifecycle()
   val savedFlows = rememberSaveableStateHolder()

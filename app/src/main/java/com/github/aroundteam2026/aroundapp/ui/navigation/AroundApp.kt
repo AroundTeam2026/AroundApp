@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -28,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
+import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 
 /** The app's top-level destinations, one per tab of the bottom bar. */
 enum class Tab(
@@ -57,12 +59,14 @@ enum class Tab(
 /**
  * The app's root: the selected tab's screen above a bottom navigation bar.
  *
+ * @param onSignOut supplies the Profile sign-out action.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  */
 @Composable
 fun AroundApp(
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (Tab) -> Unit = { TabScreen(it) },
+    onSignOut: (() -> Unit)? = null,
+    screen: @Composable (Tab) -> Unit = { TabScreen(it, onSignOut) },
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = backStackEntry?.destination?.route
@@ -107,9 +111,10 @@ private fun NavHostController.navigateToTab(tab: Tab) =
     }
 
 @Composable
-private fun TabScreen(tab: Tab) =
+private fun TabScreen(tab: Tab, onSignOut: (() -> Unit)?) =
     when (tab) {
       Tab.MAP -> MapScreen()
+      Tab.PROFILE -> if (onSignOut != null) ProfileScreen(onSignOut) else PlaceholderScreen(tab)
       else -> PlaceholderScreen(tab)
     }
 

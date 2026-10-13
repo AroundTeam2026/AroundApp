@@ -18,6 +18,7 @@ object C {
     const val QUESTS_SCREEN = "quests_screen"
     const val MAP_SCREEN = "map_screen"
     const val PROFILE_SCREEN = "profile_screen"
+    const val PROFILE_SIGN_OUT = "profile_sign_out"
 
     const val AUTH_SCREEN = "auth_screen"
     const val AUTH_TITLE = "auth_title"
