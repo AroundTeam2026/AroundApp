@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,12 +42,14 @@ import kotlinx.coroutines.launch
  * @property radiusMeters Radius of the circle around [marker], always within [VenueLimits].
  * @property areaToFrame The area the camera must move to, or null once the map framed it.
  * @property showsUserLocation Whether to draw the device's position, which needs the permission.
- * @property address The street address the venue last picked from the search, or null until it
- *   picks one. Moving the marker up to [VenueAreaViewModel.ADDRESS_DRIFT_METERS] from it keeps it,
- *   as the marker only refines the entrance; moving it farther forgets it, as it no longer says
- *   where the marker is.
+ * @property address The street address the venue last picked from the search, or its saved one, or
+ *   null until it has one. It is saved with the marker, so it is kept only while the address field
+ *   shows it: clearing the field or typing over it forgets it. Moving the marker up to
+ *   [VenueAreaViewModel.ADDRESS_DRIFT_METERS] from it keeps it, as the marker only refines the
+ *   entrance; moving it farther forgets it, as it no longer says where the marker is. A saved
+ *   address is measured from the saved marker.
  * @property addressSearch What the address search found.
- * @property isSaving Whether the marker and radius are being saved.
+ * @property isSaving Whether the marker, radius and address are being saved.
  * @property saveFailed Whether the latest save failed; the edits stay, to try again.
  * @property isSaved Whether a save succeeded and its caller wasn't told yet.
  */
@@ -94,10 +97,11 @@ enum class AddressSearchStatus {
 }
 
 /**
- * Holds the marker a venue places on the map and the radius in which a visit counts. It opens on
- * the venue's saved marker and radius, framing them, or on the defaults when there are none. The
- * map starts on [DEFAULT_MAP_CENTER], then frames the device once its position is known, unless a
- * marker is already placed. The venue can also search its address, which places the marker there.
+ * Holds the marker a venue places on the map, the radius in which a visit counts and the venue's
+ * street address. It opens on the venue's saved marker, radius and address, framing them, or on the
+ * defaults when there are none. The map starts on [DEFAULT_MAP_CENTER], then frames the device once
+ * its position is known, unless a marker is already placed. The venue can also search its address,
+ * which places the marker there.
  *
  * @param venueId Id of the venue whose area this edits.
  */
@@ -118,6 +122,7 @@ class VenueAreaViewModel(
   private var visibleArea: GeoBounds? = null
   private var addressLocation: Location? = null
   private var radiusChosen = false
+  private var addressEdited = false
 
   /**
    * What the address field shows. It is Compose state rather than part of [uiState], so the field
@@ -132,9 +137,12 @@ class VenueAreaViewModel(
   }
 
   /**
-   * Shows the venue's saved area, framing its marker, with the radius clamped to [VenueLimits]. A
-   * marker placed or a radius chosen while it loads is kept, as the venue's latest choice. A venue
-   * that is unknown, has no saved marker or can't be read keeps the defaults.
+   * Shows the venue's saved area, framing its marker, with the radius clamped to [VenueLimits]. The
+   * saved address comes with the marker and fills the field, unless the venue already edited or
+   * cleared the field: it then doesn't show the address, so it isn't kept. A marker placed or a
+   * radius chosen while it loads is kept, as the venue's latest choice; a placed marker keeps its
+   * own address too. A venue that is unknown, has no saved marker or can't be read keeps the
+   * defaults.
    */
   private suspend fun loadArea() {
     val venue =
@@ -146,11 +154,21 @@ class VenueAreaViewModel(
           null
         }
     val saved = venue?.location ?: return
-    _uiState.update {
+    val address = venue.address?.takeIf { !addressEdited }
+    val before = _uiState.getAndUpdate {
       val marked =
           if (it.marker != null) it
-          else it.copy(marker = saved, areaToFrame = saved.boundsWithin(FRAMED_RADIUS_METERS))
+          else
+              it.copy(
+                  marker = saved,
+                  areaToFrame = saved.boundsWithin(FRAMED_RADIUS_METERS),
+                  address = address,
+              )
       if (radiusChosen) marked else marked.copy(radiusMeters = clampRadius(venue.radiusMeters))
+    }
+    if (before.marker == null && address != null) {
+      addressLocation = saved
+      addressQuery = address
     }
   }
 
@@ -217,17 +235,22 @@ class VenueAreaViewModel(
   /**
    * Called as the venue types [query] in the address field. Once the trimmed query has at least
    * [MIN_QUERY_LENGTH] characters, it is searched after [SEARCH_DELAY_MILLIS] without typing,
-   * around the area the map shows; each new query replaces the search still pending or running.
+   * around the area the map shows; each new query replaces the search still pending or running. A
+   * query other than the kept address forgets it, as the field no longer shows it.
    */
   fun onAddressQueryChanged(query: String) {
+    addressEdited = true
     addressLookup?.cancel()
     addressQuery = query
+    val forgets = query != _uiState.value.address
+    if (forgets) addressLocation = null
     val searches = query.trim().length >= MIN_QUERY_LENGTH
     _uiState.update {
       it.copy(
+          address = if (forgets) null else it.address,
           addressSearch =
               if (searches) it.addressSearch.copy(status = AddressSearchStatus.SEARCHING)
-              else AddressSearchUiState()
+              else AddressSearchUiState(),
       )
     }
     if (searches) addressLookup = searchAddress(query, delayMillis = SEARCH_DELAY_MILLIS)
@@ -268,9 +291,12 @@ class VenueAreaViewModel(
     }
   }
 
-  /** Called when the venue clears the field; the marker and the picked address stay. */
+  /** Called when the venue clears the field: the marker stays, the address is forgotten. */
   fun onAddressCleared() {
+    addressEdited = true
     addressQuery = ""
+    addressLocation = null
+    _uiState.update { it.copy(address = null) }
     onAddressSearchDismissed()
   }
 
@@ -290,10 +316,10 @@ class VenueAreaViewModel(
   }
 
   /**
-   * Called when the venue presses "Save location": saves the marker and radius with
-   * [VenueRepository.setArea], which changes nothing else. Does nothing unless
-   * [VenueAreaUiState.canSave]. A success sets [VenueAreaUiState.isSaved]; a failure sets
-   * [VenueAreaUiState.saveFailed] and keeps the edits.
+   * Called when the venue presses "Save location": saves the marker, radius and address with
+   * [VenueRepository.setArea], which changes nothing else; no address clears the saved one. Does
+   * nothing unless [VenueAreaUiState.canSave]. A success sets [VenueAreaUiState.isSaved]; a failure
+   * sets [VenueAreaUiState.saveFailed] and keeps the edits.
    */
   fun onSave() {
     val state = _uiState.value
@@ -302,7 +328,7 @@ class VenueAreaViewModel(
     viewModelScope.launch {
       val saved =
           try {
-            venueRepository.setArea(venueId, marker, state.radiusMeters).isSuccess
+            venueRepository.setArea(venueId, marker, state.radiusMeters, state.address).isSuccess
           } catch (cancelled: CancellationException) {
             throw cancelled
           } catch (_: Exception) {

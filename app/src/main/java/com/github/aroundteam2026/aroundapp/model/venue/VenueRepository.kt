@@ -33,8 +33,9 @@ interface VenueRepository {
   suspend fun createVenue(venue: Venue): Result<Unit>
 
   /**
-   * Sets the area of the venue identified by [venueId]: replaces its [Venue.location] and
-   * [Venue.radiusMeters] and leaves every other field unchanged.
+   * Sets the area of the venue identified by [venueId]: replaces its [Venue.location],
+   * [Venue.radiusMeters] and [Venue.address] together and leaves every other field unchanged. A
+   * null [address] clears the saved one.
    *
    * The existence check and the write are one atomic step. Fails with [IllegalArgumentException] if
    * the venue does not exist, without creating it.
@@ -45,6 +46,12 @@ interface VenueRepository {
    * @param venueId Id of the venue to update.
    * @param location The marker the venue placed on the map.
    * @param radiusMeters Distance from [location] within which a visit counts.
+   * @param address The street address the venue picked for [location], or null for none.
    */
-  suspend fun setArea(venueId: String, location: Location, radiusMeters: Int): Result<Unit>
+  suspend fun setArea(
+      venueId: String,
+      location: Location,
+      radiusMeters: Int,
+      address: String?,
+  ): Result<Unit>
 }

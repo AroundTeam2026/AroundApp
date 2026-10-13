@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The gift of the venue page's reward chips, from Figma; tinted where it is drawn -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="14dp"
+    android:height="14dp"
+    android:viewportWidth="14"
+    android:viewportHeight="14">
+    <path
+        android:pathData="M1.7002,6.33845V12.3385H11.7002V6.33845M6.7002,3.33845V12.3385M6.7002,3.33845C4.7002,-0.661546 1.7002,0.338454 3.7002,3.33845M6.7002,3.33845C8.7002,-0.661546 11.7002,0.338454 9.7002,3.33845M0.700195,3.33845H12.7002V6.33845H0.700195V3.33845Z"
+        android:strokeWidth="1.4"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

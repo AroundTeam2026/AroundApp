@@ -55,8 +55,7 @@ class AuthViewModelTest {
         vm.signIn()
         advanceUntilIdle()
         assertEquals(uid, repo.currentUserId.value)
-        assertFalse(vm.uiState.value.isLoading)
-        assertNull(vm.uiState.value.error)
+        assertEquals(AuthUiState(), vm.uiState.value)
       }
 
   @Test
@@ -66,7 +65,7 @@ class AuthViewModelTest {
         vm.signUp()
         advanceUntilIdle()
         assertNotNull(repo.currentUserId.value)
-        assertNull(vm.uiState.value.error)
+        assertEquals(AuthUiState(), vm.uiState.value)
       }
 
   @Test

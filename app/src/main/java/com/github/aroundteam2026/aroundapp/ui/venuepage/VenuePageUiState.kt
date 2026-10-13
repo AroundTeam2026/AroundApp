@@ -32,6 +32,16 @@ data class VenuePageUiState(
     get() = selectedQuestId?.let { id -> quests.find { it.questId == id } }
 
   /**
+   * This page listing [quests] instead. A picked quest that isn't among them is unpicked, so it
+   * isn't picked again if it comes back, as when its venue extends an expired reward.
+   */
+  fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState =
+      copy(
+          quests = quests,
+          selectedQuestId = selectedQuestId?.takeIf { id -> quests.any { it.questId == id } },
+      )
+
+  /**
    * This page once the explorer tapped the quest [questId]: picked, or unpicked if it was picked. A
    * quest the page doesn't list changes nothing.
    */

@@ -203,8 +203,12 @@ class VenueInitializationScreenTest {
 
     override fun observeVenue(venueId: String) = delegate.observeVenue(venueId)
 
-    override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
-        delegate.setArea(venueId, location, radiusMeters)
+    override suspend fun setArea(
+        venueId: String,
+        location: Location,
+        radiusMeters: Int,
+        address: String?,
+    ) = delegate.setArea(venueId, location, radiusMeters, address)
 
     override suspend fun getVenue(venueId: String) = delegate.getVenue(venueId)
 

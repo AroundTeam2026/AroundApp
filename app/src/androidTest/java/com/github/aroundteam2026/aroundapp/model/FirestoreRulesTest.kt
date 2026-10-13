@@ -47,7 +47,10 @@ class FirestoreRulesTest {
     assertSucceeds(user(bob).set(profile(role = null)))
     assertDenied(user(alice).set(profile(role = null)))
     assertDenied(user(alice).get(Source.SERVER))
-    assertEquals(EMAIL_FIELD_VALUE, assertSucceeds(user(bob).get(Source.SERVER)).getString("email"))
+    assertEquals(
+        DISPLAY_NAME,
+        assertSucceeds(user(bob).get(Source.SERVER)).getString("displayName"),
+    )
   }
 
   @Test
@@ -213,8 +216,7 @@ class FirestoreRulesTest {
   private fun newReservation() =
       db.collection("reservations").document(UUID.randomUUID().toString())
 
-  private fun profile(role: String?) =
-      mapOf("email" to EMAIL_FIELD_VALUE, "displayName" to "Test", "role" to role)
+  private fun profile(role: String?) = mapOf("displayName" to DISPLAY_NAME, "role" to role)
 
   private fun quest(venueId: String) =
       mapOf("venueId" to venueId, "title" to "Find the hidden owl", "status" to "ACTIVE")
@@ -242,7 +244,7 @@ class FirestoreRulesTest {
 
   private companion object {
     const val PASSWORD = "password123"
-    const val EMAIL_FIELD_VALUE = "test@around.test"
+    const val DISPLAY_NAME = "Test"
     const val TIMEOUT_S = 10L
   }
 }
