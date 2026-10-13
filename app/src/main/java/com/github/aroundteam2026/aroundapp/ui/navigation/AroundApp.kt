@@ -100,7 +100,7 @@ fun AroundApp(
     ) {
       Tab.entries.forEach { tab -> composable(tab.route) { screen(tab) } }
       // Explorer screens only: the venue's screens belong to the venue's own NavHost
-      venuePageDestination()
+      venuePageDestination(onBack = { navController.popBackStack() })
     }
   }
 }
