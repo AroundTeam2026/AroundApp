@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -33,13 +34,13 @@ class AroundAppTest {
 
   private lateinit var navController: NavHostController
 
-  private fun launch(app: @Composable () -> Unit = { AroundApp() }) =
+  private fun launch(app: @Composable () -> Unit = { AroundApp(onSignOut = {}) }) =
       composeTestRule.setContent(app)
 
   /** Shows the app with a controller the test can navigate with. */
   private fun launchWithNavController() = launch {
     navController = rememberNavController()
-    AroundApp(navController = navController)
+    AroundApp(onSignOut = {}, navController = navController)
   }
 
   /** Opens a venue's page from the tab in use, as a tap on its card will. */
@@ -164,7 +165,7 @@ class AroundAppTest {
   // if switching tabs did not save it.
   @Test
   fun eachTabKeepsItsOwnState() {
-    launch { AroundApp(screen = { CounterScreen(it) }) }
+    launch { AroundApp(onSignOut = {}, screen = { CounterScreen(it) }) }
     select(Tab.MAP)
     repeat(2) { composeTestRule.onNodeWithTag(Tab.MAP.screenTag).performClick() }
 

@@ -99,7 +99,7 @@ class RegistrationFlowTest {
                   },
               )
             },
-            explorerHome = { AroundApp() },
+            explorerHome = { AroundApp(onSignOut = {}) },
             venueEntry = { Text("Venue entry") },
             profileError = { error("Unexpected profile failure") },
         )
