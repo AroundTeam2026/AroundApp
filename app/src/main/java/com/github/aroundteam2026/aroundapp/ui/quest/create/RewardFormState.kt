@@ -22,7 +22,10 @@ enum class DiscountAmountError {
   BLANK,
   /** Not digits with an optional decimal point or comma, e.g. "1e3", "+5" or "-5". */
   NOT_A_NUMBER,
-  /** More than [QuestLimits.MAX_DISCOUNT_DECIMALS] decimals, e.g. "0.015" or "1,000". */
+  /**
+   * More than [QuestLimits.MAX_DISCOUNT_DECIMALS] decimals besides trailing zeros, e.g. "0.015", or
+   * a comma that reads as a thousands separator, e.g. "1,000".
+   */
   TOO_MANY_DECIMALS,
   /** Below [QuestLimits.MIN_DISCOUNT_AMOUNT]. */
   TOO_SMALL,
@@ -30,8 +33,14 @@ enum class DiscountAmountError {
   TOO_LARGE,
 }
 
-/** What the amount field accepts: ASCII digits, then optionally a point or comma and digits. */
-private val AMOUNT_FORMAT = Regex("""\d+([.,]\d+)?""")
+/**
+ * What the amount field accepts: ASCII digits with an optional point or comma, which may start or
+ * end it as in ".5" or "5.". `[0-9]` rather than `\d`, which can match other digits on Android.
+ */
+private val AMOUNT_FORMAT = Regex("[0-9]+([.,][0-9]*)?|[.,][0-9]+")
+
+/** An amount like "1,000", which some read as a thousand: it is rejected rather than taken as 1. */
+private val THOUSANDS_FORMAT = Regex("[0-9]+,[0-9]{3}")
 
 /**
  * The reward part of the quest form. No [type] means the quest has no reward.
@@ -73,7 +82,9 @@ data class RewardFormState(
       return when {
         discountAmount.isBlank() -> DiscountAmountError.BLANK
         amount == null -> DiscountAmountError.NOT_A_NUMBER
-        amount.scale() > QuestLimits.MAX_DISCOUNT_DECIMALS -> DiscountAmountError.TOO_MANY_DECIMALS
+        // Trailing zeros don't count: 5.000 is 5
+        amount.stripTrailingZeros().scale() > QuestLimits.MAX_DISCOUNT_DECIMALS ||
+            THOUSANDS_FORMAT.matches(discountAmount.trim()) -> DiscountAmountError.TOO_MANY_DECIMALS
         amount < QuestLimits.MIN_DISCOUNT_AMOUNT.toBigDecimal() -> DiscountAmountError.TOO_SMALL
         amount > QuestLimits.maxDiscountAmount(discountUnit).toBigDecimal() ->
             DiscountAmountError.TOO_LARGE

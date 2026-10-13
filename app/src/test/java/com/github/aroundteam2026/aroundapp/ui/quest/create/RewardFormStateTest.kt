@@ -56,17 +56,33 @@ class RewardFormStateTest {
   @Test
   fun discountAmountIsOnlyDigitsWithAnOptionalDecimalPointOrComma() {
     // toDoubleOrNull() or a person reads most of these as numbers, but none is plain decimal input
-    listOf("abc", "Infinity", "NaN", "1e3", "15f", "0x1p4", "+5", "-5", "1.", ",5", "1 000", "١٥")
+    listOf("abc", "Infinity", "NaN", "1e3", "15f", "0x1p4", "+5", "-5", ".", "1 000", "١٥")
         .forEach { amount -> assertAmountError(DiscountUnit.CHF, amount, NOT_A_NUMBER) }
+  }
+
+  @Test
+  fun discountAmountMayStartOrEndWithItsDecimalPoint() {
+    assertEquals(
+        Reward.Discount(0.5, DiscountUnit.PERCENT, null),
+        discount.copy(discountAmount = ".5").toReward(),
+    )
+    assertEquals(
+        Reward.Discount(5.0, DiscountUnit.PERCENT, null),
+        discount.copy(discountAmount = "5,").toReward(),
+    )
   }
 
   @Test
   fun discountAmountHasAtMostTwoDecimals() {
     assertAmountError(DiscountUnit.CHF, "0.015", TOO_MANY_DECIMALS)
     assertAmountError(DiscountUnit.PERCENT, "99,996", TOO_MANY_DECIMALS)
-    // A comma is never a thousands separator
-    assertAmountError(DiscountUnit.CHF, "1,000", TOO_MANY_DECIMALS)
     assertAmountError(DiscountUnit.CHF, "0,99", null)
+    // Trailing zeros don't count
+    listOf("5.000", "0.010", "100.000").forEach {
+      assertAmountError(DiscountUnit.PERCENT, it, null)
+    }
+    // Read by some as a thousand, so it isn't taken as 1
+    assertAmountError(DiscountUnit.CHF, "1,000", TOO_MANY_DECIMALS)
   }
 
   @Test
