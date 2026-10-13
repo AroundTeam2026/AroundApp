@@ -104,9 +104,7 @@ fun RoleNavigation(
               flows.SaveableStateProvider(AppDestination.EXPLORER_HOME.name) { explorerScreen() }
             },
             venueEntry = {
-              flows.SaveableStateProvider(AppDestination.VENUE_ENTRY.name) {
-                venueScreen(requireNotNull(uid))
-              }
+              flows.SaveableStateProvider(AppDestination.VENUE_ENTRY.name) { venueScreen(uid) }
             },
             profileError = { ProfileError(router::retryProfile) },
         )

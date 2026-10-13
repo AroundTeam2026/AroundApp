@@ -11,6 +11,7 @@ import com.github.aroundteam2026.aroundapp.model.user.ProfileSetup
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
@@ -53,19 +53,13 @@ class RoleRoutingViewModel(
               emit(RoleSessionState.SignedOut)
             } else {
               emit(RoleSessionState.Checking)
-              emitAll(
-                  flow {
-                    profileSetup.finish().getOrThrow()
-                    emitAll(userRepository.observeUser(uid))
-                  }
-                      .map<
-                          com.github.aroundteam2026.aroundapp.model.user.User?,
-                          RoleSessionState,
-                      > { user ->
-                        RoleSessionState.SignedIn(uid, user?.role)
-                      }
-                      .catch { emit(RoleSessionState.ProfileUnavailable(uid)) }
-              )
+              val profile: Flow<RoleSessionState> = flow {
+                profileSetup.finish().getOrThrow()
+                userRepository.observeUser(uid).collect { user ->
+                  emit(RoleSessionState.SignedIn(uid, user?.role))
+                }
+              }
+              emitAll(profile.catch { emit(RoleSessionState.ProfileUnavailable(uid)) })
             }
           }
           .stateIn(viewModelScope, SharingStarted.Eagerly, RoleSessionState.Checking)
