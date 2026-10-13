@@ -18,8 +18,11 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,8 +31,23 @@ import org.junit.runner.RunWith
 class AroundAppTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
+  private lateinit var navController: NavHostController
+
   private fun launch(app: @Composable () -> Unit = { AroundApp() }) =
       composeTestRule.setContent(app)
+
+  /** Shows the app with a controller the test can navigate with. */
+  private fun launchWithNavController() = launch {
+    navController = rememberNavController()
+    AroundApp(navController = navController)
+  }
+
+  /** Opens a venue's page from the tab in use, as a tap on its card will. */
+  private fun openVenuePage() {
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnUiThread { navController.navigateToVenuePage("venue-1") }
+    composeTestRule.waitForIdle()
+  }
 
   private fun select(tab: Tab) {
     composeTestRule.onNodeWithTag(tab.tabTag).performClick()
@@ -80,6 +98,48 @@ class AroundAppTest {
     select(Tab.MAP)
 
     composeTestRule.onNodeWithTag(C.Tag.MAP).assertIsDisplayed()
+  }
+
+  @Test
+  fun theQuestsTabShowsTheOverview() {
+    launch()
+
+    composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.OVERVIEW_STUB).assertIsDisplayed()
+  }
+
+  // Otherwise no tab is selected while a screen opened from a tab is shown
+  @Test
+  fun aScreenOpenedFromATabKeepsThatTabSelected() {
+    launchWithNavController()
+    openVenuePage()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
+  }
+
+  // The tab would otherwise be stuck on the opened screen, with no way back through the bar
+  @Test
+  fun reselectingTheTabInUseReturnsToItsOwnScreen() {
+    launchWithNavController()
+    openVenuePage()
+    select(Tab.QUESTS)
+
+    assertShowing(Tab.QUESTS)
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertDoesNotExist()
+  }
+
+  // Leaving a tab keeps what was opened from it; coming back shows it, and the tab, again
+  @Test
+  fun switchingTabsKeepsTheScreenOpenedFromATab() {
+    launchWithNavController()
+    openVenuePage()
+    select(Tab.MAP)
+    assertShowing(Tab.MAP)
+
+    select(Tab.QUESTS)
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
   }
 
   @Test
