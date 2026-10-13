@@ -129,11 +129,13 @@ class RewardFormStateTest {
   }
 
   @Test
-  fun tooLongSpecificsShowAtOnceAndBlockTheFreeItem() {
-    val reward =
-        freeItem.copy(itemSpecifics = "x".repeat(QuestLimits.REWARD_SPECIFICS_MAX_LENGTH + 1))
-    assertEquals(QuestTextError.TOO_LONG, reward.specificsError)
-    assertFalse(reward.isValid)
+  fun tooLongSpecificsShowAtOnceAndBlockTheReward() {
+    val tooLong = "x".repeat(QuestLimits.REWARD_SPECIFICS_MAX_LENGTH + 1)
+    listOf(freeItem.copy(itemSpecifics = tooLong), discount.copy(discountSpecifics = tooLong))
+        .forEach { reward ->
+          assertEquals(reward.type.toString(), QuestTextError.TOO_LONG, reward.specificsError)
+          assertFalse(reward.type.toString(), reward.isValid)
+        }
   }
 
   @Test
