@@ -6,6 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Transaction
@@ -52,12 +53,31 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
     }
   }
 
+  /**
+   * Writes only the area fields, deleting `address` when [address] is null. Needs a connection: a
+   * transaction fails while the device is offline.
+   */
   override suspend fun setArea(
       venueId: String,
       location: Location,
       radiusMeters: Int,
       address: String?,
-  ): Result<Unit> = TODO("Set in the next commit")
+  ): Result<Unit> = transaction {
+    val document = venues.document(venueId)
+    if (!it.get(document).exists()) {
+      IllegalArgumentException("No venue with id $venueId")
+    } else {
+      it.update(
+          document,
+          mapOf(
+              LOCATION to GeoPoint(location.lat, location.lng),
+              RADIUS_METERS to radiusMeters,
+              ADDRESS to (address ?: FieldValue.delete()),
+          ),
+      )
+      null
+    }
+  }
 
   /**
    * Runs [block] in a transaction. [block] returns the reason for refusing instead of throwing it,

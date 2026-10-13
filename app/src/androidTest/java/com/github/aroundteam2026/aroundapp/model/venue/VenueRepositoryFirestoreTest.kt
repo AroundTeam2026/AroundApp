@@ -22,6 +22,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -176,6 +177,32 @@ class VenueRepositoryFirestoreTest {
     assertNull(readerRepository.getVenue(ownerUid))
   }
 
+  /**
+   * Bug: setArea writes fields other than the area, ignores one of its arguments, or keeps the
+   * stored address when given null instead of clearing it.
+   */
+  @Test
+  fun setArea_replacesOnlyTheAreaAndANullAddressClearsIt() = withTimeoutBlocking {
+    val original = venue(ownerUid).copy(location = null, address = null)
+    ownerRepository.createVenue(original).getOrThrow()
+    val placed = original.copy(location = NEW_LOCATION, radiusMeters = 120, address = "Place 2")
+
+    ownerRepository.setArea(ownerUid, NEW_LOCATION, 120, "Place 2").getOrThrow()
+    assertEquals(placed, readerRepository.getVenue(ownerUid))
+
+    ownerRepository.setArea(ownerUid, NEW_LOCATION, 120, null).getOrThrow()
+    assertEquals(placed.copy(address = null), readerRepository.getVenue(ownerUid))
+  }
+
+  /** Bug: setArea on a missing venue creates a partial one, or does not report the failure. */
+  @Test
+  fun setArea_forAMissingVenue_failsWithoutCreatingIt() = withTimeoutBlocking {
+    val result = ownerRepository.setArea(ownerUid, NEW_LOCATION, 120, null)
+
+    assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    assertFalse(readerDb.collection(VENUES).document(ownerUid).get(Source.SERVER).await().exists())
+  }
+
   /** A venue with every field set, owned by [id]. */
   private fun venue(id: String) =
       Venue(
@@ -200,5 +227,8 @@ class VenueRepositoryFirestoreTest {
 
     /** Creation time of every venue, in epoch ms; the non-zero ms catch precision loss. */
     const val CREATED_AT = 1_700_000_000_123L
+
+    /** Where setArea moves the venue to. */
+    val NEW_LOCATION = Location(46.5225, 6.6328)
   }
 }
