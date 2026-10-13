@@ -9,9 +9,11 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 
 /** Profile session actions; navigation observes the repository's session state. */
 class ProfileViewModel(private val repository: AuthRepository) : ViewModel() {
+  /** Ends the shared auth session; the session observer returns navigation to auth. */
   fun signOut() = repository.signOut()
 
   companion object {
+    /** Supplies the repository interface when Compose creates this ViewModel. */
     fun factory(repository: AuthRepository): ViewModelProvider.Factory = viewModelFactory {
       initializer { ProfileViewModel(repository) }
     }

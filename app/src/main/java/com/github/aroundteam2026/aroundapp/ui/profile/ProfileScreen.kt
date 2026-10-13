@@ -18,7 +18,11 @@ import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 
-/** Minimal Profile action until the full profile screen is integrated. */
+/**
+ * Minimal Profile action until the full profile screen is integrated.
+ *
+ * @param onSignOut ends the current session through the Profile ViewModel.
+ */
 @Composable
 fun ProfileScreen(onSignOut: () -> Unit) {
   Column(

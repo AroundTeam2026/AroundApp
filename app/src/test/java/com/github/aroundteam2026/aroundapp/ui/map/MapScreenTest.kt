@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
@@ -103,7 +104,10 @@ class MapScreenTest {
     val dialog = PermissionDialog(answer)
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        AroundApp(screen = { tab -> if (tab == Tab.MAP) MapScreen(viewModel) else Text(tab.route) })
+        AroundApp(
+            onSignOut = {},
+            screen = { tab -> if (tab == Tab.MAP) MapScreen(viewModel) else Text(tab.route) },
+        )
       }
     }
     openTab(Tab.MAP)

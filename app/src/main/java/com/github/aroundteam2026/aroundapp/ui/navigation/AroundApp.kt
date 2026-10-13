@@ -8,14 +8,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -73,7 +71,7 @@ private val START_TAB = Tab.QUESTS
 @Composable
 fun AroundApp(
     navController: NavHostController = rememberNavController(),
-    onSignOut: (() -> Unit)? = null,
+    onSignOut: () -> Unit,
     screen: @Composable (Tab) -> Unit = { TabScreen(it, onSignOut) },
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
@@ -141,18 +139,10 @@ private fun NavHostController.tabOfCurrentScreen(): Tab? {
 }
 
 @Composable
-private fun TabScreen(tab: Tab, onSignOut: (() -> Unit)?) =
+private fun TabScreen(tab: Tab, onSignOut: () -> Unit) =
     when (tab) {
       Tab.MAP -> MapScreen()
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS -> Box(Modifier.fillMaxSize().testTag(tab.screenTag)) { OverviewScreen() }
-      Tab.PROFILE -> if (onSignOut != null) ProfileScreen(onSignOut) else PlaceholderScreen(tab)
+      Tab.PROFILE -> ProfileScreen(onSignOut)
     }
-
-// TODO: a stand-in for the Profile tab, until it gets its real screen in its own task
-@Composable
-private fun PlaceholderScreen(tab: Tab) {
-  Box(Modifier.fillMaxSize().testTag(tab.screenTag), contentAlignment = Alignment.Center) {
-    Text(stringResource(tab.label), style = MaterialTheme.typography.headlineMedium)
-  }
-}

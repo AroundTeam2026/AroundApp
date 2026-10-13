@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
@@ -93,6 +94,7 @@ class MapScreenDeviceTest {
     var camera: CameraPositionState? = null
     composeTestRule.setContent {
       AroundApp(
+          onSignOut = {},
           screen = { tab ->
             if (tab == Tab.MAP) {
               val mapCamera = rememberMapCamera()
@@ -101,7 +103,7 @@ class MapScreenDeviceTest {
             } else {
               Text("")
             }
-          }
+          },
       )
     }
     openTab(Tab.MAP)

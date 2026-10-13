@@ -63,10 +63,11 @@ class SessionNavigationTest {
             repo,
             mainScreen = {
               AroundApp(
+                  onSignOut = {},
                   screen = {
                     var count by rememberSaveable { mutableIntStateOf(0) }
                     Text("$count", Modifier.testTag(it.screenTag).clickable { count++ })
-                  }
+                  },
               )
             },
         )
@@ -126,7 +127,9 @@ class SessionNavigationTest {
       SessionNavigation(
           delayed,
           vm,
-          mainScreen = { AroundApp(screen = { Text(it.route, Modifier.testTag(it.screenTag)) }) },
+          mainScreen = {
+            AroundApp(onSignOut = {}, screen = { Text(it.route, Modifier.testTag(it.screenTag)) })
+          },
       )
     }
     compose.onNodeWithTag(C.Tag.APP_LOADING).assertIsDisplayed()
@@ -392,6 +395,7 @@ class SessionNavigationTest {
   @Composable
   private fun TabsWithProbe(probes: MutableList<TabViewModel>) {
     AroundApp(
+        onSignOut = {},
         screen = { tab ->
           if (tab == Tab.MAP) {
             val probe: TabViewModel =
@@ -400,7 +404,7 @@ class SessionNavigationTest {
                 )
             Text("Map", Modifier.testTag(tab.screenTag))
           } else Text(tab.route, Modifier.testTag(tab.screenTag))
-        }
+        },
     )
   }
 
@@ -480,7 +484,9 @@ class SessionNavigationTest {
       SessionNavigation(
           delayed,
           vm,
-          mainScreen = { AroundApp(screen = { Text(it.route, Modifier.testTag(it.screenTag)) }) },
+          mainScreen = {
+            AroundApp(onSignOut = {}, screen = { Text(it.route, Modifier.testTag(it.screenTag)) })
+          },
       )
     }
     compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
