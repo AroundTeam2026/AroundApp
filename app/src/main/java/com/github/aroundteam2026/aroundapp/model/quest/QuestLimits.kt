@@ -17,6 +17,15 @@ object QuestLimits {
   /** Maximum number of characters in [Quest.requirements]. */
   const val REQUIREMENTS_MAX_LENGTH = 300
 
+  /** Maximum number of characters in [Reward.FreeItem.name]. */
+  const val REWARD_ITEM_MAX_LENGTH = 60
+
+  /** Maximum number of characters in the specifics of a [Reward]. */
+  const val REWARD_SPECIFICS_MAX_LENGTH = 200
+
+  /** Maximum number of characters in [Reward.Other.description]. */
+  const val REWARD_DESCRIPTION_MAX_LENGTH = 200
+
   /** Smallest allowed [Quest.minPartySize]: a solo visit. */
   const val MIN_PARTY_SIZE = 1
 

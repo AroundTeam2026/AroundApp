@@ -33,7 +33,7 @@ enum class QuestTextError {
  * The error of a quest text field holding [value], or null if it is valid: not blank, and at most
  * [maxLength] characters once trimmed, since the quest is saved trimmed.
  */
-private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
+internal fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
   val trimmed = value.trim()
   return when {
     trimmed.isEmpty() -> QuestTextError.BLANK
@@ -43,13 +43,23 @@ private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
 }
 
 /**
+ * The error of [value] to show: as [validateQuestText], but no [QuestTextError.BLANK] until
+ * [touched].
+ */
+internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean): QuestTextError? {
+  val error = validateQuestText(value, maxLength)
+  return if (error == QuestTextError.BLANK && !touched) null else error
+}
+
+/**
  * The quest form being filled in by a venue.
  *
  * Errors are derived from the values, so they can never disagree with them. A
  * [QuestTextError.BLANK] error is only shown once its field has been edited, so the form doesn't
  * open full of errors; [QuestTextError.TOO_LONG] shows at once.
  *
- * The completion rules always hold a valid value, so they never block [canSubmit].
+ * The completion rules always hold a valid value, so they never block [canSubmit]; an invalid
+ * [reward] does.
  *
  * @property titleTouched Whether [title] has been edited; likewise for the other `Touched` flags.
  * @property proofType The kind of proof explorers submit.
@@ -61,6 +71,7 @@ private fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
  * @property minPartySize Smallest party allowed, never below [QuestLimits.MIN_PARTY_SIZE].
  * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
  *   least that many.
+ * @property reward The reward explorers get, if any.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -75,6 +86,7 @@ data class CreateQuestUiState(
     val venueLocation: Location? = null,
     val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
     val exactPartySize: Boolean = false,
+    val reward: RewardFormState = RewardFormState(),
 ) {
   /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
   val selectedRadiusPreset: Int?
@@ -86,25 +98,22 @@ data class CreateQuestUiState(
 
   /** The error shown under the title, or null. */
   val titleError: QuestTextError?
-    get() = shownError(title, QuestLimits.TITLE_MAX_LENGTH, titleTouched)
+    get() = shownQuestTextError(title, QuestLimits.TITLE_MAX_LENGTH, titleTouched)
 
   /** The error shown under the description, or null. */
   val descriptionError: QuestTextError?
-    get() = shownError(description, QuestLimits.DESCRIPTION_MAX_LENGTH, descriptionTouched)
+    get() = shownQuestTextError(description, QuestLimits.DESCRIPTION_MAX_LENGTH, descriptionTouched)
 
   /** The error shown under the requirements, or null. */
   val requirementsError: QuestTextError?
-    get() = shownError(requirements, QuestLimits.REQUIREMENTS_MAX_LENGTH, requirementsTouched)
+    get() =
+        shownQuestTextError(requirements, QuestLimits.REQUIREMENTS_MAX_LENGTH, requirementsTouched)
 
   /** Whether every field is valid, touched or not. */
   val canSubmit: Boolean
     get() =
         validateQuestText(title, QuestLimits.TITLE_MAX_LENGTH) == null &&
             validateQuestText(description, QuestLimits.DESCRIPTION_MAX_LENGTH) == null &&
-            validateQuestText(requirements, QuestLimits.REQUIREMENTS_MAX_LENGTH) == null
-
-  private fun shownError(value: String, maxLength: Int, touched: Boolean): QuestTextError? {
-    val error = validateQuestText(value, maxLength)
-    return if (error == QuestTextError.BLANK && !touched) null else error
-  }
+            validateQuestText(requirements, QuestLimits.REQUIREMENTS_MAX_LENGTH) == null &&
+            reward.isValid
 }

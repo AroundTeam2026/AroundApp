@@ -88,7 +88,7 @@ fun QuestTextFields(
  * the trimmed text is what gets validated, and [error] below.
  */
 @Composable
-private fun QuestTextField(
+internal fun QuestTextField(
     label: String,
     hint: String,
     value: String,
