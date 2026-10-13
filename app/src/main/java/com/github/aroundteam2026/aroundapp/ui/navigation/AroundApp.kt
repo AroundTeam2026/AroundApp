@@ -29,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
+import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venuePageDestination
 
 /** The app's top-level destinations, one per tab of the bottom bar. */
@@ -70,7 +71,7 @@ private val START_TAB = Tab.QUESTS
 @Composable
 fun AroundApp(
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (Tab) -> Unit = { TabScreen(it) },
+    screen: @Composable (Tab) -> Unit = { TabScreen(it, navController::navigateToVenuePage) },
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   // Recomputed whenever the shown screen changes, since it reads backStackEntry
@@ -136,10 +137,16 @@ private fun NavHostController.tabOfCurrentScreen(): Tab? {
       ?: START_TAB.takeIf { inBackStack(it) }
 }
 
+/**
+ * The screen of [tab].
+ *
+ * @param onOpenVenue opens the page of the venue with this id, when its card on the map is tapped.
+ */
 @Composable
-private fun TabScreen(tab: Tab) =
+private fun TabScreen(tab: Tab, onOpenVenue: (venueId: String) -> Unit) =
     when (tab) {
-      Tab.MAP -> MapScreen()
+      // The venue page loads the venue's name itself, so only the id is passed on
+      Tab.MAP -> MapScreen(onOpenVenue = { venueId, _ -> onOpenVenue(venueId) })
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS -> Box(Modifier.fillMaxSize().testTag(tab.screenTag)) { OverviewScreen() }
       Tab.PROFILE -> PlaceholderScreen(tab)

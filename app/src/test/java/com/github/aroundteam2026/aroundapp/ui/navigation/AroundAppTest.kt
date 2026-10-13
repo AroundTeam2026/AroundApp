@@ -142,6 +142,21 @@ class AroundAppTest {
     composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
   }
 
+  // A venue's card on the map opens its page: the Map tab stays selected, and Back returns to the
+  // map
+  @Test
+  fun aVenuePageOpenedFromTheMapBelongsToTheMapTab() {
+    launchWithNavController()
+    select(Tab.MAP)
+    openVenuePage()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(Tab.MAP.tabTag).assertIsSelected()
+
+    pressBack()
+    assertShowing(Tab.MAP)
+  }
+
   @Test
   fun backFromAnyTabReturnsToQuests() {
     launch()
