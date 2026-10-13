@@ -24,15 +24,22 @@ import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
  * account change. AppRoot disposes the inactive flow and its Back handlers; no root back stack is
  * retained. Signed-in ViewModels survive recreation and are cleared with their session. Role
  * routing is a separate integration task.
+ *
+ * @param mainScreen receives the uid whose retained signed-in store owns this composition.
+ * @param authFlow allows the role router to supply the shared registration form.
  */
 @Composable
 fun SessionNavigation(
     repository: AuthRepository,
     sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.factory(repository)),
-    mainScreen: @Composable () -> Unit = {
+    mainScreen: @Composable (userId: String) -> Unit = {
       val profileViewModel: ProfileViewModel =
           viewModel(factory = ProfileViewModel.factory(repository))
       AroundApp(onSignOut = profileViewModel::signOut)
+    },
+    authFlow: @Composable () -> Unit = {
+      val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(repository))
+      AuthScreen(authViewModel)
     },
 ) {
   val state by sessionViewModel.uiState.collectAsStateWithLifecycle()
@@ -56,17 +63,14 @@ fun SessionNavigation(
       }
   AppRoot(
       destination = destination,
-      authFlow = {
-        val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(repository))
-        AuthScreen(authViewModel)
-      },
+      authFlow = authFlow,
       explorerHome = {
         val session = state as SessionState.SignedIn
         key(session.userId) {
           CompositionLocalProvider(
               LocalViewModelStoreOwner provides sessionViewModel.signedInStoreOwner(session.userId)
           ) {
-            savedFlows.SaveableStateProvider(session.userId) { mainScreen() }
+            savedFlows.SaveableStateProvider(session.userId) { mainScreen(session.userId) }
           }
         }
       },

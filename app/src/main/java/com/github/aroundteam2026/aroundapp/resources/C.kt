@@ -6,6 +6,8 @@ package com.github.aroundteam2026.aroundapp.resources
 // Like R, but C
 object C {
   object Tag {
+    const val ROLE_PROFILE_ERROR = "role_profile_error"
+    const val ROLE_PROFILE_RETRY = "role_profile_retry"
     const val APP_LOADING = "app_loading"
 
     const val APP = "app"
