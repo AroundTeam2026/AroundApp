@@ -308,10 +308,11 @@ class CreateQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).assertExists()
 
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextClearance()
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextInput("abc")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextInput("1000.01")
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
-        .assertTextEquals("Enter a number.")
+        .performScrollTo()
+        .assertTextEquals("Use CHF 1000 or less.")
   }
 
   @Test
@@ -369,14 +370,13 @@ class CreateQuestScreenTest {
   }
 
   @Test
-  fun francsShowTheirOwnMaximumAndTheDecimalLimit() {
+  fun discountShowsTheNumberAndDecimalErrors() {
     viewModel.selectRewardType(RewardType.DISCOUNT)
-    viewModel.updateDiscountUnit(DiscountUnit.CHF)
     val amount = compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo()
     val error = compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
 
-    amount.performTextInput("1000.01")
-    error.performScrollTo().assertTextEquals("Use CHF 1000 or less.")
+    amount.performTextInput("abc")
+    error.performScrollTo().assertTextEquals("Enter a number.")
 
     amount.performTextClearance()
     amount.performTextInput("0.015")
