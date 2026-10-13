@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -31,7 +32,7 @@ import org.junit.runner.RunWith
 
 /**
  * Tests [Routes]: explorer routes are registered in [AroundApp], venue routes are not, and every
- * route opens its stub.
+ * route opens its screen.
  */
 @RunWith(AndroidJUnit4::class)
 class RoutesTest {
@@ -107,10 +108,14 @@ class RoutesTest {
   }
 
   @Test
-  fun venuePageOpensItsStub() {
+  fun venuePageOpensTheVenuesPage() {
     launchApp()
     open { navigateToVenuePage("venue-1") }
-    assertStub(C.Tag.VENUE_PAGE_STUB)
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(composeTestRule.activity.getString(R.string.coming_soon))
+        .assertDoesNotExist()
   }
 
   // An id with a slash would otherwise be read as two path segments and match no route
@@ -119,7 +124,7 @@ class RoutesTest {
     launchApp()
     open { navigateToVenuePage("a b/c?d") }
 
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
     val venueId = composeTestRule.runOnUiThread {
       navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
     }
@@ -133,7 +138,7 @@ class RoutesTest {
     open { navigateToVenuePage(" ") }
 
     composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
   }
 
   @Test
@@ -141,15 +146,26 @@ class RoutesTest {
     assertThrows(IllegalArgumentException::class.java) { Routes.venuePage("") }
   }
 
-  // A stub must not be a dead end: Back returns to where it was opened from
+  // The venue's page must not be a dead end: Back returns to where it was opened from
   @Test
-  fun backFromAStubReturnsToThePreviousScreen() {
+  fun backFromTheVenuePageReturnsToThePreviousScreen() {
     launchApp()
     open { navigateToVenuePage("venue-1") }
     pressBack()
 
     composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
+  }
+
+  @Test
+  fun theVenuePagesBackArrowReturnsToThePreviousScreen() {
+    launchApp()
+    open { navigateToVenuePage("venue-1") }
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
   }
 
   @Test

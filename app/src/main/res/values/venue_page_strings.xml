@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- A venue's page, where explorers see its quests -->
+    <string name="venue_page_not_found">This venue isn\'t on Around anymore.</string>
+    <string name="venue_page_failed">Couldn\'t load this venue. Check your connection and try again.</string>
+    <string name="venue_page_retry">Try again</string>
+    <string name="venue_page_no_quests">No quests here right now. Check back soon.</string>
+</resources>
