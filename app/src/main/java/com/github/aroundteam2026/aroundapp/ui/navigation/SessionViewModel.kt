@@ -3,6 +3,8 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -23,6 +25,31 @@ sealed interface SessionState {
 
 /** Restores and observes the provider's session without maintaining a separate login flag. */
 class SessionViewModel(repository: AuthRepository) : ViewModel() {
+  private val signedInStores = mutableMapOf<String, ViewModelStoreOwner>()
+
+  /**
+   * Retained through configuration changes; owns signed-in flow ViewModels.
+   *
+   * This owner supplies only a ViewModelStore. Callers above the NavHost must provide any required
+   * factory and saved-state creation extras.
+   */
+  internal fun signedInStoreOwner(userId: String): ViewModelStoreOwner =
+      signedInStores.getOrPut(userId) {
+        object : ViewModelStoreOwner {
+          override val viewModelStore = ViewModelStore()
+        }
+      }
+
+  /** Called after a settled session is composed, so disposed flows lose their ViewModels. */
+  internal fun retainSignedInStore(userId: String?) {
+    val oldUsers = signedInStores.keys.filter { it != userId }
+    oldUsers.forEach { signedInStores.remove(it)?.viewModelStore?.clear() }
+  }
+
+  override fun onCleared() {
+    retainSignedInStore(null)
+  }
+
   val uiState: StateFlow<SessionState> =
       repository.currentUserId
           .map { uid -> if (uid == null) SessionState.SignedOut else SessionState.SignedIn(uid) }
