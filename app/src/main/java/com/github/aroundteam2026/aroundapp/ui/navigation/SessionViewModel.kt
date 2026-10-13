@@ -27,7 +27,12 @@ sealed interface SessionState {
 class SessionViewModel(repository: AuthRepository) : ViewModel() {
   private val signedInStores = mutableMapOf<String, ViewModelStoreOwner>()
 
-  /** Retained through configuration changes; all tab/back-stack ViewModels use this owner. */
+  /**
+   * Retained through configuration changes; owns signed-in flow ViewModels.
+   *
+   * This owner supplies only a ViewModelStore. Callers above the NavHost must provide any required
+   * factory and saved-state creation extras.
+   */
   internal fun signedInStoreOwner(userId: String): ViewModelStoreOwner =
       signedInStores.getOrPut(userId) {
         object : ViewModelStoreOwner {
