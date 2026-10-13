@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
 import androidx.activity.ComponentActivity
@@ -61,6 +62,8 @@ class AuthScreenTest {
     repository.nextError = AuthError.Network
     launch()
     click(C.Tag.AUTH_SWITCH_MODE)
+    // Without ProfileSetup a Venue choice could not be recorded, so the link is not offered.
+    compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).assertDoesNotExist()
     fill()
     click(C.Tag.AUTH_SUBMIT)
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertTextEquals("Passwords do not match.")

@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 import java.util.Properties
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -77,6 +78,12 @@ android {
   testCoverage { jacocoVersion = "0.8.11" }
 
   buildFeatures { compose = true }
+
+  // Registration page-object steps are exercised by Robolectric and reused by device journeys.
+  sourceSets {
+    getByName("test").kotlin.directories.add("src/testSupport/java")
+    getByName("androidTest").kotlin.directories.add("src/testSupport/java")
+  }
 
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17

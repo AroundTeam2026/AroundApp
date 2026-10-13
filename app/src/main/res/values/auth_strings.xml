@@ -4,6 +4,9 @@
     <string name="auth_welcome">Welcome to Around</string>
     <string name="auth_sign_in">Sign in</string>
     <string name="auth_create_account">Create account</string>
+    <string name="auth_complete_registration">Complete registration</string>
+    <string name="auth_venue_link">Signing up a business? Create a venue account</string>
+    <string name="auth_account_setup_error">Could not save your account type. Please try again.</string>
     <string name="auth_email">Email</string>
     <string name="auth_password">Password</string>
     <string name="auth_confirm_password">Confirm password</string>
