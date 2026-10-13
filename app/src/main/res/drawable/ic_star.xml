@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- One star of the venue page's rating, from Figma; tinted filled or empty where it is drawn -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="18dp"
+    android:height="18dp"
+    android:viewportWidth="18"
+    android:viewportHeight="18">
+    <path
+        android:fillColor="@android:color/black"
+        android:pathData="M7.61502,3.32989C8.12741,2.09795 9.87259,2.09795 10.385,3.32989L11.0287,4.87754C11.2447,5.39689 11.7331,5.75175 12.2938,5.7967L13.9646,5.93065C15.2946,6.03727 15.8339,7.69703 14.8206,8.56503L13.5476,9.65548C13.1204,10.0214 12.9338,10.5956 13.0644,11.1427L13.4533,12.7731C13.7629,14.071 12.351,15.0968 11.2123,14.4013L9.78188,13.5276C9.30186,13.2344 8.69814,13.2344 8.21812,13.5276L6.78767,14.4013C5.64902,15.0968 4.23714,14.071 4.54672,12.7731L4.93564,11.1427C5.06615,10.5956 4.87959,10.0214 4.45241,9.65548L3.17942,8.56503C2.16612,7.69703 2.70541,6.03727 4.03539,5.93065L5.70621,5.7967C6.26689,5.75175 6.75531,5.39689 6.97132,4.87754L7.61502,3.32989Z" />
+</vector>
