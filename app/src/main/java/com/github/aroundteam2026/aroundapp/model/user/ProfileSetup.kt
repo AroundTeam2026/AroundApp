@@ -33,7 +33,7 @@ class ProfileSetup(
     private val users: UserRepository,
     private val pendingRole: PendingRoleStore,
     private val now: () -> Long = System::currentTimeMillis,
-) {
+) : RegistrationChoice {
 
   /**
    * Records [role] as the account type to save, then call [finish] once signed in.
@@ -42,7 +42,7 @@ class ProfileSetup(
    * while signed in is bound to that account. If it fails, don't go on: without the record, an
    * interrupted save couldn't tell which type was chosen.
    */
-  suspend fun choose(role: Role): Result<Unit> = storeCall {
+  override suspend fun choose(role: Role): Result<Unit> = storeCall {
     pendingRole.save(PendingRole(role, auth.currentUserId.value))
   }
 
@@ -52,7 +52,7 @@ class ProfileSetup(
    * otherwise become this account's role for good. A choice bound to an account is kept: it is
    * either this account's own, or one that [finish] never applies to another account.
    */
-  suspend fun discardChoice(): Result<Unit> = storeCall {
+  override suspend fun discardChoice(): Result<Unit> = storeCall {
     if (pendingRole.load()?.uid == null) pendingRole.clear()
   }
 

@@ -20,6 +20,8 @@ object C {
     const val PROFILE_SCREEN = "profile_screen"
 
     const val AUTH_SCREEN = "auth_screen"
+    const val AUTH_TITLE = "auth_title"
+    const val AUTH_VENUE_LINK = "auth_venue_link"
     const val AUTH_EMAIL = "auth_email"
     const val AUTH_PASSWORD = "auth_password"
     const val AUTH_CONFIRMATION = "auth_confirmation"
