@@ -29,7 +29,7 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
 
   init {
     // Also catches changes made outside this class, such as an expired or deleted account.
-    // The listener lives as long as the app, since AppContainer creates one instance.
+    // The listener lives as long as the app, since AuthRepositoryProvider creates one instance.
     auth.addAuthStateListener { _currentUserId.value = it.currentUser?.uid }
   }
 

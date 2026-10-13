@@ -68,4 +68,21 @@ class VenuePageUiStateTest {
     val picked = loaded.withQuestTapped("a")
     assertSame(picked, picked.withQuestTapped("gone"))
   }
+
+  @Test
+  fun newQuestsReplaceTheListAndKeepAQuestThatIsStillListed() {
+    val updated = loaded.withQuestTapped("a").withQuests(listOf(quest("c"), quest("a")))
+
+    assertEquals(listOf(quest("c"), quest("a")), updated.quests)
+    assertEquals("a", updated.selectedQuestId)
+  }
+
+  @Test
+  fun aPickedQuestThatLeavesTheListIsUnpickedForGood() {
+    val left = loaded.withQuestTapped("a").withQuests(listOf(quest("b")))
+    assertNull(left.selectedQuestId)
+
+    // Coming back, e.g. when its venue extends an expired reward, doesn't pick it again
+    assertNull(left.withQuests(listOf(quest("a"), quest("b"))).selectedQuestId)
+  }
 }

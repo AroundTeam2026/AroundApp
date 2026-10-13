@@ -92,6 +92,30 @@ class CreateQuestViewModel(
     mutableUiState.update { it.copy(exactPartySize = exact) }
   }
 
+  /** Picks [type] as the reward, or no reward if it is null. */
+  fun selectRewardType(type: RewardType?) {
+    updateReward { it.copy(type = type) }
+  }
+
+  /** Sets the free item to [value] and marks it as edited. */
+  fun updateRewardItemName(value: String) {
+    updateReward { it.copy(itemName = value, itemNameTouched = true) }
+  }
+
+  /** Sets the reward's specifics to [value]. */
+  fun updateRewardSpecifics(value: String) {
+    updateReward { it.copy(specifics = value) }
+  }
+
+  /** Sets the description of an other reward to [value] and marks it as edited. */
+  fun updateRewardDescription(value: String) {
+    updateReward { it.copy(description = value, descriptionTouched = true) }
+  }
+
+  private fun updateReward(transform: (RewardFormState) -> RewardFormState) {
+    mutableUiState.update { it.copy(reward = transform(it.reward)) }
+  }
+
   /**
    * Reads the signed-in venue: its location for the radius map, and its radius as the starting one,
    * unless the venue has already chosen one.
