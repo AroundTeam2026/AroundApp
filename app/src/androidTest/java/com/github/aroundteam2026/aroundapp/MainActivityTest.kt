@@ -32,12 +32,10 @@ class MainActivityTest : TestCase() {
   private val composeTestRule = e2e.composeTestRule
 
   /** Enters the tabs through the real form, with an account unique to this test. */
-  private fun createAccount() {
+  private fun createAccount(email: String = "navigation-${UUID.randomUUID()}@around.test") {
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
-    composeTestRule
-        .onNodeWithTag(C.Tag.AUTH_EMAIL)
-        .performTextInput("navigation-${UUID.randomUUID()}@around.test")
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     composeTestRule.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
@@ -72,6 +70,24 @@ class MainActivityTest : TestCase() {
         profileScreen { assertIsDisplayed() }
       }
     }
+  }
+
+  @Test
+  fun profileSignOutAllowsSigningInAgain() {
+    val email = "navigation-${UUID.randomUUID()}@around.test"
+    createAccount(email)
+    composeTestRule.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+    composeTestRule.waitUntil(10_000) {
+      composeTestRule.onAllNodes(hasTestTag(C.Tag.NAV_BAR)).fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
   }
 
   @Test

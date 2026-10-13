@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -7,14 +8,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -29,6 +28,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
+import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venuePageDestination
 
@@ -66,12 +66,16 @@ private val START_TAB = Tab.QUESTS
  * A screen opened from a tab, such as a venue's page, belongs to that tab: the tab stays selected
  * while it is shown, and reselecting the tab returns to the tab's own screen.
  *
+ * @param onSignOut supplies the Profile sign-out action.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  */
 @Composable
 fun AroundApp(
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (Tab) -> Unit = { TabScreen(it, navController::navigateToVenuePage) },
+    onSignOut: () -> Unit,
+    screen: @Composable (Tab) -> Unit = {
+      TabScreen(it, navController::openVenueFromMap, onSignOut)
+    },
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   // Recomputed whenever the shown screen changes, since it reads backStackEntry
@@ -138,24 +142,29 @@ private fun NavHostController.tabOfCurrentScreen(): Tab? {
 }
 
 /**
+ * Opens the page of the venue with [venueId], when its card on the map is tapped. The venue page
+ * loads the venue's name itself, so [venueName] is not passed on.
+ */
+@Suppress("UNUSED_PARAMETER")
+internal fun NavHostController.openVenueFromMap(venueId: String, venueName: String) =
+    navigateToVenuePage(venueId)
+
+/**
  * The screen of [tab].
  *
- * @param onOpenVenue opens the page of the venue with this id, when its card on the map is tapped.
+ * @param onOpenVenue opens the page of the venue with this id and name, when its card on the map is
+ *   tapped.
+ * @param onSignOut signs the user out from the Profile tab.
  */
 @Composable
-private fun TabScreen(tab: Tab, onOpenVenue: (venueId: String) -> Unit) =
+private fun TabScreen(
+    tab: Tab,
+    onOpenVenue: (venueId: String, venueName: String) -> Unit,
+    onSignOut: () -> Unit,
+) =
     when (tab) {
-      // The venue page loads the venue's name itself, so only the id is passed on
-      Tab.MAP -> MapScreen(onOpenVenue = { venueId, _ -> onOpenVenue(venueId) })
+      Tab.MAP -> MapScreen(onOpenVenue = onOpenVenue)
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS -> Box(Modifier.fillMaxSize().testTag(tab.screenTag)) { OverviewScreen() }
-      Tab.PROFILE -> PlaceholderScreen(tab)
+      Tab.PROFILE -> ProfileScreen(onSignOut)
     }
-
-// TODO: a stand-in for the Profile tab, until it gets its real screen in its own task
-@Composable
-private fun PlaceholderScreen(tab: Tab) {
-  Box(Modifier.fillMaxSize().testTag(tab.screenTag), contentAlignment = Alignment.Center) {
-    Text(stringResource(tab.label), style = MaterialTheme.typography.headlineMedium)
-  }
-}

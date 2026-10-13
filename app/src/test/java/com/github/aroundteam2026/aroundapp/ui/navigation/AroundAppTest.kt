@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -23,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,13 +35,13 @@ class AroundAppTest {
 
   private lateinit var navController: NavHostController
 
-  private fun launch(app: @Composable () -> Unit = { AroundApp() }) =
+  private fun launch(app: @Composable () -> Unit = { AroundApp(onSignOut = {}) }) =
       composeTestRule.setContent(app)
 
   /** Shows the app with a controller the test can navigate with. */
   private fun launchWithNavController() = launch {
     navController = rememberNavController()
-    AroundApp(navController = navController)
+    AroundApp(onSignOut = {}, navController = navController)
   }
 
   /** Opens a venue's page from the tab in use, as a tap on its card will. */
@@ -142,16 +144,21 @@ class AroundAppTest {
     composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
   }
 
-  // A venue's card on the map opens its page: the Map tab stays selected, and Back returns to the
-  // map
+  // A venue's card on the map opens its page: the Map tab stays selected, and Back returns to it
   @Test
-  fun aVenuePageOpenedFromTheMapBelongsToTheMapTab() {
+  fun aVenueCardOnTheMapOpensItsPageInTheMapTab() {
     launchWithNavController()
     select(Tab.MAP)
-    openVenuePage()
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnUiThread { navController.openVenueFromMap("venue-1", "Café") }
+    composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
     composeTestRule.onNodeWithTag(Tab.MAP.tabTag).assertIsSelected()
+    val venueId = composeTestRule.runOnUiThread {
+      navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
+    }
+    assertEquals("venue-1", venueId)
 
     pressBack()
     assertShowing(Tab.MAP)
@@ -179,7 +186,7 @@ class AroundAppTest {
   // if switching tabs did not save it.
   @Test
   fun eachTabKeepsItsOwnState() {
-    launch { AroundApp(screen = { CounterScreen(it) }) }
+    launch { AroundApp(onSignOut = {}, screen = { CounterScreen(it) }) }
     select(Tab.MAP)
     repeat(2) { composeTestRule.onNodeWithTag(Tab.MAP.screenTag).performClick() }
 
