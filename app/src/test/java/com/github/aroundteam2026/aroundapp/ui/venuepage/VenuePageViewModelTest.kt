@@ -340,6 +340,10 @@ private class ScriptedVenueRepository(private val venue: Flow<Venue?>) : VenueRe
 
   override suspend fun createVenue(venue: Venue) = Result.success(Unit)
 
-  override suspend fun setArea(venueId: String, location: Location, radiusMeters: Int) =
-      Result.success(Unit)
+  override suspend fun setArea(
+      venueId: String,
+      location: Location,
+      radiusMeters: Int,
+      address: String?,
+  ) = Result.success(Unit)
 }
