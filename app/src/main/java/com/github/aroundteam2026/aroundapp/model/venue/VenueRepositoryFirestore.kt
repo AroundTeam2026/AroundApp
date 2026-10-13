@@ -6,15 +6,19 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Transaction
 import java.util.Date
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -35,6 +39,21 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
     get() = db.collection(VENUES)
 
   override fun observeVenue(venueId: String): Flow<Venue?> = venues.document(venueId).observe()
+
+  /**
+   * Watches the venues with one `in` query per [MAX_IDS_PER_QUERY] ids, the most Firestore takes in
+   * one, instead of the default's listener per venue.
+   */
+  override fun observeVenues(venueIds: Set<String>): Flow<List<Venue>> =
+      if (venueIds.isEmpty()) flowOf(emptyList())
+      else
+          combine(
+              venueIds.chunked(MAX_IDS_PER_QUERY).map { ids ->
+                venues.whereIn(FieldPath.documentId(), ids).observe()
+              }
+          ) { chunks ->
+            chunks.flatMap { it }
+          }
 
   override suspend fun getVenue(venueId: String): Venue? =
       venues.document(venueId).get().await().toVenue()
@@ -106,6 +125,18 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
     awaitClose { registration.remove() }
   }
 
+  /** Turns Firestore's callback-style listener into a Flow of this query's venues. */
+  private fun Query.observe(): Flow<List<Venue>> = callbackFlow {
+    val registration = addSnapshotListener { snapshot, error ->
+      if (error != null) {
+        close(error)
+      } else if (snapshot != null) {
+        trySend(snapshot.documents.mapNotNull { it.toVenue() })
+      }
+    }
+    awaitClose { registration.remove() }
+  }
+
   /** The document fields for this venue, without its id and its null fields. */
   private fun Venue.toFirestore(): Map<String, Any> = buildMap {
     put(NAME, name)
@@ -142,6 +173,7 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
   private companion object {
     const val TAG = "VenueRepositoryFirestore"
     const val VENUES = "venues"
+    const val MAX_IDS_PER_QUERY = 30
 
     const val NAME = "name"
     const val LOCATION = "location"

@@ -16,6 +16,7 @@ import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
@@ -168,14 +169,63 @@ class VenueRepositoryFirestoreTest {
     }
   }
 
-  /** Bug: a malformed document makes getVenue throw instead of reading it as missing. */
+  /**
+   * Bug: a malformed document makes getVenue throw, or ends the observeVenues flow, instead of
+   * being read as missing.
+   */
   @Test
-  fun getVenue_readsAMalformedDocumentAsMissing() = withTimeoutBlocking {
+  fun malformedDocument_isReadAsMissing() = withTimeoutBlocking {
     // No name or createdAt; the rules only check the owner.
     ownerDb.collection(VENUES).document(ownerUid).set(mapOf("radiusMeters" to 50)).await()
+    readerRepository.createVenue(venue(readerUid)).getOrThrow()
+
+    val observed =
+        readerRepository.observeVenues(setOf(ownerUid, readerUid)).first { list ->
+          list.any { it.id == readerUid }
+        }
 
     assertNull(readerRepository.getVenue(ownerUid))
+    assertEquals(listOf(readerUid), observed.map { it.id })
   }
+
+  /** Bug: observeVenues queries Firestore with no ids, which it refuses, instead of emitting. */
+  @Test
+  fun observeVenues_withNoIds_emitsAnEmptyList() = withTimeoutBlocking {
+    assertEquals(emptyList<Venue>(), readerRepository.observeVenues(emptySet()).first())
+  }
+
+  /**
+   * Bug: observeVenues puts more ids in one query than Firestore takes, does not leave out missing
+   * venues, or reads once instead of listening, so a later change never arrives.
+   */
+  @Test
+  fun observeVenues_overMoreIdsThanOneQueryTakes_emitsExistingVenuesAndTheirChanges() =
+      withTimeoutBlocking {
+        val venue = venue(ownerUid)
+        ownerRepository.createVenue(venue).getOrThrow()
+        // The real venue comes last, so it is in a later query than the missing ones.
+        val ids = (1..MAX_IDS_PER_QUERY).map { "missing-$it" }.toSet() + ownerUid
+        val emissions = Channel<List<Venue>>(Channel.UNLIMITED)
+        val collector =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+              readerRepository.observeVenues(ids).collect(emissions::send)
+            }
+        try {
+          var first = emissions.receive()
+          // The reader's empty cache may answer before the server does.
+          while (first.isEmpty()) first = emissions.receive()
+          assertEquals(listOf(venue), first)
+
+          ownerRepository.setArea(ownerUid, NEW_LOCATION, 120, null).getOrThrow()
+
+          // A one-shot flow never emits again, so this loop never ends and the test times out.
+          do {
+            val latest = emissions.receive()
+          } while (latest.single().radiusMeters != 120)
+        } finally {
+          collector.cancel()
+        }
+      }
 
   /**
    * Bug: setArea writes fields other than the area, ignores one of its arguments, or keeps the
@@ -230,5 +280,8 @@ class VenueRepositoryFirestoreTest {
 
     /** Where setArea moves the venue to. */
     val NEW_LOCATION = Location(46.5225, 6.6328)
+
+    /** The most ids Firestore takes in one `in` query. */
+    const val MAX_IDS_PER_QUERY = 30
   }
 }
