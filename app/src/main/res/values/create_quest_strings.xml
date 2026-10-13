@@ -57,7 +57,9 @@
     <string name="create_quest_reward_unit_chf">CHF</string>
     <string name="create_quest_reward_amount_not_a_number">Enter a number.</string>
     <string name="create_quest_reward_amount_too_small">Enter at least %1$s.</string>
-    <string name="create_quest_reward_amount_too_large">Use %1$d %% or less.</string>
+    <string name="create_quest_reward_amount_too_many_decimals">Use at most %1$s decimals.</string>
+    <string name="create_quest_reward_amount_too_large_percent">Use %1$s %% or less.</string>
+    <string name="create_quest_reward_amount_too_large_chf">Use CHF %1$s or less.</string>
     <string name="create_quest_reward_free_item">Free item</string>
     <string name="create_quest_reward_other">Other</string>
     <string name="create_quest_reward_item_hint">Mini croissant</string>

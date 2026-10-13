@@ -4,6 +4,10 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.ui.quest.create.DiscountAmountError.NOT_A_NUMBER
+import com.github.aroundteam2026.aroundapp.ui.quest.create.DiscountAmountError.TOO_LARGE
+import com.github.aroundteam2026.aroundapp.ui.quest.create.DiscountAmountError.TOO_MANY_DECIMALS
+import com.github.aroundteam2026.aroundapp.ui.quest.create.DiscountAmountError.TOO_SMALL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -50,23 +54,37 @@ class RewardFormStateTest {
   }
 
   @Test
-  fun discountAmountIsANumberWithinTheLimitsOfItsUnit() {
-    val cases =
-        listOf(
-            Triple(DiscountUnit.PERCENT, "abc", DiscountAmountError.NOT_A_NUMBER),
-            Triple(DiscountUnit.CHF, "Infinity", DiscountAmountError.NOT_A_NUMBER),
-            Triple(DiscountUnit.CHF, "0", DiscountAmountError.TOO_SMALL),
-            Triple(DiscountUnit.PERCENT, "-5", DiscountAmountError.TOO_SMALL),
-            Triple(DiscountUnit.PERCENT, "100.01", DiscountAmountError.TOO_LARGE),
-            Triple(DiscountUnit.PERCENT, "100", null),
-            Triple(DiscountUnit.CHF, "100.01", null),
-            Triple(DiscountUnit.CHF, "0.01", null),
-        )
-    cases.forEach { (unit, amount, error) ->
-      val reward = discount.copy(discountAmount = amount, discountUnit = unit)
-      assertEquals("$amount $unit", error, reward.discountAmountError)
-      assertEquals("$amount $unit", error == null, reward.isValid)
-    }
+  fun discountAmountIsOnlyDigitsWithAnOptionalDecimalPointOrComma() {
+    // toDoubleOrNull() or a person reads most of these as numbers, but none is plain decimal input
+    listOf("abc", "Infinity", "NaN", "1e3", "15f", "0x1p4", "+5", "-5", "1.", ",5", "1 000", "١٥")
+        .forEach { amount -> assertAmountError(DiscountUnit.CHF, amount, NOT_A_NUMBER) }
+  }
+
+  @Test
+  fun discountAmountHasAtMostTwoDecimals() {
+    assertAmountError(DiscountUnit.CHF, "0.015", TOO_MANY_DECIMALS)
+    assertAmountError(DiscountUnit.PERCENT, "99,996", TOO_MANY_DECIMALS)
+    // A comma is never a thousands separator
+    assertAmountError(DiscountUnit.CHF, "1,000", TOO_MANY_DECIMALS)
+    assertAmountError(DiscountUnit.CHF, "0,99", null)
+  }
+
+  @Test
+  fun discountAmountIsWithinTheLimitsOfItsUnit() {
+    assertAmountError(DiscountUnit.CHF, "0", TOO_SMALL)
+    assertAmountError(DiscountUnit.PERCENT, "0.00", TOO_SMALL)
+    assertAmountError(DiscountUnit.CHF, "0.01", null)
+    assertAmountError(DiscountUnit.PERCENT, "100", null)
+    assertAmountError(DiscountUnit.PERCENT, "100.01", TOO_LARGE)
+    assertAmountError(DiscountUnit.CHF, "1000", null)
+    assertAmountError(DiscountUnit.CHF, "1000.01", TOO_LARGE)
+    assertAmountError(DiscountUnit.CHF, "99999999999999999999", TOO_LARGE)
+  }
+
+  private fun assertAmountError(unit: DiscountUnit, amount: String, error: DiscountAmountError?) {
+    val reward = discount.copy(discountAmount = amount, discountUnit = unit)
+    assertEquals("$amount $unit", error, reward.discountAmountError)
+    assertEquals("$amount $unit", error == null, reward.isValid)
   }
 
   @Test
