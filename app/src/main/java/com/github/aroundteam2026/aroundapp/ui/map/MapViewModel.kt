@@ -85,6 +85,10 @@ class MapViewModel(
 
   private var lookup: Job? = null
   private var located = false
+  /**
+   * Whether the explorer picked a venue, which the first framing of their position must not undo.
+   */
+  private var picked = false
 
   /** The part of the world on screen, or null until the map reports it. */
   private val visibleArea = MutableStateFlow<GeoBounds?>(null)
@@ -129,7 +133,8 @@ class MapViewModel(
   /**
    * Called with the answer to the location permission request, or with `true` when it was already
    * granted. The explorer is located once per visit to the map: switching back to the Map tab keeps
-   * the camera where they left it, unless no position was found yet.
+   * the camera where they left it, unless no position was found yet. Once found, the camera frames
+   * it, unless the explorer already picked a venue, which stays in view.
    */
   fun onLocationPermissionResult(granted: Boolean) {
     _uiState.update { it.copy(showsUserLocation = granted) }
@@ -138,7 +143,9 @@ class MapViewModel(
       val here = locationRepository.currentLocation() ?: return@launch
       located = true
       explorer.value = here
-      _uiState.update { it.copy(areaToFrame = here.boundsWithin(NEARBY_RADIUS_METERS)) }
+      // A venue picked meanwhile stays in view: its card would be left off screen
+      if (!picked)
+          _uiState.update { it.copy(areaToFrame = here.boundsWithin(NEARBY_RADIUS_METERS)) }
     }
   }
 
@@ -161,6 +168,7 @@ class MapViewModel(
    */
   fun onPinClick(venueId: String) {
     if (content.value.pins.none { it.venueId == venueId }) return
+    picked = true
     selectedVenueId.value = venueId
     // The card must stay in sight
     _uiState.update { it.copy(showsNearby = false) }
@@ -183,6 +191,24 @@ class MapViewModel(
   }
 
   /**
+   * Called when the explorer taps the page of [quest] in the nearby quests: opens its venue's card
+   * in their place, as a tap on its pin does, and frames [VENUE_FRAME_RADIUS_METERS] around the
+   * venue. The venue is placed where its pin is. A page whose venue no longer has valid quests
+   * changes nothing.
+   */
+  fun onNearbyQuestClick(quest: NearbyQuest) {
+    val pin = content.value.pins.find { it.venueId == quest.venueId } ?: return
+    picked = true
+    selectedVenueId.value = pin.venueId
+    _uiState.update {
+      it.copy(
+          areaToFrame = pin.location.boundsWithin(VENUE_FRAME_RADIUS_METERS),
+          showsNearby = false,
+      )
+    }
+  }
+
+  /**
    * The active quests, their venues, the explorer's position and the time, again whenever quests or
    * their venues change, when a reward expires, and once the explorer is located. Without quests,
    * or when they fail, there are none; without venues, the quests' own copies stand in for them.
@@ -190,19 +216,20 @@ class MapViewModel(
    * The quests are listened to once, for both the pins and the nearby list, and their venues again
    * only when the set of venues changes, as each new listener costs Firestore reads.
    */
+  // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun mapData(): Flow<MapData> {
     val quests =
         questRepository
             .observeActiveQuests()
-            .catch { emit(emptyList()) }
+            .catch { emit(emptyList()) } // NOSONAR
             .shareIn(viewModelScope, SharingStarted.WhileSubscribed(), replay = 1)
     val venues =
         quests
             .map { it.mapTo(mutableSetOf()) { quest -> quest.venueId } }
             .distinctUntilChanged()
             .flatMapLatest { venueIds ->
-              venueRepository.observeVenues(venueIds).catch { emit(emptyList()) }
+              venueRepository.observeVenues(venueIds).catch { emit(emptyList()) } // NOSONAR
             }
     return combine(quests, venues, explorer) { current, known, here ->
           Triple(current, known.associateBy { it.id }, here)
@@ -242,6 +269,9 @@ class MapViewModel(
   companion object {
     /** The map frames this distance around the explorer, and lists the quests within it. */
     const val NEARBY_RADIUS_METERS = 5_000.0
+
+    /** A tap on a nearby quest frames this distance around its venue, so 500 m across. */
+    const val VENUE_FRAME_RADIUS_METERS = 250.0
 
     /** Builds the [MapViewModel] with the app's [LocationRepository]. */
     val factory: ViewModelProvider.Factory = viewModelFactory {
