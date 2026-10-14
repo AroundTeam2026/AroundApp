@@ -127,6 +127,9 @@ object C {
 
     const val CREATE_QUEST_SCREEN = "create_quest_screen"
     const val CREATE_QUEST_CLOSE = "create_quest_close"
+    const val CREATE_QUEST_SUMMARY = "create_quest_summary"
+    const val CREATE_QUEST_SUBMIT = "create_quest_submit"
+    const val CREATE_QUEST_SAVING = "create_quest_saving"
     const val CREATE_QUEST_TITLE = "create_quest_title"
     const val CREATE_QUEST_TITLE_COUNTER = "create_quest_title_counter"
     const val CREATE_QUEST_TITLE_ERROR = "create_quest_title_error"
@@ -153,7 +156,6 @@ object C {
     const val CREATE_QUEST_PARTY_EXTRA = "create_quest_party_extra"
     const val CREATE_QUEST_PARTY_AT_LEAST = "create_quest_party_at_least"
     const val CREATE_QUEST_PARTY_EXACTLY = "create_quest_party_exactly"
-    const val CREATE_QUEST_STUB = "create_quest_stub"
     const val DASHBOARD_STUB = "dashboard_stub"
     const val OVERVIEW_STUB = "overview_stub"
     const val CREATE_QUEST_REWARD_NONE = "create_quest_reward_none"

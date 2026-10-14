@@ -72,4 +72,13 @@
     <string name="create_quest_reward_set_date">Set date</string>
     <string name="create_quest_reward_expiry_clear">Remove the end date</string>
     <string name="create_quest_reward_expiry_past">Pick today or a later date.</string>
+    <string name="create_quest_summary_photo">Photo proof</string>
+    <string name="create_quest_summary_text">Text proof</string>
+    <string name="create_quest_summary_party_at_least">%1$d+ people</string>
+    <plurals name="create_quest_summary_party_exactly">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item>
+    </plurals>
+    <string name="create_quest_submit">Create quest</string>
+    <string name="create_quest_save_failed">Couldn\'t save the quest. Try again.</string>
 </resources>

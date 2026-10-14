@@ -55,7 +55,7 @@ class CreateQuestScreenTest {
   @Before
   fun setUp() {
     compose.setContent {
-      AroundAppTheme { CreateQuestScreen(viewModel, onClose = { closeCalls++ }) }
+      AroundAppTheme { CreateQuestScreen(viewModel, onClose = { closeCalls++ }, onCreated = {}) }
     }
   }
 

@@ -29,6 +29,7 @@ class QuestRadiusMapTest {
             onRequirementsChange = {},
             completionActions = QuestCompletionActions(),
             rewardActions = QuestRewardActions(),
+            onSubmit = {},
             onClose = {},
         )
       }
