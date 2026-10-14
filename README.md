@@ -75,10 +75,6 @@ firebase deploy --only firestore:rules --project around-67942
 - **Who:** a team member with the Owner or Editor role on the `around-67942` Firebase project.
 - **When:** right after a PR that changes `firestore.rules` is merged, from an up-to-date `main`. Announce it in the team channel, then check the Rules tab of Firestore in the Firebase console. Rules v2 read the writer's role from `users/{uid}`, so they only go to production once the app saves user profiles to Firestore; before that, they would deny every venue and quest write.
 
-### Demo quests on the map
-
-Until the map reads quests from Firestore, it shows made-up venues and quests around Lausanne, from `model/demo/MapDemoData.kt`, kept in memory.
-
 ### Useful commands
 
 ```sh

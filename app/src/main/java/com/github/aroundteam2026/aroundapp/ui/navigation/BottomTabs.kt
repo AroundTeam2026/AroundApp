@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -88,7 +89,8 @@ internal fun <T : BottomTab> BottomTabScaffold(
     NavHost(
         navController = navController,
         startDestination = startTab.route,
-        modifier = Modifier.padding(innerPadding),
+        // Screens that read the insets themselves must not add the bars' room a second time
+        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
     ) {
       tabs.forEach { tab -> composable(tab.route) { screen(tab) } }
       destinations()

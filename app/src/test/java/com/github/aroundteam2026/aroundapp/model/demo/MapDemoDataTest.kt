@@ -16,8 +16,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tests that the demo data stays consistent, and keeps showing every case the map handles: every
- * build shows it until the map reads Firestore, so it is what the team tests and screenshots.
+ * Tests that the demo data stays consistent, and keeps showing every case the map handles, so a map
+ * filled with it shows them all.
  */
 class MapDemoDataTest {
 

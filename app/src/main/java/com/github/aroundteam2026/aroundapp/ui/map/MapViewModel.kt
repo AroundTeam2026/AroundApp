@@ -44,22 +44,27 @@ import kotlinx.coroutines.launch
  *
  * @property areaToFrame The area the camera must move to, or null once the map framed it.
  * @property showsUserLocation Whether to draw the explorer's position, which needs the permission.
+ * @property locationRefused Whether the explorer refused the location permission, so the map says
+ *   it is off. False until they answer.
  * @property pins The venues to mark: those on screen with valid quests, and the open one wherever
  *   it is.
  * @property selectedVenueId The venue whose card is open, or null when every pin is closed.
  * @property nearby The valid quests for the list: those within [MapViewModel.NEARBY_RADIUS_METERS]
  *   of the explorer, nearest first, or, while their position is unknown, every valid quest by venue
- *   name, with no distance.
+ *   name, with no distance. Only those that pass [filters] are listed.
+ * @property filters The filters the explorer chose for the list. They don't hide any pin.
  * @property showsNearby Whether the nearby quests are open over the map. They and a card are never
  *   open together.
  */
 data class MapUiState(
     val areaToFrame: GeoBounds?,
     val showsUserLocation: Boolean = false,
+    val locationRefused: Boolean = false,
     val pins: List<VenuePin> = emptyList(),
     val selectedVenueId: String? = null,
     val nearby: List<NearbyQuest> = emptyList(),
     val showsNearby: Boolean = false,
+    val filters: NearbyFilters = NearbyFilters(),
 )
 
 /**
@@ -96,6 +101,8 @@ class MapViewModel(
   private val explorer = MutableStateFlow<Location?>(null)
   /** The venue whose card the explorer opened, or null. */
   private val selectedVenueId = MutableStateFlow<String?>(null)
+  /** The filters of the nearby list. */
+  private val filters = MutableStateFlow(NearbyFilters())
   /**
    * The pins of every venue with valid quests, on screen or not, and the nearby list, built
    * together from each snapshot of [mapData], so the screen never shows one newer than the other.
@@ -114,18 +121,21 @@ class MapViewModel(
     viewModelScope.launch {
       // The venues on screen get a pin, and the open one keeps it wherever it is: the card is far
       // bigger than the pin, so it can still be on screen when its venue isn't
-      combine(content, visibleArea, selectedVenueId) { (pins, nearby), area, opened ->
+      combine(content, visibleArea, selectedVenueId, filters) { (pins, nearby), area, opened, chosen
+            ->
             val selected = opened?.takeIf { id -> pins.any { it.venueId == id } }
             val shown = pins.filter {
               (area != null && it.location in area) || it.venueId == selected
             }
-            ShownMap(shown, opened, selected, nearby)
+            ShownMap(shown, opened, selected, nearby.filter(chosen::matches), chosen)
           }
-          .collect { (shown, opened, selected, nearby) ->
+          .collect { (shown, opened, selected, nearby, chosen) ->
             // A venue left without valid quests closes its card for good
             if (selected == null && opened != null) selectedVenueId.compareAndSet(opened, null)
             // One update, so the pins and the list always come from the same snapshot
-            _uiState.update { it.copy(pins = shown, selectedVenueId = selected, nearby = nearby) }
+            _uiState.update {
+              it.copy(pins = shown, selectedVenueId = selected, nearby = nearby, filters = chosen)
+            }
           }
     }
   }
@@ -137,7 +147,7 @@ class MapViewModel(
    * it, unless the explorer already picked a venue, which stays in view.
    */
   fun onLocationPermissionResult(granted: Boolean) {
-    _uiState.update { it.copy(showsUserLocation = granted) }
+    _uiState.update { it.copy(showsUserLocation = granted, locationRefused = !granted) }
     if (!granted || located || lookup?.isActive == true) return
     lookup = viewModelScope.launch {
       val here = locationRepository.currentLocation() ?: return@launch
@@ -183,6 +193,11 @@ class MapViewModel(
   fun onNearbyOpen() {
     selectedVenueId.value = null
     _uiState.update { it.copy(showsNearby = true) }
+  }
+
+  /** Called when the explorer changes the nearby list's filters; they stay until changed again. */
+  fun onFiltersChange(filters: NearbyFilters) {
+    this.filters.value = filters
   }
 
   /** Called when the explorer closes the nearby quests. */
@@ -257,13 +272,15 @@ class MapViewModel(
 
   /**
    * What the screen shows: the [pins] on screen, the card the explorer [opened], the one still
-   * [selected] (null once its venue has no valid quest left) and the [nearby] list.
+   * [selected] (null once its venue has no valid quest left), and the [nearby] list that passes the
+   * [filters].
    */
   private data class ShownMap(
       val pins: List<VenuePin>,
       val opened: String?,
       val selected: String?,
       val nearby: List<NearbyQuest>,
+      val filters: NearbyFilters,
   )
 
   companion object {

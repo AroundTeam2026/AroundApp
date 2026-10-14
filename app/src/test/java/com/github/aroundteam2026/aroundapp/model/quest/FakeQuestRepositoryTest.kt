@@ -106,6 +106,36 @@ class FakeQuestRepositoryTest {
   }
 
   @Test
+  fun observeActiveQuestsByVenue_returnsOnlyThatVenuesActiveQuests() = runBlocking {
+    val activeId = repository.createQuest(testQuest(venueId = "v1")).getOrThrow()
+    repository.createQuest(testQuest(venueId = "v1", status = QuestStatus.DRAFT))
+    repository.createQuest(testQuest(venueId = "v1", status = QuestStatus.ARCHIVED))
+    repository.createQuest(testQuest(venueId = "v2"))
+
+    val quests = repository.observeActiveQuestsByVenue("v1").first()
+
+    assertEquals(listOf(activeId), quests.map { it.id })
+  }
+
+  @Test
+  fun observeActiveQuestsByVenue_doesNotEmitForADraftOrAnotherVenue() = runBlocking {
+    withTimeout(TIMEOUT_MS) {
+      val emissions =
+          async(start = CoroutineStart.UNDISPATCHED) {
+            repository.observeActiveQuestsByVenue("v1").take(2).toList()
+          }
+
+      repository.createQuest(testQuest(venueId = "v1", status = QuestStatus.DRAFT))
+      repository.createQuest(testQuest(venueId = "v2"))
+      // Lets the collector see the state after those writes; see the active-quests test above.
+      yield()
+      repository.createQuest(testQuest(venueId = "v1"))
+
+      assertEquals(listOf(0, 1), emissions.await().map { it.size })
+    }
+  }
+
+  @Test
   fun createQuest_returnsNewUniqueId() = runBlocking {
     val first = repository.createQuest(testQuest()).getOrThrow()
     val second = repository.createQuest(testQuest()).getOrThrow()
@@ -197,6 +227,7 @@ class FakeQuestRepositoryTest {
 
     assertEquals(listOf(active), repository.observeActiveQuests().first())
     assertEquals(setOf(active, draft), repository.observeQuestsByVenue("v1").first().toSet())
+    assertEquals(listOf(active), repository.observeActiveQuestsByVenue("v1").first())
   }
 
   @Test
