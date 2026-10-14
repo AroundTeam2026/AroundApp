@@ -32,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -335,6 +336,61 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
         .performScrollTo()
         .assertTextEquals("Enter at least 0,01.")
+  }
+
+  @Test
+  fun pickingAnExpiryShowsItAndClearingRemovesIt() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    val today = LocalDate.now()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CONFIRM).performClick()
+    // The picker starts at the day it opened, which is today unless midnight just passed
+    assertTrue(viewModel.uiState.value.reward.expiryDate in listOf(today, today.plusDays(1)))
+
+    viewModel.updateExpiryDate(LocalDate.of(2099, 12, 31))
+    // In the phone's own order: month first in US English
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).assertTextContains("Dec 31, 2099")
+    compose.onNodeWithText("Set date").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CLEAR).performClick()
+    assertNull(viewModel.uiState.value.reward.expiryDate)
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY)
+        .assertTextContains("No expiry")
+        .assertTextContains("Set date")
+  }
+
+  @Test
+  fun cancellingThePickerKeepsTheExpiry() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    val lastDay = LocalDate.of(2099, 12, 31)
+    viewModel.updateExpiryDate(lastDay)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo().performClick()
+    compose.onNodeWithText("Cancel").performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CONFIRM).assertDoesNotExist()
+    assertEquals(lastDay, viewModel.uiState.value.reward.expiryDate)
+  }
+
+  @Test
+  fun aPastExpiryShowsItsError() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR).assertDoesNotExist()
+    viewModel.updateExpiryDate(LocalDate.now().minusDays(1))
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Pick today or a later date.")
+  }
+
+  @Test
+  @Config(qualifiers = "+en-rGB")
+  fun expiryFollowsTheDayFirstOrderOfABritishPhone() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    viewModel.updateExpiryDate(LocalDate.of(2099, 12, 31))
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY)
+        .performScrollTo()
+        .assertTextContains("31 Dec 2099")
   }
 
   // Egyptian Arabic writes numbers in Arabic-Indic digits, which the amount field rejects.

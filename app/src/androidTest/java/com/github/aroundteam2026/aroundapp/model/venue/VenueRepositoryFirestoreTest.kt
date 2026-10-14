@@ -3,11 +3,13 @@ package com.github.aroundteam2026.aroundapp.model.venue
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorClient
 import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -38,11 +40,11 @@ import org.junit.runner.RunWith
  * Tests [VenueRepositoryFirestore] on the Auth and Firestore emulators, started with `firebase
  * emulators:start --only auth,firestore --project demo-project`, so firestore.rules apply.
  *
- * Two fresh users take part, each on their own [FirebaseApp] from [emulatorClient], never the
- * default app: the owner and a reader. The rules make a venue's id its owner's uid, so each user
- * has at most one venue and tests never see each other's. Each client has its own empty cache, so
- * what one user reads of the other's venue has been accepted by the server. Each test's KDoc names
- * the production bug it catches.
+ * Two fresh venue accounts take part, since the rules only let venue accounts write venues, each on
+ * their own [FirebaseApp] from [emulatorClient], never the default app: the owner and a reader. The
+ * rules make a venue's id its owner's uid, so each user has at most one venue and tests never see
+ * each other's. Each client has its own empty cache, so what one user reads of the other's venue
+ * has been accepted by the server. Each test's KDoc names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class VenueRepositoryFirestoreTest {
@@ -67,8 +69,8 @@ class VenueRepositoryFirestoreTest {
   fun setUp() =
       runBlocking<Unit> {
         withTimeout(SETUP_TIMEOUT_MS) {
-          ownerUid = signInNewUser(OWNER_APP)
-          readerUid = signInNewUser(READER_APP)
+          ownerUid = signInNewUser(OWNER_APP, Role.VENUE)
+          readerUid = signInNewUser(READER_APP, Role.VENUE)
         }
         ownerDb = emulatorClient(OWNER_APP)
         readerDb = emulatorClient(READER_APP)
@@ -196,8 +198,8 @@ class VenueRepositoryFirestoreTest {
    */
   @Test
   fun malformedDocument_isReadAsMissing() = withTimeoutBlocking {
-    // No name or createdAt; the rules only check the owner.
-    ownerDb.collection(VENUES).document(ownerUid).set(mapOf("radiusMeters" to 50)).await()
+    // No name or createdAt: the rules refuse it, so it goes past them
+    writeBypassingRules("$VENUES/$ownerUid", mapOf("radiusMeters" to 50))
     readerRepository.createVenue(venue(readerUid)).getOrThrow()
 
     val observed =

@@ -220,6 +220,33 @@ class VenuePageViewModelTest {
   }
 
   @Test
+  fun theDetailsOpenAndClose() = test {
+    viewModel
+    runCurrent()
+
+    viewModel.onQuestDetailsOpened("a")
+    assertEquals("a", state.detailQuest?.questId)
+    assertNull(state.selectedQuestId)
+
+    viewModel.onQuestDetailsClosed()
+    assertNull(state.detailQuestId)
+  }
+
+  @Test
+  fun theDetailsCloseWhenTheirRewardExpires() = test {
+    quests.value =
+        listOf(testQuest(id = "a", venueId = VENUE_ID, reward = rewardExpiringAt(START + 1_000)))
+    viewModel
+    runCurrent()
+    viewModel.onQuestDetailsOpened("a")
+
+    advanceTimeBy(1_000)
+    runCurrent()
+
+    assertNull(state.detailQuestId)
+  }
+
+  @Test
   fun tappingAQuestPicksIt() = test {
     viewModel
     runCurrent()

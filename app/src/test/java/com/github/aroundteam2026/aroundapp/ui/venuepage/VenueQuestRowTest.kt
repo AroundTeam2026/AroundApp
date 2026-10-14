@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -34,6 +35,7 @@ class VenueQuestRowTest {
   @get:Rule val compose = createComposeRule()
 
   private var clicks = 0
+  private var details = 0
 
   private fun quest(
       title: String = "Bring a friend",
@@ -153,6 +155,30 @@ class VenueQuestRowTest {
     compose
         .onNodeWithTag(C.Tag.VENUE_QUEST_ROW)
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+  }
+
+  @Test
+  fun theChevronOpensTheDetailsWithoutPicking() {
+    compose.setContent {
+      AroundAppTheme {
+        VenueQuestRow(quest(), selected = false, onClick = { clicks++ }, onDetails = { details++ })
+      }
+    }
+
+    compose
+        .onNodeWithTag(C.Tag.VENUE_QUEST_ROW_DETAILS)
+        .assertContentDescriptionEquals("Details of Bring a friend")
+        .performClick()
+
+    assertEquals(1, details)
+    assertEquals(0, clicks)
+  }
+
+  @Test
+  fun withoutDetailsTheChevronIsNoButton() {
+    show()
+
+    node(C.Tag.VENUE_QUEST_ROW_DETAILS).assertDoesNotExist()
   }
 
   @Test

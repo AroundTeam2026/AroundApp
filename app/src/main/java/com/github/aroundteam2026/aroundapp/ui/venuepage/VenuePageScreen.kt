@@ -58,9 +58,11 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
  * @param quest The quest to draw.
  * @param selected Whether the explorer picked it to accept.
  * @param onClick Picks the quest, or unpicks it if it was picked.
+ * @param onDetails Opens the quest's details in a [QuestDetailSheet].
  */
 typealias VenuePageQuestRow =
-    @Composable (quest: VenuePageQuest, selected: Boolean, onClick: () -> Unit) -> Unit
+    @Composable
+    (quest: VenuePageQuest, selected: Boolean, onClick: () -> Unit, onDetails: () -> Unit) -> Unit
 
 /**
  * A venue's page, showing what [viewModel] holds. It sits inside the app's scaffold, which already
@@ -85,13 +87,18 @@ fun VenuePageScreen(
       onBack = onBack,
       onQuestTapped = viewModel::onQuestSelected,
       onRetry = viewModel::onRetry,
+      onQuestDetails = viewModel::onQuestDetailsOpened,
+      onQuestDetailsClosed = viewModel::onQuestDetailsClosed,
       modifier = modifier,
       questRow = questRow,
       bottomBar = bottomBar,
   )
 }
 
-/** Stateless page: the top bar, then what [state] says the page can show. */
+/**
+ * Stateless page: the top bar, then what [state] says the page can show, with the details of
+ * [VenuePageUiState.detailQuest] in a sheet on top.
+ */
 @Composable
 fun VenuePageContent(
     state: VenuePageUiState,
@@ -99,6 +106,8 @@ fun VenuePageContent(
     onQuestTapped: (questId: String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onQuestDetails: (questId: String) -> Unit = {},
+    onQuestDetailsClosed: () -> Unit = {},
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {},
 ) {
@@ -133,11 +142,14 @@ fun VenuePageContent(
                       .testTag(C.Tag.VENUE_PAGE_EMPTY),
               )
             } else {
-              Quests(state, questRow, onQuestTapped)
+              Quests(state, questRow, onQuestTapped, onQuestDetails)
             }
           }
         }
         bottomBar(state.selectedQuest)
+        state.detailQuest?.let { quest ->
+          key(quest.questId) { QuestDetailSheet(quest, onQuestDetailsClosed) }
+        }
       }
     }
   }
@@ -174,6 +186,7 @@ private fun Quests(
     state: VenuePageUiState,
     questRow: VenuePageQuestRow,
     onQuestTapped: (questId: String) -> Unit,
+    onQuestDetails: (questId: String) -> Unit,
 ) {
   val colors = MaterialTheme.colorScheme
   Column(
@@ -211,7 +224,12 @@ private fun Quests(
       state.quests.forEachIndexed { index, quest ->
         key(quest.questId) {
           if (index > 0) HorizontalDivider(thickness = DIVIDER_WIDTH, color = colors.outline)
-          questRow(quest, quest.questId == state.selectedQuestId) { onQuestTapped(quest.questId) }
+          questRow(
+              quest,
+              quest.questId == state.selectedQuestId,
+              { onQuestTapped(quest.questId) },
+              { onQuestDetails(quest.questId) },
+          )
         }
       }
     }
@@ -312,8 +330,8 @@ private fun Message(text: Int, modifier: Modifier = Modifier) {
 }
 
 /** Each quest as a [VenueQuestRow]. */
-internal val DefaultQuestRow: VenuePageQuestRow = { quest, selected, onClick ->
-  VenueQuestRow(quest, selected, onClick)
+internal val DefaultQuestRow: VenuePageQuestRow = { quest, selected, onClick, onDetails ->
+  VenueQuestRow(quest, selected, onClick, onDetails = onDetails)
 }
 
 private val BACK_SIZE = 44.dp

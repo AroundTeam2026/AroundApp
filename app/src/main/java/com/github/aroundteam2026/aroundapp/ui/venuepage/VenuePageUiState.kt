@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property quests The venue's valid quests, in the order the page lists them.
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
+ * @property detailQuestId Id of the quest whose details are open in a sheet, or null when none is.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -26,20 +27,34 @@ data class VenuePageUiState(
     val address: String? = null,
     val quests: List<VenuePageQuest> = emptyList(),
     val selectedQuestId: String? = null,
+    val detailQuestId: String? = null,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
     get() = selectedQuestId?.let { id -> quests.find { it.questId == id } }
 
+  /** The quest whose details are open, or null when none are or it is no longer in [quests]. */
+  val detailQuest: VenuePageQuest?
+    get() = detailQuestId?.let { id -> quests.find { it.questId == id } }
+
   /**
    * This page listing [quests] instead. A picked quest that isn't among them is unpicked, so it
-   * isn't picked again if it comes back, as when its venue extends an expired reward.
+   * isn't picked again if it comes back, as when its venue extends an expired reward; likewise, its
+   * details close.
    */
   fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState =
       copy(
           quests = quests,
           selectedQuestId = selectedQuestId?.takeIf { id -> quests.any { it.questId == id } },
+          detailQuestId = detailQuestId?.takeIf { id -> quests.any { it.questId == id } },
       )
+
+  /**
+   * This page with the details of the quest [questId] open; a quest it doesn't list changes
+   * nothing.
+   */
+  fun withQuestDetails(questId: String): VenuePageUiState =
+      if (quests.any { it.questId == questId }) copy(detailQuestId = questId) else this
 
   /**
    * This page once the explorer tapped the quest [questId]: picked, or unpicked if it was picked. A

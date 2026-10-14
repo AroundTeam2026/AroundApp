@@ -10,6 +10,9 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.io.IOException
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -351,6 +354,21 @@ class CreateQuestViewModelTest {
     assertEquals("12,5 ", state.reward.discountAmount)
     assertTrue(state.reward.discountAmountTouched)
     assertEquals(DiscountUnit.CHF, state.reward.discountUnit)
+  }
+
+  @Test
+  fun expiryBeforeTodayIsInThePastButTodayIsNot() {
+    val today = LocalDate.of(2026, 10, 12)
+    val clock = Clock.fixed(today.atTime(23, 59).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+    viewModel = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), FakeVenueRepository(), clock)
+
+    viewModel.updateExpiryDate(today.minusDays(1))
+    assertTrue(state.reward.expiryInPast)
+    viewModel.updateExpiryDate(today)
+    assertEquals(today, state.reward.expiryDate)
+    assertFalse(state.reward.expiryInPast)
+    viewModel.updateExpiryDate(null)
+    assertNull(state.reward.expiryDate)
   }
 
   @Test
