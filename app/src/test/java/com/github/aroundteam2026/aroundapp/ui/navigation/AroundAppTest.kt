@@ -116,7 +116,7 @@ class AroundAppTest {
     launchWithNavController()
     openVenuePage()
 
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
   }
 
@@ -128,7 +128,7 @@ class AroundAppTest {
     select(Tab.QUESTS)
 
     assertShowing(Tab.QUESTS)
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
   }
 
   // Leaving a tab keeps what was opened from it; coming back shows it, and the tab, again
@@ -140,7 +140,7 @@ class AroundAppTest {
     assertShowing(Tab.MAP)
 
     select(Tab.QUESTS)
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
   }
 
@@ -153,7 +153,7 @@ class AroundAppTest {
     composeTestRule.runOnUiThread { navController.openVenueFromMap("venue-1", "Café") }
     composeTestRule.waitForIdle()
 
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(Tab.MAP.tabTag).assertIsSelected()
     val venueId = composeTestRule.runOnUiThread {
       navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
