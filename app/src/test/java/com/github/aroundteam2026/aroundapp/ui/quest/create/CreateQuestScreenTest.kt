@@ -360,6 +360,17 @@ class CreateQuestScreenTest {
   }
 
   @Test
+  fun cancellingThePickerKeepsTheExpiry() {
+    viewModel.selectRewardType(RewardType.OTHER)
+    val lastDay = LocalDate.of(2099, 12, 31)
+    viewModel.updateExpiryDate(lastDay)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo().performClick()
+    compose.onNodeWithText("Cancel").performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY_CONFIRM).assertDoesNotExist()
+    assertEquals(lastDay, viewModel.uiState.value.reward.expiryDate)
+  }
+
+  @Test
   fun aPastExpiryShowsItsError() {
     viewModel.selectRewardType(RewardType.OTHER)
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_EXPIRY).performScrollTo()

@@ -444,13 +444,7 @@ private fun ExpiryDatePicker(
   val state =
       rememberDatePickerState(
           initialSelectedDateMillis = (initial ?: today).toUtcMillis(),
-          selectableDates =
-              object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) =
-                    !utcTimeMillis.toUtcDate().isBefore(today)
-
-                override fun isSelectableYear(year: Int) = year >= today.year
-              },
+          selectableDates = selectableFrom(today),
       )
   DatePickerDialog(
       onDismissRequest = onDismiss,
@@ -471,8 +465,18 @@ private fun ExpiryDatePicker(
   }
 }
 
+/** The days of the date picker from [today] on, and the years that contain them. */
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun selectableFrom(today: LocalDate): SelectableDates =
+    object : SelectableDates {
+      override fun isSelectableDate(utcTimeMillis: Long) =
+          !utcTimeMillis.toUtcDate().isBefore(today)
+
+      override fun isSelectableYear(year: Int) = year >= today.year
+    }
+
 /** The date picker counts days as midnights in UTC. */
-private fun LocalDate.toUtcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+internal fun LocalDate.toUtcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
 private fun Long.toUtcDate(): LocalDate =
     Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
