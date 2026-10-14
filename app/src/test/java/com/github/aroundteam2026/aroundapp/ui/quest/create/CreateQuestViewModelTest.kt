@@ -3,16 +3,24 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.io.IOException
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -32,6 +40,7 @@ import org.junit.Test
 class CreateQuestViewModelTest {
   private val dispatcher = StandardTestDispatcher()
   private lateinit var viewModel: CreateQuestViewModel
+  private val quests = FakeQuestRepository(now = { SAVED_AT })
   private val state
     get() = viewModel.uiState.value
 
@@ -46,9 +55,25 @@ class CreateQuestViewModelTest {
     Dispatchers.resetMain()
   }
 
-  /** A form for the signed-in [VENUE_ID], whose venue is read from [venues]. */
-  private fun newViewModel(venues: VenueRepository = FakeVenueRepository()) =
-      CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues)
+  /**
+   * A form for the signed-in [VENUE_ID], whose venue is read from [venues], saved to
+   * [questRepository] and dated by [clock].
+   */
+  private fun newViewModel(
+      venues: VenueRepository = FakeVenueRepository(),
+      questRepository: QuestRepository = quests,
+      clock: Clock = Clock.systemUTC(),
+  ) = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues, questRepository, clock)
+
+  /** A form whose signed-in venue is placed and loaded, saving to [questRepository]. */
+  private fun newLoadedViewModel(
+      questRepository: QuestRepository = quests,
+      clock: Clock = Clock.systemUTC(),
+  ): CreateQuestViewModel {
+    viewModel = newViewModel(FakeVenueRepository(listOf(venue(50))), questRepository, clock)
+    loadVenue()
+    return viewModel
+  }
 
   /** A form whose signed-in venue has [radiusMeters]; its radius is not loaded yet. */
   private fun newViewModelWithVenueRadius(radiusMeters: Int) =
@@ -232,7 +257,12 @@ class CreateQuestViewModelTest {
 
   @Test
   fun radiusStaysAtTheDefaultWhenNoVenueIsSignedIn() {
-    viewModel = CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository(listOf(venue(100))))
+    viewModel =
+        CreateQuestViewModel(
+            FakeAuthRepository(),
+            FakeVenueRepository(listOf(venue(100))),
+            quests,
+        )
     loadVenue()
     assertEquals(QuestLimits.DEFAULT_RADIUS_METERS, state.radiusMeters)
   }
@@ -360,7 +390,7 @@ class CreateQuestViewModelTest {
   fun expiryBeforeTodayIsInThePastButTodayIsNot() {
     val today = LocalDate.of(2026, 10, 12)
     val clock = Clock.fixed(today.atTime(23, 59).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
-    viewModel = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), FakeVenueRepository(), clock)
+    viewModel = newViewModel(clock = clock)
 
     viewModel.updateExpiryDate(today.minusDays(1))
     assertTrue(state.reward.expiryInPast)
@@ -380,7 +410,258 @@ class CreateQuestViewModelTest {
     assertTrue(state.canSubmit)
   }
 
+  @Test
+  fun submitSavesTheTrimmedFormAsAnActiveQuestOfTheVenue() =
+      runTest(dispatcher) {
+        val today = LocalDate.of(2026, 10, 12)
+        newLoadedViewModel(clock = Clock.fixed(today.atStartOfDay(ZONE).toInstant(), ZONE))
+        viewModel.updateTitle(" Find the fox ")
+        viewModel.updateDescription(" A fox hides here. ")
+        viewModel.updateRequirements(" Order a drink. ")
+        viewModel.updateProofType(ProofType.TEXT)
+        viewModel.selectRadiusPreset(100)
+        viewModel.incrementPartySize()
+        viewModel.updateExactPartySize(true)
+        viewModel.selectRewardType(RewardType.OTHER)
+        viewModel.updateRewardDescription(" A tour ")
+        viewModel.updateExpiryDate(today)
+
+        viewModel.submit()
+        runCurrent()
+
+        assertEquals(SaveState.Saved("quest-1"), state.saveState)
+        val endOfToday = today.plusDays(1).atStartOfDay(ZONE).toInstant().toEpochMilli()
+        assertEquals(
+            Quest(
+                id = "quest-1",
+                venueId = VENUE_ID,
+                venueName = venue(50).name,
+                location = requireNotNull(venue(50).location),
+                radiusMeters = 100,
+                title = "Find the fox",
+                description = "A fox hides here.",
+                requirements = "Order a drink.",
+                proofType = ProofType.TEXT,
+                minPartySize = 2,
+                exactPartySize = true,
+                reward = Reward.Other("A tour", endOfToday),
+                status = QuestStatus.ACTIVE,
+                createdAt = SAVED_AT,
+                updatedAt = SAVED_AT,
+            ),
+            quests.getQuest("quest-1"),
+        )
+      }
+
+  @Test
+  fun aSavedQuestIsNotSavedAgain() =
+      runTest(dispatcher) {
+        newLoadedViewModel()
+        fillValid()
+        viewModel.submit()
+        runCurrent()
+        viewModel.submit()
+        runCurrent()
+        assertEquals(SaveState.Saved("quest-1"), state.saveState)
+        assertNull(quests.getQuest("quest-2"))
+      }
+
+  @Test
+  fun aSaveInProgressBlocksAnotherUntilItEnds() =
+      runTest(dispatcher) {
+        val answer = CompletableDeferred<Result<String>>()
+        var calls = 0
+        val slow =
+            object : QuestRepository by quests {
+              override suspend fun createQuest(quest: Quest): Result<String> {
+                calls++
+                return answer.await()
+              }
+            }
+        newLoadedViewModel(slow)
+        fillValid()
+
+        viewModel.submit()
+        runCurrent()
+        assertEquals(SaveState.Saving, state.saveState)
+        assertFalse(state.canSave)
+        viewModel.submit()
+        answer.complete(Result.success("quest-9"))
+        runCurrent()
+
+        assertEquals(1, calls)
+        assertEquals(SaveState.Saved("quest-9"), state.saveState)
+      }
+
+  @Test
+  fun clearingTheSaveErrorForgetsOnlyAFailedSave() =
+      runTest(dispatcher) {
+        newLoadedViewModel()
+        fillValid()
+        quests.forcedFailure = IOException("offline")
+        viewModel.submit()
+        runCurrent()
+        viewModel.clearSaveError()
+        assertEquals(SaveState.Idle, state.saveState)
+
+        quests.forcedFailure = null
+        viewModel.submit()
+        runCurrent()
+        viewModel.clearSaveError()
+        assertEquals(SaveState.Saved("quest-1"), state.saveState)
+      }
+
+  @Test
+  fun editsWhileSavingAreIgnored() =
+      runTest(dispatcher) {
+        val answer = CompletableDeferred<Result<String>>()
+        newLoadedViewModel(
+            object : QuestRepository by quests {
+              override suspend fun createQuest(quest: Quest): Result<String> = answer.await()
+            }
+        )
+        fillValid()
+        viewModel.submit()
+        runCurrent()
+        val saving = state
+
+        viewModel.updateTitle("Another title")
+        viewModel.incrementPartySize()
+        viewModel.selectRewardType(RewardType.OTHER)
+        assertEquals(saving, state)
+
+        answer.complete(Result.failure(IOException("offline")))
+        runCurrent()
+        viewModel.updateTitle("Another title")
+        assertEquals("Another title", state.title)
+      }
+
+  @Test
+  fun aFailedSaveKeepsTheFormAndCanBeRetried() =
+      runTest(dispatcher) {
+        newLoadedViewModel()
+        fillValid()
+        viewModel.incrementPartySize()
+        viewModel.selectRewardType(RewardType.OTHER)
+        viewModel.updateRewardDescription("A tour")
+        val before = state
+        quests.forcedFailure = IOException("offline")
+        viewModel.submit()
+        runCurrent()
+        assertEquals(before.copy(saveState = SaveState.Failed), state)
+        assertTrue(state.canSave)
+
+        quests.forcedFailure = null
+        viewModel.submit()
+        runCurrent()
+        assertEquals(SaveState.Saved("quest-1"), state.saveState)
+      }
+
+  /** runTest fails on an uncaught exception, so the save must catch it. */
+  @Test
+  fun aRepositoryThatThrowsFailsTheSave() =
+      runTest(dispatcher) {
+        val throwing =
+            object : QuestRepository by quests {
+              override suspend fun createQuest(quest: Quest): Result<String> =
+                  throw IOException("offline")
+            }
+        newLoadedViewModel(throwing)
+        fillValid()
+        viewModel.submit()
+        runCurrent()
+        assertEquals(SaveState.Failed, state.saveState)
+      }
+
+  @Test
+  fun nothingIsSavedBeforeTheVenueLoads() =
+      runTest(dispatcher) {
+        viewModel = newViewModelWithVenueRadius(50)
+        fillValid()
+        assertFalse(state.canSave)
+        viewModel.submit()
+        assertNothingSaved()
+      }
+
+  @Test
+  fun nothingIsSavedForAVenueNotPlacedOnTheMap() =
+      runTest(dispatcher) {
+        viewModel =
+            newViewModel(FakeVenueRepository(listOf(testVenue(id = VENUE_ID, location = null))))
+        loadVenue()
+        fillValid()
+        assertFalse(state.canSave)
+        viewModel.submit()
+        assertNothingSaved()
+      }
+
+  @Test
+  fun nothingIsSavedWhileTheFormIsInvalid() =
+      runTest(dispatcher) {
+        newLoadedViewModel()
+        assertFalse(state.canSave)
+        viewModel.submit()
+        assertNothingSaved()
+      }
+
+  /** Runs what the last submit started, and checks that it saved nothing. */
+  private suspend fun assertNothingSaved() {
+    dispatcher.scheduler.runCurrent()
+    assertEquals(SaveState.Idle, state.saveState)
+    assertNull(quests.getQuest("quest-1"))
+  }
+
+  @Test
+  fun aPastExpiryLeftFromAnotherRewardDoesNotBlockSavingNoReward() =
+      runTest(dispatcher) {
+        val today = LocalDate.of(2026, 10, 12)
+        val clock = MovableClock(today.atTime(23, 59).atZone(ZONE).toInstant())
+        newLoadedViewModel(clock = clock)
+        fillValid()
+        viewModel.selectRewardType(RewardType.OTHER)
+        viewModel.updateExpiryDate(today)
+        viewModel.selectRewardType(null)
+
+        clock.instant = clock.instant.plusSeconds(120)
+        viewModel.submit()
+        runCurrent()
+
+        assertEquals(SaveState.Saved("quest-1"), state.saveState)
+        assertNull(quests.getQuest("quest-1")?.reward)
+      }
+
+  @Test
+  fun anExpiryThatPassedSincePickingItBlocksTheSave() =
+      runTest(dispatcher) {
+        val today = LocalDate.of(2026, 10, 12)
+        val clock = MovableClock(today.atTime(23, 59).atZone(ZONE).toInstant())
+        newLoadedViewModel(clock = clock)
+        fillValid()
+        viewModel.selectRewardType(RewardType.OTHER)
+        viewModel.updateRewardDescription("A tour")
+        viewModel.updateExpiryDate(today)
+
+        clock.instant = clock.instant.plusSeconds(120)
+        viewModel.submit()
+        runCurrent()
+
+        assertTrue(state.reward.expiryInPast)
+        assertEquals(SaveState.Idle, state.saveState)
+        assertNull(quests.getQuest("quest-1"))
+      }
+
+  /** A clock at [instant], which a test can move forward. */
+  private class MovableClock(var instant: Instant) : Clock() {
+    override fun getZone(): ZoneId = ZONE
+
+    override fun withZone(zone: ZoneId): Clock = this
+
+    override fun instant(): Instant = instant
+  }
+
   private companion object {
     const val VENUE_ID = "venue-1"
+    const val SAVED_AT = 5_000L
+    val ZONE: ZoneId = ZoneOffset.UTC
   }
 }

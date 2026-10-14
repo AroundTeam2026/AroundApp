@@ -105,9 +105,17 @@ class VenueAreaSaveScreenTest {
   }
 
   @Test
-  fun itsOwnViewModelOpensTheGivenVenue() {
-    // The app's demo venues each have a saved marker, so saving is available at once
-    composeTestRule.setContent { VenueAreaScreen("demo-lumen", onSaved = {}, onBack = {}) }
+  fun aVenueWithASavedAreaCanSaveAtOnce() {
+    val placed =
+        VenueAreaViewModel(
+            "venue",
+            FakeVenueRepository(listOf(testVenue())),
+            FakeLocationRepository(null),
+            FakeAddressSearchRepository(),
+        )
+    composeTestRule.setContent {
+      VenueAreaScreen("venue", onSaved = {}, onBack = {}, viewModel = placed)
+    }
 
     save.assertIsEnabled()
   }

@@ -27,6 +27,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.input.ImeAction
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -47,13 +48,14 @@ import org.robolectric.annotation.Config
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class CreateQuestScreenTest {
   @get:Rule val compose = createComposeRule()
-  private val viewModel = CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository())
+  private val viewModel =
+      CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository(), FakeQuestRepository())
   private var closeCalls = 0
 
   @Before
   fun setUp() {
     compose.setContent {
-      AroundAppTheme { CreateQuestScreen(viewModel, onClose = { closeCalls++ }) }
+      AroundAppTheme { CreateQuestScreen(viewModel, onClose = { closeCalls++ }, onCreated = {}) }
     }
   }
 
@@ -260,6 +262,27 @@ class CreateQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).performScrollTo().performClick()
     assertNull(viewModel.uiState.value.reward.type)
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertDoesNotExist()
+  }
+
+  @Test
+  fun emptyFieldsShowNoExampleText() {
+    // A placeholder would be the field's only text
+    val noText = SemanticsMatcher.keyNotDefined(SemanticsProperties.Text)
+    fun assertNoText(vararg tags: String) = tags.forEach {
+      compose.onNodeWithTag(it).performScrollTo().assert(noText)
+    }
+
+    assertNoText(
+        C.Tag.CREATE_QUEST_TITLE,
+        C.Tag.CREATE_QUEST_DESCRIPTION,
+        C.Tag.CREATE_QUEST_REQUIREMENTS,
+    )
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    assertNoText(C.Tag.CREATE_QUEST_REWARD_AMOUNT, C.Tag.CREATE_QUEST_REWARD_SPECIFICS)
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    assertNoText(C.Tag.CREATE_QUEST_REWARD_ITEM, C.Tag.CREATE_QUEST_REWARD_SPECIFICS)
+    viewModel.selectRewardType(RewardType.OTHER)
+    assertNoText(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION)
   }
 
   @Test

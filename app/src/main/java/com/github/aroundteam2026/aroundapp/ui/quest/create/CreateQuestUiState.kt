@@ -3,7 +3,11 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
+import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import java.time.ZoneId
 import kotlin.math.ceil
 
 /** An average walking pace, about 5 km/h. */
@@ -51,6 +55,21 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
   return if (error == QuestTextError.BLANK && !touched) null else error
 }
 
+/** Where saving the quest stands. */
+sealed interface SaveState {
+  /** Not saved yet. */
+  data object Idle : SaveState
+
+  /** Being saved; the form can't be saved again meanwhile. */
+  data object Saving : SaveState
+
+  /** Saved as the quest [questId]. */
+  data class Saved(val questId: String) : SaveState
+
+  /** The last save failed; the form keeps its values and can be saved again. */
+  data object Failed : SaveState
+}
+
 /**
  * The quest form being filled in by a venue.
  *
@@ -72,6 +91,7 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
  * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
  *   least that many.
  * @property reward The reward explorers get, if any.
+ * @property saveState Where saving the quest stands.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -87,6 +107,7 @@ data class CreateQuestUiState(
     val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
     val exactPartySize: Boolean = false,
     val reward: RewardFormState = RewardFormState(),
+    val saveState: SaveState = SaveState.Idle,
 ) {
   /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
   val selectedRadiusPreset: Int?
@@ -116,4 +137,38 @@ data class CreateQuestUiState(
             validateQuestText(description, QuestLimits.DESCRIPTION_MAX_LENGTH) == null &&
             validateQuestText(requirements, QuestLimits.REQUIREMENTS_MAX_LENGTH) == null &&
             reward.isValid
+
+  /**
+   * Whether the quest can be saved now: [canSubmit], the venue's location is known, and it is
+   * neither being saved nor already saved.
+   */
+  val canSave: Boolean
+    get() =
+        canSubmit &&
+            venueLocation != null &&
+            (saveState == SaveState.Idle || saveState == SaveState.Failed)
+
+  /**
+   * The quest to save for [venue], trimmed, as active, where the venue is. Only call it when
+   * [canSubmit] and the venue has a location. Its id and timestamps are left for the repository to
+   * set, and its reward expires at the end of its last day in [zone].
+   */
+  fun toQuest(venue: Venue, zone: ZoneId): Quest =
+      Quest(
+          id = "",
+          venueId = venue.id,
+          venueName = venue.name,
+          location = requireNotNull(venue.location),
+          radiusMeters = radiusMeters,
+          title = title.trim(),
+          description = description.trim(),
+          requirements = requirements.trim(),
+          proofType = proofType,
+          minPartySize = minPartySize,
+          exactPartySize = exactPartySize,
+          reward = reward.toReward(zone),
+          status = QuestStatus.ACTIVE,
+          createdAt = 0,
+          updatedAt = 0,
+      )
 }

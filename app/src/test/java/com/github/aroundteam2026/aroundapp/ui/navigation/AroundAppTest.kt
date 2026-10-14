@@ -22,7 +22,13 @@ import androidx.compose.ui.test.performClick
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
+import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel
+import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -38,10 +44,23 @@ class AroundAppTest {
   private fun launch(app: @Composable () -> Unit = { AroundApp(onSignOut = {}) }) =
       composeTestRule.setContent(app)
 
-  /** Shows the app with a controller the test can navigate with. */
+  /** Shows the app with stand-ins for the tabs' screens, to check the navigation alone. */
+  private fun launchTabs() = launch {
+    AroundApp(onSignOut = {}, screen = { Text(it.route, Modifier.testTag(it.screenTag)) })
+  }
+
+  /**
+   * Shows the app with a controller the test can navigate with, stand-ins for the tabs' screens,
+   * and the venue page on in-memory repositories.
+   */
   private fun launchWithNavController() = launch {
     navController = rememberNavController()
-    AroundApp(onSignOut = {}, navController = navController)
+    AroundApp(
+        onSignOut = {},
+        navController = navController,
+        screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
+        venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+    )
   }
 
   /** Opens a venue's page from the tab in use, as a tap on its card will. */
@@ -94,7 +113,7 @@ class AroundAppTest {
 
   @Test
   fun eachTabShowsItsScreen() {
-    launch()
+    launchTabs()
     Tab.entries.reversed().forEach {
       select(it)
       assertShowing(it)
@@ -103,7 +122,19 @@ class AroundAppTest {
 
   @Test
   fun theMapTabShowsTheMap() {
-    launch()
+    // The app's own map would read Firestore, so the Map tab shows the map on in-memory
+    // repositories
+    val map =
+        MapViewModel(FakeLocationRepository(null), FakeQuestRepository(), FakeVenueRepository())
+    launch {
+      AroundApp(
+          onSignOut = {},
+          screen = { tab ->
+            if (tab == Tab.MAP) MapScreen(map, onOpenVenue = { _, _ -> })
+            else Text(tab.route, Modifier.testTag(tab.screenTag))
+          },
+      )
+    }
     select(Tab.MAP)
 
     composeTestRule.onNodeWithTag(C.Tag.MAP).assertIsDisplayed()
@@ -179,7 +210,7 @@ class AroundAppTest {
 
   @Test
   fun backFromAnyTabReturnsToQuests() {
-    launch()
+    launchTabs()
     select(Tab.MAP)
     select(Tab.PROFILE)
     pressBack()
@@ -188,7 +219,7 @@ class AroundAppTest {
 
   @Test
   fun reselectingATabDoesNotStackIt() {
-    launch()
+    launchTabs()
     select(Tab.MAP)
     select(Tab.MAP)
     pressBack()

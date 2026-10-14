@@ -28,6 +28,19 @@ interface QuestRepository {
   fun observeQuestsByVenue(venueId: String): Flow<List<Quest>>
 
   /**
+   * Observes the quests explorers can see at one venue, for its page. Emits on collection and on
+   * every change. Unlike [observeQuestsByVenue], the backend only sends active quests, so explorers
+   * neither download nor pay for the venue's drafts and archived quests.
+   *
+   * @param venueId id of the venue whose quests to return.
+   * @return that venue's quests whose status is [QuestStatus.ACTIVE], in unspecified order. Callers
+   *   that need an order must sort the list themselves.
+   * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
+   *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
+   */
+  fun observeActiveQuestsByVenue(venueId: String): Flow<List<Quest>>
+
+  /**
    * Fetches a single quest once.
    *
    * @param questId id of the quest.

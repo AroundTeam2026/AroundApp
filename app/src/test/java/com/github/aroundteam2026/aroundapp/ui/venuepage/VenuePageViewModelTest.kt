@@ -1,7 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
-import androidx.lifecycle.viewmodel.CreationExtras
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -42,7 +41,7 @@ class VenuePageViewModelTest {
   private val venue = testVenue(id = VENUE_ID, name = "Café Lumen", address = "Rue du Pont 1")
   private val venues = FakeVenueRepository(listOf(venue))
   private val quests = MutableStateFlow(listOf(testQuest(id = "a", venueId = VENUE_ID)))
-  private var questRepository = ScriptedQuestRepository(questsByVenue = { quests })
+  private var questRepository = ScriptedQuestRepository(activeQuestsByVenue = { quests })
   private var venueRepository: VenueRepository = venues
 
   private val viewModel by lazy {
@@ -79,7 +78,7 @@ class VenuePageViewModelTest {
     val asked = mutableListOf<String>()
     questRepository =
         ScriptedQuestRepository(
-            questsByVenue = {
+            activeQuestsByVenue = {
               asked += it
               quests
             }
@@ -88,6 +87,19 @@ class VenuePageViewModelTest {
     runCurrent()
 
     assertEquals(listOf(VENUE_ID), asked)
+  }
+
+  @Test
+  fun readsOnlyTheVenuesActiveQuests() = test {
+    questRepository =
+        ScriptedQuestRepository(
+            questsByVenue = { throw AssertionError("The page read the venue's drafts too") },
+            activeQuestsByVenue = { quests },
+        )
+    viewModel
+    runCurrent()
+
+    assertEquals(listOf("a"), ids())
   }
 
   @Test
@@ -261,7 +273,7 @@ class VenuePageViewModelTest {
 
   @Test
   fun failingQuestsFailThePage() = test {
-    questRepository = ScriptedQuestRepository(questsByVenue = { failing() })
+    questRepository = ScriptedQuestRepository(activeQuestsByVenue = { failing() })
     viewModel
     runCurrent()
 
@@ -280,7 +292,8 @@ class VenuePageViewModelTest {
   @Test
   fun retryingAfterAFailureListensAgain() = test {
     var fails = true
-    questRepository = ScriptedQuestRepository(questsByVenue = { if (fails) failing() else quests })
+    questRepository =
+        ScriptedQuestRepository(activeQuestsByVenue = { if (fails) failing() else quests })
     viewModel
     runCurrent()
     assertEquals(VenuePageStatus.FAILED, state.status)
@@ -300,7 +313,7 @@ class VenuePageViewModelTest {
     val live = MutableStateFlow<List<Quest>?>(quests.value)
     questRepository =
         ScriptedQuestRepository(
-            questsByVenue = { live.map { it ?: throw IOException("connection lost") } }
+            activeQuestsByVenue = { live.map { it ?: throw IOException("connection lost") } }
         )
     viewModel
     runCurrent()
@@ -323,7 +336,7 @@ class VenuePageViewModelTest {
     var listens = 0
     questRepository =
         ScriptedQuestRepository(
-            questsByVenue = {
+            activeQuestsByVenue = {
               listens++
               quests
             }
@@ -336,17 +349,6 @@ class VenuePageViewModelTest {
 
     assertEquals(1, listens)
     assertEquals(VenuePageStatus.LOADED, state.status)
-  }
-
-  @Test
-  fun theFactoryBuildsTheViewModelOfItsVenue() = test {
-    val built =
-        VenuePageViewModel.factory("no-such-venue")
-            .create(VenuePageViewModel::class.java, CreationExtras.Empty)
-    // Not advanceUntilIdle: the app's demo quests expire by the real clock, not the test's
-    runCurrent()
-
-    assertEquals(VenuePageStatus.NOT_FOUND, built.uiState.value.status)
   }
 
   private fun <T> failing(): Flow<T> = flow { throw IOException("offline") }

@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
+import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePage
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venuePageDestination
 
@@ -53,6 +54,8 @@ private val START_TAB = Tab.QUESTS
  *
  * @param onSignOut supplies the Profile sign-out action.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
+ * @param venuePage draws a venue's page, given its id and back action; tests pass their own so the
+ *   page doesn't read Firestore.
  */
 @Composable
 fun AroundApp(
@@ -60,6 +63,9 @@ fun AroundApp(
     onSignOut: () -> Unit,
     screen: @Composable (Tab) -> Unit = {
       TabScreen(it, navController::openVenueFromMap, onSignOut)
+    },
+    venuePage: @Composable (venueId: String, onBack: () -> Unit) -> Unit = { venueId, onBack ->
+      VenuePage(venueId, onBack)
     },
 ) {
   BottomTabScaffold(
@@ -71,7 +77,7 @@ fun AroundApp(
       modifier = Modifier.testTag(C.Tag.APP),
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
-    venuePageDestination(onBack = { navController.popBackStack() })
+    venuePageDestination(onBack = { navController.popBackStack() }, page = venuePage)
   }
 }
 
@@ -89,8 +95,8 @@ internal fun NavHostController.openVenueFromMap(venueId: String, venueName: Stri
 /**
  * The screen of [tab].
  *
- * @param onOpenVenue opens the page of the venue with this id and name, when its card on the map is
- *   tapped.
+ * @param onOpenVenue opens the page of the venue with this id and name, when its card on the map or
+ *   its quest's "View quest" is tapped.
  * @param onSignOut signs the user out from the Profile tab.
  */
 @Composable

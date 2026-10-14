@@ -10,11 +10,11 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 
 /**
- * Made-up venues and quests, which the map shows until it reads the real ones from Firestore. Most
- * are around Lausanne, where the map opens, and show every case the map handles: a venue featuring
- * an older quest, one with several quests, group quests, quests without a reward or with each kind
- * of reward, an expired reward and a draft, which the map hides, and a venue in Geneva, out of view
- * at first.
+ * Made-up venues and quests for tests and for seeding the emulator; the app reads the real ones
+ * from Firestore. Most are around Lausanne, where the map opens, and show every case the map
+ * handles: a venue featuring an older quest, one with several quests, group quests, quests without
+ * a reward or with each kind of reward, an expired reward and a draft, which the map hides, and a
+ * venue in Geneva, out of view at first.
  */
 object MapDemoData {
   private const val HOUR = 60 * 60 * 1000L
