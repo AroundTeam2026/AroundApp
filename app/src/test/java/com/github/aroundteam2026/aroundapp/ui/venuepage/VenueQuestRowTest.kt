@@ -4,6 +4,10 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -140,6 +144,15 @@ class VenueQuestRowTest {
     show(selected = false)
 
     compose.onNodeWithTag(C.Tag.VENUE_QUEST_ROW).assertIsNotSelected()
+  }
+
+  @Test
+  fun theRowIsARadioButton() {
+    show()
+
+    compose
+        .onNodeWithTag(C.Tag.VENUE_QUEST_ROW)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
   }
 
   @Test

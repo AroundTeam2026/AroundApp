@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -206,7 +207,7 @@ private fun Quests(
           style = AroundTextStyles.Caption,
       )
     }
-    Column {
+    Column(Modifier.selectableGroup()) {
       state.quests.forEachIndexed { index, quest ->
         key(quest.questId) {
           if (index > 0) HorizontalDivider(thickness = DIVIDER_WIDTH, color = colors.outline)

@@ -41,11 +41,13 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
  * One of a venue's quests on its page, as in the Figma venue page: the quest's title, description,
  * and chips for its reward and the party size it needs, the same chips as the map's cards, with a
  * chevron on the end. Tapping it picks the quest, or unpicks it; a picked row sits on the page's
- * background, inset from the edges.
+ * background, inset from the edges. Screen readers announce it as a radio button, as only one quest
+ * is picked at a time.
  *
  * @param quest The quest to draw.
  * @param selected Whether the explorer picked it to accept.
  * @param onClick Picks the quest, or unpicks it if it was picked.
+ * @param modifier The [Modifier] for the row.
  */
 @Composable
 fun VenueQuestRow(
@@ -61,7 +63,7 @@ fun VenueQuestRow(
           .testTag(C.Tag.VENUE_QUEST_ROW)
           .clip(PICKED_SHAPE)
           .background(if (selected) colors.background else Color.Transparent)
-          .selectable(selected = selected, role = Role.Button, onClick = onClick)
+          .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
           .padding(
               horizontal = if (selected) PICKED_INSET else 0.dp,
               vertical = AroundSpacing.Medium,
