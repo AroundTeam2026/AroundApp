@@ -44,7 +44,6 @@ fun QuestTextFields(
   Column {
     QuestTextField(
         label = stringResource(R.string.create_quest_field_title),
-        hint = stringResource(R.string.create_quest_field_title_hint),
         value = state.title,
         onValueChange = onTitleChange,
         error = state.titleError,
@@ -57,7 +56,6 @@ fun QuestTextFields(
     Spacer(Modifier.height(AroundSpacing.Large))
     QuestTextField(
         label = stringResource(R.string.create_quest_field_description),
-        hint = stringResource(R.string.create_quest_field_description_hint),
         value = state.description,
         onValueChange = onDescriptionChange,
         error = state.descriptionError,
@@ -70,7 +68,6 @@ fun QuestTextFields(
     Spacer(Modifier.height(AroundSpacing.Large))
     QuestTextField(
         label = stringResource(R.string.create_quest_field_requirements),
-        hint = stringResource(R.string.create_quest_field_requirements_hint),
         value = state.requirements,
         onValueChange = onRequirementsChange,
         error = state.requirementsError,
@@ -90,7 +87,6 @@ fun QuestTextFields(
 @Composable
 internal fun QuestTextField(
     label: String,
-    hint: String,
     value: String,
     onValueChange: (String) -> Unit,
     error: QuestTextError?,
@@ -104,7 +100,6 @@ internal fun QuestTextField(
     FieldLabel(label)
     QuestInputField(
         label = label,
-        hint = hint,
         value = value,
         onValueChange = onValueChange,
         isError = error != null,
@@ -141,7 +136,6 @@ internal fun QuestTextField(
 @Composable
 internal fun QuestInputField(
     label: String,
-    hint: String,
     value: String,
     onValueChange: (String) -> Unit,
     isError: Boolean,
@@ -155,7 +149,6 @@ internal fun QuestInputField(
       singleLine = singleLine,
       minLines = if (singleLine) 1 else 2,
       isError = isError,
-      placeholder = { Text(hint) },
       shape = MaterialTheme.shapes.small,
       textStyle = if (singleLine) AroundTextStyles.FieldValue else AroundTextStyles.TextArea,
       colors = questFieldColors(),
@@ -184,8 +177,6 @@ internal fun questFieldColors() =
         errorContainerColor = MaterialTheme.colorScheme.surface,
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 
 @Preview(widthDp = 413)
