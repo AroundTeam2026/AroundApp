@@ -142,7 +142,7 @@ data class RewardFormState(
    * valid.
    */
   val isValid: Boolean
-    get() = type == null || (!expiryInPast && fieldsValid)
+    get() = fieldsValid && (type == null || !expiryInPast)
 
   private val fieldsValid: Boolean
     get() =
