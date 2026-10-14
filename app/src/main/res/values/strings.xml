@@ -56,7 +56,6 @@
 
     <!-- Screens that are not built yet: their title, then a note that they are coming soon -->
     <string name="coming_soon">Coming soon</string>
-    <string name="venue_page_title">Venue</string>
     <string name="dashboard_title">Dashboard</string>
     <string name="overview_title">Overview</string>
 </resources>

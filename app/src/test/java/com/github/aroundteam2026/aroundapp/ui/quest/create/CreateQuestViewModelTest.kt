@@ -338,7 +338,7 @@ class CreateQuestViewModelTest {
         RewardFormState(
             type = RewardType.FREE_ITEM,
             itemName = "Coffee ",
-            specifics = "Any size",
+            itemSpecifics = "Any size",
             description = "A tour",
             itemNameTouched = true,
             descriptionTouched = true,

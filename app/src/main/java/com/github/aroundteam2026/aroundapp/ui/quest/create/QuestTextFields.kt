@@ -147,7 +147,7 @@ internal fun QuestInputField(
     isError: Boolean,
     singleLine: Boolean,
     keyboardOptions: KeyboardOptions,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
   OutlinedTextField(
       value = value,

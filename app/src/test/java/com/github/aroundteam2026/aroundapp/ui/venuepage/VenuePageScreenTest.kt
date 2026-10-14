@@ -1,0 +1,262 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+package com.github.aroundteam2026.aroundapp.ui.venuepage
+
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
+import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import java.io.IOException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w413dp-h917dp-mdpi")
+class VenuePageScreenTest {
+  @get:Rule val compose = createComposeRule()
+
+  private var backCalls = 0
+  private val tapped = mutableListOf<String>()
+  private var retries = 0
+
+  private fun show(
+      state: VenuePageUiState,
+      questRow: VenuePageQuestRow = PlaceholderQuestRow,
+      bottomBar: @Composable (VenuePageQuest?) -> Unit = {},
+  ) {
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageContent(
+            state,
+            onBack = { backCalls++ },
+            onQuestTapped = { tapped += it },
+            onRetry = { retries++ },
+            questRow = questRow,
+            bottomBar = bottomBar,
+        )
+      }
+    }
+  }
+
+  @Test
+  fun loadingShowsOnlyTheSpinner() {
+    show(VenuePageUiState())
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_LOADING).assertIsDisplayed()
+    listOf(C.Tag.VENUE_PAGE_HEADER, C.Tag.VENUE_PAGE_NOT_FOUND, C.Tag.VENUE_PAGE_FAILED).forEach {
+      compose.onNodeWithTag(it).assertDoesNotExist()
+    }
+  }
+
+  @Test
+  fun notFoundSaysSo() {
+    show(VenuePageUiState(status = VenuePageStatus.NOT_FOUND))
+
+    compose
+        .onNodeWithTag(C.Tag.VENUE_PAGE_NOT_FOUND)
+        .assertTextEquals("This venue isn't on Around anymore.")
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_HEADER).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_RETRY).assertDoesNotExist()
+  }
+
+  @Test
+  fun failedOffersARetry() {
+    show(VenuePageUiState(status = VenuePageStatus.FAILED))
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_FAILED).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_HEADER).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_RETRY).performClick()
+
+    assertEquals(1, retries)
+  }
+
+  @Test
+  fun showsTheVenuesHeader() {
+    show(LOADED)
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_AVATAR).assertIsDisplayed()
+    compose.onNodeWithText("CL").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_NAME).assertTextEquals("Café Lumen")
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_ADDRESS).assertTextEquals("Rue du Pont 1")
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_LOADING).assertDoesNotExist()
+  }
+
+  @Test
+  fun aVenueWithoutAnAddressShowsNone() {
+    show(LOADED.copy(address = null))
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_NAME).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_ADDRESS).assertDoesNotExist()
+  }
+
+  @Test
+  fun noQuestsShowsTheEmptyState() {
+    show(LOADED.copy(quests = emptyList()))
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_HEADER).assertIsDisplayed()
+    compose
+        .onNodeWithTag(C.Tag.VENUE_PAGE_EMPTY)
+        .assertTextEquals("No quests here right now. Check back soon.")
+  }
+
+  @Test
+  fun theQuestRowSlotDrawsEachQuestInOrderWithItsPick() {
+    val drawn = mutableListOf<Pair<String, Boolean>>()
+    show(
+        LOADED.copy(selectedQuestId = "b"),
+        questRow = { quest, selected, onClick ->
+          drawn += quest.questId to selected
+          Text(quest.title, Modifier.testTag("row_${quest.questId}").clickable(onClick = onClick))
+        },
+    )
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_EMPTY).assertDoesNotExist()
+    compose.onNodeWithTag("row_a").assertTextEquals("Quest a")
+    compose.onNodeWithTag("row_b").assertTextEquals("Quest b")
+    assertEquals(listOf("a" to false, "b" to true), drawn.distinct())
+
+    compose.onNodeWithTag("row_a").performClick()
+    assertEquals(listOf("a"), tapped)
+  }
+
+  @Test
+  fun theDefaultRowShowsTheTitleAndPicksOnTap() {
+    show(LOADED.copy(selectedQuestId = "b"))
+
+    compose.onNodeWithText("Quest b").assertIsSelected()
+    compose.onNodeWithText("Quest a").assertIsNotSelected().performClick()
+
+    assertEquals(listOf("a"), tapped)
+  }
+
+  @Test
+  fun theBottomBarSitsUnderTheListWithThePickedQuest() {
+    val given = mutableListOf<VenuePageQuest?>()
+    show(
+        LOADED.copy(selectedQuestId = "b"),
+        bottomBar = {
+          given += it
+          Text("bar", Modifier.testTag("bar"))
+        },
+    )
+
+    val list = compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUESTS).fetchSemanticsNode().boundsInRoot
+    val bar = compose.onNodeWithTag("bar").fetchSemanticsNode().boundsInRoot
+    assertEquals(list.bottom, bar.top)
+    assertEquals("b", given.last()?.questId)
+  }
+
+  @Test
+  fun theBottomBarIsLeftOutUntilTheVenueLoads() {
+    var state by mutableStateOf(VenuePageUiState())
+    val shownWhile = mutableSetOf<VenuePageStatus>()
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageContent(state, {}, {}, {}, bottomBar = { shownWhile += state.status })
+      }
+    }
+
+    listOf(VenuePageStatus.NOT_FOUND, VenuePageStatus.FAILED, VenuePageStatus.LOADING).forEach {
+      state = VenuePageUiState(status = it)
+      compose.waitForIdle()
+    }
+
+    assertEquals(emptySet<VenuePageStatus>(), shownWhile)
+  }
+
+  @Test
+  fun theBackArrowCallsBack() {
+    show(LOADED)
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
+
+    assertEquals(1, backCalls)
+  }
+
+  @Test
+  fun theScreenPicksAndUnpicksThroughItsViewModel() {
+    showScreen(questsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
+
+    compose.onNodeWithText("Order the secret menu").performClick().assertIsSelected()
+    compose.onNodeWithText("Order the secret menu").performClick().assertIsNotSelected()
+  }
+
+  @Test
+  fun theScreenRetriesThroughItsViewModel() {
+    var calls = 0
+    showScreen(
+        questsByVenue = {
+          if (calls++ == 0) failing() else flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID)))
+        }
+    )
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_RETRY).performClick()
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_NAME).assertTextEquals("Café Lumen")
+    compose.onNodeWithText("Order the secret menu").assertIsDisplayed()
+  }
+
+  private fun showScreen(questsByVenue: (String) -> Flow<List<Quest>>) {
+    val viewModel =
+        VenuePageViewModel(
+            VENUE_ID,
+            FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumen"))),
+            ScriptedQuestRepository(questsByVenue = questsByVenue),
+        )
+    compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }
+  }
+
+  private fun <T> failing(): Flow<T> = flow { throw IOException("offline") }
+
+  private companion object {
+    const val VENUE_ID = "cafe"
+
+    fun quest(id: String) =
+        VenuePageQuest(
+            questId = id,
+            title = "Quest $id",
+            description = "",
+            requirements = "",
+            proofType = ProofType.PHOTO,
+            minPartySize = 1,
+            reward = null,
+        )
+
+    val LOADED =
+        VenuePageUiState(
+            status = VenuePageStatus.LOADED,
+            venueName = "Café Lumen",
+            avatar = VenueAvatar.Initials("CL"),
+            address = "Rue du Pont 1",
+            quests = listOf(quest("a"), quest("b")),
+        )
+  }
+}
