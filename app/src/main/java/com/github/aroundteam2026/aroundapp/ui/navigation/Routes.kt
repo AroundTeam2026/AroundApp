@@ -10,8 +10,8 @@ import android.net.Uri
  * Each route starts as a "Coming soon" stub. The task that builds a screen replaces its stub, and
  * the route stays the same, so nothing that navigates to it has to change.
  *
- * Explorer routes are registered in the explorer's NavHost, [AroundApp]. Venue routes belong to the
- * venue's own NavHost, which the venue home will add: an explorer must not reach them.
+ * Explorer routes are registered in the explorer's NavHost, [AroundApp]. Venue routes are
+ * registered in the venue's own NavHost, [VenueNavigation]: an explorer must not reach them.
  */
 object Routes {
   /** Argument of [VENUE_PAGE]: the venue's id, equal to its owner's uid. */
@@ -21,6 +21,9 @@ object Routes {
 
   /** A venue's page, with its quests. Build the route to one venue with [venuePage]. */
   const val VENUE_PAGE = "$VENUE_PAGE_PREFIX/{$VENUE_ID}"
+
+  /** The venue's home, with its tabs ([VenueHome]). */
+  const val VENUE_HOME = "venue_home"
 
   /** The form where a venue creates a quest. */
   const val CREATE_QUEST = "create_quest"
@@ -32,7 +35,7 @@ object Routes {
   val EXPLORER = listOf(VENUE_PAGE)
 
   /** Routes of the venue's screens, for the venue's own NavHost. */
-  val VENUE = listOf(CREATE_QUEST, DASHBOARD)
+  val VENUE = listOf(VENUE_HOME, CREATE_QUEST, DASHBOARD)
 
   /** Every route above. */
   val ALL = EXPLORER + VENUE
