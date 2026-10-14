@@ -39,13 +39,6 @@ class VenueNavigationTest {
     composeTestRule.waitForIdle()
   }
 
-  private fun pressBack() {
-    composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread {
-      composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
-    }
-  }
-
   /** The form is gone, and the home shows the Quests tab it was opened from. */
   private fun assertBackOnTheQuestsTab() {
     composeTestRule.waitForIdle()
@@ -82,7 +75,7 @@ class VenueNavigationTest {
   @Test
   fun backFromTheFormReturnsToTheQuestsTab() {
     openTheForm()
-    pressBack()
+    composeTestRule.pressBack()
 
     assertBackOnTheQuestsTab()
   }

@@ -81,14 +81,6 @@ class AroundAppTest {
     composeTestRule.onNodeWithTag(tab.tabTag).performClick()
   }
 
-  private fun pressBack() {
-    // Otherwise Back can arrive before the last tab switch finished, and leaves the app instead
-    composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread {
-      composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
-    }
-  }
-
   /** Only [tab] is selected, and only its screen is shown. */
   private fun assertShowing(tab: Tab) {
     composeTestRule.waitForIdle()
@@ -203,7 +195,7 @@ class AroundAppTest {
     select(Tab.MAP)
     openFromMap("venue-1")
     openFromMap("venue-1")
-    pressBack()
+    composeTestRule.pressBack()
 
     assertShowing(Tab.MAP)
   }
@@ -213,7 +205,7 @@ class AroundAppTest {
     launchTabs()
     select(Tab.MAP)
     select(Tab.PROFILE)
-    pressBack()
+    composeTestRule.pressBack()
     assertShowing(Tab.QUESTS)
   }
 
@@ -222,7 +214,7 @@ class AroundAppTest {
     launchTabs()
     select(Tab.MAP)
     select(Tab.MAP)
-    pressBack()
+    composeTestRule.pressBack()
     assertShowing(Tab.QUESTS)
   }
 

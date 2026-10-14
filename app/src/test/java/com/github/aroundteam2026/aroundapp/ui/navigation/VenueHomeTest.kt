@@ -73,13 +73,6 @@ class VenueHomeTest {
     composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_STUB).assertIsDisplayed()
   }
 
-  private fun pressBack() {
-    composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread {
-      composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
-    }
-  }
-
   // VenueNavigationTest checks that the venue's NavHost opens the form
   @Test
   fun newQuestAsksToOpenTheCreateQuestForm() {
@@ -101,7 +94,7 @@ class VenueHomeTest {
   fun backFromAnyTabReturnsToTheDashboard() {
     select(VenueTab.QUESTS)
     select(VenueTab.PROFILE)
-    pressBack()
+    composeTestRule.pressBack()
 
     assertShowing(VenueTab.DASHBOARD)
   }

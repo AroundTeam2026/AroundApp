@@ -76,14 +76,6 @@ class RoutesTest {
     composeTestRule.waitForIdle()
   }
 
-  private fun pressBack() {
-    composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread {
-      composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
-    }
-    composeTestRule.waitForIdle()
-  }
-
   private fun registered(routes: List<String>) = composeTestRule.runOnUiThread {
     routes.filter { navController.graph.findNode(it) != null }
   }
@@ -160,7 +152,7 @@ class RoutesTest {
   fun backFromTheVenuePageReturnsToThePreviousScreen() {
     launchApp()
     open { navigateToVenuePage("venue-1") }
-    pressBack()
+    composeTestRule.pressBack()
 
     composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
@@ -197,7 +189,7 @@ class RoutesTest {
     launchVenueGraph()
     open { navigateToCreateQuest() }
     open { navigateToCreateQuest() }
-    pressBack()
+    composeTestRule.pressBack()
 
     composeTestRule.onNodeWithTag(VENUE_START).assertIsDisplayed()
   }
