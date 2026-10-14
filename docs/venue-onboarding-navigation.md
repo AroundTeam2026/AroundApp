@@ -1,53 +1,79 @@
 <!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 
-# Venue onboarding handoff (#55)
+# Venue entry and onboarding navigation
 
-`venueOnboardingDestinations` registers initialization and location in the
-auth owner's `NavHost`. Supply the same `AuthRepository` and `VenueRepository`
-instances used by signup and location setup.
+Where a signed-in **Venue** user enters the app, and how onboarding is wired
+(#136, which rewrote #79).
 
-After a successful **Venue** signup, call
-`navController.navigateToVenueInitialization()`. Authentication and role
-routing remain with #50 and #7.
+## Where a venue lands
 
-Inside that NavHost's builder, register:
+Role routing (`RoleNavigation`, G2.3) sends a signed-in user whose role is
+`VENUE` to C2's `venueEntry` slot, giving it the user's uid. That slot holds
+`VenueEntry`:
 
 ```kotlin
-venueOnboardingDestinations(navController, authRepository, venueRepository) { venueId, onBack ->
-  // Render #54's location screen using venueId and the shared venueRepository.
-  // Connect its Back button to onBack.
-}
+RoleNavigation(
+    authRepository, userRepository, pendingRoleStore,
+    venueScreen = { uid ->
+      VenueEntry(uid, authRepository, venueRepository, onSignOut = authRepository::signOut)
+    },
+)
 ```
 
-The initialization ViewModel belongs to its back-stack entry. Continue saves
-the profile before navigating and passes its id to location as a route
-argument. Both system Back and the location Back callback return to the form
-with its name intact. The success signal is consumed after navigation so
-returning does not immediately reopen location. Continuing again preserves
-the existing profile. Existing profiles prefill the business name and disable
-name editing, including after Back from location. New names are trimmed and
-limited to `VenueLimits.MAX_NAME_LENGTH` (100 characters).
+`RoleNavigation` is not yet what `MainActivity` shows; that switch belongs to
+the Firestore integration task, which supplies the persistent repositories.
 
-Integration is tested with a signup callback fixture, the real initialization
-screen, fake repositories, and a location destination fixture. The signup
-fixture represents completion of authentication; it does not implement or
-test signup itself.
+`VenueEntryViewModel` reads the user's venue once (the venue's id is its
+owner's uid) and chooses where it starts:
 
-Follow-up integration is tracked in [#79](https://github.com/AroundTeam2026/AroundApp/issues/79).
-The running app still needs the auth owner to register this graph and supply
-the actual location screen. The auth UI in #67 (`feature/minimal-auth-screen`)
-observes authentication in a debug-only demo; it does not select a Venue role
-or route a successful Venue signup into this graph.
+| Venue state             | Starts at                      |
+| ----------------------- | ------------------------------ |
+| No venue doc            | Initialization (business name) |
+| Venue without location  | Area screen                    |
+| Venue with a location   | Venue home                     |
 
-The location UI in #69 (`feature/venue-marker-screen`, following #62) exposes
-`VenueAreaScreen(viewModel, cameraPositionState)`. Its ViewModel holds marker
-and radius state, but the screen does not yet accept a venue id or a Back
-callback, or save through `VenueRepository.setArea`. Navigation and saving
-are explicitly outside #54's scope. The follow-up post-role onboarding work
-can wrap the map in this graph's `locationScreen` callback and coordinate
-registration with #7's routing owner. Saving and loading the area remain a
-separate task.
+Progress is read back from `VenueRepository` each time, so a venue that
+leaves mid-onboarding (or whose app is killed) resumes at the right step when
+it signs in again. While reading, the entry shows a spinner; if the read
+fails, it offers to retry or to sign out.
 
-This change does not satisfy the two end-to-end acceptance criteria until
-the real Venue signup and location integrations are connected. The existing
-navigation tests cover the handoff contract using destination fixtures.
+## The venue's NavHost
+
+`VenueEntry` owns the venue's NavHost, separate from the explorer's
+`AroundApp`. It registers:
+
+- `venueOnboardingDestinations(...)`: initialization and location, with the
+  real `VenueAreaScreen(venueId, onSaved, onBack)` (contract C4) as the
+  location step.
+- The venue home (`VenueHome`): Dashboard, Quests (with "New quest") and
+  Profile.
+- The venue-only routes (`Routes.VENUE`): `createQuestDestination()` and
+  `dashboardDestination()`, "Coming soon" stubs until their screens are built.
+  The Quests tab's "New quest" opens the create-quest form. An explorer can't
+  reach these routes, since `AroundApp` doesn't register them.
+
+## How onboarding moves
+
+- Continue on initialization saves the venue, then opens the location step
+  with its id as the route argument (`VenueOnboardingRoutes.location`).
+- Saving the area opens the venue home and clears onboarding from the back
+  stack, so Back can't return to it.
+- Back from the area (its arrow or system Back) returns to initialization.
+  The initialization ViewModel belongs to its back-stack entry, so the name
+  survives; an existing venue's name is prefilled and can't be edited. The
+  navigation signal is consumed once handled, so returning doesn't move
+  forward again.
+- A venue resuming on the area has initialization under it, so Back behaves
+  as above. The entry opens the area once, not again after recreation.
+
+## Tests
+
+- `VenueEntryViewModelTest`: the start for each venue state, failures and
+  retry.
+- `VenueEntryTest` (Robolectric, fake repositories, a stand-in for the area
+  screen whose map Robolectric can't draw): each start point, setup in one go,
+  saving the area, Back from the area, resuming after signing in again, the
+  venue routes and sign-out.
+- `VenueOnboardingNavigationTest`: the onboarding graph on its own.
+- `RoutesTest`: the explorer's `AroundApp` registers no venue route.
