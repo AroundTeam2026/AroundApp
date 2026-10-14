@@ -94,7 +94,7 @@ object C {
     const val QUEST_DETAIL_DESCRIPTION = "quest_detail_description"
     const val QUEST_DETAIL_REQUIREMENTS = "quest_detail_requirements"
     const val QUEST_DETAIL_PROOF = "quest_detail_proof"
-    const val QUEST_DETAIL_REWARD_SPECIFICS = "quest_detail_reward_specifics"
+    const val QUEST_DETAIL_REWARD_DETAILS = "quest_detail_reward_details"
 
     const val NEARBY_COUNTER = "nearby_counter"
     const val NEARBY_LOCATION_HINT = "nearby_location_hint"

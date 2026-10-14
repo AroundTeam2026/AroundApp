@@ -82,7 +82,7 @@ class QuestDetailSheetTest {
     node(C.Tag.QUEST_DETAIL_REQUIREMENTS).assertTextEquals("Show the photo at the counter.")
     node(C.Tag.QUEST_DETAIL_PROOF).assertTextEquals("Send a photo")
     node(C.Tag.QUEST_CHIP_REWARD).assertTextEquals("Free croissant")
-    node(C.Tag.QUEST_DETAIL_REWARD_SPECIFICS).assertTextEquals("Plain or almond")
+    node(C.Tag.QUEST_DETAIL_REWARD_DETAILS).assertTextEquals("Plain or almond")
   }
 
   @Test
@@ -91,6 +91,14 @@ class QuestDetailSheetTest {
     show(quest(description = description))
 
     node(C.Tag.QUEST_DETAIL_DESCRIPTION).assertTextEquals(description)
+  }
+
+  @Test
+  fun aLongOtherRewardIsShownWhole() {
+    val reward = "A guided tour of the roastery, with a tasting of three single-origin coffees"
+    show(quest(reward = Reward.Other(reward)))
+
+    node(C.Tag.QUEST_DETAIL_REWARD_DETAILS).assertTextEquals(reward)
   }
 
   @Test
@@ -112,7 +120,7 @@ class QuestDetailSheetTest {
     show(quest(reward = Reward.Discount(10.0, DiscountUnit.PERCENT, specifics = "Hot drinks")))
 
     node(C.Tag.QUEST_CHIP_REWARD).assertTextEquals("10% off")
-    node(C.Tag.QUEST_DETAIL_REWARD_SPECIFICS).assertTextEquals("Hot drinks")
+    node(C.Tag.QUEST_DETAIL_REWARD_DETAILS).assertTextEquals("Hot drinks")
   }
 
   @Test
@@ -124,7 +132,7 @@ class QuestDetailSheetTest {
     listOf(
             C.Tag.QUEST_DETAIL_DESCRIPTION,
             C.Tag.QUEST_DETAIL_REQUIREMENTS,
-            C.Tag.QUEST_DETAIL_REWARD_SPECIFICS,
+            C.Tag.QUEST_DETAIL_REWARD_DETAILS,
             C.Tag.QUEST_CHIP_REWARD,
         )
         .forEach { node(it).assertDoesNotExist() }
@@ -164,12 +172,13 @@ class QuestDetailSheetTest {
   }
 
   @Test
-  fun rewardSpecificsAreWhatTheRewardAppliesTo() {
-    assertEquals("Oat milk", rewardSpecifics(Reward.FreeItem("latte", "Oat milk")))
-    assertEquals("Pastries", rewardSpecifics(Reward.Discount(5.0, DiscountUnit.CHF, "Pastries")))
-    assertNull(rewardSpecifics(Reward.FreeItem("latte", " ")))
-    assertNull(rewardSpecifics(Reward.Discount(5.0, DiscountUnit.CHF, null)))
-    assertNull(rewardSpecifics(Reward.Other("A tour")))
-    assertNull(rewardSpecifics(null))
+  fun rewardDetailsAreWhatTheChipCannotFit() {
+    assertEquals("Oat milk", rewardDetails(Reward.FreeItem("latte", "Oat milk")))
+    assertEquals("Pastries", rewardDetails(Reward.Discount(5.0, DiscountUnit.CHF, "Pastries")))
+    assertNull(rewardDetails(Reward.FreeItem("latte", " ")))
+    assertNull(rewardDetails(Reward.Discount(5.0, DiscountUnit.CHF, null)))
+    assertEquals("A tour", rewardDetails(Reward.Other("A tour")))
+    assertNull(rewardDetails(Reward.Other(" ")))
+    assertNull(rewardDetails(null))
   }
 }

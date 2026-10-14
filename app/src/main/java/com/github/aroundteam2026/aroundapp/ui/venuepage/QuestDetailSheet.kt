@@ -115,8 +115,8 @@ private fun QuestDetails(quest: VenuePageQuest, onClose: () -> Unit) {
       Section(R.string.quest_detail_to_do, quest.requirements, C.Tag.QUEST_DETAIL_REQUIREMENTS)
     }
     Proof(quest.proofType)
-    rewardSpecifics(quest.reward)?.let {
-      Section(R.string.quest_detail_reward, it, C.Tag.QUEST_DETAIL_REWARD_SPECIFICS)
+    rewardDetails(quest.reward)?.let {
+      Section(R.string.quest_detail_reward, it, C.Tag.QUEST_DETAIL_REWARD_DETAILS)
     }
   }
 }
@@ -200,12 +200,15 @@ private fun SectionLabel(label: Int) {
   )
 }
 
-/** What [reward] applies to, beyond what its chip says, or null when there is nothing more. */
-internal fun rewardSpecifics(reward: Reward?): String? =
+/**
+ * The whole of [reward], beyond what its one-line chip can fit, or null when there is nothing more:
+ * what a discount or free item applies to, or the full description of an other reward.
+ */
+internal fun rewardDetails(reward: Reward?): String? =
     when (reward) {
       is Reward.Discount -> reward.specifics
       is Reward.FreeItem -> reward.specifics
-      is Reward.Other,
+      is Reward.Other -> reward.description
       null -> null
     }?.takeIf { it.isNotBlank() }
 
