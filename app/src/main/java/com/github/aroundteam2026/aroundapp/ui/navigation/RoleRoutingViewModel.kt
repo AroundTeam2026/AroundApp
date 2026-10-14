@@ -1,0 +1,99 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
+package com.github.aroundteam2026.aroundapp.ui.navigation
+
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.ProfileSetup
+import com.github.aroundteam2026.aroundapp.model.user.Role
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.flow.transformWhile
+import kotlinx.coroutines.flow.update
+
+/** Access is resolved from the authenticated account and its saved profile role. */
+sealed interface RoleSessionState {
+  data object Checking : RoleSessionState
+
+  data object SignedOut : RoleSessionState
+
+  /** A missing profile or unset role requires role selection. */
+  data class SignedIn(val userId: String, val role: Role? = null) : RoleSessionState
+
+  /** A failed profile read must never be treated as a missing role. */
+  data class ProfileUnavailable(val userId: String) : RoleSessionState
+}
+
+/**
+ * Observes the provider's session and cancels the previous profile subscription on account change.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class RoleRoutingViewModel(
+    private val authRepository: AuthRepository,
+    userRepository: UserRepository,
+    profileSetup: ProfileSetup,
+) : ViewModel() {
+  private val retry = MutableStateFlow(0L)
+  val uiState: StateFlow<RoleSessionState> =
+      // Each retry re-emits the uid, so transformLatest restarts profile resolution.
+      combine(authRepository.currentUserId, retry) { uid, _ -> uid }
+          .transformLatest { uid ->
+            if (uid == null) {
+              emit(RoleSessionState.SignedOut)
+            } else {
+              emit(RoleSessionState.Checking)
+              val profile: Flow<RoleSessionState> = flow {
+                profileSetup.finish().getOrThrow()
+                // Roles are write-once: a later listener failure must not replace a resolved home.
+                emitAll(
+                    userRepository.observeUser(uid).transformWhile { user ->
+                      emit(RoleSessionState.SignedIn(uid, user?.role))
+                      user?.role == null
+                    }
+                )
+              }
+              emitAll(
+                  profile.catch {
+                    Log.w(TAG, "Resolving the signed-in profile failed", it)
+                    emit(RoleSessionState.ProfileUnavailable(uid))
+                  }
+              )
+            }
+          }
+          .stateIn(viewModelScope, SharingStarted.Eagerly, RoleSessionState.Checking)
+
+  /** Retries profile resolution without discarding the provider's authenticated session. */
+  fun retryProfile() {
+    retry.update { it + 1 }
+  }
+
+  /** Ends the session when the profile cannot be resolved. */
+  fun signOut() = authRepository.signOut()
+
+  companion object {
+    private const val TAG = "RoleRoutingViewModel"
+
+    /** Creates the routing ViewModel using repository interfaces. */
+    fun factory(
+        authRepository: AuthRepository,
+        userRepository: UserRepository,
+        profileSetup: ProfileSetup,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer { RoleRoutingViewModel(authRepository, userRepository, profileSetup) }
+    }
+  }
+}

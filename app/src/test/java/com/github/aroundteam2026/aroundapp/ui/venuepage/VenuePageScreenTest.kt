@@ -9,13 +9,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -45,10 +52,12 @@ class VenuePageScreenTest {
   private var backCalls = 0
   private val tapped = mutableListOf<String>()
   private var retries = 0
+  private val detailsOpened = mutableListOf<String>()
+  private var detailsClosed = 0
 
   private fun show(
       state: VenuePageUiState,
-      questRow: VenuePageQuestRow = PlaceholderQuestRow,
+      questRow: VenuePageQuestRow = DefaultQuestRow,
       bottomBar: @Composable (VenuePageQuest?) -> Unit = {},
   ) {
     compose.setContent {
@@ -58,6 +67,8 @@ class VenuePageScreenTest {
             onBack = { backCalls++ },
             onQuestTapped = { tapped += it },
             onRetry = { retries++ },
+            onQuestDetails = { detailsOpened += it },
+            onQuestDetailsClosed = { detailsClosed++ },
             questRow = questRow,
             bottomBar = bottomBar,
         )
@@ -128,11 +139,27 @@ class VenuePageScreenTest {
   }
 
   @Test
+  fun theQuestsCardCountsTheQuests() {
+    show(LOADED)
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUESTS_CARD).assertIsDisplayed()
+    compose.onNodeWithText("Quests").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUEST_COUNT).assertTextEquals("2 active")
+  }
+
+  @Test
+  fun noQuestsShowsNoQuestsCard() {
+    show(LOADED.copy(quests = emptyList()))
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUESTS_CARD).assertDoesNotExist()
+  }
+
+  @Test
   fun theQuestRowSlotDrawsEachQuestInOrderWithItsPick() {
     val drawn = mutableListOf<Pair<String, Boolean>>()
     show(
         LOADED.copy(selectedQuestId = "b"),
-        questRow = { quest, selected, onClick ->
+        questRow = { quest, selected, onClick, _ ->
           drawn += quest.questId to selected
           Text(quest.title, Modifier.testTag("row_${quest.questId}").clickable(onClick = onClick))
         },
@@ -148,13 +175,24 @@ class VenuePageScreenTest {
   }
 
   @Test
-  fun theDefaultRowShowsTheTitleAndPicksOnTap() {
+  fun theDefaultRowsAreQuestRowsThatPickOnTap() {
     show(LOADED.copy(selectedQuestId = "b"))
 
+    compose.onAllNodesWithTag(C.Tag.VENUE_QUEST_ROW).assertCountEquals(2)
     compose.onNodeWithText("Quest b").assertIsSelected()
     compose.onNodeWithText("Quest a").assertIsNotSelected().performClick()
 
     assertEquals(listOf("a"), tapped)
+  }
+
+  @Test
+  fun theQuestRowsAreOneChoice() {
+    show(LOADED)
+
+    compose
+        .onAllNodesWithTag(C.Tag.VENUE_QUEST_ROW)[0]
+        .onParent()
+        .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
   }
 
   @Test
@@ -190,6 +228,54 @@ class VenuePageScreenTest {
     }
 
     assertEquals(emptySet<VenuePageStatus>(), shownWhile)
+  }
+
+  @Test
+  fun aRowsChevronAsksForItsDetails() {
+    show(LOADED)
+
+    compose.onNodeWithContentDescription("Details of Quest b").performClick()
+
+    assertEquals(listOf("b"), detailsOpened)
+    assertEquals(emptyList<String>(), tapped)
+  }
+
+  @Test
+  fun theDetailQuestIsShownInASheet() {
+    show(LOADED.copy(detailQuestId = "b"))
+
+    compose
+        .onNodeWithTag(C.Tag.QUEST_DETAIL_TITLE, useUnmergedTree = true)
+        .assertTextEquals("Quest b")
+  }
+
+  @Test
+  fun noDetailQuestShowsNoSheet() {
+    show(LOADED)
+
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertDoesNotExist()
+  }
+
+  @Test
+  fun closingTheSheetSaysSo() {
+    show(LOADED.copy(detailQuestId = "a"))
+
+    compose.onNodeWithContentDescription("Close quest details").performClick()
+    compose.waitForIdle()
+
+    assertEquals(1, detailsClosed)
+  }
+
+  @Test
+  fun theScreenOpensAndClosesTheDetailsThroughItsViewModel() {
+    showScreen(questsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
+
+    compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertIsDisplayed()
+
+    compose.onNodeWithContentDescription("Close quest details").performClick()
+    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertDoesNotExist()
   }
 
   @Test

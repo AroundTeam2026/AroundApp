@@ -6,6 +6,9 @@ package com.github.aroundteam2026.aroundapp.resources
 // Like R, but C
 object C {
   object Tag {
+    const val ROLE_PROFILE_ERROR = "role_profile_error"
+    const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
+    const val ROLE_PROFILE_RETRY = "role_profile_retry"
     const val APP_LOADING = "app_loading"
 
     const val APP = "app"
@@ -92,6 +95,19 @@ object C {
     const val VENUE_PAGE_ADDRESS = "venue_page_address"
     const val VENUE_PAGE_QUESTS = "venue_page_quests"
     const val VENUE_PAGE_EMPTY = "venue_page_empty"
+    const val VENUE_PAGE_QUESTS_CARD = "venue_page_quests_card"
+    const val VENUE_PAGE_QUEST_COUNT = "venue_page_quest_count"
+    const val VENUE_QUEST_ROW = "venue_quest_row"
+    const val VENUE_QUEST_ROW_TITLE = "venue_quest_row_title"
+    const val VENUE_QUEST_ROW_DESCRIPTION = "venue_quest_row_description"
+    const val VENUE_QUEST_ROW_DETAILS = "venue_quest_row_details"
+    const val QUEST_DETAIL_SHEET = "quest_detail_sheet"
+    const val QUEST_DETAIL_TITLE = "quest_detail_title"
+    const val QUEST_DETAIL_CLOSE = "quest_detail_close"
+    const val QUEST_DETAIL_DESCRIPTION = "quest_detail_description"
+    const val QUEST_DETAIL_REQUIREMENTS = "quest_detail_requirements"
+    const val QUEST_DETAIL_PROOF = "quest_detail_proof"
+    const val QUEST_DETAIL_REWARD_DETAILS = "quest_detail_reward_details"
 
     const val NEARBY_COUNTER = "nearby_counter"
     const val NEARBY_LOCATION_HINT = "nearby_location_hint"
@@ -139,6 +155,11 @@ object C {
     const val DASHBOARD_STUB = "dashboard_stub"
     const val OVERVIEW_STUB = "overview_stub"
     const val CREATE_QUEST_REWARD_NONE = "create_quest_reward_none"
+    const val CREATE_QUEST_REWARD_DISCOUNT = "create_quest_reward_discount"
+    const val CREATE_QUEST_REWARD_AMOUNT = "create_quest_reward_amount"
+    const val CREATE_QUEST_REWARD_AMOUNT_ERROR = "create_quest_reward_amount_error"
+    const val CREATE_QUEST_REWARD_UNIT_PERCENT = "create_quest_reward_unit_percent"
+    const val CREATE_QUEST_REWARD_UNIT_CHF = "create_quest_reward_unit_chf"
     const val CREATE_QUEST_REWARD_FREE_ITEM = "create_quest_reward_free_item"
     const val CREATE_QUEST_REWARD_OTHER = "create_quest_reward_other"
     const val CREATE_QUEST_REWARD_ITEM = "create_quest_reward_item"
@@ -150,5 +171,9 @@ object C {
     const val CREATE_QUEST_REWARD_DESCRIPTION = "create_quest_reward_description"
     const val CREATE_QUEST_REWARD_DESCRIPTION_COUNTER = "create_quest_reward_description_counter"
     const val CREATE_QUEST_REWARD_DESCRIPTION_ERROR = "create_quest_reward_description_error"
+    const val CREATE_QUEST_REWARD_EXPIRY = "create_quest_reward_expiry"
+    const val CREATE_QUEST_REWARD_EXPIRY_CLEAR = "create_quest_reward_expiry_clear"
+    const val CREATE_QUEST_REWARD_EXPIRY_ERROR = "create_quest_reward_expiry_error"
+    const val CREATE_QUEST_REWARD_EXPIRY_CONFIRM = "create_quest_reward_expiry_confirm"
   }
 }

@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -9,6 +10,9 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.io.IOException
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -334,13 +338,37 @@ class CreateQuestViewModelTest {
         RewardFormState(
             type = RewardType.FREE_ITEM,
             itemName = "Coffee ",
-            specifics = "Any size",
+            itemSpecifics = "Any size",
             description = "A tour",
             itemNameTouched = true,
             descriptionTouched = true,
         ),
         state.reward,
     )
+  }
+
+  @Test
+  fun discountEditsSetTheAmountAsTypedAndItsUnit() {
+    viewModel.updateDiscountAmount("12,5 ")
+    viewModel.updateDiscountUnit(DiscountUnit.CHF)
+    assertEquals("12,5 ", state.reward.discountAmount)
+    assertTrue(state.reward.discountAmountTouched)
+    assertEquals(DiscountUnit.CHF, state.reward.discountUnit)
+  }
+
+  @Test
+  fun expiryBeforeTodayIsInThePastButTodayIsNot() {
+    val today = LocalDate.of(2026, 10, 12)
+    val clock = Clock.fixed(today.atTime(23, 59).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+    viewModel = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), FakeVenueRepository(), clock)
+
+    viewModel.updateExpiryDate(today.minusDays(1))
+    assertTrue(state.reward.expiryInPast)
+    viewModel.updateExpiryDate(today)
+    assertEquals(today, state.reward.expiryDate)
+    assertFalse(state.reward.expiryInPast)
+    viewModel.updateExpiryDate(null)
+    assertNull(state.reward.expiryDate)
   }
 
   @Test

@@ -69,9 +69,12 @@ fun CreateQuestScreen(
       rewardActions =
           QuestRewardActions(
               onTypeSelect = viewModel::selectRewardType,
+              onDiscountAmountChange = viewModel::updateDiscountAmount,
+              onDiscountUnitChange = viewModel::updateDiscountUnit,
               onItemNameChange = viewModel::updateRewardItemName,
               onSpecificsChange = viewModel::updateRewardSpecifics,
               onDescriptionChange = viewModel::updateRewardDescription,
+              onExpiryDateChange = viewModel::updateExpiryDate,
           ),
       onClose = onClose,
       modifier = modifier,

@@ -5,14 +5,19 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -40,7 +45,10 @@ fun QuestChips(
       horizontalArrangement = spacing,
       verticalArrangement = spacing,
   ) {
-    reward?.let { Chip(rewardText(it), C.Tag.QUEST_CHIP_REWARD, style.reward, style) }
+    reward?.let {
+      val colors = if (it is Reward.FreeItem) style.freeItem else style.reward
+      Chip(rewardText(it), C.Tag.QUEST_CHIP_REWARD, colors, style, style.rewardIcon)
+    }
     partySize?.let {
       Chip(
           stringResource(R.string.map_card_party_size, it),
@@ -60,18 +68,39 @@ fun QuestChips(
   }
 }
 
-/** A one-line chip of [text] in [colors], ringed when they have an outline. */
+/** A one-line chip of [text] in [colors], after [icon] if any, ringed when they have an outline. */
 @Composable
-private fun Chip(text: String, tag: String, colors: ChipColors, style: QuestChipStyle) {
-  Box(
+private fun Chip(
+    text: String,
+    tag: String,
+    colors: ChipColors,
+    style: QuestChipStyle,
+    icon: ChipIcon? = null,
+) {
+  Row(
       Modifier.background(colors.container, style.shape)
           .then(
               colors.outline?.let {
                 Modifier.border(BorderStroke(style.outlineWidth, it), style.shape)
               } ?: Modifier
           )
-          .padding(horizontal = style.horizontalPadding, vertical = style.verticalPadding)
+          .padding(
+              start = icon?.startPadding ?: style.horizontalPadding,
+              end = style.horizontalPadding,
+              top = style.verticalPadding,
+              bottom = style.verticalPadding,
+          ),
+      horizontalArrangement = Arrangement.spacedBy(icon?.gap ?: 0.dp),
+      verticalAlignment = Alignment.CenterVertically,
   ) {
+    icon?.let {
+      Icon(
+          painterResource(it.icon),
+          contentDescription = null,
+          Modifier.size(it.size),
+          tint = colors.content,
+      )
+    }
     QuestLine(text, tag, style.textStyle, colors.content)
   }
 }
@@ -91,8 +120,8 @@ private fun distanceText(meters: Double): String {
   return stringResource(unit, distance.amount)
 }
 
-/** The app's language, which decides the distance's decimal separator; recomposes if it changes. */
-@Composable private fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
+/** The app's language, which decides how numbers are written; recomposes if it changes. */
+@Composable internal fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
 
 /** What a [reward] chip says, e.g. "10% off", "CHF 5 off" or "Free coffee". */
 @Composable

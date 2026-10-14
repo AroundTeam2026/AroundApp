@@ -38,4 +38,22 @@ class RewardAmountFormatTest {
   fun followsTheLanguagesDecimalSeparator() {
     assertEquals("2,50", formatRewardAmount(2.5, DiscountUnit.CHF, Locale.FRENCH))
   }
+
+  @Test
+  fun cardsUseTheDigitsOfTheLanguage() {
+    assertEquals("٢٫٥٠", formatRewardAmount(2.5, DiscountUnit.CHF, EGYPTIAN_ARABIC))
+  }
+
+  // The amount field accepts only ASCII digits and a point or comma, so the limits shown in its
+  // errors must be written that way too.
+  @Test
+  fun inputWritesOnlyWhatTheAmountFieldAccepts() {
+    assertEquals("2.50", formatRewardAmountInput(2.5, DiscountUnit.CHF, EGYPTIAN_ARABIC))
+    assertEquals("2,50", formatRewardAmountInput(2.5, DiscountUnit.CHF, Locale.FRENCH))
+    assertEquals("12.5", formatRewardAmountInput(12.5, DiscountUnit.PERCENT, Locale.US))
+  }
+
+  private companion object {
+    val EGYPTIAN_ARABIC: Locale = Locale.forLanguageTag("ar-EG")
+  }
 }

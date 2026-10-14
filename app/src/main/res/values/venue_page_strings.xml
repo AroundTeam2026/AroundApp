@@ -6,4 +6,19 @@
     <string name="venue_page_failed">Couldn\'t load this venue. Check your connection and try again.</string>
     <string name="venue_page_retry">Try again</string>
     <string name="venue_page_no_quests">No quests here right now. Check back soon.</string>
+    <string name="venue_page_quests">Quests</string>
+    <plurals name="venue_page_active_quests">
+        <item quantity="one">%1$d active</item>
+        <item quantity="other">%1$d active</item>
+    </plurals>
+    <string name="venue_quest_details">Details of %1$s</string>
+
+    <!-- The sheet with the whole of a quest, opened from its row -->
+    <string name="quest_detail_close">Close quest details</string>
+    <string name="quest_detail_about">About</string>
+    <string name="quest_detail_to_do">What to do</string>
+    <string name="quest_detail_proof">Proof</string>
+    <string name="quest_detail_proof_photo">Send a photo</string>
+    <string name="quest_detail_proof_text">Send a text answer</string>
+    <string name="quest_detail_reward">Reward details</string>
 </resources>

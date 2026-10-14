@@ -4,9 +4,12 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import java.time.Clock
+import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,11 +23,13 @@ import kotlinx.coroutines.launch
  *
  * The radius starts at the venue's own radius once it is loaded, unless the venue has already
  * chosen one; until then, or if the venue can't be read, it is [QuestLimits.DEFAULT_RADIUS_METERS].
- * The venue's location, once loaded, centres the radius map.
+ * The venue's location, once loaded, centres the radius map. [clock] tells which day it is, to
+ * reject a reward expiry that has already passed.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
     private val venueRepository: VenueRepository,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(CreateQuestUiState())
   /** The form as the venue has filled it in so far. */
@@ -97,19 +102,35 @@ class CreateQuestViewModel(
     updateReward { it.copy(type = type) }
   }
 
+  /** Sets the discount amount to [value], as typed, and marks it as edited. */
+  fun updateDiscountAmount(value: String) {
+    updateReward { it.copy(discountAmount = value, discountAmountTouched = true) }
+  }
+
+  /** Sets whether the discount is in percent or francs to [unit]. */
+  fun updateDiscountUnit(unit: DiscountUnit) {
+    updateReward { it.copy(discountUnit = unit) }
+  }
+
   /** Sets the free item to [value] and marks it as edited. */
   fun updateRewardItemName(value: String) {
     updateReward { it.copy(itemName = value, itemNameTouched = true) }
   }
 
-  /** Sets the reward's specifics to [value]. */
+  /** Sets the specifics of the picked reward type to [value]. */
   fun updateRewardSpecifics(value: String) {
-    updateReward { it.copy(specifics = value) }
+    updateReward { it.withSpecifics(value) }
   }
 
   /** Sets the description of an other reward to [value] and marks it as edited. */
   fun updateRewardDescription(value: String) {
     updateReward { it.copy(description = value, descriptionTouched = true) }
+  }
+
+  /** Sets the last day the reward can be used to [date], or removes the expiry if it is null. */
+  fun updateExpiryDate(date: LocalDate?) {
+    val inPast = date != null && date.isBefore(LocalDate.now(clock))
+    updateReward { it.copy(expiryDate = date, expiryInPast = inPast) }
   }
 
   private fun updateReward(transform: (RewardFormState) -> RewardFormState) {

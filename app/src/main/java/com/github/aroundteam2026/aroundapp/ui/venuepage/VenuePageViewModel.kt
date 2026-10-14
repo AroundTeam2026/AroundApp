@@ -56,6 +56,16 @@ class VenuePageViewModel(
     mutableUiState.update { it.withQuestTapped(questId) }
   }
 
+  /** Called when the explorer opens the details of the quest [questId]. */
+  fun onQuestDetailsOpened(questId: String) {
+    mutableUiState.update { it.withQuestDetails(questId) }
+  }
+
+  /** Called when the explorer closes the quest details, however they close them. */
+  fun onQuestDetailsClosed() {
+    mutableUiState.update { it.copy(detailQuestId = null) }
+  }
+
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
   fun onRetry() {
     if (mutableUiState.value.status != VenuePageStatus.FAILED) return
