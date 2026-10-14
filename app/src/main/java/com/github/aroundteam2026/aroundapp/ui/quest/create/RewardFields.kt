@@ -203,16 +203,11 @@ private fun RewardDetails(
       when (type) {
         RewardType.DISCOUNT -> {
           DiscountAmount(reward, actions)
-          RewardSpecifics(
-              reward,
-              stringResource(R.string.create_quest_reward_discount_specifics_hint),
-              actions.onSpecificsChange,
-          )
+          RewardSpecifics(reward, actions.onSpecificsChange)
         }
         RewardType.FREE_ITEM -> {
           QuestTextField(
               label = stringResource(R.string.create_quest_reward_free_item),
-              hint = stringResource(R.string.create_quest_reward_item_hint),
               value = reward.itemName,
               onValueChange = actions.onItemNameChange,
               error = reward.itemNameError,
@@ -222,16 +217,11 @@ private fun RewardDetails(
               errorTag = C.Tag.CREATE_QUEST_REWARD_ITEM_ERROR,
               counterTag = C.Tag.CREATE_QUEST_REWARD_ITEM_COUNTER,
           )
-          RewardSpecifics(
-              reward,
-              stringResource(R.string.create_quest_reward_specifics_hint),
-              actions.onSpecificsChange,
-          )
+          RewardSpecifics(reward, actions.onSpecificsChange)
         }
         RewardType.OTHER ->
             QuestTextField(
                 label = stringResource(R.string.create_quest_reward_description),
-                hint = stringResource(R.string.create_quest_reward_description_hint),
                 value = reward.description,
                 onValueChange = actions.onDescriptionChange,
                 error = reward.descriptionError,
@@ -260,7 +250,6 @@ private fun DiscountAmount(reward: RewardFormState, actions: QuestRewardActions)
     ) {
       QuestInputField(
           label = label,
-          hint = stringResource(R.string.create_quest_reward_amount_hint),
           value = reward.discountAmount,
           onValueChange = actions.onDiscountAmountChange,
           isError = error != null,
@@ -479,12 +468,11 @@ internal fun LocalDate.toUtcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().
 private fun Long.toUtcDate(): LocalDate =
     Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
 
-/** The optional details of the reward, with the [hint] of its type. */
+/** The optional details of the reward. */
 @Composable
-private fun RewardSpecifics(reward: RewardFormState, hint: String, onChange: (String) -> Unit) {
+private fun RewardSpecifics(reward: RewardFormState, onChange: (String) -> Unit) {
   QuestTextField(
       label = stringResource(R.string.create_quest_reward_specifics),
-      hint = hint,
       value = reward.specifics,
       onValueChange = onChange,
       error = reward.specificsError,
