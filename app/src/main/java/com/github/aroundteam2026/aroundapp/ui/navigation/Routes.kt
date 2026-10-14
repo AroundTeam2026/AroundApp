@@ -11,9 +11,9 @@ import android.net.Uri
  * the route stays the same, so nothing that navigates to it has to change.
  *
  * Explorer routes are registered in the explorer's NavHost, [AroundApp]. Venue routes belong to the
- * venue's own NavHost, [VenueNavigation], so an explorer can't reach them. [VenueNavigation]
- * registers the home and the create-quest form; the dashboard is still a tab of [VenueHome], and
- * its route is registered when its screen is built.
+ * venue's own NavHost, so an explorer can't reach them. [venueDestinations] registers the home and
+ * the create-quest form there; the dashboard is still a tab of [VenueHome], and its route is
+ * registered when its screen is built.
  */
 object Routes {
   /** Argument of [VENUE_PAGE]: the venue's id, equal to its owner's uid. */

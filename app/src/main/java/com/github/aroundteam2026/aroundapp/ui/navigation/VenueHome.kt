@@ -65,8 +65,8 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * Dashboard, Quests and Profile (see [BottomTabScaffold]).
  *
  * The dashboard and the list of quests are "Coming soon" stubs until their own tasks build them.
- * The Quests tab's "New quest" button calls [onCreateQuest], so the venue's NavHost,
- * [VenueNavigation], opens the create-quest form full screen above the home.
+ * The Quests tab's "New quest" button calls [onCreateQuest], so the venue's NavHost opens the
+ * create-quest form full screen above the home (see [venueDestinations]).
  *
  * @param onCreateQuest opens the form where the venue creates a quest.
  * @param onSignOut signs the venue out, from the Profile tab.

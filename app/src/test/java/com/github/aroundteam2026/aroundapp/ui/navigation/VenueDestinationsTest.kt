@@ -7,29 +7,35 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Tests [VenueNavigation]: the venue home, and the create-quest form it opens full screen. */
+/** Tests [venueDestinations]: the venue home, and the create-quest form it opens full screen. */
 @RunWith(AndroidJUnit4::class)
-class VenueNavigationTest {
+class VenueDestinationsTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private var signOuts = 0
+  private lateinit var navController: NavHostController
 
+  /** A venue NavHost that opens on the home, with the form on fakes. */
   @Before
   fun launch() {
     composeTestRule.setContent {
-      VenueNavigation(
-          onSignOut = { signOuts++ },
-          createQuestFactory = createQuestFactoryOnFakes(),
-      )
+      navController = rememberNavController()
+      NavHost(navController, startDestination = Routes.VENUE_HOME) {
+        venueDestinations(navController, { signOuts++ }, createQuestFactoryOnFakes())
+      }
     }
   }
 
@@ -37,6 +43,10 @@ class VenueNavigationTest {
     composeTestRule.onNodeWithTag(VenueTab.QUESTS.tabTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
     composeTestRule.waitForIdle()
+  }
+
+  private fun currentRoute() = composeTestRule.runOnUiThread {
+    navController.currentDestination?.route
   }
 
   /** The form is gone, and the home shows the Quests tab it was opened from. */
@@ -48,7 +58,7 @@ class VenueNavigationTest {
   }
 
   @Test
-  fun opensOnTheVenueHome() {
+  fun theHomeOpensOnTheDashboard() {
     composeTestRule.onNodeWithTag(C.Tag.VENUE_HOME).assertIsDisplayed()
     composeTestRule.onNodeWithTag(VenueTab.DASHBOARD.tabTag).assertIsSelected()
   }
@@ -70,6 +80,18 @@ class VenueNavigationTest {
     composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
 
     assertBackOnTheQuestsTab()
+  }
+
+  @Test
+  fun closingTheFormLeavesOnlyTheHomeOnTheBackStack() {
+    openTheForm()
+    assertEquals(Routes.CREATE_QUEST, currentRoute())
+
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
+    composeTestRule.waitForIdle()
+
+    assertEquals(Routes.VENUE_HOME, currentRoute())
+    assertNull(composeTestRule.runOnUiThread { navController.previousBackStackEntry })
   }
 
   @Test

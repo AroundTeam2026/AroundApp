@@ -73,7 +73,7 @@ class VenueHomeTest {
     composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_STUB).assertIsDisplayed()
   }
 
-  // VenueNavigationTest checks that the venue's NavHost opens the form
+  // VenueDestinationsTest checks that the venue's NavHost opens the form
   @Test
   fun newQuestAsksToOpenTheCreateQuestForm() {
     select(VenueTab.QUESTS)
