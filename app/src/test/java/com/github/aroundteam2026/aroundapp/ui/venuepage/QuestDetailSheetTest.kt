@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.test.espresso.Espresso
@@ -86,11 +87,17 @@ class QuestDetailSheetTest {
   }
 
   @Test
-  fun aLongDescriptionIsShownWhole() {
-    val description = "A long hunt through the café. ".repeat(12).trim()
+  fun aLongDescriptionIsShownWholeAndTheRestCanBeScrolledTo() {
+    val description = "A long hunt through the café. ".repeat(40).trim()
     show(quest(description = description))
 
     node(C.Tag.QUEST_DETAIL_DESCRIPTION).assertTextEquals(description)
+    listOf(
+            C.Tag.QUEST_DETAIL_REQUIREMENTS,
+            C.Tag.QUEST_DETAIL_PROOF,
+            C.Tag.QUEST_DETAIL_REWARD_DETAILS,
+        )
+        .forEach { node(it).performScrollTo().assertIsDisplayed() }
   }
 
   @Test
