@@ -106,6 +106,8 @@ fun AuthScreen(
             value = state.password,
             onValueChange = viewModel::onPasswordChange,
             label = stringResource(R.string.auth_password),
+            showLabel = stringResource(R.string.auth_show_password),
+            hideLabel = stringResource(R.string.auth_hide_password),
             enabled = !state.isLoading,
             fieldTag = C.Tag.AUTH_PASSWORD,
             toggleTag = C.Tag.AUTH_PASSWORD_VISIBILITY,
@@ -115,13 +117,14 @@ fun AuthScreen(
               value = state.passwordConfirmation,
               onValueChange = viewModel::onPasswordConfirmationChange,
               label = stringResource(R.string.auth_confirm_password),
+              showLabel = stringResource(R.string.auth_show_confirmation_password),
+              hideLabel = stringResource(R.string.auth_hide_confirmation_password),
               enabled = !state.isLoading,
               fieldTag = C.Tag.AUTH_CONFIRMATION,
               toggleTag = C.Tag.AUTH_CONFIRMATION_VISIBILITY,
           )
         }
       }
-
       state.error?.let { error ->
         Text(
             if (error == AuthFormError.PASSWORD_TOO_SHORT) {
@@ -183,12 +186,25 @@ fun AuthScreen(
   }
 }
 
-/** Visibility is local presentation state; toggling never changes the entered credentials. */
+/**
+ * Visibility is local presentation state; toggling never changes the entered credentials.
+ *
+ * @param value the entered password.
+ * @param onValueChange forwards credential edits to the form ViewModel.
+ * @param label the field's visible label.
+ * @param showLabel the accessibility action for revealing this field.
+ * @param hideLabel the accessibility action for masking this field.
+ * @param enabled whether editing and visibility changes are allowed.
+ * @param fieldTag identifies the input for UI tests.
+ * @param toggleTag identifies its visibility button for UI tests.
+ */
 @Composable
 private fun PasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
+    showLabel: String,
+    hideLabel: String,
     enabled: Boolean,
     fieldTag: String,
     toggleTag: String,
@@ -211,10 +227,7 @@ private fun PasswordField(
         ) {
           Icon(
               painterResource(if (visible) R.drawable.ic_eye_off else R.drawable.ic_eye),
-              stringResource(
-                  if (visible) R.string.auth_hide_password else R.string.auth_show_password,
-                  label,
-              ),
+              if (visible) hideLabel else showLabel,
           )
         }
       },

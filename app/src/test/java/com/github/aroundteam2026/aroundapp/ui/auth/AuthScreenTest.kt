@@ -175,12 +175,12 @@ class AuthScreenTest {
     assertRenderedPassword(C.Tag.AUTH_PASSWORD, "••••••")
     compose
         .onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY)
-        .assertContentDescriptionEquals("Show Password")
+        .assertContentDescriptionEquals("Show password")
         .performClick()
     assertRenderedPassword(C.Tag.AUTH_PASSWORD, "123456")
     compose
         .onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY)
-        .assertContentDescriptionEquals("Hide Password")
+        .assertContentDescriptionEquals("Hide password")
         .performClick()
     assertRenderedPassword(C.Tag.AUTH_PASSWORD, "••••••")
     click(C.Tag.AUTH_SUBMIT)
@@ -198,10 +198,13 @@ class AuthScreenTest {
     assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "••••••")
     compose
         .onNodeWithTag(C.Tag.AUTH_CONFIRMATION_VISIBILITY)
-        .assertContentDescriptionEquals("Show Confirm password")
+        .assertContentDescriptionEquals("Show confirmation password")
         .performClick()
     assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "123456")
-    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION_VISIBILITY).performClick()
+    compose
+        .onNodeWithTag(C.Tag.AUTH_CONFIRMATION_VISIBILITY)
+        .assertContentDescriptionEquals("Hide confirmation password")
+        .performClick()
     assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "••••••")
     assertRenderedPassword(C.Tag.AUTH_PASSWORD, "123456")
     click(C.Tag.AUTH_SUBMIT)
@@ -219,7 +222,7 @@ class AuthScreenTest {
     assertRenderedPassword(C.Tag.AUTH_PASSWORD, "123456")
     compose
         .onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY)
-        .assertContentDescriptionEquals("Hide Password")
+        .assertContentDescriptionEquals("Hide password")
   }
 
   @Test
