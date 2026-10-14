@@ -2,14 +2,20 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import java.time.Clock
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
@@ -21,7 +27,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Holds the quest form of the signed-in venue. Values are kept as typed, untrimmed, so editing
- * never moves the cursor; they are trimmed when the quest is saved.
+ * never moves the cursor; they are trimmed when the quest is saved. Edits are ignored while the
+ * quest is being saved.
  *
  * The radius starts at the venue's own radius once it is loaded, unless the venue has already
  * chosen one; until then, or if the venue can't be read, it is [QuestLimits.DEFAULT_RADIUS_METERS].
@@ -50,57 +57,55 @@ class CreateQuestViewModel(
 
   /** Sets the title to [value] and marks it as edited. */
   fun updateTitle(value: String) {
-    mutableUiState.update { it.copy(title = value, titleTouched = true) }
+    edit { it.copy(title = value, titleTouched = true) }
   }
 
   /** Sets the description to [value] and marks it as edited. */
   fun updateDescription(value: String) {
-    mutableUiState.update { it.copy(description = value, descriptionTouched = true) }
+    edit { it.copy(description = value, descriptionTouched = true) }
   }
 
   /** Sets the requirements to [value] and marks them as edited. */
   fun updateRequirements(value: String) {
-    mutableUiState.update { it.copy(requirements = value, requirementsTouched = true) }
+    edit { it.copy(requirements = value, requirementsTouched = true) }
   }
 
   /** Sets the kind of proof explorers submit to [type]. */
   fun updateProofType(type: ProofType) {
-    mutableUiState.update { it.copy(proofType = type) }
+    edit { it.copy(proofType = type) }
   }
 
   /** Sets the radius to the preset [meters] and hides the slider. */
   fun selectRadiusPreset(meters: Int) {
     radiusChosen = true
-    mutableUiState.update { it.copy(radiusMeters = clampRadius(meters), customRadius = false) }
+    edit { it.copy(radiusMeters = clampRadius(meters), customRadius = false) }
   }
 
   /** Shows the slider, keeping the current radius as its starting point. */
   fun selectCustomRadius() {
     radiusChosen = true
-    mutableUiState.update { it.copy(customRadius = true) }
+    edit { it.copy(customRadius = true) }
   }
 
   /** Sets the radius to [meters], clamped to [QuestLimits]. */
   fun updateRadius(meters: Int) {
     radiusChosen = true
-    mutableUiState.update { it.copy(radiusMeters = clampRadius(meters)) }
+    edit { it.copy(radiusMeters = clampRadius(meters)) }
   }
 
   /** Raises the party size by one. */
   fun incrementPartySize() {
-    mutableUiState.update { it.copy(minPartySize = it.minPartySize + 1) }
+    edit { it.copy(minPartySize = it.minPartySize + 1) }
   }
 
   /** Lowers the party size by one, never below [QuestLimits.MIN_PARTY_SIZE]. */
   fun decrementPartySize() {
-    mutableUiState.update {
-      it.copy(minPartySize = (it.minPartySize - 1).coerceAtLeast(QuestLimits.MIN_PARTY_SIZE))
-    }
+    edit { it.copy(minPartySize = (it.minPartySize - 1).coerceAtLeast(QuestLimits.MIN_PARTY_SIZE)) }
   }
 
   /** Sets whether the party must have exactly, rather than at least, the party size. */
   fun updateExactPartySize(exact: Boolean) {
-    mutableUiState.update { it.copy(exactPartySize = exact) }
+    edit { it.copy(exactPartySize = exact) }
   }
 
   /** Picks [type] as the reward, or no reward if it is null. */
@@ -168,10 +173,25 @@ class CreateQuestViewModel(
     }
   }
 
+  /** Forgets a failed save once the venue has been told about it, so it is told only once. */
+  fun clearSaveError() {
+    mutableUiState.update {
+      if (it.saveState == SaveState.Failed) it.copy(saveState = SaveState.Idle) else it
+    }
+  }
+
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
 
   private fun updateReward(transform: (RewardFormState) -> RewardFormState) {
-    mutableUiState.update { it.copy(reward = transform(it.reward)) }
+    edit { it.copy(reward = transform(it.reward)) }
+  }
+
+  /**
+   * Applies [transform] to the form, unless it is being saved: the quest being saved is the one
+   * submitted, so later edits would be lost.
+   */
+  private fun edit(transform: (CreateQuestUiState) -> CreateQuestUiState) {
+    mutableUiState.update { if (it.saveState == SaveState.Saving) it else transform(it) }
   }
 
   /**
@@ -204,4 +224,17 @@ class CreateQuestViewModel(
 
   private fun clampRadius(meters: Int) =
       meters.coerceIn(QuestLimits.MIN_RADIUS_METERS, QuestLimits.MAX_RADIUS_METERS)
+
+  companion object {
+    /** Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories. */
+    fun factory(): ViewModelProvider.Factory = viewModelFactory {
+      initializer {
+        CreateQuestViewModel(
+            AuthRepositoryProvider.repository,
+            VenueRepositoryProvider.repository,
+            QuestRepositoryProvider.repository,
+        )
+      }
+    }
+  }
 }
