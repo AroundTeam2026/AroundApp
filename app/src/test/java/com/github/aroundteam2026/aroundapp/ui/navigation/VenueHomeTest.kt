@@ -16,7 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Tests [VenueHome]: its tabs, the "New quest" button and signing out. */
+/** Tests [VenueHome]: its tabs, its "New quest" button and signing out. */
 @RunWith(AndroidJUnit4::class)
 class VenueHomeTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
@@ -73,8 +73,9 @@ class VenueHomeTest {
     composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_STUB).assertIsDisplayed()
   }
 
+  // VenueDestinationsTest checks that the venue's NavHost opens the form
   @Test
-  fun newQuestOpensTheCreateQuestForm() {
+  fun newQuestAsksToOpenTheCreateQuestForm() {
     select(VenueTab.QUESTS)
     composeTestRule.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
 
@@ -93,10 +94,7 @@ class VenueHomeTest {
   fun backFromAnyTabReturnsToTheDashboard() {
     select(VenueTab.QUESTS)
     select(VenueTab.PROFILE)
-    composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread {
-      composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
-    }
+    composeTestRule.pressBack()
 
     assertShowing(VenueTab.DASHBOARD)
   }
