@@ -2,7 +2,10 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,6 +13,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -18,12 +23,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
+import com.github.aroundteam2026.aroundapp.ui.quest.formatRewardAmountInput
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
@@ -31,6 +48,8 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 /** What the reward fields do when the venue changes them; each does nothing by default. */
 class QuestRewardActions(
     val onTypeSelect: (RewardType?) -> Unit = {},
+    val onDiscountAmountChange: (String) -> Unit = {},
+    val onDiscountUnitChange: (DiscountUnit) -> Unit = {},
     val onItemNameChange: (String) -> Unit = {},
     val onSpecificsChange: (String) -> Unit = {},
     val onDescriptionChange: (String) -> Unit = {},
@@ -112,6 +131,8 @@ private fun RewardTypeOptions(selected: RewardType?, onSelect: (RewardType?) -> 
       val isSelected = type == selected
       val (title, tag) =
           when (type) {
+            RewardType.DISCOUNT ->
+                R.string.create_quest_reward_discount to C.Tag.CREATE_QUEST_REWARD_DISCOUNT
             RewardType.FREE_ITEM ->
                 R.string.create_quest_reward_free_item to C.Tag.CREATE_QUEST_REWARD_FREE_ITEM
             RewardType.OTHER ->
@@ -155,6 +176,14 @@ private fun RewardDetails(
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
       when (type) {
+        RewardType.DISCOUNT -> {
+          DiscountAmount(reward, actions)
+          RewardSpecifics(
+              reward,
+              stringResource(R.string.create_quest_reward_discount_specifics_hint),
+              actions.onSpecificsChange,
+          )
+        }
         RewardType.FREE_ITEM -> {
           QuestTextField(
               label = stringResource(R.string.create_quest_reward_free_item),
@@ -168,7 +197,11 @@ private fun RewardDetails(
               errorTag = C.Tag.CREATE_QUEST_REWARD_ITEM_ERROR,
               counterTag = C.Tag.CREATE_QUEST_REWARD_ITEM_COUNTER,
           )
-          RewardSpecifics(reward, actions.onSpecificsChange)
+          RewardSpecifics(
+              reward,
+              stringResource(R.string.create_quest_reward_specifics_hint),
+              actions.onSpecificsChange,
+          )
         }
         RewardType.OTHER ->
             QuestTextField(
@@ -188,12 +221,116 @@ private fun RewardDetails(
   }
 }
 
-/** The optional details of the reward. */
+/** The discount amount beside its unit, with the amount's error below. */
 @Composable
-private fun RewardSpecifics(reward: RewardFormState, onChange: (String) -> Unit) {
+private fun DiscountAmount(reward: RewardFormState, actions: QuestRewardActions) {
+  val label = stringResource(R.string.create_quest_reward_amount)
+  val error = reward.discountAmountError
+  Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small)) {
+    FieldLabel(label)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      QuestInputField(
+          label = label,
+          hint = stringResource(R.string.create_quest_reward_amount_hint),
+          value = reward.discountAmount,
+          onValueChange = actions.onDiscountAmountChange,
+          isError = error != null,
+          singleLine = true,
+          keyboardOptions =
+              KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+          modifier = Modifier.weight(1f).testTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT),
+      )
+      DiscountUnitToggle(reward.discountUnit, actions.onDiscountUnitChange)
+    }
+    error?.let {
+      QuestFieldError(
+          discountErrorText(it, reward.discountUnit),
+          C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR,
+      )
+    }
+  }
+}
+
+/** What [error] tells the venue to fix in the discount amount, in [unit]. */
+@Composable
+private fun discountErrorText(error: DiscountAmountError, unit: DiscountUnit): String {
+  // Written as the amount field accepts it, so the venue can type the limit back in
+  val locale = currentLocale()
+  return when (error) {
+    DiscountAmountError.BLANK -> stringResource(R.string.create_quest_blank)
+    DiscountAmountError.NOT_A_NUMBER ->
+        stringResource(R.string.create_quest_reward_amount_not_a_number)
+    DiscountAmountError.TOO_MANY_DECIMALS ->
+        stringResource(
+            R.string.create_quest_reward_amount_too_many_decimals,
+            QuestLimits.MAX_DISCOUNT_DECIMALS.toString(),
+        )
+    DiscountAmountError.TOO_SMALL ->
+        stringResource(
+            R.string.create_quest_reward_amount_too_small,
+            formatRewardAmountInput(QuestLimits.MIN_DISCOUNT_AMOUNT, unit, locale),
+        )
+    DiscountAmountError.TOO_LARGE ->
+        stringResource(
+            when (unit) {
+              DiscountUnit.PERCENT -> R.string.create_quest_reward_amount_too_large_percent
+              DiscountUnit.CHF -> R.string.create_quest_reward_amount_too_large_chf
+            },
+            formatRewardAmountInput(QuestLimits.maxDiscountAmount(unit), unit, locale),
+        )
+  }
+}
+
+/** Percent or francs, as a segmented control: the chosen unit is filled in purple. */
+@Composable
+private fun DiscountUnitToggle(selected: DiscountUnit, onSelect: (DiscountUnit) -> Unit) {
+  Row(
+      Modifier.background(MaterialTheme.colorScheme.surface, AroundCorners.InsetField)
+          .border(1.dp, MaterialTheme.colorScheme.outline, AroundCorners.InsetField)
+          .padding(AroundSpacing.ExtraSmall)
+          .selectableGroup(),
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall),
+  ) {
+    DiscountUnit.entries.forEach { unit ->
+      val isSelected = unit == selected
+      val (title, tag) =
+          when (unit) {
+            DiscountUnit.PERCENT ->
+                R.string.create_quest_reward_unit_percent to C.Tag.CREATE_QUEST_REWARD_UNIT_PERCENT
+            DiscountUnit.CHF ->
+                R.string.create_quest_reward_unit_chf to C.Tag.CREATE_QUEST_REWARD_UNIT_CHF
+          }
+      Surface(
+          selected = isSelected,
+          onClick = { onSelect(unit) },
+          shape = AroundCorners.SegmentedOption,
+          color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+          modifier =
+              Modifier.height(UNIT_HEIGHT).testTag(tag).semantics { role = Role.RadioButton },
+      ) {
+        Box(Modifier.padding(horizontal = AroundSpacing.InsetPadding), Alignment.Center) {
+          Text(
+              stringResource(title),
+              style = AroundTextStyles.FieldLabel,
+              color =
+                  if (isSelected) MaterialTheme.colorScheme.onPrimary
+                  else MaterialTheme.colorScheme.onSurface,
+          )
+        }
+      }
+    }
+  }
+}
+
+/** The optional details of the reward, with the [hint] of its type. */
+@Composable
+private fun RewardSpecifics(reward: RewardFormState, hint: String, onChange: (String) -> Unit) {
   QuestTextField(
       label = stringResource(R.string.create_quest_reward_specifics),
-      hint = stringResource(R.string.create_quest_reward_specifics_hint),
+      hint = hint,
       value = reward.specifics,
       onValueChange = onChange,
       error = reward.specificsError,
@@ -204,3 +341,5 @@ private fun RewardSpecifics(reward: RewardFormState, onChange: (String) -> Unit)
       counterTag = C.Tag.CREATE_QUEST_REWARD_SPECIFICS_COUNTER,
   )
 }
+
+private val UNIT_HEIGHT: Dp = 36.dp

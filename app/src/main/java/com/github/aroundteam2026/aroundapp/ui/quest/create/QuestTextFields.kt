@@ -102,31 +102,19 @@ internal fun QuestTextField(
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small)) {
     FieldLabel(label)
-    OutlinedTextField(
+    QuestInputField(
+        label = label,
+        hint = hint,
         value = value,
         onValueChange = onValueChange,
-        singleLine = singleLine,
-        minLines = if (singleLine) 1 else 2,
         isError = error != null,
-        placeholder = { Text(hint) },
-        shape = MaterialTheme.shapes.small,
-        textStyle = if (singleLine) AroundTextStyles.FieldValue else AroundTextStyles.TextArea,
-        colors =
-            OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                errorContainerColor = MaterialTheme.colorScheme.surface,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
+        singleLine = singleLine,
         keyboardOptions =
             KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
                 imeAction = if (singleLine) ImeAction.Next else ImeAction.Default,
             ),
-        modifier = Modifier.fillMaxWidth().testTag(tag).semantics { contentDescription = label },
+        modifier = Modifier.fillMaxWidth().testTag(tag),
     )
     Text(
         stringResource(R.string.create_quest_counter, value.trim().length, maxLength),
@@ -137,19 +125,68 @@ internal fun QuestTextField(
         modifier = Modifier.align(Alignment.End).testTag(counterTag),
     )
     error?.let {
-      Text(
+      QuestFieldError(
           when (it) {
             QuestTextError.BLANK -> stringResource(R.string.create_quest_blank)
             QuestTextError.TOO_LONG ->
                 pluralStringResource(R.plurals.create_quest_too_long, maxLength, maxLength)
           },
-          style = AroundTextStyles.Caption,
-          color = MaterialTheme.colorScheme.error,
-          modifier = Modifier.testTag(errorTag).semantics { liveRegion = LiveRegionMode.Polite },
+          errorTag,
       )
     }
   }
 }
+
+/** The input box of every quest form text field, without its label, counter or error. */
+@Composable
+internal fun QuestInputField(
+    label: String,
+    hint: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    isError: Boolean,
+    singleLine: Boolean,
+    keyboardOptions: KeyboardOptions,
+    modifier: Modifier = Modifier,
+) {
+  OutlinedTextField(
+      value = value,
+      onValueChange = onValueChange,
+      singleLine = singleLine,
+      minLines = if (singleLine) 1 else 2,
+      isError = isError,
+      placeholder = { Text(hint) },
+      shape = MaterialTheme.shapes.small,
+      textStyle = if (singleLine) AroundTextStyles.FieldValue else AroundTextStyles.TextArea,
+      colors = questFieldColors(),
+      keyboardOptions = keyboardOptions,
+      modifier = modifier.semantics { contentDescription = label },
+  )
+}
+
+/** The error under a quest form field, announced when it changes. */
+@Composable
+internal fun QuestFieldError(text: String, tag: String) {
+  Text(
+      text,
+      style = AroundTextStyles.Caption,
+      color = MaterialTheme.colorScheme.error,
+      modifier = Modifier.testTag(tag).semantics { liveRegion = LiveRegionMode.Polite },
+  )
+}
+
+/** The colours of every quest form text field: the surface inside, purple once focused. */
+@Composable
+internal fun questFieldColors() =
+    OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = MaterialTheme.colorScheme.surface,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        errorContainerColor = MaterialTheme.colorScheme.surface,
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
 @Preview(widthDp = 413)
 @Composable

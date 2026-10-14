@@ -91,8 +91,8 @@ private fun distanceText(meters: Double): String {
   return stringResource(unit, distance.amount)
 }
 
-/** The app's language, which decides the distance's decimal separator; recomposes if it changes. */
-@Composable private fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
+/** The app's language, which decides how numbers are written; recomposes if it changes. */
+@Composable internal fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
 
 /** What a [reward] chip says, e.g. "10% off", "CHF 5 off" or "Free coffee". */
 @Composable
