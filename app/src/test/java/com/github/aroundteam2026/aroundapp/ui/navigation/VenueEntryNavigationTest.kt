@@ -3,34 +3,47 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w413dp-h917dp-mdpi")
 class VenueEntryNavigationTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val auth = FakeAuthRepository("venue-owner")
   private val venues = FakeVenueRepository()
   private var exits = 0
 
-  private fun launch() {
+  private fun launch(restoration: StateRestorationTester? = null) {
     compose.activity.onBackPressedDispatcher.addCallback(
         object : OnBackPressedCallback(true) {
           override fun handleOnBackPressed() {
@@ -38,16 +51,21 @@ class VenueEntryNavigationTest {
           }
         }
     )
-    compose.setContent {
+    val content: @androidx.compose.runtime.Composable () -> Unit = {
       AroundAppTheme {
         VenueEntryNavigation(
             auth,
             venues,
-            locationScreen = { uid, onSaved, _ ->
-              Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
+            locationScreen = { uid, onSaved, onBack ->
+              Column {
+                Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
+                Button(onClick = onBack, modifier = Modifier.testTag("location-back")) {
+                  Text("Back")
+                }
+              }
             },
             homeScreen = { onCreate, onSignOut ->
-              androidx.compose.foundation.layout.Column {
+              Column {
                 Button(onClick = onCreate, modifier = Modifier.testTag("home")) { Text("Create") }
                 Button(onClick = onSignOut, modifier = Modifier.testTag("signout")) {
                   Text("Sign out")
@@ -60,6 +78,7 @@ class VenueEntryNavigationTest {
         )
       }
     }
+    if (restoration == null) compose.setContent(content) else restoration.setContent(content)
   }
 
   private fun finishOnboarding() {
@@ -89,5 +108,123 @@ class VenueEntryNavigationTest {
     compose.onNodeWithTag("home").assertIsDisplayed()
     compose.onNodeWithTag("signout").performClick()
     compose.runOnIdle { assertEquals(null, auth.currentUserId.value) }
+  }
+
+  /** A lost location Back callback would trap the owner or discard the saved business. */
+  @Test
+  fun locationBackReturnsToTheSavedBusinessWithoutReopeningLocation() {
+    launch()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput("Cafe")
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose.onNodeWithTag("location-back").performClick()
+    compose
+        .onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME)
+        .assertTextContains("Cafe")
+        .assertIsNotEnabled()
+    compose.onNodeWithTag("location").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose.onNodeWithTag("location").assertTextEquals("venue-owner")
+  }
+
+  /** System Back must close the nested form, not leave the signed-in venue graph. */
+  @Test
+  fun systemBackFromQuestFormReturnsToHomeWithoutReopeningSetup() {
+    launch()
+    finishOnboarding()
+    compose.onNodeWithTag("home").performClick()
+    compose.waitForIdle()
+    compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    compose.onNodeWithTag("home").assertIsDisplayed()
+    compose.onNodeWithTag("create").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
+    compose.runOnIdle { assertEquals(0, exits) }
+  }
+
+  /** Recreation must restore the active nested destination, rather than restart onboarding. */
+  @Test
+  fun restoringAnOpenQuestFormKeepsItsDestinationAndCloseReturnsHome() {
+    val restoration = StateRestorationTester(compose)
+    launch(restoration)
+    finishOnboarding()
+    compose.onNodeWithTag("home").performClick()
+    restoration.emulateSavedInstanceStateRestore()
+    compose.onNodeWithTag("create").assertIsDisplayed().performClick()
+    compose.onNodeWithTag("home").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
+  }
+
+  /**
+   * The real home's sign-out callback must reach the session gate and dispose protected content.
+   */
+  @Test
+  fun realVenueHomeSignOutDisposesTheVenueGraph() {
+    compose.setContent {
+      AroundAppTheme {
+        SessionNavigation(
+            auth,
+            mainScreen = {
+              VenueEntryNavigation(
+                  auth,
+                  venues,
+                  locationScreen = { uid, onSaved, _ ->
+                    Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
+                  },
+              )
+            },
+        )
+      }
+    }
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput("Cafe")
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose.onNodeWithTag("location").performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_DASHBOARD_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_HOME).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
+    compose.runOnIdle { assertEquals(null, auth.currentUserId.value) }
+  }
+
+  /**
+   * The default form must use its supplied factory and return to home only after saving a quest.
+   */
+  @Test
+  fun defaultQuestFormSavesThroughItsViewModelAndReturnsToHome() {
+    val venue = testVenue(id = "venue-owner")
+    val repository = FakeVenueRepository(listOf(venue))
+    val quests = FakeQuestRepository()
+    val form = CreateQuestViewModel(auth, repository, quests)
+    compose.setContent {
+      AroundAppTheme {
+        VenueEntryNavigation(
+            auth,
+            repository,
+            locationScreen = { uid, onSaved, _ ->
+              Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
+            },
+            homeScreen = { onCreate, _ ->
+              Button(onClick = onCreate, modifier = Modifier.testTag("home")) { Text("New quest") }
+            },
+            createQuestFactory = viewModelFactory { initializer { form } },
+        )
+      }
+    }
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose.onNodeWithTag("location").performClick()
+    compose.onNodeWithTag("home").performClick()
+    compose.runOnIdle {
+      form.updateTitle("Find the mural")
+      form.updateDescription("Visit the cafe")
+      form.updateRequirements("Ask the owner")
+    }
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).assertTextContains("Find the mural")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
+    compose.onNodeWithTag("home").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertDoesNotExist()
+    val saved = runBlocking { quests.observeQuestsByVenue(venue.id).first().single() }
+    assertEquals("Find the mural", saved.title)
+    assertEquals(venue.id, saved.venueId)
+    assertEquals(venue.location, saved.location)
   }
 }

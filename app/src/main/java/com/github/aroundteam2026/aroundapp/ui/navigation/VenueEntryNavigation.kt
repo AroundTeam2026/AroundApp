@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -24,6 +25,7 @@ private const val CREATE_QUEST_ROUTE = "venue_create_quest"
  * them.
  *
  * Screen slots let tests exercise graph transitions without a Maps SDK or backend.
+ * [createQuestFactory] can supply an isolated repository-backed form, as in createQuestDestination.
  */
 @Composable
 fun VenueEntryNavigation(
@@ -37,8 +39,9 @@ fun VenueEntryNavigation(
         { onCreateQuest, onSignOut ->
           VenueHome(onCreateQuest, onSignOut)
         },
+    createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     createQuestScreen: @Composable (onClose: () -> Unit) -> Unit = { onClose ->
-      val form: CreateQuestViewModel = viewModel(factory = CreateQuestViewModel.factory())
+      val form: CreateQuestViewModel = viewModel(factory = createQuestFactory)
       CreateQuestScreen(form, onClose = onClose, onCreated = { onClose() })
     },
 ) {
