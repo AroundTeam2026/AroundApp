@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -334,13 +335,22 @@ class CreateQuestViewModelTest {
         RewardFormState(
             type = RewardType.FREE_ITEM,
             itemName = "Coffee ",
-            specifics = "Any size",
+            itemSpecifics = "Any size",
             description = "A tour",
             itemNameTouched = true,
             descriptionTouched = true,
         ),
         state.reward,
     )
+  }
+
+  @Test
+  fun discountEditsSetTheAmountAsTypedAndItsUnit() {
+    viewModel.updateDiscountAmount("12,5 ")
+    viewModel.updateDiscountUnit(DiscountUnit.CHF)
+    assertEquals("12,5 ", state.reward.discountAmount)
+    assertTrue(state.reward.discountAmountTouched)
+    assertEquals(DiscountUnit.CHF, state.reward.discountUnit)
   }
 
   @Test

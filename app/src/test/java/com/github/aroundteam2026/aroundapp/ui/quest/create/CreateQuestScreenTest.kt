@@ -1,7 +1,11 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -10,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasImeAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,7 +24,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.input.ImeAction
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -230,10 +237,16 @@ class CreateQuestScreenTest {
   @Test
   fun rewardFieldsShowOnlyForThePickedType() {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).performScrollTo().assertIsSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DISCOUNT).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).assertIsNotSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).assertDoesNotExist()
 
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_FREE_ITEM).performScrollTo().performClick()
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_NONE).assertIsNotSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DISCOUNT).assertIsNotSelected()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).assertExists()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION).assertDoesNotExist()
@@ -261,7 +274,7 @@ class CreateQuestScreenTest {
     val reward = viewModel.uiState.value.reward
     assertEquals(
         listOf("Tea", "Any size", "A tour"),
-        listOf(reward.itemName, reward.specifics, reward.description),
+        listOf(reward.itemName, reward.itemSpecifics, reward.description),
     )
   }
 
@@ -274,5 +287,99 @@ class CreateQuestScreenTest {
         .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM_ERROR)
         .performScrollTo()
         .assertTextEquals("This field is required.")
+  }
+
+  @Test
+  fun discountShowsTheAmountErrorOfItsUnit() {
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DISCOUNT).performScrollTo().performClick()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT)
+        .performScrollTo()
+        .performTextInput("120")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Use 100 % or less.")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_UNIT_PERCENT).assertIsSelected()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_UNIT_CHF).performClick().assertIsSelected()
+    assertEquals(DiscountUnit.CHF, viewModel.uiState.value.reward.discountUnit)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_SPECIFICS).assertExists()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextClearance()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextInput("1000.01")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Use CHF 1000 or less.")
+  }
+
+  @Test
+  fun aClearedDiscountAmountIsRequired() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().performTextInput("5")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performTextClearance()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("This field is required.")
+  }
+
+  @Test
+  @Config(qualifiers = "+fr")
+  fun tooSmallAmountShowsTheMinimumWithThePhonesDecimalSeparator() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().performTextInput("0")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Enter at least 0,01.")
+  }
+
+  // Egyptian Arabic writes numbers in Arabic-Indic digits, which the amount field rejects.
+  @Test
+  @Config(qualifiers = "+ar-rEG")
+  fun tooSmallAmountShowsTheMinimumInDigitsTheFieldAccepts() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo().performTextInput("0")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+        .performScrollTo()
+        .assertTextEquals("Enter at least 0.01.")
+  }
+
+  @Test
+  fun discountAmountMovesToTheNextFieldFromTheKeyboard() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT)
+        .performScrollTo()
+        .assert(hasImeAction(ImeAction.Next))
+  }
+
+  @Test
+  fun eachUnitIsARadioButton() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    listOf(C.Tag.CREATE_QUEST_REWARD_UNIT_PERCENT, C.Tag.CREATE_QUEST_REWARD_UNIT_CHF).forEach {
+      compose
+          .onNodeWithTag(it)
+          .performScrollTo()
+          .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+    }
+  }
+
+  @Test
+  fun discountShowsTheNumberAndDecimalErrors() {
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    val amount = compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT).performScrollTo()
+    val error = compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_AMOUNT_ERROR)
+
+    amount.performTextInput("abc")
+    error.performScrollTo().assertTextEquals("Enter a number.")
+
+    amount.performTextClearance()
+    amount.performTextInput("0.015")
+    error.assertTextEquals("Use at most 2 decimals.")
   }
 }

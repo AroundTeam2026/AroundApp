@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.quest
 
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 import kotlin.math.roundToLong
 
@@ -19,4 +20,15 @@ internal fun formatRewardAmount(amount: Double, unit: DiscountUnit, locale: Loca
         else -> 1
       }
   return String.format(locale, "%.${decimals}f", hundredths / 100.0)
+}
+
+/**
+ * Writes [amount] like [formatRewardAmount], but only as the amount field accepts it, so the venue
+ * can type it back in: ASCII digits, and a comma where [locale] uses one as its decimal separator,
+ * a point otherwise.
+ */
+internal fun formatRewardAmountInput(amount: Double, unit: DiscountUnit, locale: Locale): String {
+  val text = formatRewardAmount(amount, unit, Locale.ROOT)
+  val usesComma = DecimalFormatSymbols.getInstance(locale).decimalSeparator == ','
+  return if (usesComma) text.replace('.', ',') else text
 }
