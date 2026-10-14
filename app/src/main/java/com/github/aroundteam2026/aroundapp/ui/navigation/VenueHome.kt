@@ -19,11 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
+import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
+import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
+import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 
 /** The venue's top-level destinations, one per tab of its bottom bar. */
@@ -65,19 +69,21 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * Dashboard, Quests and Profile (see [BottomTabScaffold]).
  *
  * The dashboard and the list of quests are "Coming soon" stubs until their own tasks build them.
- * The Quests tab's "New quest" button calls [onCreateQuest], so whoever shows the venue home opens
- * the create-quest form in their own NavHost.
+ * The Quests tab's "New quest" button opens the create-quest form above the Quests tab; closing the
+ * form, or saving its quest, returns to the tab.
  *
- * @param onCreateQuest opens the form where the venue creates a quest.
  * @param onSignOut signs the venue out, from the Profile tab.
+ * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  */
 @Composable
 fun VenueHome(
-    onCreateQuest: () -> Unit,
     onSignOut: () -> Unit,
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (VenueTab) -> Unit = { VenueTabScreen(it, onCreateQuest, onSignOut) },
+    createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
+    screen: @Composable (VenueTab) -> Unit = {
+      VenueTabScreen(it, navController::navigateToCreateQuest, onSignOut)
+    },
 ) {
   BottomTabScaffold(
       tabs = VenueTab.entries,
@@ -86,7 +92,9 @@ fun VenueHome(
       navBarTag = C.Tag.VENUE_NAV_BAR,
       screen = screen,
       modifier = Modifier.testTag(C.Tag.VENUE_HOME),
-  )
+  ) {
+    createQuestDestination(onClose = { navController.popBackStack() }, factory = createQuestFactory)
+  }
 }
 
 /** The screen of [tab]. */

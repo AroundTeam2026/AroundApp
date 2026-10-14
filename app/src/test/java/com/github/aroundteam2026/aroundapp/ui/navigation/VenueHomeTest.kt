@@ -8,26 +8,31 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Tests [VenueHome]: its tabs, the "New quest" button and signing out. */
+/** Tests [VenueHome]: its tabs, the create-quest form it opens and signing out. */
 @RunWith(AndroidJUnit4::class)
 class VenueHomeTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
-  private var questsCreated = 0
   private var signOuts = 0
 
   @Before
   fun launch() {
     composeTestRule.setContent {
-      VenueHome(onCreateQuest = { questsCreated++ }, onSignOut = { signOuts++ })
+      VenueHome(onSignOut = { signOuts++ }, createQuestFactory = formFactory)
     }
   }
 
@@ -73,12 +78,44 @@ class VenueHomeTest {
     composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_STUB).assertIsDisplayed()
   }
 
-  @Test
-  fun newQuestOpensTheCreateQuestForm() {
+  private fun openTheForm() {
     select(VenueTab.QUESTS)
     composeTestRule.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
+  }
 
-    assertEquals(1, questsCreated)
+  private fun pressBack() {
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnUiThread {
+      composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+    }
+  }
+
+  // The form belongs to the Quests tab, so the tab stays selected above it
+  @Test
+  fun newQuestOpensTheCreateQuestForm() {
+    openTheForm()
+
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(VenueTab.QUESTS.tabTag).assertIsSelected()
+  }
+
+  // Saving calls the same onClose; CreateQuestDestinationTest checks that it does
+  @Test
+  fun closingTheFormReturnsToTheQuestsTab() {
+    openTheForm()
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
+
+    assertShowing(VenueTab.QUESTS)
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertDoesNotExist()
+  }
+
+  @Test
+  fun backFromTheFormReturnsToTheQuestsTab() {
+    openTheForm()
+    pressBack()
+
+    assertShowing(VenueTab.QUESTS)
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertDoesNotExist()
   }
 
   @Test
@@ -93,11 +130,17 @@ class VenueHomeTest {
   fun backFromAnyTabReturnsToTheDashboard() {
     select(VenueTab.QUESTS)
     select(VenueTab.PROFILE)
-    composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread {
-      composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
-    }
+    pressBack()
 
     assertShowing(VenueTab.DASHBOARD)
+  }
+
+  private companion object {
+    /** The create-quest form on fakes, so opening it needs no Firebase. */
+    val formFactory = viewModelFactory {
+      initializer {
+        CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository(), FakeQuestRepository())
+      }
+    }
   }
 }
