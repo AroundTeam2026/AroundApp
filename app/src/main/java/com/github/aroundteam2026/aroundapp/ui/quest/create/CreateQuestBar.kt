@@ -64,19 +64,25 @@ internal fun CreateQuestBar(state: CreateQuestUiState, onSubmit: () -> Unit) {
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.testTag(C.Tag.CREATE_QUEST_SUMMARY),
     )
+    val saving = state.saveState == SaveState.Saving
+    val savingLabel = stringResource(R.string.create_quest_saving)
     Button(
         onClick = onSubmit,
         enabled = state.canSave,
         shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.CREATE_QUEST_SUBMIT),
+        modifier =
+            Modifier.fillMaxWidth()
+                .height(BUTTON_HEIGHT)
+                .testTag(C.Tag.CREATE_QUEST_SUBMIT)
+                // On the button, not the spinner: the spinner's semantics aren't merged into the
+                // button, so TalkBack would read an unlabelled button while it has no text
+                .semantics { if (saving) contentDescription = savingLabel },
     ) {
-      if (state.saveState == SaveState.Saving) {
-        // Labelled, so TalkBack doesn't read an empty button while it has no text
-        val saving = stringResource(R.string.create_quest_saving)
+      if (saving) {
         CircularProgressIndicator(
             color = LocalContentColor.current,
             strokeWidth = PROGRESS_STROKE,
-            modifier = Modifier.size(PROGRESS_SIZE).semantics { contentDescription = saving },
+            modifier = Modifier.size(PROGRESS_SIZE),
         )
       } else {
         Text(stringResource(R.string.create_quest_submit), style = AroundTextStyles.Button)
