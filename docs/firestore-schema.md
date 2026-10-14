@@ -103,16 +103,18 @@ Encoded in `canTransition(from, to)`, which has one overload per status enum. Th
 | Completion | `PENDING` | `APPROVED`, `REJECTED` |
 | Completion | `APPROVED`, `REJECTED` | none |
 
-## Security rules summary (v1)
+## Security rules summary (v2)
 
 From `firestore.rules`. Anything not listed is denied.
+
+Every create and update must match its collection's table above: only the listed fields, every field not marked `?` present (`role` may be absent), with the listed type, values and limits. A `reward` is checked against the fields of its `type`.
 
 | Collection | Read | Write |
 |---|---|---|
 | `users` | Only the owner | The owner creates and updates it; `role` must be null, `EXPLORER` or `VENUE`, and can't change once set. No delete. |
-| `venues` | Any signed-in user | Only the owner (document id is their uid). |
-| `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid); `venueId` can't change. |
-| `reservations` | The venue and the listed explorers | An explorer creates a `PENDING` one that lists them. Only the venue updates it, only its `status`, along an allowed transition. No delete. |
+| `venues` | Any signed-in user | Only the owner (document id is their uid), whose `users` document has role `VENUE`. |
+| `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
+| `reservations` | The venue and the listed explorers | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one that lists them, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards only `status` changes, along an allowed transition: the venue makes any of them, and a listed explorer can only cancel. No delete. |
 | `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
 
 ## Deferred to Sprint 3
