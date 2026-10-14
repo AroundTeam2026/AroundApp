@@ -494,6 +494,49 @@ class CreateQuestViewModelTest {
       }
 
   @Test
+  fun clearingTheSaveErrorForgetsOnlyAFailedSave() =
+      runTest(dispatcher) {
+        newLoadedViewModel()
+        fillValid()
+        quests.forcedFailure = IOException("offline")
+        viewModel.submit()
+        runCurrent()
+        viewModel.clearSaveError()
+        assertEquals(SaveState.Idle, state.saveState)
+
+        quests.forcedFailure = null
+        viewModel.submit()
+        runCurrent()
+        viewModel.clearSaveError()
+        assertEquals(SaveState.Saved("quest-1"), state.saveState)
+      }
+
+  @Test
+  fun editsWhileSavingAreIgnored() =
+      runTest(dispatcher) {
+        val answer = CompletableDeferred<Result<String>>()
+        newLoadedViewModel(
+            object : QuestRepository by quests {
+              override suspend fun createQuest(quest: Quest): Result<String> = answer.await()
+            }
+        )
+        fillValid()
+        viewModel.submit()
+        runCurrent()
+        val saving = state
+
+        viewModel.updateTitle("Another title")
+        viewModel.incrementPartySize()
+        viewModel.selectRewardType(RewardType.OTHER)
+        assertEquals(saving, state)
+
+        answer.complete(Result.failure(IOException("offline")))
+        runCurrent()
+        viewModel.updateTitle("Another title")
+        assertEquals("Another title", state.title)
+      }
+
+  @Test
   fun aFailedSaveKeepsTheFormAndCanBeRetried() =
       runTest(dispatcher) {
         newLoadedViewModel()

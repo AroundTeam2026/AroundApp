@@ -2,26 +2,34 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -43,15 +51,39 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import kotlinx.coroutines.launch
 
-/** The form a venue fills in to create a quest; [onClose] leaves it without saving. */
+/**
+ * The form a venue fills in to create a quest. [onClose] leaves it without saving, but can't be
+ * tapped once the quest is being saved, and [onCreated] gets the id of the quest once it is saved.
+ * A failed save shows a snackbar once and keeps the form.
+ */
 @Composable
 fun CreateQuestScreen(
     viewModel: CreateQuestViewModel,
     onClose: () -> Unit,
+    onCreated: (questId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val state by viewModel.uiState.collectAsState()
+  val snackbarHostState = remember { SnackbarHostState() }
+  val scope = rememberCoroutineScope()
+  val saveFailed = stringResource(R.string.create_quest_save_failed)
+  val currentOnCreated by rememberUpdatedState(onCreated)
+  LaunchedEffect(state.saveState) {
+    when (val save = state.saveState) {
+      is SaveState.Saved -> currentOnCreated(save.questId)
+      SaveState.Failed -> {
+        // Launched in the screen's scope, not in this effect: clearing the error changes the
+        // effect's key, which would cancel a snackbar shown from inside it
+        scope.launch { snackbarHostState.showSnackbar(saveFailed) }
+        // Cleared at once, so the snackbar doesn't show again when the screen is recreated
+        viewModel.clearSaveError()
+      }
+      SaveState.Idle,
+      SaveState.Saving -> Unit
+    }
+  }
   CreateQuestContent(
       state = state,
       onTitleChange = viewModel::updateTitle,
@@ -77,12 +109,14 @@ fun CreateQuestScreen(
               onDescriptionChange = viewModel::updateRewardDescription,
               onExpiryDateChange = viewModel::updateExpiryDate,
           ),
+      onSubmit = viewModel::submit,
       onClose = onClose,
+      snackbarHostState = snackbarHostState,
       modifier = modifier,
   )
 }
 
-/** Stateless form. */
+/** Stateless form, scrolling above the sticky [CreateQuestBar]. */
 @Composable
 fun CreateQuestContent(
     state: CreateQuestUiState,
@@ -91,34 +125,53 @@ fun CreateQuestContent(
     onRequirementsChange: (String) -> Unit,
     completionActions: QuestCompletionActions,
     rewardActions: QuestRewardActions,
+    onSubmit: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-  Column(
-      modifier
-          .fillMaxSize()
-          .background(MaterialTheme.colorScheme.background)
-          .safeDrawingPadding()
-          .verticalScroll(rememberScrollState())
-          .padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.ExtraLarge)
-          .testTag(C.Tag.CREATE_QUEST_SCREEN)
-  ) {
-    CreateQuestHeader(onClose)
-    Spacer(Modifier.height(AroundSpacing.ExtraLarge))
-    QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
-    Spacer(Modifier.height(AroundSpacing.Medium))
-    QuestCompletionRules(state, completionActions)
-    Spacer(Modifier.height(AroundSpacing.SetupGap))
-    RewardFields(state.reward, rewardActions)
+  Scaffold(
+      modifier = modifier,
+      containerColor = MaterialTheme.colorScheme.background,
+      contentWindowInsets = WindowInsets.safeDrawing,
+      snackbarHost = { SnackbarHost(snackbarHostState) },
+      bottomBar = { CreateQuestBar(state, onSubmit) },
+  ) { padding ->
+    Column(
+        Modifier.fillMaxSize()
+            .padding(padding)
+            // The bar stays under the keyboard, so the form makes room for the keyboard itself
+            .consumeWindowInsets(padding)
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(
+                horizontal = AroundSpacing.ScreenHorizontal,
+                vertical = AroundSpacing.ExtraLarge,
+            )
+            .testTag(C.Tag.CREATE_QUEST_SCREEN)
+    ) {
+      // Also disabled once saved, as the screen is closing and a second close would pop its caller
+      CreateQuestHeader(
+          onClose,
+          closeEnabled = state.saveState == SaveState.Idle || state.saveState == SaveState.Failed,
+      )
+      Spacer(Modifier.height(AroundSpacing.ExtraLarge))
+      QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
+      Spacer(Modifier.height(AroundSpacing.Medium))
+      QuestCompletionRules(state, completionActions)
+      Spacer(Modifier.height(AroundSpacing.SetupGap))
+      RewardFields(state.reward, rewardActions)
+    }
   }
 }
 
 /** The round close button, and the screen title centred on the full width. */
 @Composable
-private fun CreateQuestHeader(onClose: () -> Unit) {
+private fun CreateQuestHeader(onClose: () -> Unit, closeEnabled: Boolean) {
   Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
     Surface(
         onClick = onClose,
+        enabled = closeEnabled,
         shape = AroundPillShape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -172,7 +225,7 @@ private fun CreateQuestPreview() {
         FakeQuestRepository(),
     )
   }
-  AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}) }
+  AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}, onCreated = {}) }
 }
 
 private const val PREVIEW_VENUE_ID = "preview-venue"
