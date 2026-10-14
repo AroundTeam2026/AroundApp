@@ -73,13 +73,17 @@ roles open `VenueEntryNavigation`, which connects existing business setup,
 location setup, Venue home and the create-quest form. Saved location replaces
 onboarding in the back stack. Entry currently begins at business setup, which
 prefills an existing venue and preserves it; skipping completed onboarding on a
-later launch belongs to the venue-entry owner.
+later launch belongs to #136/#226. As agreed with that owner, those changes
+will follow #221 and extend this NavHost rather than create another one.
 
 The existing role tests cover missing profiles, pending choices, saved roles,
 loading, failures, retry, sign-out and account changes. `RoleRoutingActivityTest`
 checks MainActivity's real providers against Firebase emulators, including role
 persistence and recreation. `VenueEntryNavigationTest` covers the onboarding/home
-handoff, Back cleanup and the create-quest callback.
+handoff, root Back behavior and restoration through the shared venue destinations.
+`venueDestinations` from #225 registers the home and quest form, including safe form
+closing; this bridge does not introduce a second set of venue routes. Profile
+sign-out is dispatched through `ProfileViewModel` for both roles.
 
 The router observes missing profiles and unset roles until a role is saved.
 Roles are write-once, so that profile subscription then ends and the resolved
@@ -87,6 +91,6 @@ home remains selected for the session. Account change or sign-out still
 cancels profile resolution through the session observer.
 
 The role-routing fake repositories are test fixtures only; home slots are empty
-by default for callers that do not supply them. The separate quest provider still
-uses its existing demo repository; changing that provider is outside G2.3.
+by default for callers that do not supply them. The quest provider is also
+Firestore-backed, as supplied by #219.
 The role selection form is supplied by #181, and Profile sign-out by #187.

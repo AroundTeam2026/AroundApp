@@ -25,6 +25,7 @@ import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
+import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -64,17 +65,7 @@ class VenueEntryNavigationTest {
                 }
               }
             },
-            homeScreen = { onCreate, onSignOut ->
-              Column {
-                Button(onClick = onCreate, modifier = Modifier.testTag("home")) { Text("Create") }
-                Button(onClick = onSignOut, modifier = Modifier.testTag("signout")) {
-                  Text("Sign out")
-                }
-              }
-            },
-            createQuestScreen = { onClose ->
-              Button(onClick = onClose, modifier = Modifier.testTag("create")) { Text("Close") }
-            },
+            createQuestFactory = createQuestFactoryOnFakes(),
         )
       }
     }
@@ -85,7 +76,24 @@ class VenueEntryNavigationTest {
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput("Cafe")
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
     compose.onNodeWithTag("location").assertTextEquals("venue-owner").performClick()
-    compose.onNodeWithTag("home").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_HOME).assertIsDisplayed()
+  }
+
+  private fun openQuestForm() {
+    compose.onNodeWithTag(C.Tag.VENUE_QUESTS_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
+  }
+
+  /** Root setup must not swallow the first Back or offer an arrow with nowhere to go. */
+  @Test
+  fun firstBackFromBusinessSetupLeavesTheFlow() {
+    launch()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_BACK).assertDoesNotExist()
+    compose.waitForIdle()
+    compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    compose.runOnIdle { assertEquals(1, exits) }
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertIsDisplayed()
   }
 
   @Test
@@ -100,14 +108,13 @@ class VenueEntryNavigationTest {
   }
 
   @Test
-  fun questFormClosesBackToHomeAndProfileActionEndsSession() {
+  fun questFormClosesBackToHome() {
     launch()
     finishOnboarding()
-    compose.onNodeWithTag("home").performClick()
-    compose.onNodeWithTag("create").assertIsDisplayed().performClick()
-    compose.onNodeWithTag("home").assertIsDisplayed()
-    compose.onNodeWithTag("signout").performClick()
-    compose.runOnIdle { assertEquals(null, auth.currentUserId.value) }
+    openQuestForm()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_HOME).assertIsDisplayed()
   }
 
   /** A lost location Back callback would trap the owner or discard the saved business. */
@@ -131,11 +138,11 @@ class VenueEntryNavigationTest {
   fun systemBackFromQuestFormReturnsToHomeWithoutReopeningSetup() {
     launch()
     finishOnboarding()
-    compose.onNodeWithTag("home").performClick()
+    openQuestForm()
     compose.waitForIdle()
     compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-    compose.onNodeWithTag("home").assertIsDisplayed()
-    compose.onNodeWithTag("create").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_HOME).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
     compose.runOnIdle { assertEquals(0, exits) }
   }
@@ -146,10 +153,11 @@ class VenueEntryNavigationTest {
     val restoration = StateRestorationTester(compose)
     launch(restoration)
     finishOnboarding()
-    compose.onNodeWithTag("home").performClick()
+    openQuestForm()
     restoration.emulateSavedInstanceStateRestore()
-    compose.onNodeWithTag("create").assertIsDisplayed().performClick()
-    compose.onNodeWithTag("home").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_HOME).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
   }
 
@@ -166,6 +174,7 @@ class VenueEntryNavigationTest {
               VenueEntryNavigation(
                   auth,
                   venues,
+                  createQuestFactory = createQuestFactoryOnFakes(),
                   locationScreen = { uid, onSaved, _ ->
                     Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
                   },
@@ -203,16 +212,13 @@ class VenueEntryNavigationTest {
             locationScreen = { uid, onSaved, _ ->
               Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
             },
-            homeScreen = { onCreate, _ ->
-              Button(onClick = onCreate, modifier = Modifier.testTag("home")) { Text("New quest") }
-            },
             createQuestFactory = viewModelFactory { initializer { form } },
         )
       }
     }
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
     compose.onNodeWithTag("location").performClick()
-    compose.onNodeWithTag("home").performClick()
+    openQuestForm()
     compose.runOnIdle {
       form.updateTitle("Find the mural")
       form.updateDescription("Visit the cafe")
@@ -220,7 +226,7 @@ class VenueEntryNavigationTest {
     }
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).assertTextContains("Find the mural")
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
-    compose.onNodeWithTag("home").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_HOME).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertDoesNotExist()
     val saved = runBlocking { quests.observeQuestsByVenue(venue.id).first().single() }
     assertEquals("Find the mural", saved.title)

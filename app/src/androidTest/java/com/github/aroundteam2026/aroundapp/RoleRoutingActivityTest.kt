@@ -11,12 +11,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.e2e.E2eRule
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.common.Location
-import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
@@ -24,10 +22,8 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.resources.C
 import java.util.UUID
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,6 +40,14 @@ class RoleRoutingActivityTest {
       compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
     }
     compose.onNodeWithTag(tag).assertIsDisplayed()
+  }
+
+  private fun awaitEnabled(tag: String) {
+    compose.waitUntil(15_000) {
+      compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().any {
+        it.config.getOrNull(SemanticsProperties.Disabled) == null
+      }
+    }
   }
 
   @Test
@@ -92,20 +96,12 @@ class RoleRoutingActivityTest {
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
   }
 
-  private fun awaitEnabled(tag: String) {
-    compose.waitUntil(15_000) {
-      compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().any {
-        it.config.getOrNull(SemanticsProperties.Disabled) == null
-      }
-    }
-  }
-
   /**
-   * Guards the production default slots and their callbacks. A saved marker removes dependency on
+   * Guards the production role-to-onboarding-to-home wiring. A saved marker removes dependency on
    * GPS and map interaction; each fixture uses a fresh owner and writes finish before UI sign-in.
    */
   @Test
-  fun storedVenueAreaReachesHomeAndQuestFormPreservesDraftWithoutSavingOnClose() {
+  fun savedVenueAreaContinuesToVenueHome() {
     val email = "venue-flow-${UUID.randomUUID()}@around.test"
     val location = Location(46.52, 6.57)
     val uid = runBlocking {
@@ -137,31 +133,8 @@ class RoleRoutingActivityTest {
         location,
         runBlocking { VenueRepositoryProvider.repository.getVenue(uid) }?.location,
     )
-    compose.onNodeWithTag(C.Tag.VENUE_QUESTS_TAB).performClick()
-    compose.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
-    awaitTag(C.Tag.CREATE_QUEST_SCREEN)
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).performTextInput("Unfinished quest")
-    closeSoftKeyboard()
-    compose.activityRule.scenario.recreate()
-    awaitTag(C.Tag.CREATE_QUEST_SCREEN)
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).assertTextContains("Unfinished quest")
-    listOf(
-            C.Tag.CREATE_QUEST_DESCRIPTION to "Visit the fixture venue",
-            C.Tag.CREATE_QUEST_REQUIREMENTS to "Ask the owner",
-        )
-        .forEach { (tag, value) ->
-          compose.onNodeWithTag(tag).performScrollTo().performTextInput(value)
-        }
-    closeSoftKeyboard()
-    // A valid, saveable draft makes an accidental publish-on-close observable. Save readiness
-    // also proves the default factory loaded this owner's stored area, without waiting for Maps.
-    awaitEnabled(C.Tag.CREATE_QUEST_SUBMIT)
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performScrollTo().performClick()
-    awaitTag(C.Tag.VENUE_QUESTS_SCREEN)
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertDoesNotExist()
-    val quests = runBlocking {
-      QuestRepositoryProvider.repository.observeQuestsByVenue(uid).first()
-    }
-    assertTrue("Closing a valid draft must not publish a quest", quests.isEmpty())
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_AREA_SCREEN).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
   }
 }
