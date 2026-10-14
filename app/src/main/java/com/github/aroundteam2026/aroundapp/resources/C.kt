@@ -7,6 +7,7 @@ package com.github.aroundteam2026.aroundapp.resources
 object C {
   object Tag {
     const val ROLE_PROFILE_ERROR = "role_profile_error"
+    const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
     const val ROLE_PROFILE_RETRY = "role_profile_retry"
     const val APP_LOADING = "app_loading"
 

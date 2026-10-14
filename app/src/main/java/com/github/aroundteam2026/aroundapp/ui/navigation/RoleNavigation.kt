@@ -8,11 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -36,6 +35,12 @@ import com.github.aroundteam2026.aroundapp.ui.auth.RegistrationFlow
  * This scaffold leaves both home slots empty by default. Production activation belongs to the
  * Firestore integration PR: supply a persistent UserRepository and real role destinations there.
  * Never supply a fake in MainActivity.
+ *
+ * @param authRepository the session source, shared with the session gate and registration.
+ * @param userRepository reads and saves the profile whose role selects the destination.
+ * @param pendingRoleStore keeps a registration choice until its profile is saved.
+ * @param explorerScreen the Explorer home; empty until its owner supplies it.
+ * @param venueScreen the Venue entry, given the signed-in uid; empty until its owner supplies it.
  */
 @Composable
 fun RoleNavigation(
@@ -60,35 +65,17 @@ fun RoleNavigation(
         // home.
         val destination =
             when (val resolved = state) {
-              is RoleSessionState.SignedIn ->
-                  if (resolved.userId != uid) AppDestination.LOADING
-                  else
-                      when (resolved.role) {
-                        null -> AppDestination.ROLE_SELECTION
-                        Role.EXPLORER -> AppDestination.EXPLORER_HOME
-                        Role.VENUE -> AppDestination.VENUE_ENTRY
-                      }
-              is RoleSessionState.ProfileUnavailable ->
-                  if (resolved.userId == uid) AppDestination.PROFILE_ERROR
-                  else AppDestination.LOADING
+              is RoleSessionState.SignedIn if resolved.userId == uid ->
+                  when (resolved.role) {
+                    null -> AppDestination.ROLE_SELECTION
+                    Role.EXPLORER -> AppDestination.EXPLORER_HOME
+                    Role.VENUE -> AppDestination.VENUE_ENTRY
+                  }
+              is RoleSessionState.ProfileUnavailable if resolved.userId == uid ->
+                  AppDestination.PROFILE_ERROR
+              // Checking, signed out, or still resolving the previous session's uid.
               else -> AppDestination.LOADING
             }
-        val flows = rememberSaveableStateHolder()
-        // Keep a resolved home's state while its profile is checking or unavailable.
-        if (
-            destination in
-                listOf(
-                    AppDestination.ROLE_SELECTION,
-                    AppDestination.EXPLORER_HOME,
-                    AppDestination.VENUE_ENTRY,
-                )
-        ) {
-          SideEffect {
-            listOf(AppDestination.EXPLORER_HOME, AppDestination.VENUE_ENTRY)
-                .filter { it != destination }
-                .forEach { flows.removeState(it.name) }
-          }
-        }
         AppRoot(
             destination = destination,
             authFlow = {},
@@ -100,13 +87,9 @@ fun RoleNavigation(
                   completeRegistration = true,
               )
             },
-            explorerHome = {
-              flows.SaveableStateProvider(AppDestination.EXPLORER_HOME.name) { explorerScreen() }
-            },
-            venueEntry = {
-              flows.SaveableStateProvider(AppDestination.VENUE_ENTRY.name) { venueScreen(uid) }
-            },
-            profileError = { ProfileError(router::retryProfile) },
+            explorerHome = explorerScreen,
+            venueEntry = { venueScreen(uid) },
+            profileError = { ProfileError(router::retryProfile, router::signOut) },
         )
       },
   )
@@ -114,7 +97,7 @@ fun RoleNavigation(
 
 /** A failed profile read is distinct from an absent profile; retry keeps the auth session. */
 @Composable
-private fun ProfileError(onRetry: () -> Unit) {
+private fun ProfileError(onRetry: () -> Unit, onSignOut: () -> Unit) {
   Column(
       Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp).testTag(C.Tag.ROLE_PROFILE_ERROR),
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
@@ -123,6 +106,9 @@ private fun ProfileError(onRetry: () -> Unit) {
     Text(stringResource(R.string.role_profile_error))
     Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.ROLE_PROFILE_RETRY)) {
       Text(stringResource(R.string.role_profile_retry))
+    }
+    TextButton(onClick = onSignOut, modifier = Modifier.testTag(C.Tag.ROLE_PROFILE_SIGN_OUT)) {
+      Text(stringResource(R.string.auth_sign_out))
     }
   }
 }

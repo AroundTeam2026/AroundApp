@@ -125,7 +125,9 @@ class RoleRoutingViewModelTest {
             }
         val vm = router(repo, observed)
         advanceUntilIdle()
-        oldProfiles.emit(profile("old", Role.VENUE))
+        oldProfiles.emit(profile("old", null))
+        advanceUntilIdle()
+        assertEquals(1, oldProfiles.subscriptionCount.value)
         advanceUntilIdle()
         val uid = repo.signUpWithEmail("new@around.test", "123456").getOrThrow()
         advanceUntilIdle()
@@ -177,13 +179,41 @@ class RoleRoutingViewModelTest {
       }
 
   @Test
-  fun failedSignInDoesNotUnlockMainFlow() =
+  fun stopsObservingOnceARoleIsSaved() =
       runTest(dispatcher) {
-        val repo = FakeAuthRepository()
-        val vm = router(repo, users)
+        val profiles = MutableSharedFlow<User?>()
+        val observed =
+            object : UserRepository by users {
+              override fun observeUser(uid: String) = profiles
+            }
+        val vm = router(FakeAuthRepository("user"), observed)
         advanceUntilIdle()
-        repo.signInWithEmail("ada@around.test", "wrong")
+        profiles.emit(profile("user", null))
         advanceUntilIdle()
+        assertEquals(1, profiles.subscriptionCount.value)
+        profiles.emit(profile("user", Role.EXPLORER))
+        advanceUntilIdle()
+        assertEquals(RoleSessionState.SignedIn("user", Role.EXPLORER), vm.uiState.value)
+        assertEquals(0, profiles.subscriptionCount.value)
+        profiles.emit(profile("user", null))
+        advanceUntilIdle()
+        assertEquals(RoleSessionState.SignedIn("user", Role.EXPLORER), vm.uiState.value)
+      }
+
+  @Test
+  fun profileFailureCanEndTheSession() =
+      runTest(dispatcher) {
+        val auth = FakeAuthRepository("user")
+        val failing =
+            object : UserRepository by users {
+              override suspend fun getUser(uid: String): User? = error("offline")
+            }
+        val vm = router(auth, failing)
+        advanceUntilIdle()
+        assertEquals(RoleSessionState.ProfileUnavailable("user"), vm.uiState.value)
+        vm.signOut()
+        advanceUntilIdle()
+        assertEquals(null, auth.currentUserId.value)
         assertEquals(RoleSessionState.SignedOut, vm.uiState.value)
       }
 

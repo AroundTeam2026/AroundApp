@@ -81,6 +81,8 @@ class RoleNavigationTest {
     profile("restored", Role.EXPLORER)
     val auth = FakeAuthRepository("restored")
     compose.setContent { AroundAppTheme { RoleNavigation(auth, users, pending) } }
+    compose.onNodeWithTag(C.Tag.APP_LOADING).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_ERROR).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
     compose.runOnIdle { auth.signOut() }
@@ -224,26 +226,16 @@ class RoleNavigationTest {
   }
 
   @Test
-  fun retryAfterObserverFailureRestoresExplorerState() {
-    profile("restored", Role.EXPLORER)
-    val gate = CompletableDeferred<Unit>()
-    var failObserver = true
+  fun profileErrorCanSignOut() {
     val failing =
         object : UserRepository by users {
-          override fun observeUser(uid: String) = flow {
-            emit(users.getUser(uid))
-            if (failObserver) {
-              gate.await()
-              error("offline")
-            }
-          }
+          override suspend fun getUser(uid: String): User? = error("offline")
         }
-    launch(FakeAuthRepository("restored"), failing)
-    compose.onNodeWithTag("explorer").performClick()
-    compose.runOnIdle { gate.complete(Unit) }
-    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_ERROR).assertIsDisplayed()
-    compose.runOnIdle { failObserver = false }
-    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_RETRY).performClick()
-    compose.onNodeWithTag("explorer").assertTextEquals("Explorer 1")
+    val auth = FakeAuthRepository("restored")
+    launch(auth, failing)
+    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_SIGN_OUT).performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_ERROR).assertDoesNotExist()
+    compose.runOnIdle { assertEquals(null, auth.currentUserId.value) }
   }
 }
