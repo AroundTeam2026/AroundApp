@@ -17,7 +17,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +34,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -203,12 +201,13 @@ private fun Header(
       }
     }
     filtersOpen?.let { open ->
-      val description = stringResource(R.string.map_nearby_filters)
-      FilterChip(
+      RoundButton(
+          R.drawable.ic_sliders,
+          R.string.map_nearby_filters,
+          CLOSE_SIZE,
+          CLOSE_SIZE,
           selected = open,
           onClick = onToggleFilters,
-          label = { Text(stringResource(R.string.map_nearby_filters_label)) },
-          modifier = Modifier.semantics { contentDescription = description },
       )
     }
     onClose?.let {
@@ -385,7 +384,8 @@ private fun Navigation(pagerState: PagerState, onView: () -> Unit) {
 
 /**
  * A round, outlined [size] button showing [icon] at [iconSize], which screen readers announce as
- * [label]: the arrows and the close button.
+ * [label]: the arrows, the close button and the filter button. A toggle passes [selected], which
+ * fills it in purple while on; the others leave it null.
  */
 @Composable
 private fun RoundButton(
@@ -394,20 +394,22 @@ private fun RoundButton(
     size: Dp,
     iconSize: Dp,
     enabled: Boolean = true,
+    selected: Boolean? = null,
     onClick: () -> Unit,
 ) {
   val colors = MaterialTheme.colorScheme
+  val filled = selected == true
   OutlinedIconButton(
       onClick,
-      Modifier.size(size),
+      Modifier.size(size).semantics { selected?.let { this.selected = it } },
       enabled = enabled,
       shape = CircleShape,
       colors =
           IconButtonDefaults.outlinedIconButtonColors(
-              containerColor = colors.background,
-              contentColor = colors.onSurface,
+              containerColor = if (filled) colors.primary else colors.background,
+              contentColor = if (filled) colors.onPrimary else colors.onSurface,
           ),
-      border = BorderStroke(1.dp, colors.outline),
+      border = if (filled) null else BorderStroke(1.dp, colors.outline),
   ) {
     Icon(painterResource(icon), stringResource(label), Modifier.size(iconSize))
   }

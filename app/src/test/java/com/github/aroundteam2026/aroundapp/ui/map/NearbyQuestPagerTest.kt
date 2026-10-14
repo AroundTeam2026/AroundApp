@@ -470,12 +470,16 @@ class NearbyQuestPagerTest {
   fun theFilterButtonOpensAndClosesTheFilters() {
     show(rows(2), withFilters = true)
     node(C.Tag.NEARBY_FILTERS).assertDoesNotExist()
+    filterButton().assertIsNotSelected()
 
     filterButton().performClick()
     node(C.Tag.NEARBY_FILTERS).assertIsDisplayed()
+    // Filled in purple while open
+    filterButton().assertIsSelected()
 
     filterButton().performClick()
     node(C.Tag.NEARBY_FILTERS).assertDoesNotExist()
+    filterButton().assertIsNotSelected()
   }
 
   @Test

@@ -9,10 +9,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
@@ -21,6 +23,7 @@ import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -77,6 +80,14 @@ class MapScreenLocationBannerTest {
     composeTestRule
         .onNodeWithText(app.getString(R.string.map_location_off_fallback))
         .assertIsDisplayed()
+  }
+
+  @Test
+  fun theTurnOnButtonIsFortyFourDpTall() {
+    show(PermissionDialog(refused))
+
+    val button = node(C.Tag.LOCATION_TURN_ON).getBoundsInRoot()
+    assertDpEquals("button height", 44.dp, button.bottom - button.top)
   }
 
   @Test

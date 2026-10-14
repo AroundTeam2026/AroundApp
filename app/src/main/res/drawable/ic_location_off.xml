@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The crossed-out pin of the map's "Location is off" banner, from Figma -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20">
+    <path
+        android:pathData="M10,17.5C10,17.5 15.8333,12.0833 15.8333,7.5C15.8333,5.9529 15.2188,4.46917 14.1248,3.37521C13.0308,2.28125 11.5471,1.66667 10,1.66667C8.4529,1.66667 6.96917,2.28125 5.87521,3.37521C4.78125,4.46917 4.16667,5.9529 4.16667,7.5C4.16667,12.0833 10,17.5 10,17.5Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M2.5,2.5L17.5,17.5"
+        android:strokeWidth="1.5"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
