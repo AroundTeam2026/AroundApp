@@ -124,6 +124,9 @@ object C {
     const val NEARBY_BUTTON = "nearby_button"
     const val NEARBY_OVERLAY = "nearby_overlay"
     const val NEARBY_GRABBER = "nearby_grabber"
+    const val NEARBY_FILTERS = "nearby_filters"
+    const val LOCATION_BANNER = "location_banner"
+    const val LOCATION_TURN_ON = "location_turn_on"
 
     const val CREATE_QUEST_SCREEN = "create_quest_screen"
     const val CREATE_QUEST_CLOSE = "create_quest_close"

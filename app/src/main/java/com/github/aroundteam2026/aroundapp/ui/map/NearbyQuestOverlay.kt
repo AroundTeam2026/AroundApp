@@ -105,6 +105,8 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * @param onQuestClick Called with a page's quest when the explorer taps the page.
  * @param onViewQuest Called with the shown quest when the explorer taps "View quest".
  * @param onClose Called when the explorer closes the overlay.
+ * @param filters The filters [quests] already passed.
+ * @param onFiltersChange Called with the filters the explorer picks in the pager.
  * @param modifier Places the overlay; the map puts it along its bottom edge, and the overlay keeps
  *   its own margin inside it.
  */
@@ -115,6 +117,8 @@ fun NearbyQuestOverlay(
     onQuestClick: (NearbyQuest) -> Unit,
     onViewQuest: (NearbyQuest) -> Unit,
     onClose: () -> Unit,
+    filters: NearbyFilters,
+    onFiltersChange: (NearbyFilters) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val colors = MaterialTheme.colorScheme
@@ -164,6 +168,14 @@ fun NearbyQuestOverlay(
             .size(GRABBER_WIDTH, GRABBER_HEIGHT)
             .background(colors.outline, RoundedCornerShape(GRABBER_HEIGHT / 2))
     )
-    NearbyQuestPager(quests, locationOn, onQuestClick, onViewQuest, onClose = onClose)
+    NearbyQuestPager(
+        quests,
+        locationOn,
+        onQuestClick,
+        onViewQuest,
+        onClose = onClose,
+        filters = filters,
+        onFiltersChange = onFiltersChange,
+    )
   }
 }

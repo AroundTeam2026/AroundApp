@@ -52,6 +52,9 @@ class NearbyQuestPagerTest {
   private var quests by mutableStateOf(emptyList<NearbyQuest>())
   private val clicked = mutableListOf<NearbyQuest>()
   private val viewed = mutableListOf<NearbyQuest>()
+  /** The filters the pager shows; a change from the pager is applied, as the map does. */
+  private var filters by mutableStateOf(NearbyFilters())
+  private val filterChanges = mutableListOf<NearbyFilters>()
 
   private fun row(
       id: String,
@@ -78,6 +81,7 @@ class NearbyQuestPagerTest {
       shown: List<NearbyQuest>,
       locationOn: Boolean = true,
       onClose: (() -> Unit)? = null,
+      withFilters: Boolean = false,
   ) {
     quests = shown
     composeTestRule.setContent {
@@ -87,9 +91,24 @@ class NearbyQuestPagerTest {
           onQuestClick = { clicked += it },
           onViewQuest = { viewed += it },
           onClose = onClose,
+          filters = filters,
+          onFiltersChange =
+              if (withFilters) {
+                {
+                  filterChanges += it
+                  filters = it
+                }
+              } else {
+                null
+              },
       )
     }
   }
+
+  private fun filterButton() =
+      composeTestRule.onNodeWithContentDescription(context.getString(R.string.map_nearby_filters))
+
+  private fun option(label: Int) = composeTestRule.onNodeWithText(context.getString(label))
 
   private fun close() =
       composeTestRule.onNodeWithContentDescription(context.getString(R.string.map_nearby_close))
@@ -438,5 +457,82 @@ class NearbyQuestPagerTest {
     dots.assertCountEquals(5)
     dots[4].assertIsSelected()
     dots[0].assertIsNotSelected()
+  }
+
+  @Test
+  fun withoutFiltersTheHeaderHasNoFilterButton() {
+    show(rows(2))
+
+    filterButton().assertDoesNotExist()
+  }
+
+  @Test
+  fun theFilterButtonOpensAndClosesTheFilters() {
+    show(rows(2), withFilters = true)
+    node(C.Tag.NEARBY_FILTERS).assertDoesNotExist()
+
+    filterButton().performClick()
+    node(C.Tag.NEARBY_FILTERS).assertIsDisplayed()
+
+    filterButton().performClick()
+    node(C.Tag.NEARBY_FILTERS).assertDoesNotExist()
+  }
+
+  @Test
+  fun choosingAnOptionChangesThatFilterOnly() {
+    show(rows(2), withFilters = true)
+    filterButton().performClick()
+
+    option(R.string.map_nearby_filter_1_km).performClick()
+    option(R.string.map_nearby_filter_discount).performClick()
+
+    assertEquals(
+        listOf(
+            NearbyFilters(distance = DistanceFilter.WITHIN_1_KM),
+            NearbyFilters(DistanceFilter.WITHIN_1_KM, RewardFilter.DISCOUNT),
+        ),
+        filterChanges,
+    )
+    option(R.string.map_nearby_filter_1_km).assertIsSelected()
+    option(R.string.map_nearby_filter_500_m).assertIsNotSelected()
+    option(R.string.map_nearby_filter_discount).assertIsSelected()
+    option(R.string.map_nearby_filter_other).assertIsNotSelected()
+  }
+
+  @Test
+  fun withoutTheLocationOnlyTheRewardCanBeChosen() {
+    show(rows(2), locationOn = false, withFilters = true)
+    filterButton().performClick()
+
+    option(R.string.map_nearby_filter_500_m).assertIsNotEnabled()
+    option(R.string.map_nearby_filter_3_km).assertIsNotEnabled()
+    option(R.string.map_nearby_filter_other).assertIsEnabled()
+  }
+
+  @Test
+  fun activeFiltersReplaceTheOrderInTheCounter() {
+    filters = NearbyFilters(DistanceFilter.WITHIN_3_KM, RewardFilter.DISCOUNT)
+    show(rows(2), withFilters = true)
+
+    val summary =
+        context.getString(
+            R.string.map_nearby_filter_pair,
+            context.getString(R.string.map_nearby_within_3_km),
+            context.getString(R.string.map_nearby_discounts),
+        )
+    node(C.Tag.NEARBY_COUNTER)
+        .assertTextEquals(context.getString(R.string.map_nearby_filtered, 1, 2, summary))
+  }
+
+  @Test
+  fun whenNothingMatchesThePagerSaysSoAndKeepsTheFilters() {
+    filters = NearbyFilters(reward = RewardFilter.OTHER)
+    show(emptyList(), withFilters = true)
+
+    node(C.Tag.NEARBY_EMPTY).assertTextEquals(context.getString(R.string.map_nearby_no_match))
+    node(C.Tag.NEARBY_COUNTER)
+        .assertTextEquals(context.getString(R.string.map_nearby_other_rewards))
+    filterButton().performClick()
+    option(R.string.map_nearby_filter_other).assertIsSelected()
   }
 }
