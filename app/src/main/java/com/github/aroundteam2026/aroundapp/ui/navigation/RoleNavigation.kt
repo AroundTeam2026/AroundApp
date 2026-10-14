@@ -33,9 +33,8 @@ import com.github.aroundteam2026.aroundapp.ui.auth.RegistrationFlow
  * Resolves stored roles inside the session gate. Registration shares one ProfileSetup with the
  * router; profile persistence and each role's home are supplied by their owners.
  *
- * This scaffold leaves both home slots empty by default. Production activation belongs to the
- * Firestore integration PR: supply a persistent UserRepository and real role destinations there.
- * Never supply a fake in MainActivity.
+ * MainActivity supplies the persistent user repository and each role's destination. Tests may
+ * supply independent slots; never supply a fake in MainActivity.
  *
  * @param authRepository the session source, shared with the session gate and registration.
  * @param userRepository reads and saves the profile whose role selects the destination.
