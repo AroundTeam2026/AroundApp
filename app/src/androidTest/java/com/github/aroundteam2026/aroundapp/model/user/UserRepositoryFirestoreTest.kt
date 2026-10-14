@@ -7,6 +7,7 @@ import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorClient
 import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -184,7 +185,8 @@ class UserRepositoryFirestoreTest {
   @Test
   fun getUser_readsAMalformedDocumentAsMissing() = withTimeoutBlocking {
     // No displayName or createdAt; the rules only check the owner and the role.
-    db.collection(USERS).document(uid).set(mapOf("role" to "EXPLORER")).await()
+    // No displayName or createdAt: the rules refuse it, so it goes past them
+    writeBypassingRules("$USERS/$uid", mapOf("role" to "EXPLORER"))
 
     assertNull(repository.getUser(uid))
   }

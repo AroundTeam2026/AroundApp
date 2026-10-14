@@ -6,6 +6,9 @@ package com.github.aroundteam2026.aroundapp.resources
 // Like R, but C
 object C {
   object Tag {
+    const val ROLE_PROFILE_ERROR = "role_profile_error"
+    const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
+    const val ROLE_PROFILE_RETRY = "role_profile_retry"
     const val APP_LOADING = "app_loading"
 
     const val APP = "app"
@@ -20,11 +23,23 @@ object C {
     const val PROFILE_SCREEN = "profile_screen"
     const val PROFILE_SIGN_OUT = "profile_sign_out"
 
+    const val VENUE_HOME = "venue_home"
+    const val VENUE_NAV_BAR = "venue_nav_bar"
+    const val VENUE_DASHBOARD_TAB = "venue_dashboard_tab"
+    const val VENUE_QUESTS_TAB = "venue_quests_tab"
+    const val VENUE_PROFILE_TAB = "venue_profile_tab"
+    const val VENUE_DASHBOARD_SCREEN = "venue_dashboard_screen"
+    const val VENUE_QUESTS_SCREEN = "venue_quests_screen"
+    const val VENUE_NEW_QUEST = "venue_new_quest"
+    const val VENUE_QUESTS_STUB = "venue_quests_stub"
+
     const val AUTH_SCREEN = "auth_screen"
     const val AUTH_TITLE = "auth_title"
     const val AUTH_VENUE_LINK = "auth_venue_link"
     const val AUTH_EMAIL = "auth_email"
     const val AUTH_PASSWORD = "auth_password"
+    const val AUTH_PASSWORD_VISIBILITY = "auth_password_visibility"
+    const val AUTH_CONFIRMATION_VISIBILITY = "auth_confirmation_visibility"
     const val AUTH_CONFIRMATION = "auth_confirmation"
     const val AUTH_SUBMIT = "auth_submit"
     const val AUTH_SWITCH_MODE = "auth_switch_mode"

@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import kotlinx.coroutines.flow.Flow
@@ -46,10 +47,9 @@ interface ReservationRepository {
   /**
    * Moves a reservation to [status], changing nothing else.
    *
-   * For now only the venue that owns the reservation can change its status, because the security
-   * rules allow nothing else. The Firestore implementation therefore fails when an explorer calls
-   * this, for example to cancel their own reservation (E21), even though the fake allows it. The
-   * rules will have to change when E21 is scheduled.
+   * The security rules let the venue that owns the reservation make any change, and an explorer of
+   * the party only cancel it (E21). The Firestore implementation therefore fails when an explorer
+   * asks for any other status, even though the fake allows it.
    *
    * @param id id of the reservation.
    * @param status the new status; the change must be allowed by [canTransition].

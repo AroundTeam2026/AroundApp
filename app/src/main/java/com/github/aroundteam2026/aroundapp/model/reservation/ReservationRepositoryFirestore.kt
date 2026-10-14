@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.util.Log
@@ -64,13 +65,14 @@ class ReservationRepositoryFirestore(
   /**
    * Reads the reservation and changes its status in one transaction, so the transition is checked
    * against the status that is actually stored. Only `status` is written, which is all the rules
-   * let the venue change. Needs a connection: a transaction fails while the device is offline.
+   * let anyone change. Needs a connection: a transaction fails while the device is offline.
    *
    * Fails with [NoSuchElementException] if the reservation is malformed, with
    * [IllegalStateException] if [canTransition] forbids the change, and with the Firestore exception
-   * if the rules refuse it, which they do for everyone but the venue. An id with no document is
-   * refused too: the read rule cannot evaluate a missing document, so the server answers
-   * `PERMISSION_DENIED` instead of the transaction seeing a missing reservation.
+   * if the rules refuse it, which they do for everyone but the venue and, to cancel, an explorer of
+   * the party. An id with no document is refused too: the read rule cannot evaluate a missing
+   * document, so the server answers `PERMISSION_DENIED` instead of the transaction seeing a missing
+   * reservation.
    */
   override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> =
       try {
