@@ -3,10 +3,12 @@ package com.github.aroundteam2026.aroundapp.model.quest
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorClient
 import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
@@ -39,8 +41,8 @@ import org.junit.runner.RunWith
  *
  * Clients come from [emulatorClient], so they belong to named [FirebaseApp]s on the `demo-project`
  * id, never to the default app, and the tests cannot reach the real project. Each test signs in a
- * fresh user and uses their uid as the venue id, as the rules require, so tests never see each
- * other's quests. Each test's KDoc names the production bug it catches.
+ * fresh venue account and uses its uid as the venue id, as the rules require, so tests never see
+ * each other's quests. Each test's KDoc names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class QuestRepositoryFirestoreTest {
@@ -63,7 +65,7 @@ class QuestRepositoryFirestoreTest {
   @Before
   fun setUp() =
       runBlocking<Unit> {
-        withTimeout(SETUP_TIMEOUT_MS) { venueId = signInNewUser(MAIN_APP) }
+        withTimeout(SETUP_TIMEOUT_MS) { venueId = signInNewUser(MAIN_APP, Role.VENUE) }
         db = emulatorClient(MAIN_APP)
         repository = QuestRepositoryFirestore(db) { FIXED_NOW }
       }
@@ -194,9 +196,11 @@ class QuestRepositoryFirestoreTest {
         )
     for (reward in unreadableRewards) {
       val id = repository.createQuest(quest()).getOrThrow()
-      db.collection(QUESTS).document(id).update("reward", reward).await()
+      // The rules refuse these rewards, so they go past them, once the quest is on the server
+      db.waitForPendingWrites().await()
+      writeBypassingRules("$QUESTS/$id", mapOf("reward" to reward))
 
-      assertNull("reward $reward", repository.getQuest(id))
+      assertNull("reward $reward", getQuestFromServer(id))
     }
   }
 
@@ -328,11 +332,15 @@ class QuestRepositoryFirestoreTest {
    */
   @Test
   fun observeActiveQuests_skipsMalformedDocuments() = withTimeoutBlocking {
-    db.collection(QUESTS)
-        .document()
-        .set(mapOf("venueId" to venueId, "status" to "ACTIVE")) // no title, location, ...
-        .await()
+    // No title, location, ...: the rules refuse it, so it goes past them
+    writeBypassingRules(
+        "$QUESTS/${db.collection(QUESTS).document().id}",
+        mapOf("venueId" to venueId, "status" to "ACTIVE"),
+    )
     val validId = repository.createQuest(quest()).getOrThrow()
+    // Once the server has the valid quest, the memory cache drops it, so the listener's first list
+    // comes from the server, which has the malformed quest too.
+    db.waitForPendingWrites().await()
 
     val active = repository.observeActiveQuests().first { list -> list.any { it.id == validId } }
 
@@ -398,7 +406,7 @@ class QuestRepositoryFirestoreTest {
    * query that ignores the venue would see it.
    */
   private suspend fun createQuestAsAnotherVenue() {
-    val otherVenueId = signInNewUser(OTHER_VENUE_APP)
+    val otherVenueId = signInNewUser(OTHER_VENUE_APP, Role.VENUE)
     val other = emulatorClient(OTHER_VENUE_APP)
     try {
       QuestRepositoryFirestore(other).createQuest(quest().copy(venueId = otherVenueId)).getOrThrow()

@@ -2,12 +2,17 @@
 package com.github.aroundteam2026.aroundapp.model
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.firestore
@@ -33,7 +38,7 @@ class FirestoreRulesTest {
   @Before
   fun setUp() {
     FirebaseEmulator.connect()
-    auth.signOut()
+    signOut()
   }
 
   // ---- users ----
@@ -71,63 +76,115 @@ class FirestoreRulesTest {
     assertDenied(user(alice).set(profile(role = "ADMIN")))
   }
 
+  @Test
+  fun profileMustFollowTheSchema() {
+    val alice = newUser()
+    val valid = profile(role = null)
+
+    assertOnlyValidWriteSucceeds(
+        user(alice),
+        valid,
+        mapOf(
+            "an unknown field" to valid + ("email" to alice.email),
+            "no createdAt" to valid - "createdAt",
+            "a displayName that is not a string" to valid + ("displayName" to 42),
+        ),
+    )
+  }
+
   // ---- venues ----
 
   @Test
   fun venueIsReadableBySignedInUsersAndWritableByItsOwnerOnly() {
-    val venue = newUser()
-    val explorer = newUser()
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
 
     signInAs(venue)
-    assertSucceeds(db.collection("venues").document(venue.uid).set(mapOf("name" to "Café")))
+    assertSucceeds(venueOf(venue).set(venueData()))
 
     signInAs(explorer)
-    assertSucceeds(db.collection("venues").document(venue.uid).get(Source.SERVER))
-    assertDenied(
-        db.collection("venues")
-            .document(venue.uid)
-            .set(mapOf("name" to "Taken"), SetOptions.merge())
-    )
+    assertSucceeds(venueOf(venue).get(Source.SERVER))
+    assertDenied(venueOf(venue).set(mapOf("name" to "Taken"), SetOptions.merge()))
 
-    auth.signOut()
-    assertDenied(db.collection("venues").document(venue.uid).get(Source.SERVER))
+    signOut()
+    assertDenied(venueOf(venue).get(Source.SERVER))
+  }
+
+  @Test
+  fun onlyVenueAccountsWriteTheirVenue() {
+    val explorer = newUser(Role.EXPLORER)
+    assertDenied(venueOf(explorer).set(venueData()), "an explorer")
+
+    val withoutProfile = newUser()
+    assertDenied(venueOf(withoutProfile).set(venueData()), "an account without a profile")
+  }
+
+  @Test
+  fun venueMustFollowTheSchema() {
+    val venue = newUser(Role.VENUE)
+    val valid = venueData()
+
+    assertOnlyValidWriteSucceeds(
+        venueOf(venue),
+        valid,
+        mapOf(
+            "a name over 100 characters" to valid + ("name" to "x".repeat(101)),
+            "a radius under 20 m" to valid + ("radiusMeters" to 19),
+            "a radius over 200 m" to valid + ("radiusMeters" to 201),
+            "a location that is not a GeoPoint" to valid + ("location" to "Lausanne"),
+            "no createdAt" to valid - "createdAt",
+            "an unknown field" to valid + ("ownerUid" to venue.uid),
+        ),
+    )
+    // Optional fields are omitted when null
+    assertSucceeds(venueOf(venue).set(valid - listOf("location", "address", "featuredQuestId")))
   }
 
   // ---- quests ----
 
   @Test
   fun venueCreatesQuestsOnlyUnderItsOwnId() {
-    val venue = newUser()
-    val other = newUser()
+    val venue = newUser(Role.VENUE)
+    val other = newUser(Role.VENUE)
     signInAs(venue)
 
-    assertSucceeds(newQuest().set(quest(venueId = venue.uid)))
-    assertDenied(newQuest().set(quest(venueId = other.uid)))
+    assertSucceeds(newQuest().set(questData(venue)))
+    assertDenied(newQuest().set(questData(other)))
+  }
+
+  @Test
+  fun onlyVenueAccountsWriteQuests() {
+    val explorer = newUser(Role.EXPLORER)
+    assertDenied(newQuest().set(questData(explorer)), "an explorer")
+
+    val withoutProfile = newUser()
+    assertDenied(newQuest().set(questData(withoutProfile)), "an account without a profile")
   }
 
   @Test
   fun questsAreReadableBySignedInUsersOnly() {
-    val venue = newUser()
+    val venue = newUser(Role.VENUE)
     val explorer = newUser()
     signInAs(venue)
     val quest = newQuest()
-    assertSucceeds(quest.set(quest(venueId = venue.uid)))
+    assertSucceeds(quest.set(questData(venue)))
 
     signInAs(explorer)
     assertSucceeds(quest.get(Source.SERVER))
-    auth.signOut()
+    signOut()
     assertDenied(quest.get(Source.SERVER))
   }
 
   @Test
   fun onlyTheOwningVenueEditsAQuestAndCannotReassignIt() {
-    val venue = newUser()
-    val other = newUser()
+    val venue = newUser(Role.VENUE)
+    val other = newUser(Role.VENUE)
     signInAs(venue)
     val quest = newQuest()
-    assertSucceeds(quest.set(quest(venueId = venue.uid)))
+    assertSucceeds(quest.set(questData(venue)))
 
     assertSucceeds(quest.update("title", "New title"))
+    assertDenied(quest.update("title", "x".repeat(61)), "an update that breaks the schema")
     assertDenied(quest.update("venueId", other.uid))
 
     signInAs(other)
@@ -135,28 +192,156 @@ class FirestoreRulesTest {
     assertDenied(quest.delete())
   }
 
+  @Test
+  fun questMustFollowTheSchema() {
+    val venue = newUser(Role.VENUE)
+    val valid = questData(venue)
+
+    assertOnlyValidWriteSucceeds(
+        newQuest(),
+        valid,
+        mapOf(
+            "a title over 60 characters" to valid + ("title" to "x".repeat(61)),
+            "a description over 500 characters" to valid + ("description" to "x".repeat(501)),
+            "requirements over 300 characters" to valid + ("requirements" to "x".repeat(301)),
+            "a radius over 200 m" to valid + ("radiusMeters" to 201),
+            "a radius that is not an integer" to valid + ("radiusMeters" to "50"),
+            "a party of 0" to valid + ("minPartySize" to 0),
+            "an exactPartySize that is not a boolean" to valid + ("exactPartySize" to "yes"),
+            "an unknown proof type" to valid + ("proofType" to "VIDEO"),
+            "an unknown status" to valid + ("status" to "LIVE"),
+            "no venueName" to valid - "venueName",
+            "an unknown field" to valid + ("rating" to 5),
+        ),
+    )
+    assertSucceeds(newQuest().set(valid + ("exactPartySize" to true)))
+  }
+
+  @Test
+  fun rewardMustMatchItsType() {
+    val venue = newUser(Role.VENUE)
+    val expiresAt = Timestamp.now()
+    val validRewards =
+        listOf(
+            mapOf(
+                "type" to "DISCOUNT",
+                "amount" to 12.5,
+                "unit" to "PERCENT",
+                "specifics" to "On drinks",
+                "expiresAt" to expiresAt,
+            ),
+            mapOf("type" to "DISCOUNT", "amount" to 150, "unit" to "CHF"),
+            mapOf("type" to "FREE_ITEM", "name" to "Coffee", "specifics" to "Any size"),
+            mapOf("type" to "OTHER", "description" to "A sticker", "expiresAt" to expiresAt),
+        )
+    val invalidRewards =
+        mapOf(
+            "a discount over 100 %" to
+                mapOf("type" to "DISCOUNT", "amount" to 101, "unit" to "PERCENT"),
+            "a discount under 0.01" to mapOf("type" to "DISCOUNT", "amount" to 0, "unit" to "CHF"),
+            "an unknown unit" to mapOf("type" to "DISCOUNT", "amount" to 5, "unit" to "EUR"),
+            "a discount without an amount" to mapOf("type" to "DISCOUNT", "unit" to "CHF"),
+            "an item name over 60 characters" to
+                mapOf("type" to "FREE_ITEM", "name" to "x".repeat(61)),
+            "specifics over 200 characters" to
+                mapOf("type" to "FREE_ITEM", "name" to "Coffee", "specifics" to "x".repeat(201)),
+            "a field of another type" to
+                mapOf("type" to "OTHER", "description" to "A sticker", "amount" to 5),
+            "an unknown type" to mapOf("type" to "MYSTERY", "description" to "Surprise"),
+            "no type" to mapOf("description" to "Surprise"),
+            "an expiry that is not a timestamp" to
+                mapOf("type" to "OTHER", "description" to "A sticker", "expiresAt" to "tomorrow"),
+        )
+
+    for ((why, reward) in invalidRewards) {
+      assertDenied(newQuest().set(questData(venue) + ("reward" to reward)), why)
+    }
+    for (reward in validRewards) {
+      assertSucceeds(newQuest().set(questData(venue) + ("reward" to reward)))
+    }
+  }
+
   // ---- reservations ----
 
   @Test
   fun explorerCreatesOnlyPendingReservationsThatListThem() {
-    val venue = newUser()
-    val explorer = newUser()
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
     val friend = newUser()
     signInAs(explorer)
 
-    assertSucceeds(newReservation().set(reservation(venue, listOf(explorer, friend))))
-    assertDenied(newReservation().set(reservation(venue, listOf(friend))))
-    assertDenied(newReservation().set(reservation(venue, listOf(explorer), status = "APPROVED")))
+    assertSucceeds(newReservation().set(reservation(quest, venue, listOf(explorer, friend))))
+    assertDenied(newReservation().set(reservation(quest, venue, listOf(friend))))
+    assertDenied(
+        newReservation().set(reservation(quest, venue, listOf(explorer), status = "APPROVED"))
+    )
+  }
+
+  @Test
+  fun onlyExplorerAccountsCreateReservations() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    assertDenied(newReservation().set(reservation(quest, venue, listOf(venue))), "a venue")
+
+    val withoutProfile = newUser()
+    assertDenied(
+        newReservation().set(reservation(quest, venue, listOf(withoutProfile))),
+        "an account without a profile",
+    )
+
+    val explorer = newUser(Role.EXPLORER)
+    assertSucceeds(newReservation().set(reservation(quest, venue, listOf(explorer))))
+  }
+
+  @Test
+  fun reservationMustBeForAnActiveQuestOfItsVenue() {
+    val venue = newUser(Role.VENUE)
+    val otherVenue = newUser(Role.VENUE)
+    val active = questOf(venue)
+    val draft = questOf(venue, status = "DRAFT")
+    val explorer = newUser(Role.EXPLORER)
+
+    assertDenied(newReservation().set(reservation(draft, venue, listOf(explorer))), "a draft")
+    assertDenied(
+        newReservation().set(reservation("missing", venue, listOf(explorer))),
+        "a missing quest",
+    )
+    assertDenied(
+        newReservation().set(reservation(active, otherVenue, listOf(explorer))),
+        "another venue than the quest's",
+    )
+    assertSucceeds(newReservation().set(reservation(active, venue, listOf(explorer))))
+  }
+
+  @Test
+  fun reservationMustFollowTheSchema() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
+    val valid = reservation(quest, venue, listOf(explorer))
+
+    assertOnlyValidWriteSucceeds(
+        newReservation(),
+        valid,
+        mapOf(
+            "no slotStart" to valid - "slotStart",
+            "a slotStart that is not a timestamp" to valid + ("slotStart" to 1_800_000_000_000L),
+            "a party that is not a list" to valid + ("explorerUids" to explorer.uid),
+            "an unknown field" to valid + ("leaderUid" to explorer.uid),
+        ),
+    )
   }
 
   @Test
   fun reservationIsReadableByItsVenueAndPartyOnly() {
-    val venue = newUser()
-    val explorer = newUser()
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
     val outsider = newUser()
     signInAs(explorer)
     val reservation = newReservation()
-    assertSucceeds(reservation.set(reservation(venue, listOf(explorer))))
+    assertSucceeds(reservation.set(reservation(quest, venue, listOf(explorer))))
 
     signInAs(venue)
     assertSucceeds(reservation.get(Source.SERVER))
@@ -165,13 +350,13 @@ class FirestoreRulesTest {
   }
 
   @Test
-  fun onlyTheVenueMovesAReservationAlongAllowedTransitions() {
-    val venue = newUser()
-    val explorer = newUser()
+  fun venueMovesAReservationAlongAllowedTransitionsOnly() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
     signInAs(explorer)
     val reservation = newReservation()
-    assertSucceeds(reservation.set(reservation(venue, listOf(explorer))))
-    assertDenied(reservation.update("status", "APPROVED"))
+    assertSucceeds(reservation.set(reservation(quest, venue, listOf(explorer))))
 
     signInAs(venue)
     assertDenied(reservation.update(mapOf("status" to "APPROVED", "slotStart" to "changed")))
@@ -179,6 +364,29 @@ class FirestoreRulesTest {
     assertDenied(reservation.update("status", "PENDING"))
     assertSucceeds(reservation.update("status", "CANCELLED"))
     assertDenied(reservation.update("status", "APPROVED"))
+  }
+
+  @Test
+  fun explorerOfThePartyCancelsButNeverAnswers() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
+    val outsider = newUser()
+    signInAs(explorer)
+    val pending = newReservation()
+    assertSucceeds(pending.set(reservation(quest, venue, listOf(explorer))))
+    val approved = newReservation()
+    assertSucceeds(approved.set(reservation(quest, venue, listOf(explorer))))
+    signInAs(venue)
+    assertSucceeds(approved.update("status", "APPROVED"))
+
+    signInAs(outsider)
+    assertDenied(pending.update("status", "CANCELLED"), "an outsider cancelling")
+    signInAs(explorer)
+    assertDenied(pending.update("status", "APPROVED"), "the explorer approving")
+    assertDenied(pending.update("status", "REJECTED"), "the explorer rejecting")
+    assertSucceeds(pending.update("status", "CANCELLED"))
+    assertSucceeds(approved.update("status", "CANCELLED"))
   }
 
   // ---- completions ----
@@ -198,45 +406,122 @@ class FirestoreRulesTest {
 
   private data class TestUser(val email: String, val uid: String)
 
-  /** Creates an emulator user; signing up leaves them signed in. */
-  private fun newUser(): TestUser {
+  /**
+   * Creates an emulator user; signing up leaves them signed in. With a [role], also saves their
+   * profile with it, as the app does after sign-up.
+   */
+  private fun newUser(role: Role? = null): TestUser {
     val email = "test-${UUID.randomUUID()}@around.test"
     val uid = assertSucceeds(auth.createUserWithEmailAndPassword(email, PASSWORD)).user!!.uid
-    return TestUser(email, uid)
+    awaitUserChange()
+    val created = TestUser(email, uid)
+    if (role != null) assertSucceeds(user(created).set(profile(role.name)))
+    return created
   }
 
   private fun signInAs(user: TestUser) {
     assertSucceeds(auth.signInWithEmailAndPassword(user.email, PASSWORD))
+    awaitUserChange()
   }
 
+  private fun signOut() {
+    auth.signOut()
+    awaitUserChange()
+  }
+
+  /**
+   * Waits until Firestore knows who is signed in. Auth tells it on the main thread, after the
+   * sign-in task has completed, so a write issued in between is queued for the previous user and
+   * never sent.
+   */
+  private fun awaitUserChange() = InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
   private fun user(user: TestUser) = db.collection("users").document(user.uid)
+
+  private fun venueOf(user: TestUser) = db.collection("venues").document(user.uid)
 
   private fun newQuest() = db.collection("quests").document(UUID.randomUUID().toString())
 
   private fun newReservation() =
       db.collection("reservations").document(UUID.randomUUID().toString())
 
-  private fun profile(role: String?) = mapOf("displayName" to DISPLAY_NAME, "role" to role)
+  /** Has [venue] create a quest with [status] and returns its id. Leaves [venue] signed in. */
+  private fun questOf(venue: TestUser, status: String = "ACTIVE"): String {
+    signInAs(venue)
+    val quest = newQuest()
+    assertSucceeds(quest.set(questData(venue) + ("status" to status)))
+    return quest.id
+  }
 
-  private fun quest(venueId: String) =
-      mapOf("venueId" to venueId, "title" to "Find the hidden owl", "status" to "ACTIVE")
+  private fun profile(role: String?) =
+      mapOf("displayName" to DISPLAY_NAME, "role" to role, "createdAt" to Timestamp.now())
 
-  private fun reservation(venue: TestUser, party: List<TestUser>, status: String = "PENDING") =
+  /** A venue with every optional field set. */
+  private fun venueData() =
       mapOf(
-          "questId" to "quest",
+          "name" to "Café",
+          "location" to GeoPoint(46.52, 6.57),
+          "radiusMeters" to 50,
+          "address" to "Rue de Bourg 1, Lausanne",
+          "createdAt" to Timestamp.now(),
+          "featuredQuestId" to "quest-1",
+      )
+
+  /** An active quest of [venue] with only the required fields set. */
+  private fun questData(venue: TestUser) =
+      mapOf(
+          "venueId" to venue.uid,
+          "venueName" to "Café",
+          "location" to GeoPoint(46.52, 6.57),
+          "radiusMeters" to 50,
+          "title" to "Find the hidden owl",
+          "description" to "An owl hides somewhere in the café.",
+          "requirements" to "Photograph it.",
+          "proofType" to "PHOTO",
+          "minPartySize" to 1,
+          "status" to "ACTIVE",
+          "createdAt" to Timestamp.now(),
+          "updatedAt" to Timestamp.now(),
+      )
+
+  private fun reservation(
+      questId: String,
+      venue: TestUser,
+      party: List<TestUser>,
+      status: String = "PENDING",
+  ) =
+      mapOf(
+          "questId" to questId,
           "venueId" to venue.uid,
           "explorerUids" to party.map { it.uid },
+          "slotStart" to Timestamp.now(),
           "status" to status,
+          "createdAt" to Timestamp.now(),
       )
+
+  /**
+   * Asserts that writing each of [invalid], keyed by what is wrong with it, to [document] is
+   * denied, and that writing [valid] then succeeds, so each denial comes from what is wrong.
+   */
+  private fun assertOnlyValidWriteSucceeds(
+      document: DocumentReference,
+      valid: Map<String, Any?>,
+      invalid: Map<String, Map<String, Any?>>,
+  ) {
+    for ((why, data) in invalid) assertDenied(document.set(data), why)
+    assertSucceeds(document.set(valid))
+  }
 
   private fun <T> assertSucceeds(task: Task<T>): T = Tasks.await(task, TIMEOUT_S, TimeUnit.SECONDS)
 
-  private fun assertDenied(task: Task<*>) {
+  /** Asserts the rules deny [task]; [why] names the case in the failure message. */
+  private fun assertDenied(task: Task<*>, why: String = "") {
     val error =
-        assertThrows(ExecutionException::class.java) {
+        assertThrows(why, ExecutionException::class.java) {
           Tasks.await(task, TIMEOUT_S, TimeUnit.SECONDS)
         }
     assertEquals(
+        why,
         FirebaseFirestoreException.Code.PERMISSION_DENIED,
         (error.cause as FirebaseFirestoreException).code,
     )

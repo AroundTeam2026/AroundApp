@@ -3,11 +3,18 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
+import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorClient
 import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -38,9 +45,10 @@ import org.junit.runner.RunWith
  * Two clients take part, each from [emulatorClient] on its own named [FirebaseApp] on the
  * `demo-project` id, never the default app, so the tests cannot reach the real project: the
  * explorer creates reservations and the venue answers them. Each client has its own empty cache, so
- * what the venue reads has been accepted by the server. Each test signs in fresh users and uses the
- * venue's uid as the venue id, as the rules require, so tests never see each other's reservations.
- * Each test's KDoc names the production bug it catches.
+ * what the venue reads has been accepted by the server. Each test signs in fresh users, uses the
+ * venue's uid as the venue id and has the venue create an active quest to reserve, as the rules
+ * require, so tests never see each other's reservations. Each test's KDoc names the production bug
+ * it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class ReservationRepositoryFirestoreTest {
@@ -69,16 +77,23 @@ class ReservationRepositoryFirestoreTest {
   /** Uid of the venue signed in by [setUp], used as the venue id of every reservation. */
   private lateinit var venueId: String
 
-  /** Signs in a fresh explorer and a fresh venue, each on their own client of the emulator. */
+  /** Id of the venue's active quest, created by [setUp], which every reservation is for. */
+  private lateinit var questId: String
+
+  /**
+   * Signs in a fresh explorer and a fresh venue, each on their own client of the emulator, and has
+   * the venue create the quest to reserve.
+   */
   @Before
   fun setUp() =
       runBlocking<Unit> {
         withTimeout(SETUP_TIMEOUT_MS) {
-          explorerUid = signInNewUser(EXPLORER_APP)
-          venueId = signInNewUser(VENUE_APP)
+          explorerUid = signInNewUser(EXPLORER_APP, Role.EXPLORER)
+          venueId = signInNewUser(VENUE_APP, Role.VENUE)
+          explorerDb = emulatorClient(EXPLORER_APP)
+          venueDb = emulatorClient(VENUE_APP)
+          questId = createActiveQuest()
         }
-        explorerDb = emulatorClient(EXPLORER_APP)
-        venueDb = emulatorClient(VENUE_APP)
         explorerRepository = ReservationRepositoryFirestore(explorerDb) { FIXED_NOW }
         venueRepository = ReservationRepositoryFirestore(venueDb) { FIXED_NOW }
       }
@@ -106,7 +121,7 @@ class ReservationRepositoryFirestoreTest {
     assertEquals(
         Reservation(
             id = id,
-            questId = QUEST_ID,
+            questId = questId,
             venueId = venueId,
             explorerUids = listOf(explorerUid, FRIEND_UID),
             slotStart = SLOT_START,
@@ -271,18 +286,11 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun observe_skipsMalformedDocuments() = withTimeoutBlocking {
-    // No questId, slotStart or createdAt; the rules only check the party and the status.
-    explorerDb
-        .collection(RESERVATIONS)
-        .document()
-        .set(
-            mapOf(
-                "venueId" to venueId,
-                "explorerUids" to listOf(explorerUid),
-                "status" to "PENDING",
-            )
-        )
-        .await()
+    // No questId, slotStart or createdAt: the rules refuse it, so it goes past them
+    writeBypassingRules(
+        "$RESERVATIONS/${explorerDb.collection(RESERVATIONS).document().id}",
+        mapOf("venueId" to venueId, "explorerUids" to listOf(explorerUid), "status" to "PENDING"),
+    )
     val validId = createAndSync()
 
     val forVenue =
@@ -344,38 +352,34 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun updateStatus_forAMalformedDocument_failsWithNoSuchElement() = withTimeoutBlocking {
-    val document = explorerDb.collection(RESERVATIONS).document()
-    // No questId, slotStart or createdAt; the rules only check the party and the status, and the
-    // venue may read it because the venueId matches.
-    document
-        .set(
-            mapOf(
-                "venueId" to venueId,
-                "explorerUids" to listOf(explorerUid),
-                "status" to "PENDING",
-            )
-        )
-        .await()
+    val id = explorerDb.collection(RESERVATIONS).document().id
+    // No questId, slotStart or createdAt: the rules refuse it, so it goes past them. The venue may
+    // read it because the venueId matches.
+    writeBypassingRules(
+        "$RESERVATIONS/$id",
+        mapOf("venueId" to venueId, "explorerUids" to listOf(explorerUid), "status" to "PENDING"),
+    )
 
-    val result = venueRepository.updateStatus(document.id, ReservationStatus.APPROVED)
+    val result = venueRepository.updateStatus(id, ReservationStatus.APPROVED)
 
     assertTrue(result.exceptionOrNull() is NoSuchElementException)
-    assertEquals("PENDING", storedStatus(document.id))
+    assertEquals("PENDING", storedStatus(id))
   }
 
   /**
-   * Bug: the KDoc and the rules disagree: an explorer cancelling their own reservation is refused
-   * by the rules, so it must come back as a failure and leave the reservation untouched. This test
-   * is the one to change when E21 lets explorers cancel.
+   * Bug: the KDoc and the rules disagree: an explorer of the party may cancel their reservation
+   * (E21) but not answer it in the venue's place, and that refusal must come back as a failure that
+   * leaves the reservation untouched.
    */
   @Test
-  fun updateStatus_byTheExplorer_isRefusedByTheRules() = withTimeoutBlocking {
+  fun updateStatus_byTheExplorer_cancelsButCannotApprove() = withTimeoutBlocking {
     val id = createAndSync()
 
-    val result = explorerRepository.updateStatus(id, ReservationStatus.CANCELLED)
-
-    assertPermissionDenied(result)
+    assertPermissionDenied(explorerRepository.updateStatus(id, ReservationStatus.APPROVED))
     assertEquals("PENDING", storedStatus(id))
+
+    explorerRepository.updateStatus(id, ReservationStatus.CANCELLED).getOrThrow()
+    assertEquals("CANCELLED", storedStatus(id))
   }
 
   /**
@@ -385,13 +389,41 @@ class ReservationRepositoryFirestoreTest {
   private fun reservation(party: List<String> = listOf(explorerUid, FRIEND_UID)) =
       Reservation(
           id = "",
-          questId = QUEST_ID,
+          questId = questId,
           venueId = venueId,
           explorerUids = party,
           slotStart = SLOT_START,
           status = ReservationStatus.PENDING,
           createdAt = 1L,
       )
+
+  /**
+   * Has the venue create an active quest and waits until the server has it, since the rules read
+   * the quest when a reservation for it is created.
+   *
+   * @return the quest's id.
+   */
+  private suspend fun createActiveQuest(): String {
+    val quest =
+        Quest(
+            id = "",
+            venueId = venueId,
+            venueName = "Cafe",
+            location = Location(46.52, 6.57),
+            radiusMeters = 50,
+            title = "Title",
+            description = "Description",
+            requirements = "Requirements",
+            proofType = ProofType.PHOTO,
+            reward = null,
+            status = QuestStatus.ACTIVE,
+            createdAt = 0L,
+            updatedAt = 0L,
+        )
+    val id = QuestRepositoryFirestore(venueDb).createQuest(quest).getOrThrow()
+    venueDb.waitForPendingWrites().await()
+    return id
+  }
 
   /**
    * Creates [reservation] as the explorer and waits until the server has answered the write, so
@@ -446,9 +478,6 @@ class ReservationRepositoryFirestoreTest {
 
     /** The app whose client a test terminates on purpose, to make the write fail. */
     const val TERMINATED_APP = "reservation-test-terminated"
-
-    /** The id of the quest every reservation is for; the rules don't check that it exists. */
-    const val QUEST_ID = "quest-1"
 
     /** A party member who never signs in; only the explorer's own uid matters to the rules. */
     const val FRIEND_UID = "friend-uid"
