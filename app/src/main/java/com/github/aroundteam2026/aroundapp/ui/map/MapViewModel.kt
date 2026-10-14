@@ -207,19 +207,20 @@ class MapViewModel(
    * The quests are listened to once, for both the pins and the nearby list, and their venues again
    * only when the set of venues changes, as each new listener costs Firestore reads.
    */
+  // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun mapData(): Flow<MapData> {
     val quests =
         questRepository
             .observeActiveQuests()
-            .catch { emit(emptyList()) }
+            .catch { emit(emptyList()) } // NOSONAR
             .shareIn(viewModelScope, SharingStarted.WhileSubscribed(), replay = 1)
     val venues =
         quests
             .map { it.mapTo(mutableSetOf()) { quest -> quest.venueId } }
             .distinctUntilChanged()
             .flatMapLatest { venueIds ->
-              venueRepository.observeVenues(venueIds).catch { emit(emptyList()) }
+              venueRepository.observeVenues(venueIds).catch { emit(emptyList()) } // NOSONAR
             }
     return combine(quests, venues, explorer) { current, known, here ->
           Triple(current, known.associateBy { it.id }, here)
