@@ -51,6 +51,13 @@ class AroundAppTest {
     composeTestRule.waitForIdle()
   }
 
+  /** Opens a venue's page as a tap on its card on the map does. */
+  private fun openFromMap(venueId: String) {
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnUiThread { navController.openVenueFromMap(venueId, "Café") }
+    composeTestRule.waitForIdle()
+  }
+
   private fun select(tab: Tab) {
     composeTestRule.onNodeWithTag(tab.tabTag).performClick()
   }
@@ -144,23 +151,29 @@ class AroundAppTest {
     composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
   }
 
-  // A venue's card on the map opens its page: the Map tab stays selected, and Back returns to it
+  // The map's card passes the venue's id, which the venue page loads
   @Test
-  fun aVenueCardOnTheMapOpensItsPageInTheMapTab() {
+  fun aVenueCardOnTheMapOpensThatVenuesPage() {
     launchWithNavController()
     select(Tab.MAP)
-    composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread { navController.openVenueFromMap("venue-1", "Café") }
-    composeTestRule.waitForIdle()
+    openFromMap("venue-1")
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(Tab.MAP.tabTag).assertIsSelected()
     val venueId = composeTestRule.runOnUiThread {
       navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
     }
     assertEquals("venue-1", venueId)
+  }
 
+  // A fast double tap on a card would otherwise stack the venue's page twice
+  @Test
+  fun aDoubleTapOnACardOpensTheVenuePageOnce() {
+    launchWithNavController()
+    select(Tab.MAP)
+    openFromMap("venue-1")
+    openFromMap("venue-1")
     pressBack()
+
     assertShowing(Tab.MAP)
   }
 

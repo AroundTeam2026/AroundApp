@@ -142,12 +142,15 @@ private fun NavHostController.tabOfCurrentScreen(): Tab? {
 }
 
 /**
- * Opens the page of the venue with [venueId], when its card on the map is tapped. The venue page
- * loads the venue's name itself, so [venueName] is not passed on.
+ * Opens the page of the venue with [venueId], when its card on the map is tapped. A tap that
+ * arrives once a venue's page is open, such as the second of a fast double tap, opens nothing. The
+ * venue page loads the venue's name itself, so [venueName] is not passed on.
  */
 @Suppress("UNUSED_PARAMETER")
-internal fun NavHostController.openVenueFromMap(venueId: String, venueName: String) =
-    navigateToVenuePage(venueId)
+internal fun NavHostController.openVenueFromMap(venueId: String, venueName: String) {
+  if (currentDestination?.route == Routes.VENUE_PAGE) return
+  navigateToVenuePage(venueId)
+}
 
 /**
  * The screen of [tab].

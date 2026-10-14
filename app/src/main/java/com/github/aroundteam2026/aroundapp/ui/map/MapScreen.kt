@@ -44,7 +44,7 @@ import com.google.maps.android.compose.MapUiSettings
 fun MapScreen(
     viewModel: MapViewModel = viewModel(factory = MapViewModel.factory),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
-    onOpenVenue: (venueId: String, venueName: String) -> Unit = { _, _ -> },
+    onOpenVenue: (venueId: String, venueName: String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
