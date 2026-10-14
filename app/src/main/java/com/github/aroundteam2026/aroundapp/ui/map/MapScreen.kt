@@ -39,13 +39,12 @@ import com.google.maps.android.compose.MapUiSettings
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
- *   Nothing opens yet: the venue page comes in its own task.
  */
 @Composable
 fun MapScreen(
     viewModel: MapViewModel = viewModel(factory = MapViewModel.factory),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
-    onOpenVenue: (venueId: String, venueName: String) -> Unit = { _, _ -> },
+    onOpenVenue: (venueId: String, venueName: String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
