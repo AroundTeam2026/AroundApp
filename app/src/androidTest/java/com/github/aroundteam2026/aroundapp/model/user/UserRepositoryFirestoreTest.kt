@@ -174,6 +174,12 @@ class UserRepositoryFirestoreTest {
     assertTrue(runCatching { user.first() }.exceptionOrNull() is IllegalArgumentException)
   }
 
+  /** Bug: getUser throws for a profile that does not exist instead of returning null. */
+  @Test
+  fun getUser_whenMissing_returnsNull() = withTimeoutBlocking {
+    assertNull(repository.getUser(uid))
+  }
+
   /** Bug: a malformed document makes getUser throw instead of reading it as missing. */
   @Test
   fun getUser_readsAMalformedDocumentAsMissing() = withTimeoutBlocking {
