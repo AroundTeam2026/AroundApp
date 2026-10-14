@@ -70,12 +70,13 @@ import com.github.aroundteam2026.aroundapp.resources.C
 
 /**
  * Entry point for the venue sign-up flow. The navigation owner supplies the existing ViewModel and
- * moves to location setup when [onContinueToLocation] receives the saved venue id.
+ * moves to location setup when [onContinueToLocation] receives the saved venue id. With no
+ * [onBack], this is a root screen: hide the arrow and leave system Back to the activity.
  */
 @Composable
 fun VenueInitializationScreen(
     viewModel: VenueInitializationViewModel,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onContinueToLocation: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -87,7 +88,9 @@ fun VenueInitializationScreen(
       viewModel.onLocationNavigationHandled()
     }
   }
-  BackHandler { if (!state.isSaving) onBack() }
+  if (onBack != null) {
+    BackHandler { if (!state.isSaving) onBack() }
+  }
   VenueInitializationContent(
       state = state,
       onNameChange = viewModel::updateBusinessName,
@@ -103,7 +106,7 @@ fun VenueInitializationContent(
     state: VenueInitializationUiState,
     onNameChange: (String) -> Unit,
     onSubmit: () -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
   MaterialTheme(colorScheme = VenueSetupColors, typography = VenueSetupTypography) {
@@ -127,20 +130,22 @@ fun VenueInitializationContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-          Surface(
-              onClick = onBack,
-              enabled = !state.isSaving,
-              shape = CircleShape,
-              color = MaterialTheme.colorScheme.surface,
-              border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-              modifier = Modifier.size(48.dp).testTag(C.Tag.VENUE_INITIALIZATION_BACK),
-          ) {
-            Box(contentAlignment = Alignment.Center) {
-              Image(
-                  painterResource(R.drawable.venue_setup_back),
-                  stringResource(R.string.back),
-                  Modifier.size(22.dp),
-              )
+          if (onBack != null) {
+            Surface(
+                onClick = onBack,
+                enabled = !state.isSaving,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.size(48.dp).testTag(C.Tag.VENUE_INITIALIZATION_BACK),
+            ) {
+              Box(contentAlignment = Alignment.Center) {
+                Image(
+                    painterResource(R.drawable.venue_setup_back),
+                    stringResource(R.string.back),
+                    Modifier.size(22.dp),
+                )
+              }
             }
           }
           Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {

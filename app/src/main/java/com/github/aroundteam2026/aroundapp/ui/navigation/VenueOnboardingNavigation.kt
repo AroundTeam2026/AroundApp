@@ -25,16 +25,18 @@ fun NavHostController.navigateToVenueInitialization() {
 }
 
 /**
- * Adds venue setup to the auth owner's NavHost. The location screen is supplied by its owner;
+ * Adds venue setup to its owner's NavHost. The location screen is supplied by its owner;
  * [locationScreen] receives the saved owner's uid and a callback to return to initialization.
  *
  * Initialization is scoped to its back-stack entry, so its name and saved venue survive Back from
- * location. Returning to it does not immediately navigate forward again.
+ * location. Returning to it does not immediately navigate forward again. Pass null for
+ * [initializationOnBack] when initialization is the graph root, so system Back leaves the flow.
  */
 fun NavGraphBuilder.venueOnboardingDestinations(
     navController: NavHostController,
     authRepository: AuthRepository,
     venueRepository: VenueRepository,
+    initializationOnBack: (() -> Unit)? = { navController.popBackStack() },
     locationScreen: @Composable (venueId: String, onBack: () -> Unit) -> Unit,
 ) {
   composable(VenueOnboardingRoutes.INITIALIZATION) { entry ->
@@ -44,7 +46,7 @@ fun NavGraphBuilder.venueOnboardingDestinations(
         }
     VenueInitializationScreen(
         viewModel = initializationViewModel,
-        onBack = { navController.popBackStack() },
+        onBack = initializationOnBack,
         onContinueToLocation = { venueId ->
           navController.navigate("venue_location/${android.net.Uri.encode(venueId)}") {
             launchSingleTop = true
