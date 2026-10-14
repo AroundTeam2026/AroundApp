@@ -23,7 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -74,7 +74,7 @@ fun VenuePageScreen(
     questRow: VenuePageQuestRow = PlaceholderQuestRow,
     bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {},
 ) {
-  val state by viewModel.uiState.collectAsState()
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
   VenuePageContent(
       state = state,
       onBack = onBack,
