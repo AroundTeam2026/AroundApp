@@ -23,6 +23,16 @@ object C {
     const val PROFILE_SCREEN = "profile_screen"
     const val PROFILE_SIGN_OUT = "profile_sign_out"
 
+    const val VENUE_HOME = "venue_home"
+    const val VENUE_NAV_BAR = "venue_nav_bar"
+    const val VENUE_DASHBOARD_TAB = "venue_dashboard_tab"
+    const val VENUE_QUESTS_TAB = "venue_quests_tab"
+    const val VENUE_PROFILE_TAB = "venue_profile_tab"
+    const val VENUE_DASHBOARD_SCREEN = "venue_dashboard_screen"
+    const val VENUE_QUESTS_SCREEN = "venue_quests_screen"
+    const val VENUE_NEW_QUEST = "venue_new_quest"
+    const val VENUE_QUESTS_STUB = "venue_quests_stub"
+
     const val AUTH_SCREEN = "auth_screen"
     const val AUTH_TITLE = "auth_title"
     const val AUTH_VENUE_LINK = "auth_venue_link"
