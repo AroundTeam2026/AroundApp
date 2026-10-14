@@ -7,6 +7,9 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.user.Role
+import com.github.aroundteam2026.aroundapp.model.user.User
+import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -39,7 +42,8 @@ class AroundAppVenuePageDeviceTest {
   private lateinit var venue: Venue
 
   /**
-   * Signs in a fresh user, since the rules let only signed-in users read venues, and saves theirs.
+   * Signs in a fresh venue account and saves its venue: the rules let only a signed-in user whose
+   * profile has the VENUE role write a venue, as registration sets up in the app.
    */
   @Before
   fun setUp() = runBlocking {
@@ -48,6 +52,7 @@ class AroundAppVenuePageDeviceTest {
       val email = "venue-page-${UUID.randomUUID()}@around.test"
       val uid =
           Firebase.auth.createUserWithEmailAndPassword(email, "password123").await().user!!.uid
+      UserRepositoryProvider.repository.createUser(User(uid, "Test", Role.VENUE, 0L)).getOrThrow()
       venue = Venue(uid, "Café Lumen", null, DEFAULT_RADIUS_METERS, null, createdAt = 0L)
       VenueRepositoryProvider.repository.createVenue(venue).getOrThrow()
     }
