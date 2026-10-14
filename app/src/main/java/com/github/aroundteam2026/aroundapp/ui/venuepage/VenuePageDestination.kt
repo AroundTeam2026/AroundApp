@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.util.Log
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
@@ -16,17 +17,26 @@ private const val TAG = "VenuePageDestination"
  * Registers a venue's page, which takes the venue's id as [Routes.VENUE_ID].
  *
  * @param onBack Called when the explorer taps the page's back arrow.
+ * @param page Draws the page of the venue with the given id, with [onBack] as its back action.
  */
-fun NavGraphBuilder.venuePageDestination(onBack: () -> Unit) {
+fun NavGraphBuilder.venuePageDestination(
+    onBack: () -> Unit,
+    page: @Composable (venueId: String, onBack: () -> Unit) -> Unit,
+) {
   composable(
       Routes.VENUE_PAGE,
       arguments = listOf(navArgument(Routes.VENUE_ID) { type = NavType.StringType }),
   ) { entry ->
     // The route only matches a non-blank id, so the argument is always there
     val venueId = requireNotNull(entry.arguments?.getString(Routes.VENUE_ID))
-    VenuePageScreen(viewModel(factory = VenuePageViewModel.factory(venueId)), onBack)
+    page(venueId, onBack)
   }
 }
+
+/** A venue's page as the app shows it, with the app's repositories. */
+@Composable
+fun VenuePage(venueId: String, onBack: () -> Unit) =
+    VenuePageScreen(viewModel(factory = VenuePageViewModel.factory(venueId)), onBack)
 
 /**
  * Opens the page of the venue with [venueId]. Not single-top, so opening another venue's page from

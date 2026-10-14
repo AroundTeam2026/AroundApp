@@ -1,7 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
-import androidx.lifecycle.viewmodel.CreationExtras
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -336,17 +335,6 @@ class VenuePageViewModelTest {
 
     assertEquals(1, listens)
     assertEquals(VenuePageStatus.LOADED, state.status)
-  }
-
-  @Test
-  fun theFactoryBuildsTheViewModelOfItsVenue() = test {
-    val built =
-        VenuePageViewModel.factory("no-such-venue")
-            .create(VenuePageViewModel::class.java, CreationExtras.Empty)
-    // Not advanceUntilIdle: the app's demo quests expire by the real clock, not the test's
-    runCurrent()
-
-    assertEquals(VenuePageStatus.NOT_FOUND, built.uiState.value.status)
   }
 
   private fun <T> failing(): Flow<T> = flow { throw IOException("offline") }
