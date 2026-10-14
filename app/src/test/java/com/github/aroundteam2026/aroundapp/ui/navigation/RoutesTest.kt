@@ -11,8 +11,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -20,14 +18,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
-import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
-import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
-import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.dashboardDestination
 import com.github.aroundteam2026.aroundapp.ui.dashboard.navigateToDashboard
-import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
+import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
@@ -66,7 +61,10 @@ class RoutesTest {
       navController = rememberNavController()
       NavHost(navController, startDestination = VENUE_START) {
         composable(VENUE_START) { Text("Venue home", Modifier.testTag(VENUE_START)) }
-        createQuestDestination(onClose = { navController.popBackStack() }, factory = formFactory)
+        createQuestDestination(
+            onClose = { navController.popBackStack() },
+            factory = createQuestFactoryOnFakes(),
+        )
         dashboardDestination()
       }
     }
@@ -206,12 +204,5 @@ class RoutesTest {
 
   private companion object {
     const val VENUE_START = "venue_start"
-
-    /** The create-quest form on fakes, so the route needs no Firebase. */
-    val formFactory = viewModelFactory {
-      initializer {
-        CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository(), FakeQuestRepository())
-      }
-    }
   }
 }
