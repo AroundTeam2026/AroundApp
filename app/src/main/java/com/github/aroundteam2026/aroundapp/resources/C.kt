@@ -150,5 +150,9 @@ object C {
     const val CREATE_QUEST_REWARD_DESCRIPTION = "create_quest_reward_description"
     const val CREATE_QUEST_REWARD_DESCRIPTION_COUNTER = "create_quest_reward_description_counter"
     const val CREATE_QUEST_REWARD_DESCRIPTION_ERROR = "create_quest_reward_description_error"
+    const val CREATE_QUEST_REWARD_EXPIRY = "create_quest_reward_expiry"
+    const val CREATE_QUEST_REWARD_EXPIRY_CLEAR = "create_quest_reward_expiry_clear"
+    const val CREATE_QUEST_REWARD_EXPIRY_ERROR = "create_quest_reward_expiry_error"
+    const val CREATE_QUEST_REWARD_EXPIRY_CONFIRM = "create_quest_reward_expiry_confirm"
   }
 }
