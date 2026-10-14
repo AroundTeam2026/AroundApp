@@ -3,9 +3,11 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,12 +40,15 @@ class MapViewModelOverlayTest {
           location = Location(46.5220, 6.6330),
       )
   private val lausanne = GeoBounds(south = 46.50, west = 6.60, north = 46.55, east = 6.66)
+  private val quests = MutableStateFlow(listOf(cafe))
+  // The venue moved, off screen, after its quest copied its location: its pin follows the venue
+  private val venueLocation = Location(46.6000, 6.7000)
 
   private val viewModel by lazy {
     MapViewModel(
         FakeLocationRepository(null),
-        ScriptedQuestRepository.of(MutableStateFlow(listOf(cafe))),
-        FakeVenueRepository(),
+        ScriptedQuestRepository.of(quests),
+        FakeVenueRepository(listOf(testVenue(id = "cafe", location = venueLocation))),
         clock = { 1_000L },
     )
   }
@@ -117,5 +122,50 @@ class MapViewModelOverlayTest {
     runCurrent()
 
     assertTrue(state.showsNearby)
+  }
+
+  @Test
+  fun tappingAPageOpensItsVenuesCardInPlaceOfTheOverlay() = test {
+    viewModel.onNearbyOpen()
+    runCurrent()
+    assertTrue("the venue is off screen", state.pins.isEmpty())
+
+    viewModel.onNearbyQuestClick(state.nearby.single())
+    runCurrent()
+
+    assertFalse(state.showsNearby)
+    assertEquals("cafe", state.selectedVenueId)
+    // The open venue keeps its pin until the camera gets there
+    assertEquals(listOf("cafe"), state.pins.map { it.venueId })
+  }
+
+  @Test
+  fun tappingAPageFramesItsVenueWhereItsPinIs() = test {
+    viewModel.onNearbyOpen()
+    runCurrent()
+
+    viewModel.onNearbyQuestClick(state.nearby.single())
+    runCurrent()
+
+    assertEquals(
+        venueLocation.boundsWithin(MapViewModel.VENUE_FRAME_RADIUS_METERS),
+        state.areaToFrame,
+    )
+  }
+
+  @Test
+  fun aPageWhoseVenueLostItsQuestsChangesNothing() = test {
+    viewModel.onNearbyOpen()
+    runCurrent()
+    val page = state.nearby.single()
+    quests.value = emptyList()
+    runCurrent()
+    val before = state
+
+    viewModel.onNearbyQuestClick(page)
+    runCurrent()
+
+    assertEquals(before, state)
+    assertTrue("the overlay stays open", state.showsNearby)
   }
 }

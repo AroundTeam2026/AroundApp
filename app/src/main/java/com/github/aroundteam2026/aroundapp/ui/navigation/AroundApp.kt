@@ -155,8 +155,8 @@ internal fun NavHostController.openVenueFromMap(venueId: String, venueName: Stri
 /**
  * The screen of [tab].
  *
- * @param onOpenVenue opens the page of the venue with this id and name, when its card on the map is
- *   tapped.
+ * @param onOpenVenue opens the page of the venue with this id and name, when its card on the map or
+ *   its quest's "View quest" is tapped.
  * @param onSignOut signs the user out from the Profile tab.
  */
 @Composable

@@ -183,6 +183,23 @@ class MapViewModel(
   }
 
   /**
+   * Called when the explorer taps the page of [quest] in the nearby quests: opens its venue's card
+   * in their place, as a tap on its pin does, and frames [VENUE_FRAME_RADIUS_METERS] around the
+   * venue. The venue is placed where its pin is. A page whose venue no longer has valid quests
+   * changes nothing.
+   */
+  fun onNearbyQuestClick(quest: NearbyQuest) {
+    val pin = content.value.pins.find { it.venueId == quest.venueId } ?: return
+    selectedVenueId.value = pin.venueId
+    _uiState.update {
+      it.copy(
+          areaToFrame = pin.location.boundsWithin(VENUE_FRAME_RADIUS_METERS),
+          showsNearby = false,
+      )
+    }
+  }
+
+  /**
    * The active quests, their venues, the explorer's position and the time, again whenever quests or
    * their venues change, when a reward expires, and once the explorer is located. Without quests,
    * or when they fail, there are none; without venues, the quests' own copies stand in for them.
@@ -242,6 +259,9 @@ class MapViewModel(
   companion object {
     /** The map frames this distance around the explorer, and lists the quests within it. */
     const val NEARBY_RADIUS_METERS = 5_000.0
+
+    /** A tap on a nearby quest frames this distance around its venue, so 500 m across. */
+    const val VENUE_FRAME_RADIUS_METERS = 250.0
 
     /** Builds the [MapViewModel] with the app's [LocationRepository]. */
     val factory: ViewModelProvider.Factory = viewModelFactory {
