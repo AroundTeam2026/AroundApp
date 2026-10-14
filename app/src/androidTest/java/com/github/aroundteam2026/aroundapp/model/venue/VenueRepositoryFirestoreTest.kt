@@ -15,6 +15,8 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -103,20 +105,26 @@ class VenueRepositoryFirestoreTest {
 
   /**
    * Bug: the document does not follow the schema (the location stored as a map, createdAt as a
-   * Long) or the id is also stored as a field. A round trip cannot see any of these.
+   * Long), the id is also stored as a field, or null fields are stored as nulls instead of being
+   * omitted. A round trip cannot see any of these.
    */
   @Test
   fun createVenue_storesSchemaTypes() = withTimeoutBlocking {
     ownerRepository.createVenue(venue(ownerUid)).getOrThrow()
+    readerRepository
+        .createVenue(venue(readerUid).copy(location = null, address = null, featuredQuestId = null))
+        .getOrThrow()
 
-    val document = readerDb.collection(VENUES).document(ownerUid).get(Source.SERVER).await()
+    val full = storedVenue(ownerUid)
+    val minimal = storedVenue(readerUid)
 
     assertEquals(
         setOf("name", "location", "radiusMeters", "address", "createdAt", "featuredQuestId"),
-        document.data!!.keys,
+        full.data!!.keys,
     )
-    assertTrue(document.get("location") is GeoPoint)
-    assertTrue(document.get("createdAt") is Timestamp)
+    assertTrue(full.get("location") is GeoPoint)
+    assertTrue(full.get("createdAt") is Timestamp)
+    assertEquals(setOf("name", "radiusMeters", "createdAt"), minimal.data!!.keys)
   }
 
   /** Bug: creating a venue whose id is taken replaces the stored one instead of failing. */
@@ -131,17 +139,28 @@ class VenueRepositoryFirestoreTest {
     assertEquals(original, readerRepository.getVenue(ownerUid))
   }
 
+  /**
+   * Bug: createVenue checks and writes in separate steps, so of concurrent creations, e.g. a double
+   * tap on onboarding's save, several succeed and the last overwrites the others.
+   */
+  @Test
+  fun createVenue_concurrently_exactlyOneSucceeds() = withTimeoutBlocking {
+    val venues = (1..CONCURRENT_CALLS).map { venue(ownerUid).copy(name = "Venue $it") }
+
+    val results = venues.map { async { ownerRepository.createVenue(it) } }.awaitAll()
+
+    val winners = results.withIndex().filter { it.value.isSuccess }
+    assertEquals(1, winners.size)
+    assertTrue(results.all { it.isSuccess || it.exceptionOrNull() is IllegalStateException })
+    assertEquals(venues[winners.single().index], readerRepository.getVenue(ownerUid))
+  }
+
   /** Bug: an exception escapes createVenue, here the rules refusing a venue of another account. */
   @Test
   fun createVenue_forAnotherAccount_failsWithPermissionDenied() = withTimeoutBlocking {
     val result = ownerRepository.createVenue(venue(readerUid))
 
-    val error = result.exceptionOrNull()
-    assertTrue("Expected a Firestore exception but got $error", error is FirebaseFirestoreException)
-    assertEquals(
-        FirebaseFirestoreException.Code.PERMISSION_DENIED,
-        (error as FirebaseFirestoreException).code,
-    )
+    assertPermissionDenied(result)
   }
 
   /**
@@ -161,9 +180,11 @@ class VenueRepositoryFirestoreTest {
       ownerRepository.createVenue(venue(ownerUid)).getOrThrow()
 
       // A one-shot flow never emits again, so this loop never ends and the test times out.
+      var latest: Venue?
       do {
-        val latest = emissions.receive()
+        latest = emissions.receive()
       } while (latest == null)
+      assertEquals(venue(ownerUid), latest)
     } finally {
       collector.cancel()
     }
@@ -263,7 +284,33 @@ class VenueRepositoryFirestoreTest {
     val result = ownerRepository.setArea(ownerUid, NEW_LOCATION, 120, null)
 
     assertTrue(result.exceptionOrNull() is IllegalArgumentException)
-    assertFalse(readerDb.collection(VENUES).document(ownerUid).get(Source.SERVER).await().exists())
+    assertFalse(storedVenue(ownerUid).exists())
+  }
+
+  /** Bug: setArea moves another account's venue, or an exception escapes instead of a failure. */
+  @Test
+  fun setArea_onAnotherAccountsVenue_failsWithPermissionDeniedAndKeepsIt() = withTimeoutBlocking {
+    val original = venue(readerUid)
+    readerRepository.createVenue(original).getOrThrow()
+
+    val result = ownerRepository.setArea(readerUid, NEW_LOCATION, 120, null)
+
+    assertPermissionDenied(result)
+    assertEquals(original, ownerRepository.getVenue(readerUid))
+  }
+
+  /** The venue document [id] as the server stores it, read by the reader. */
+  private suspend fun storedVenue(id: String) =
+      readerDb.collection(VENUES).document(id).get(Source.SERVER).await()
+
+  /** Asserts [result] is a failure caused by the security rules refusing the write. */
+  private fun assertPermissionDenied(result: Result<*>) {
+    val error = result.exceptionOrNull()
+    assertTrue("Expected a Firestore exception but got $error", error is FirebaseFirestoreException)
+    assertEquals(
+        FirebaseFirestoreException.Code.PERMISSION_DENIED,
+        (error as FirebaseFirestoreException).code,
+    )
   }
 
   /** A venue with every field set, owned by [id]. */
@@ -290,6 +337,9 @@ class VenueRepositoryFirestoreTest {
 
     /** Creation time of every venue, in epoch ms; the non-zero ms catch precision loss. */
     const val CREATED_AT = 1_700_000_000_123L
+
+    /** How many creations the concurrency test races against each other. */
+    const val CONCURRENT_CALLS = 10
 
     /** Where setArea moves the venue to. */
     val NEW_LOCATION = Location(46.5225, 6.6328)
