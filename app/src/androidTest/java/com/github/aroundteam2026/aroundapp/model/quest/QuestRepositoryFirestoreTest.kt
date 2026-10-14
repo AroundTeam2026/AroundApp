@@ -194,13 +194,16 @@ class QuestRepositoryFirestoreTest {
             mapOf("description" to "No type", "expiresAt" to expired),
             mapOf("type" to "DISCOUNT", "unit" to "CHF", "expiresAt" to expired),
         )
-    for (reward in unreadableRewards) {
-      val id = repository.createQuest(quest()).getOrThrow()
-      // The rules refuse these rewards, so they go past them, once the quest is on the server
-      db.waitForPendingWrites().await()
+    val ids = unreadableRewards.map { repository.createQuest(quest()).getOrThrow() }
+    // The rules refuse these rewards, so they go past them, once the quests are on the server
+    db.waitForPendingWrites().await()
+    for ((id, reward) in ids.zip(unreadableRewards)) {
       writeBypassingRules("$QUESTS/$id", mapOf("reward" to reward))
+    }
 
-      assertNull("reward $reward", getQuestFromServer(id))
+    // Online, getQuest reads from the server, which has the rewards the client never wrote
+    for ((id, reward) in ids.zip(unreadableRewards)) {
+      assertNull("reward $reward", repository.getQuest(id))
     }
   }
 
