@@ -36,6 +36,8 @@ class VenuePageUiStateTest {
     assertEquals(emptyList<VenuePageQuest>(), state.quests)
     assertNull(state.selectedQuestId)
     assertNull(state.selectedQuest)
+    assertNull(state.detailQuestId)
+    assertNull(state.detailQuest)
   }
 
   @Test
@@ -84,5 +86,42 @@ class VenuePageUiStateTest {
 
     // Coming back, e.g. when its venue extends an expired reward, doesn't pick it again
     assertNull(left.withQuests(listOf(quest("a"), quest("b"))).selectedQuestId)
+  }
+
+  @Test
+  fun openingAListedQuestsDetailsShowsThem() {
+    val open = loaded.withQuestDetails("b")
+
+    assertEquals("b", open.detailQuestId)
+    assertEquals(quest("b"), open.detailQuest)
+  }
+
+  @Test
+  fun openingTheDetailsDoesNotPickTheQuest() {
+    assertNull(loaded.withQuestDetails("a").selectedQuestId)
+  }
+
+  @Test
+  fun openingAnUnlistedQuestsDetailsChangesNothing() {
+    assertSame(loaded, loaded.withQuestDetails("gone"))
+  }
+
+  @Test
+  fun detailQuestIsNullWhenItIsNoLongerListed() {
+    assertNull(loaded.copy(detailQuestId = "gone").detailQuest)
+  }
+
+  @Test
+  fun theDetailsStayOpenWhileTheirQuestIsListed() {
+    val updated = loaded.withQuestDetails("a").withQuests(listOf(quest("c"), quest("a")))
+    assertEquals("a", updated.detailQuestId)
+  }
+
+  @Test
+  fun theDetailsCloseForGoodWhenTheirQuestLeavesTheList() {
+    val left = loaded.withQuestDetails("a").withQuests(listOf(quest("b")))
+    assertNull(left.detailQuestId)
+
+    assertNull(left.withQuests(listOf(quest("a"), quest("b"))).detailQuestId)
   }
 }
