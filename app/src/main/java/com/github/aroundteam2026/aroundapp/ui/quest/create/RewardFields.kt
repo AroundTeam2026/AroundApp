@@ -37,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -382,8 +381,7 @@ private fun RewardExpiry(date: LocalDate?, inPast: Boolean, onChange: (LocalDate
         )
         Text(
             date?.format(
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-                    .withLocale(LocalConfiguration.current.locales[0])
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(currentLocale())
             ) ?: stringResource(R.string.create_quest_reward_no_expiry),
             style = AroundTextStyles.Body,
             color = if (date == null) muted else MaterialTheme.colorScheme.onSurface,
