@@ -21,15 +21,18 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.dashboard.navigateToDashboard
+import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import java.io.IOException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -53,6 +56,8 @@ class VenueEntryTest {
   private var venues: VenueRepository = FakeVenueRepository()
   private lateinit var navController: NavHostController
   private var signOuts = 0
+  private val quests = FakeQuestRepository()
+  private var createQuest: CreateQuestViewModel? = null
 
   /** Bumped to sign the venue in again: a new entry, ViewModel and NavHost. */
   private var signIns by mutableIntStateOf(0)
@@ -86,6 +91,10 @@ class VenueEntryTest {
             Button(onClick = onBack, modifier = Modifier.testTag(AREA_BACK)) { Text("Back") }
           }
         },
+        createQuestFactory =
+            viewModelFactory {
+              initializer { CreateQuestViewModel(auth, venues, quests).also { createQuest = it } }
+            },
     )
   }
 
@@ -188,40 +197,59 @@ class VenueEntryTest {
     node(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
   }
 
-  @Test
-  fun newQuestOpensTheCreateQuestFormFromTheHome() {
+  /** Opens the create-quest form from the "New quest" of a set-up venue's My quests. */
+  private fun openCreateQuest() {
     venues = FakeVenueRepository(listOf(testVenue(id = USER)))
     enter()
-
     node(C.Tag.VENUE_QUESTS_TAB).performClick()
     node(C.Tag.VENUE_NEW_QUEST).performClick()
     compose.waitForIdle()
-
-    node(C.Tag.CREATE_QUEST_STUB).assertIsDisplayed()
-    pressSystemBack()
-    node(C.Tag.VENUE_HOME).assertIsDisplayed()
   }
 
   @Test
-  fun theDashboardRouteOpensInTheVenuesNavHost() {
-    venues = FakeVenueRepository(listOf(testVenue(id = USER)))
-    enter()
+  fun newQuestOpensTheCreateQuestFormFromTheHome() {
+    openCreateQuest()
 
-    compose.runOnUiThread { navController.navigateToDashboard() }
+    node(C.Tag.CREATE_QUEST_SCREEN).assertIsDisplayed()
+    node(C.Tag.VENUE_HOME).assertDoesNotExist()
+  }
+
+  @Test
+  fun closingTheCreateQuestFormReturnsToMyQuests() {
+    openCreateQuest()
+
+    node(C.Tag.CREATE_QUEST_CLOSE).performClick()
     compose.waitForIdle()
 
-    node(C.Tag.DASHBOARD_STUB).assertIsDisplayed()
+    node(C.Tag.VENUE_NEW_QUEST).assertIsDisplayed()
+    node(C.Tag.CREATE_QUEST_SCREEN).assertDoesNotExist()
   }
 
   @Test
-  fun everyVenueRouteIsRegistered() {
+  fun savingAQuestReturnsToMyQuests() {
+    openCreateQuest()
+    compose.runOnIdle {
+      createQuest!!.updateTitle("Find the fox")
+      createQuest!!.updateDescription("A fox hides here.")
+      createQuest!!.updateRequirements("Order a drink.")
+    }
+
+    node(C.Tag.CREATE_QUEST_SUBMIT).performClick()
+    compose.waitForIdle()
+
+    node(C.Tag.VENUE_NEW_QUEST).assertIsDisplayed()
+    assertEquals("Find the fox", runBlocking { quests.getQuest("quest-1") }?.title)
+  }
+
+  // The dashboard is the home's own tab, so it has no route of its own
+  @Test
+  fun onlyTheCreateQuestRouteIsRegistered() {
     venues = FakeVenueRepository(listOf(testVenue(id = USER)))
     enter()
 
     compose.runOnUiThread {
-      Routes.VENUE.forEach { route ->
-        assertEquals(route, navController.graph.findNode(route)?.route)
-      }
+      assertEquals(Routes.CREATE_QUEST, navController.graph.findNode(Routes.CREATE_QUEST)?.route)
+      assertNull(navController.graph.findNode(Routes.DASHBOARD))
     }
   }
 

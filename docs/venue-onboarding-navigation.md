@@ -48,10 +48,12 @@ fails, it offers to retry or to sign out.
   location step.
 - The venue home (`VenueHome`): Dashboard, Quests (with "New quest") and
   Profile.
-- The venue-only routes (`Routes.VENUE`): `createQuestDestination()` and
-  `dashboardDestination()`, "Coming soon" stubs until their screens are built.
-  The Quests tab's "New quest" opens the create-quest form. An explorer can't
-  reach these routes, since `AroundApp` doesn't register them.
+- The create-quest form (`createQuestDestination(onClose)`). The Quests tab's
+  "New quest" opens it, and closing it or saving a quest pops back to My
+  quests. An explorer can't reach it, since `AroundApp` doesn't register it.
+
+The dashboard has no route here: it is the venue home's own Dashboard tab, so
+`dashboardDestination()` isn't registered.
 
 ## How onboarding moves
 

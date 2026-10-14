@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -32,7 +33,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.dashboard.dashboardDestination
+import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
 import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
@@ -56,8 +57,9 @@ internal const val VENUE_HOME_ROUTE = "venue_home"
  * onboarding step left (see [startFor]): the business name, the area, or the venue home. Saving the
  * area opens the venue home in place of onboarding.
  *
- * The venue's NavHost also registers the venue-only routes ([Routes.VENUE]), so an explorer, whose
- * NavHost is [AroundApp], can't reach them.
+ * The venue's NavHost also registers the create-quest form, opened from the home's "New quest" and
+ * closed back to it, so an explorer, whose NavHost is [AroundApp], can't reach it. The dashboard
+ * needs no route: it is the home's own Dashboard tab.
  *
  * @param userId uid of the signed-in venue user, which is also its venue's id.
  * @param authRepository the session, used by the business-name step.
@@ -66,6 +68,7 @@ internal const val VENUE_HOME_ROUTE = "venue_home"
  * @param viewModel chooses where the venue starts.
  * @param navController the venue's NavHost controller; tests pass their own to read it.
  * @param areaStep draws the area step; a [VenueAreaScreen] unless replaced, e.g. by tests.
+ * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  */
 @Composable
 fun VenueEntry(
@@ -79,6 +82,7 @@ fun VenueEntry(
     areaStep: VenueAreaStep = { venueId, onSaved, onBack ->
       VenueAreaScreen(venueId, onSaved, onBack)
     },
+    createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
 ) {
   when (val state = viewModel.uiState.collectAsStateWithLifecycle().value) {
     VenueEntryUiState.Loading ->
@@ -98,6 +102,7 @@ fun VenueEntry(
             onSignOut,
             navController,
             areaStep,
+            createQuestFactory,
         )
   }
 }
@@ -115,6 +120,7 @@ private fun VenueNavHost(
     onSignOut: () -> Unit,
     navController: NavHostController,
     areaStep: VenueAreaStep,
+    createQuestFactory: ViewModelProvider.Factory,
 ) {
   NavHost(
       navController,
@@ -128,8 +134,7 @@ private fun VenueNavHost(
     composable(VENUE_HOME_ROUTE) {
       VenueHome(onCreateQuest = navController::navigateToCreateQuest, onSignOut = onSignOut)
     }
-    createQuestDestination()
-    dashboardDestination()
+    createQuestDestination(onClose = { navController.popBackStack() }, factory = createQuestFactory)
   }
   // Once only, and not again after recreation: the back stack is saved with the area on top
   var resumed by rememberSaveable { mutableStateOf(false) }
