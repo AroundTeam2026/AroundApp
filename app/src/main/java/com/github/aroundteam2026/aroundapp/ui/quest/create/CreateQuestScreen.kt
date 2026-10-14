@@ -153,8 +153,7 @@ fun CreateQuestContent(
       // Also disabled once saved, as the screen is closing and a second close would pop its caller
       CreateQuestHeader(
           onClose,
-          closeEnabled =
-              state.saveState == SaveState.Idle || state.saveState == SaveState.Failed,
+          closeEnabled = state.saveState == SaveState.Idle || state.saveState == SaveState.Failed,
       )
       Spacer(Modifier.height(AroundSpacing.ExtraLarge))
       QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
