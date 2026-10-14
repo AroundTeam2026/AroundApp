@@ -85,6 +85,10 @@ class MapViewModel(
 
   private var lookup: Job? = null
   private var located = false
+  /**
+   * Whether the explorer picked a venue, which the first framing of their position must not undo.
+   */
+  private var picked = false
 
   /** The part of the world on screen, or null until the map reports it. */
   private val visibleArea = MutableStateFlow<GeoBounds?>(null)
@@ -129,7 +133,8 @@ class MapViewModel(
   /**
    * Called with the answer to the location permission request, or with `true` when it was already
    * granted. The explorer is located once per visit to the map: switching back to the Map tab keeps
-   * the camera where they left it, unless no position was found yet.
+   * the camera where they left it, unless no position was found yet. Once found, the camera frames
+   * it, unless the explorer already picked a venue, which stays in view.
    */
   fun onLocationPermissionResult(granted: Boolean) {
     _uiState.update { it.copy(showsUserLocation = granted) }
@@ -138,7 +143,9 @@ class MapViewModel(
       val here = locationRepository.currentLocation() ?: return@launch
       located = true
       explorer.value = here
-      _uiState.update { it.copy(areaToFrame = here.boundsWithin(NEARBY_RADIUS_METERS)) }
+      // A venue picked meanwhile stays in view: its card would be left off screen
+      if (!picked)
+          _uiState.update { it.copy(areaToFrame = here.boundsWithin(NEARBY_RADIUS_METERS)) }
     }
   }
 
@@ -161,6 +168,7 @@ class MapViewModel(
    */
   fun onPinClick(venueId: String) {
     if (content.value.pins.none { it.venueId == venueId }) return
+    picked = true
     selectedVenueId.value = venueId
     // The card must stay in sight
     _uiState.update { it.copy(showsNearby = false) }
@@ -190,6 +198,7 @@ class MapViewModel(
    */
   fun onNearbyQuestClick(quest: NearbyQuest) {
     val pin = content.value.pins.find { it.venueId == quest.venueId } ?: return
+    picked = true
     selectedVenueId.value = pin.venueId
     _uiState.update {
       it.copy(

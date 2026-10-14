@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -43,10 +45,16 @@ class MapViewModelOverlayTest {
   private val quests = MutableStateFlow(listOf(cafe))
   // The venue moved, off screen, after its quest copied its location: its pin follows the venue
   private val venueLocation = Location(46.6000, 6.7000)
+  /**
+   * The explorer, away from the map's default centre but near the venue; tests hold their position
+   * back.
+   */
+  private val locating =
+      FakeLocationRepository(Location(46.5800, 6.6800)).apply { gate = CompletableDeferred() }
 
   private val viewModel by lazy {
     MapViewModel(
-        FakeLocationRepository(null),
+        locating,
         ScriptedQuestRepository.of(quests),
         FakeVenueRepository(listOf(testVenue(id = "cafe", location = venueLocation))),
         clock = { 1_000L },
@@ -167,5 +175,36 @@ class MapViewModelOverlayTest {
 
     assertEquals(before, state)
     assertTrue("the overlay stays open", state.showsNearby)
+  }
+
+  @Test
+  fun aPageTappedBeforeTheExplorerIsLocatedKeepsItsVenueFramed() = pickBeforeLocated {
+    viewModel.onNearbyQuestClick(state.nearby.single())
+  }
+
+  @Test
+  fun aPinTappedBeforeTheExplorerIsLocatedKeepsTheCameraWhereItIs() = pickBeforeLocated {
+    viewModel.onPinClick("cafe")
+  }
+
+  /**
+   * Picks a venue with [pick] while the explorer's position is on its way, then lets it arrive: the
+   * camera must keep the picked venue in view rather than fly to the explorer.
+   */
+  private fun pickBeforeLocated(pick: () -> Unit) = test {
+    viewModel.onLocationPermissionResult(granted = true)
+    viewModel.onNearbyOpen()
+    runCurrent()
+    pick()
+    runCurrent()
+    val framed = state.areaToFrame
+
+    locating.gate!!.complete(Unit)
+    runCurrent()
+
+    assertEquals(framed, state.areaToFrame)
+    assertEquals("cafe", state.selectedVenueId)
+    // The explorer is located all the same, so the list measures from them
+    assertNotNull(state.nearby.single().distanceMeters)
   }
 }
