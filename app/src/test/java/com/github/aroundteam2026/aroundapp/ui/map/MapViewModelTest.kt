@@ -50,6 +50,7 @@ class MapViewModelTest {
   fun startsOnLausanneWithoutTheExplorersPosition() = test {
     assertEquals(lausanne, state.areaToFrame)
     assertFalse(state.showsUserLocation)
+    assertFalse("not refused before the explorer answers", state.locationRefused)
   }
 
   @Test
@@ -68,7 +69,18 @@ class MapViewModelTest {
 
     assertEquals(lausanne, state.areaToFrame)
     assertFalse(state.showsUserLocation)
+    assertTrue(state.locationRefused)
     assertEquals(0, repository.calls)
+  }
+
+  @Test
+  fun aLaterGrantEndsTheRefusal() = test {
+    viewModel.onLocationPermissionResult(granted = false)
+    viewModel.onLocationPermissionResult(granted = true)
+    advanceUntilIdle()
+
+    assertFalse(state.locationRefused)
+    assertTrue(state.showsUserLocation)
   }
 
   @Test
