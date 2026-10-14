@@ -13,16 +13,14 @@ Role routing (`RoleNavigation`, G2.3) sends a signed-in user whose role is
 `VenueEntry`:
 
 ```kotlin
+// MainActivity
 RoleNavigation(
-    authRepository, userRepository, pendingRoleStore,
+    ...,
     venueScreen = { uid ->
-      VenueEntry(uid, authRepository, venueRepository, onSignOut = authRepository::signOut)
+      VenueEntry(uid, auth, VenueRepositoryProvider.repository, profile::signOut)
     },
 )
 ```
-
-`RoleNavigation` is not yet what `MainActivity` shows; that switch belongs to
-the Firestore integration task, which supplies the persistent repositories.
 
 `VenueEntryViewModel` reads the user's venue once (the venue's id is its
 owner's uid) and chooses where it starts:
@@ -40,8 +38,10 @@ fails, it offers to retry or to sign out.
 
 ## The venue's NavHost
 
-`VenueEntry` owns the venue's NavHost, separate from the explorer's
-`AroundApp`. It registers:
+Once it knows where the venue starts, `VenueEntry` shows
+`VenueEntryNavigation` (#221), the venue's NavHost, separate from the
+explorer's `AroundApp`. It opens on the venue home for a venue already set up,
+and on initialization otherwise. It registers:
 
 - `venueOnboardingDestinations(...)`: initialization and location, with the
   real `VenueAreaScreen(venueId, onSaved, onBack)` (contract C4) as the
@@ -67,7 +67,7 @@ The dashboard has no route here: it is the venue home's own Dashboard tab, so
   navigation signal is consumed once handled, so returning doesn't move
   forward again.
 - A venue resuming on the area has initialization under it, so Back behaves
-  as above. The entry opens the area once, not again after recreation.
+  as above. `VenueEntry` opens the area once, not again after recreation.
 
 ## Tests
 
@@ -77,5 +77,8 @@ The dashboard has no route here: it is the venue home's own Dashboard tab, so
   screen whose map Robolectric can't draw): each start point, setup in one go,
   saving the area, Back from the area, resuming after signing in again, the
   venue routes and sign-out.
+- `VenueEntryNavigationTest`: the NavHost from business setup, on its own.
+- `RoleRoutingActivityTest` (Firebase emulators): a set-up venue signing in
+  opens its home.
 - `VenueOnboardingNavigationTest`: the onboarding graph on its own.
 - `RoutesTest`: the explorer's `AroundApp` registers no venue route.

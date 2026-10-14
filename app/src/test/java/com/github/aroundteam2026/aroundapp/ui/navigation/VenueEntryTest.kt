@@ -261,7 +261,7 @@ class VenueEntryTest {
     node(C.Tag.VENUE_PROFILE_TAB).performClick()
     node(C.Tag.PROFILE_SIGN_OUT).performClick()
 
-    assertEquals(1, signOuts)
+    assertNull(auth.currentUserId.value)
   }
 
   @Test
