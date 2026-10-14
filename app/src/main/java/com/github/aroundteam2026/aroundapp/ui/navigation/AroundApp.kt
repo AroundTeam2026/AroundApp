@@ -29,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
+import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venuePageDestination
 
 /** The app's top-level destinations, one per tab of the bottom bar. */
@@ -72,7 +73,9 @@ private val START_TAB = Tab.QUESTS
 fun AroundApp(
     navController: NavHostController = rememberNavController(),
     onSignOut: () -> Unit,
-    screen: @Composable (Tab) -> Unit = { TabScreen(it, onSignOut) },
+    screen: @Composable (Tab) -> Unit = {
+      TabScreen(it, navController::openVenueFromMap, onSignOut)
+    },
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   // Recomputed whenever the shown screen changes, since it reads backStackEntry
@@ -138,10 +141,32 @@ private fun NavHostController.tabOfCurrentScreen(): Tab? {
       ?: START_TAB.takeIf { inBackStack(it) }
 }
 
+/**
+ * Opens the page of the venue with [venueId], when its card on the map is tapped. A tap that
+ * arrives once a venue's page is open, such as the second of a fast double tap, opens nothing. The
+ * venue page loads the venue's name itself, so [venueName] is not passed on.
+ */
+@Suppress("UNUSED_PARAMETER")
+internal fun NavHostController.openVenueFromMap(venueId: String, venueName: String) {
+  if (currentDestination?.route == Routes.VENUE_PAGE) return
+  navigateToVenuePage(venueId)
+}
+
+/**
+ * The screen of [tab].
+ *
+ * @param onOpenVenue opens the page of the venue with this id and name, when its card on the map is
+ *   tapped.
+ * @param onSignOut signs the user out from the Profile tab.
+ */
 @Composable
-private fun TabScreen(tab: Tab, onSignOut: () -> Unit) =
+private fun TabScreen(
+    tab: Tab,
+    onOpenVenue: (venueId: String, venueName: String) -> Unit,
+    onSignOut: () -> Unit,
+) =
     when (tab) {
-      Tab.MAP -> MapScreen()
+      Tab.MAP -> MapScreen(onOpenVenue = onOpenVenue)
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS -> Box(Modifier.fillMaxSize().testTag(tab.screenTag)) { OverviewScreen() }
       Tab.PROFILE -> ProfileScreen(onSignOut)

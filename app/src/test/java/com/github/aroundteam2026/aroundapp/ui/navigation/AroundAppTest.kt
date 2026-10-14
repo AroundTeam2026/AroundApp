@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +48,13 @@ class AroundAppTest {
   private fun openVenuePage() {
     composeTestRule.waitForIdle()
     composeTestRule.runOnUiThread { navController.navigateToVenuePage("venue-1") }
+    composeTestRule.waitForIdle()
+  }
+
+  /** Opens a venue's page as a tap on its card on the map does. */
+  private fun openFromMap(venueId: String) {
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnUiThread { navController.openVenueFromMap(venueId, "Café") }
     composeTestRule.waitForIdle()
   }
 
@@ -141,6 +149,32 @@ class AroundAppTest {
     select(Tab.QUESTS)
     composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
+  }
+
+  // The map's card passes the venue's id, which the venue page loads
+  @Test
+  fun aVenueCardOnTheMapOpensThatVenuesPage() {
+    launchWithNavController()
+    select(Tab.MAP)
+    openFromMap("venue-1")
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    val venueId = composeTestRule.runOnUiThread {
+      navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
+    }
+    assertEquals("venue-1", venueId)
+  }
+
+  // A fast double tap on a card would otherwise stack the venue's page twice
+  @Test
+  fun aDoubleTapOnACardOpensTheVenuePageOnce() {
+    launchWithNavController()
+    select(Tab.MAP)
+    openFromMap("venue-1")
+    openFromMap("venue-1")
+    pressBack()
+
+    assertShowing(Tab.MAP)
   }
 
   @Test
