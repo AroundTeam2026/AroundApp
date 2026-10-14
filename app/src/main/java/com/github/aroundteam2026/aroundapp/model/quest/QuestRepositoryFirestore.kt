@@ -39,6 +39,10 @@ class QuestRepositoryFirestore(
   override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> =
       quests.whereEqualTo(VENUE_ID, venueId).observe()
 
+  // Equality filters only, so Firestore needs no composite index
+  override fun observeActiveQuestsByVenue(venueId: String): Flow<List<Quest>> =
+      quests.whereEqualTo(VENUE_ID, venueId).whereEqualTo(STATUS, QuestStatus.ACTIVE.name).observe()
+
   override suspend fun getQuest(questId: String): Quest? =
       quests.document(questId).get().await().toQuest()
 
@@ -60,7 +64,7 @@ class QuestRepositoryFirestore(
 
   /**
    * Turns Firestore's callback-style listener into a Kotlin Flow<List<Quest>>, which ViewModels can
-   * collect. Both observeActiveQuests and observeQuestsByVenue use it.
+   * collect. Every observe* method uses it.
    */
   private fun Query.observe(): Flow<List<Quest>> = callbackFlow {
     val registration = addSnapshotListener { snapshot, error ->

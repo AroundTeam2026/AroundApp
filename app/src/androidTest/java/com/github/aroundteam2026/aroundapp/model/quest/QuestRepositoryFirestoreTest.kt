@@ -330,6 +330,22 @@ class QuestRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: observeActiveQuestsByVenue does not filter on venueId or on status, or filters on a string
+   * that differs from the stored enum name.
+   */
+  @Test
+  fun observeActiveQuestsByVenue_returnsOnlyThatVenuesActiveQuests() = withTimeoutBlocking {
+    repository.createQuest(quest(status = QuestStatus.DRAFT)).getOrThrow()
+    repository.createQuest(quest(status = QuestStatus.ARCHIVED)).getOrThrow()
+    val activeId = repository.createQuest(quest()).getOrThrow()
+    createQuestAsAnotherVenue()
+
+    val quests = observeActiveQuestsByVenueFromServer(venueId)
+
+    assertEquals(listOf(activeId), quests.map { it.id })
+  }
+
+  /**
    * Bug: a document that cannot be mapped crashes the listener or ends the flow instead of being
    * skipped. getQuest goes through the same mapper.
    */
@@ -436,11 +452,30 @@ class QuestRepositoryFirestoreTest {
     }
   }
 
+  /**
+   * Waits until [db] has sent its pending writes, then reads the active quests of [venueId] through
+   * a fresh client with an empty cache. The answer comes from the server, so it holds every quest
+   * the query matches there, the other venue's included if the query doesn't filter on the venue.
+   */
+  private suspend fun observeActiveQuestsByVenueFromServer(venueId: String): List<Quest> {
+    db.waitForPendingWrites().await()
+    signInNewUser(READER_APP)
+    val reader = emulatorClient(READER_APP)
+    try {
+      return QuestRepositoryFirestore(reader).observeActiveQuestsByVenue(venueId).first()
+    } finally {
+      reader.terminate().await()
+    }
+  }
+
   private companion object {
     /** The Firestore collection the repository stores quests in; some tests use it directly. */
     const val QUESTS = "quests"
 
-    /** The app of the reader that [getQuestFromServer] signs in, with an empty cache. */
+    /**
+     * The app of the reader that [getQuestFromServer] and [observeActiveQuestsByVenueFromServer]
+     * sign in, with an empty cache.
+     */
     const val READER_APP = "quest-test-reader"
 
     /** The app of the second venue that [createQuestAsAnotherVenue] signs in. */

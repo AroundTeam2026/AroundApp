@@ -268,7 +268,7 @@ class VenuePageScreenTest {
 
   @Test
   fun theScreenOpensAndClosesTheDetailsThroughItsViewModel() {
-    showScreen(questsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
+    showScreen(activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
 
     compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
     compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertIsDisplayed()
@@ -289,7 +289,7 @@ class VenuePageScreenTest {
 
   @Test
   fun theScreenPicksAndUnpicksThroughItsViewModel() {
-    showScreen(questsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
+    showScreen(activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
 
     compose.onNodeWithText("Order the secret menu").performClick().assertIsSelected()
     compose.onNodeWithText("Order the secret menu").performClick().assertIsNotSelected()
@@ -299,7 +299,7 @@ class VenuePageScreenTest {
   fun theScreenRetriesThroughItsViewModel() {
     var calls = 0
     showScreen(
-        questsByVenue = {
+        activeQuestsByVenue = {
           if (calls++ == 0) failing() else flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID)))
         }
     )
@@ -310,12 +310,12 @@ class VenuePageScreenTest {
     compose.onNodeWithText("Order the secret menu").assertIsDisplayed()
   }
 
-  private fun showScreen(questsByVenue: (String) -> Flow<List<Quest>>) {
+  private fun showScreen(activeQuestsByVenue: (String) -> Flow<List<Quest>>) {
     val viewModel =
         VenuePageViewModel(
             VENUE_ID,
             FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumen"))),
-            ScriptedQuestRepository(questsByVenue = questsByVenue),
+            ScriptedQuestRepository(activeQuestsByVenue = activeQuestsByVenue),
         )
     compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }
   }
