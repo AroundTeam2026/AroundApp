@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
@@ -165,7 +166,11 @@ private fun CreateQuestPreview() {
             address = null,
             createdAt = 0L,
         )
-    CreateQuestViewModel(FakeAuthRepository(PREVIEW_VENUE_ID), FakeVenueRepository(listOf(venue)))
+    CreateQuestViewModel(
+        FakeAuthRepository(PREVIEW_VENUE_ID),
+        FakeVenueRepository(listOf(venue)),
+        FakeQuestRepository(),
+    )
   }
   AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}) }
 }

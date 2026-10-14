@@ -7,6 +7,8 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.time.Clock
 import java.time.LocalDate
@@ -23,12 +25,13 @@ import kotlinx.coroutines.launch
  *
  * The radius starts at the venue's own radius once it is loaded, unless the venue has already
  * chosen one; until then, or if the venue can't be read, it is [QuestLimits.DEFAULT_RADIUS_METERS].
- * The venue's location, once loaded, centres the radius map. [clock] tells which day it is, to
- * reject a reward expiry that has already passed.
+ * The venue's location, once loaded, centres the radius map and is where the saved quest takes
+ * place. [clock] tells which day it is, to reject a reward expiry that has already passed.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
     private val venueRepository: VenueRepository,
+    private val questRepository: QuestRepository,
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(CreateQuestUiState())
@@ -37,6 +40,9 @@ class CreateQuestViewModel(
 
   /** Whether the venue has chosen a radius, which the venue's own radius must not overwrite. */
   private var radiusChosen = false
+
+  /** The signed-in venue, once loaded; the saved quest copies its id, name and location. */
+  private var venue: Venue? = null
 
   init {
     viewModelScope.launch { loadVenue() }
@@ -129,9 +135,40 @@ class CreateQuestViewModel(
 
   /** Sets the last day the reward can be used to [date], or removes the expiry if it is null. */
   fun updateExpiryDate(date: LocalDate?) {
-    val inPast = date != null && date.isBefore(LocalDate.now(clock))
-    updateReward { it.copy(expiryDate = date, expiryInPast = inPast) }
+    updateReward { it.copy(expiryDate = date, expiryInPast = isPast(date)) }
   }
+
+  /**
+   * Saves the form as a new active quest of the venue, if it [CreateQuestUiState.canSave]. A reward
+   * expiry that has passed since it was picked shows its error instead. The form keeps its values
+   * whether the save succeeds or fails.
+   */
+  fun submit() {
+    val form = mutableUiState.value
+    val venue = venue
+    if (!form.canSave || venue == null) return
+    if (form.reward.type != null && isPast(form.reward.expiryDate)) {
+      updateReward { it.copy(expiryInPast = true) }
+      return
+    }
+    // Built outside the try, so a quest that can't be built is a bug, not a failed save
+    val quest = form.toQuest(venue, clock.zone)
+    mutableUiState.update { it.copy(saveState = SaveState.Saving) }
+    viewModelScope.launch {
+      val result =
+          try {
+            questRepository.createQuest(quest)
+          } catch (cancelled: CancellationException) {
+            throw cancelled
+          } catch (e: Exception) {
+            Result.failure(e)
+          }
+      val saveState = result.fold({ SaveState.Saved(it) }, { SaveState.Failed })
+      mutableUiState.update { it.copy(saveState = saveState) }
+    }
+  }
+
+  private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
 
   private fun updateReward(transform: (RewardFormState) -> RewardFormState) {
     mutableUiState.update { it.copy(reward = transform(it.reward)) }
@@ -152,6 +189,7 @@ class CreateQuestViewModel(
           // The default radius still makes a valid quest, so the form stays usable
           null
         } ?: return
+    this.venue = venue
     val radius = clampRadius(venue.radiusMeters)
     mutableUiState.update {
       if (radiusChosen) it.copy(venueLocation = venue.location)

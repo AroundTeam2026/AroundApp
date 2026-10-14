@@ -27,6 +27,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.input.ImeAction
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -47,7 +48,8 @@ import org.robolectric.annotation.Config
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class CreateQuestScreenTest {
   @get:Rule val compose = createComposeRule()
-  private val viewModel = CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository())
+  private val viewModel =
+      CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository(), FakeQuestRepository())
   private var closeCalls = 0
 
   @Before
