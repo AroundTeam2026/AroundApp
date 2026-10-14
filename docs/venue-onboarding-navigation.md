@@ -46,11 +46,11 @@ fails, it offers to retry or to sign out.
 - `venueOnboardingDestinations(...)`: initialization and location, with the
   real `VenueAreaScreen(venueId, onSaved, onBack)` (contract C4) as the
   location step.
-- The venue home (`VenueHome`): Dashboard, Quests (with "New quest") and
-  Profile.
-- The create-quest form (`createQuestDestination(onClose)`). The Quests tab's
-  "New quest" opens it, and closing it or saving a quest pops back to My
-  quests. An explorer can't reach it, since `AroundApp` doesn't register it.
+- `venueDestinations(...)`: the venue home (`VenueHome`, with Dashboard,
+  Quests and Profile tabs) and the create-quest form. The Quests tab's "New
+  quest" opens the form, and closing it or saving a quest pops back to My
+  quests. An explorer can't reach these, since `AroundApp` doesn't register
+  them.
 
 The dashboard has no route here: it is the venue home's own Dashboard tab, so
 `dashboardDestination()` isn't registered.
