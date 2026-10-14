@@ -31,7 +31,7 @@ class NearbyQuestPagerLayoutTest {
 
   private val context = ApplicationProvider.getApplicationContext<Context>()
 
-  private fun show(count: Int = 3) {
+  private fun show(count: Int = 3, withButtons: Boolean = false) {
     val quests =
         (1..count).map {
           NearbyQuest(
@@ -45,14 +45,44 @@ class NearbyQuestPagerLayoutTest {
               distanceMeters = 120.0,
           )
         }
-    composeTestRule.setContent { NearbyQuestPager(quests, true, {}, {}) }
+    composeTestRule.setContent {
+      if (withButtons) NearbyQuestPager(quests, true, {}, {}, onClose = {}, onFiltersChange = {})
+      else NearbyQuestPager(quests, true, {}, {})
+    }
   }
 
   private fun bounds(tag: String): DpRect =
       composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).getBoundsInRoot()
 
-  private fun arrow(description: Int): SemanticsNodeInteraction =
+  private fun button(description: Int): SemanticsNodeInteraction =
       composeTestRule.onNodeWithContentDescription(context.getString(description))
+
+  @Test
+  fun theFilterButtonIsThirtySixDpAndEightDpBeforeTheClose() {
+    show(withButtons = true)
+
+    val filter = button(R.string.map_nearby_filters).getBoundsInRoot()
+    assertDpEquals("filter width", 36.dp, filter.right - filter.left)
+    assertDpEquals("filter height", 36.dp, filter.bottom - filter.top)
+    assertDpEquals(
+        "filter to close",
+        8.dp,
+        button(R.string.map_nearby_close).getBoundsInRoot().left - filter.right,
+    )
+  }
+
+  @Test
+  fun theFiltersSitTwelveDpInsideTheirPanel() {
+    show(withButtons = true)
+    button(R.string.map_nearby_filters).performClick()
+
+    val distance =
+        composeTestRule
+            .onNodeWithText(context.getString(R.string.map_nearby_filter_distance))
+            .getBoundsInRoot()
+    val panel = bounds(C.Tag.NEARBY_FILTERS)
+    assertDpEquals("panel to label", 12.dp, distance.left - panel.left)
+  }
 
   @Test
   fun theCounterSitsTwoDpUnderTheTitle() {
@@ -71,7 +101,7 @@ class NearbyQuestPagerLayoutTest {
 
     val pages = bounds(C.Tag.NEARBY_PAGES)
     val dots = composeTestRule.onAllNodesWithTag(C.Tag.NEARBY_DOT, useUnmergedTree = true)[0]
-    val previous = arrow(R.string.map_nearby_previous).getBoundsInRoot()
+    val previous = button(R.string.map_nearby_previous).getBoundsInRoot()
     assertDpEquals("header to page", 20.dp, pages.top - bounds(C.Tag.NEARBY_COUNTER).bottom)
     assertDpEquals("page to dots", 20.dp, dots.getBoundsInRoot().top - pages.bottom)
     assertDpEquals("dots to arrows", 20.dp, previous.top - dots.getBoundsInRoot().bottom)
@@ -101,8 +131,8 @@ class NearbyQuestPagerLayoutTest {
     show()
 
     val width = composeTestRule.onRoot().getBoundsInRoot().right
-    val previous = arrow(R.string.map_nearby_previous).getBoundsInRoot()
-    val next = arrow(R.string.map_nearby_next).getBoundsInRoot()
+    val previous = button(R.string.map_nearby_previous).getBoundsInRoot()
+    val next = button(R.string.map_nearby_next).getBoundsInRoot()
     val view = bounds(C.Tag.NEARBY_VIEW)
     assertDpEquals("previous width", 52.dp, previous.right - previous.left)
     assertDpEquals("previous height", 52.dp, previous.bottom - previous.top)
@@ -117,7 +147,7 @@ class NearbyQuestPagerLayoutTest {
   @Test
   fun theShownDotIsAnEighteenDpPillAndTheOthersSixDpDots() {
     show()
-    arrow(R.string.map_nearby_next).performClick()
+    button(R.string.map_nearby_next).performClick()
 
     val dots = composeTestRule.onAllNodesWithTag(C.Tag.NEARBY_DOT, useUnmergedTree = true)
     val first = dots[0].getBoundsInRoot()

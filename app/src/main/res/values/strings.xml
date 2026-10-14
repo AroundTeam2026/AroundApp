@@ -55,7 +55,6 @@
     <string name="map_nearby_next">Next quest</string>
     <string name="map_nearby_close">Close nearby quests</string>
     <string name="map_nearby_filters">Filter nearby quests</string>
-    <string name="map_nearby_filters_label">Filters</string>
     <string name="map_nearby_filtered">%1$d of %2$d · %3$s</string>
     <string name="map_nearby_filter_pair">%1$s · %2$s</string>
     <string name="map_nearby_no_match">No quests match these filters.</string>

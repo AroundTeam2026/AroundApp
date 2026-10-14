@@ -7,62 +7,117 @@ import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+
+// The banner's own geometry, from Figma (frame 99:588); its gaps come from AroundSpacing
+private val TILE_SIZE = 40.dp
+private val ICON_SIZE = 20.dp
+private val TEXT_SPACING = 2.dp
+private val BUTTON_HEIGHT = 44.dp
+private val BANNER_ELEVATION = 8.dp
+/** Figma's shadow: warm brown at 16 %. */
+private val BANNER_SHADOW = Color(0x296B5947)
 
 /**
  * Says the location is off, so the map shows the quests around Lausanne rather than around the
- * explorer, with a "Turn on" button.
+ * explorer, with a "Turn on" button, as in Figma.
  *
  * @param onTurnOn Called when the explorer taps "Turn on"; see [rememberTurnOnLocation].
  */
 @Composable
 fun LocationBanner(onTurnOn: () -> Unit, modifier: Modifier = Modifier) {
-  Surface(
-      modifier.testTag(C.Tag.LOCATION_BANNER).fillMaxWidth(),
-      shape = MaterialTheme.shapes.medium,
-      shadowElevation = BANNER_ELEVATION,
+  val colors = MaterialTheme.colorScheme
+  Row(
+      modifier
+          .testTag(C.Tag.LOCATION_BANNER)
+          .fillMaxWidth()
+          .shadow(
+              BANNER_ELEVATION,
+              AroundCorners.LocationBanner,
+              ambientColor = BANNER_SHADOW,
+              spotColor = BANNER_SHADOW,
+          )
+          .background(colors.surface, AroundCorners.LocationBanner)
+          .padding(
+              start = AroundSpacing.InsetPadding,
+              top = AroundSpacing.Medium,
+              end = AroundSpacing.Medium,
+              bottom = AroundSpacing.Medium,
+          ),
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+      verticalAlignment = Alignment.CenterVertically,
   ) {
-    Row(
-        Modifier.padding(AroundSpacing.Medium),
-        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        Modifier.size(TILE_SIZE).background(AroundTheme.colors.lavender, AroundCorners.InsetField),
+        Alignment.Center,
     ) {
-      Column(Modifier.weight(1f)) {
-        Text(stringResource(R.string.map_location_off), style = MaterialTheme.typography.titleSmall)
-        Text(
-            stringResource(R.string.map_location_off_fallback),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-        )
-      }
-      Button(onTurnOn, Modifier.testTag(C.Tag.LOCATION_TURN_ON)) {
-        Text(stringResource(R.string.map_location_turn_on))
-      }
+      // Decorative: the title says it
+      Icon(
+          painterResource(R.drawable.ic_location_off),
+          contentDescription = null,
+          Modifier.size(ICON_SIZE),
+          tint = colors.onSurface,
+      )
+    }
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TEXT_SPACING)) {
+      Text(
+          stringResource(R.string.map_location_off),
+          color = colors.onSurface,
+          style = AroundTextStyles.Subtitle,
+      )
+      Text(
+          stringResource(R.string.map_location_off_fallback),
+          color = colors.onSurfaceVariant,
+          style = AroundTextStyles.Caption,
+      )
+    }
+    Button(
+        onTurnOn,
+        Modifier.testTag(C.Tag.LOCATION_TURN_ON).height(BUTTON_HEIGHT),
+        shape = AroundCorners.InsetField,
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = colors.tertiary,
+                contentColor = colors.onTertiary,
+            ),
+        contentPadding = PaddingValues(horizontal = AroundSpacing.InsetPadding),
+    ) {
+      Text(stringResource(R.string.map_location_turn_on), style = AroundTextStyles.FieldLabel)
     }
   }
 }
-
-private val BANNER_ELEVATION = 4.dp
 
 /**
  * What "Turn on" does. While Android would still show its dialog, it asks for the location again
