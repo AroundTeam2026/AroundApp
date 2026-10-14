@@ -2,20 +2,14 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
-import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
-import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
-import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import java.time.Clock
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
@@ -210,17 +204,4 @@ class CreateQuestViewModel(
 
   private fun clampRadius(meters: Int) =
       meters.coerceIn(QuestLimits.MIN_RADIUS_METERS, QuestLimits.MAX_RADIUS_METERS)
-
-  companion object {
-    /** Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories. */
-    fun factory(): ViewModelProvider.Factory = viewModelFactory {
-      initializer {
-        CreateQuestViewModel(
-            AuthRepositoryProvider.repository,
-            VenueRepositoryProvider.repository,
-            QuestRepositoryProvider.repository,
-        )
-      }
-    }
-  }
 }
