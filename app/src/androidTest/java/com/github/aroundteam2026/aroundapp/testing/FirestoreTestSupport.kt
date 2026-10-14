@@ -93,7 +93,7 @@ suspend fun signInNewUser(appName: String, role: Role? = null): String {
  * Writes [fields] into the document at [path], such as `quests/abc`, on the Firestore emulator
  * without checking firestore.rules, for tests that need a document the rules refuse, such as a
  * malformed one. Other fields of an existing document are kept, and a missing one is created.
- * Values may be strings, timestamps, and lists or maps of those.
+ * Values may be strings, whole numbers, timestamps, and lists or maps of those.
  *
  * It uses the emulator's REST API, which skips the rules for the `owner` token. No client sees the
  * write until it reads from the server.
@@ -136,6 +136,9 @@ private fun restFields(fields: Map<*, *>): JSONObject =
 private fun restValue(value: Any): JSONObject =
     when (value) {
       is String -> JSONObject().put("stringValue", value)
+      // The REST API takes 64-bit integers as strings
+      is Int,
+      is Long -> JSONObject().put("integerValue", value.toString())
       is Timestamp ->
           JSONObject()
               .put(
