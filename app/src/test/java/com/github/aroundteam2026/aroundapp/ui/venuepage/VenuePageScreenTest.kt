@@ -9,13 +9,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -48,7 +54,7 @@ class VenuePageScreenTest {
 
   private fun show(
       state: VenuePageUiState,
-      questRow: VenuePageQuestRow = PlaceholderQuestRow,
+      questRow: VenuePageQuestRow = DefaultQuestRow,
       bottomBar: @Composable (VenuePageQuest?) -> Unit = {},
   ) {
     compose.setContent {
@@ -128,6 +134,22 @@ class VenuePageScreenTest {
   }
 
   @Test
+  fun theQuestsCardCountsTheQuests() {
+    show(LOADED)
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUESTS_CARD).assertIsDisplayed()
+    compose.onNodeWithText("Quests").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUEST_COUNT).assertTextEquals("2 active")
+  }
+
+  @Test
+  fun noQuestsShowsNoQuestsCard() {
+    show(LOADED.copy(quests = emptyList()))
+
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUESTS_CARD).assertDoesNotExist()
+  }
+
+  @Test
   fun theQuestRowSlotDrawsEachQuestInOrderWithItsPick() {
     val drawn = mutableListOf<Pair<String, Boolean>>()
     show(
@@ -148,13 +170,24 @@ class VenuePageScreenTest {
   }
 
   @Test
-  fun theDefaultRowShowsTheTitleAndPicksOnTap() {
+  fun theDefaultRowsAreQuestRowsThatPickOnTap() {
     show(LOADED.copy(selectedQuestId = "b"))
 
+    compose.onAllNodesWithTag(C.Tag.VENUE_QUEST_ROW).assertCountEquals(2)
     compose.onNodeWithText("Quest b").assertIsSelected()
     compose.onNodeWithText("Quest a").assertIsNotSelected().performClick()
 
     assertEquals(listOf("a"), tapped)
+  }
+
+  @Test
+  fun theQuestRowsAreOneChoice() {
+    show(LOADED)
+
+    compose
+        .onAllNodesWithTag(C.Tag.VENUE_QUEST_ROW)[0]
+        .onParent()
+        .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
   }
 
   @Test

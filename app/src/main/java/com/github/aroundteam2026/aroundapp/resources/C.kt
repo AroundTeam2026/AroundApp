@@ -82,6 +82,11 @@ object C {
     const val VENUE_PAGE_ADDRESS = "venue_page_address"
     const val VENUE_PAGE_QUESTS = "venue_page_quests"
     const val VENUE_PAGE_EMPTY = "venue_page_empty"
+    const val VENUE_PAGE_QUESTS_CARD = "venue_page_quests_card"
+    const val VENUE_PAGE_QUEST_COUNT = "venue_page_quest_count"
+    const val VENUE_QUEST_ROW = "venue_quest_row"
+    const val VENUE_QUEST_ROW_TITLE = "venue_quest_row_title"
+    const val VENUE_QUEST_ROW_DESCRIPTION = "venue_quest_row_description"
 
     const val NEARBY_COUNTER = "nearby_counter"
     const val NEARBY_LOCATION_HINT = "nearby_location_hint"

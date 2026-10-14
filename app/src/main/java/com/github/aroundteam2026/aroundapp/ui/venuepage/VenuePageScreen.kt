@@ -4,7 +4,6 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,29 +14,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatarStyle
@@ -63,7 +68,7 @@ typealias VenuePageQuestRow =
  *
  * @param viewModel Loads the venue and its quests, and keeps the picked one.
  * @param onBack Called when the explorer taps the back arrow.
- * @param questRow Draws each quest; a plain title until the quest rows land.
+ * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null.
  */
 @Composable
@@ -71,10 +76,10 @@ fun VenuePageScreen(
     viewModel: VenuePageViewModel,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    questRow: VenuePageQuestRow = PlaceholderQuestRow,
+    questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {},
 ) {
-  val state by viewModel.uiState.collectAsState()
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
   VenuePageContent(
       state = state,
       onBack = onBack,
@@ -94,7 +99,7 @@ fun VenuePageContent(
     onQuestTapped: (questId: String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
-    questRow: VenuePageQuestRow = PlaceholderQuestRow,
+    questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {},
 ) {
   Column(
@@ -119,18 +124,17 @@ fun VenuePageContent(
             verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
         ) {
           item { Header(state) }
-          if (state.quests.isEmpty()) {
-            item {
+          item {
+            if (state.quests.isEmpty()) {
               Message(
                   R.string.venue_page_no_quests,
                   Modifier.fillMaxWidth()
                       .padding(top = AroundSpacing.ExtraLarge)
                       .testTag(C.Tag.VENUE_PAGE_EMPTY),
               )
+            } else {
+              Quests(state, questRow, onQuestTapped)
             }
-          }
-          items(state.quests, key = { it.questId }) { quest ->
-            questRow(quest, quest.questId == state.selectedQuestId) { onQuestTapped(quest.questId) }
           }
         }
         bottomBar(state.selectedQuest)
@@ -159,6 +163,56 @@ private fun TopBar(onBack: () -> Unit) {
             stringResource(R.string.back),
             tint = MaterialTheme.colorScheme.onSurface,
         )
+      }
+    }
+  }
+}
+
+/** The card listing the venue's quests under a header that counts them, a line between each. */
+@Composable
+private fun Quests(
+    state: VenuePageUiState,
+    questRow: VenuePageQuestRow,
+    onQuestTapped: (questId: String) -> Unit,
+) {
+  val colors = MaterialTheme.colorScheme
+  Column(
+      Modifier.fillMaxWidth()
+          .clip(QUESTS_SHAPE)
+          .background(colors.surface)
+          .padding(
+              start = AroundSpacing.Large,
+              end = AroundSpacing.Large,
+              top = AroundSpacing.Large,
+              bottom = AroundSpacing.ExtraSmall,
+          )
+          .testTag(C.Tag.VENUE_PAGE_QUESTS_CARD),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(
+          stringResource(R.string.venue_page_quests),
+          Modifier.weight(1f).semantics { heading() },
+          color = colors.onSurface,
+          style = AroundTextStyles.OverlayTitle,
+      )
+      Text(
+          pluralStringResource(
+              R.plurals.venue_page_active_quests,
+              state.quests.size,
+              state.quests.size,
+          ),
+          Modifier.testTag(C.Tag.VENUE_PAGE_QUEST_COUNT),
+          color = colors.onSurfaceVariant,
+          style = AroundTextStyles.Caption,
+      )
+    }
+    Column(Modifier.selectableGroup()) {
+      state.quests.forEachIndexed { index, quest ->
+        key(quest.questId) {
+          if (index > 0) HorizontalDivider(thickness = DIVIDER_WIDTH, color = colors.outline)
+          questRow(quest, quest.questId == state.selectedQuestId) { onQuestTapped(quest.questId) }
+        }
       }
     }
   }
@@ -257,41 +311,37 @@ private fun Message(text: Int, modifier: Modifier = Modifier) {
   )
 }
 
-/** The quest's title, tappable, until the real quest rows replace it. */
-internal val PlaceholderQuestRow: VenuePageQuestRow = { quest, selected, onClick ->
-  Text(
-      quest.title,
-      Modifier.fillMaxWidth()
-          .clickable(onClick = onClick)
-          .semantics { this.selected = selected }
-          .padding(vertical = AroundSpacing.Small),
-      color =
-          if (selected) MaterialTheme.colorScheme.primary
-          else MaterialTheme.colorScheme.onBackground,
-      style = AroundTextStyles.CardTitle,
-  )
+/** Each quest as a [VenueQuestRow]. */
+internal val DefaultQuestRow: VenuePageQuestRow = { quest, selected, onClick ->
+  VenueQuestRow(quest, selected, onClick)
 }
 
 private val BACK_SIZE = 44.dp
 private val AVATAR_SIZE = 64.dp
 private val ADDRESS_ICON_SIZE = 16.dp
+private val QUESTS_SHAPE = RoundedCornerShape(22.dp)
+private val DIVIDER_WIDTH = 1.dp
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VenuePagePreview() {
   val quests =
-      listOf("Bring a friend", "Try our new latte").mapIndexed { i, title ->
-        VenuePageQuest(
-            questId = "quest-$i",
-            title = title,
-            description = "",
-            requirements = "",
-            proofType = ProofType.PHOTO,
-            minPartySize = 1,
-            reward = null,
-        )
-      }
+      listOf(
+              "Find the hidden fox" to Reward.FreeItem("croissant", specifics = null),
+              "Latte art moment" to Reward.Discount(15.0, DiscountUnit.PERCENT, specifics = null),
+          )
+          .mapIndexed { i, (title, reward) ->
+            VenuePageQuest(
+                questId = "quest-$i",
+                title = title,
+                description = "Snap a photo of it and show it at the counter.",
+                requirements = "",
+                proofType = ProofType.PHOTO,
+                minPartySize = 1,
+                reward = reward,
+            )
+          }
   AroundAppTheme {
     VenuePageContent(
         state =
