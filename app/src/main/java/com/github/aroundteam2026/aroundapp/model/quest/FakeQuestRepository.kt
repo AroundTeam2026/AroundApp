@@ -52,6 +52,14 @@ class FakeQuestRepository(
   override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> =
       quests.map { all -> all.values.filter { it.venueId == venueId } }.distinctUntilChanged()
 
+  /** Emits the stored [QuestStatus.ACTIVE] quests of [venueId], and again whenever they change. */
+  override fun observeActiveQuestsByVenue(venueId: String): Flow<List<Quest>> =
+      quests
+          .map { all ->
+            all.values.filter { it.venueId == venueId && it.status == QuestStatus.ACTIVE }
+          }
+          .distinctUntilChanged()
+
   /** Returns the stored quest with [questId], or null if there is none. */
   override suspend fun getQuest(questId: String): Quest? = quests.value[questId]
 

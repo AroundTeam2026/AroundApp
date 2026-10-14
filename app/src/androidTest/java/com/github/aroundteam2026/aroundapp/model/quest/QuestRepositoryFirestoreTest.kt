@@ -323,6 +323,25 @@ class QuestRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: observeActiveQuestsByVenue does not filter on venueId or on status, or filters on a string
+   * that differs from the stored enum name.
+   */
+  @Test
+  fun observeActiveQuestsByVenue_returnsOnlyThatVenuesActiveQuests() = withTimeoutBlocking {
+    repository.createQuest(quest(status = QuestStatus.DRAFT)).getOrThrow()
+    repository.createQuest(quest(status = QuestStatus.ARCHIVED)).getOrThrow()
+    val activeId = repository.createQuest(quest()).getOrThrow()
+    createQuestAsAnotherVenue()
+
+    val quests =
+        repository.observeActiveQuestsByVenue(venueId).first { list ->
+          list.any { it.id == activeId }
+        }
+
+    assertEquals(listOf(activeId), quests.map { it.id })
+  }
+
+  /**
    * Bug: a document that cannot be mapped crashes the listener or ends the flow instead of being
    * skipped. getQuest goes through the same mapper.
    */

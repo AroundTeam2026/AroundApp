@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flowOf
 class ScriptedQuestRepository(
     var activeQuests: Flow<List<Quest>> = flowOf(emptyList()),
     var questsByVenue: (String) -> Flow<List<Quest>> = { flowOf(emptyList()) },
+    var activeQuestsByVenue: (String) -> Flow<List<Quest>> = { flowOf(emptyList()) },
     var quest: suspend (String) -> Quest? = { null },
     var create: suspend (Quest) -> Result<String> = { Result.success("created") },
 ) : QuestRepository {
@@ -24,6 +25,8 @@ class ScriptedQuestRepository(
   }
 
   override fun observeQuestsByVenue(venueId: String) = questsByVenue(venueId)
+
+  override fun observeActiveQuestsByVenue(venueId: String) = activeQuestsByVenue(venueId)
 
   override suspend fun getQuest(questId: String) = quest(questId)
 
