@@ -32,8 +32,9 @@ import kotlinx.coroutines.launch
 /**
  * Holds the page of the venue [venueId]: its header and the quests explorers can take there.
  *
- * It listens to the venue and its quests, and keeps up as they change and as rewards expire, by
- * [clock]. If listening fails, the page shows [VenuePageStatus.FAILED] until [onRetry].
+ * It listens to the venue and its active quests, the only ones the repository sends, and keeps up
+ * as they change and as rewards expire, by [clock]. If listening fails, the page shows
+ * [VenuePageStatus.FAILED] until [onRetry].
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -83,7 +84,7 @@ class VenuePageViewModel(
     listening = viewModelScope.launch {
       combine(
               venueRepository.observeVenue(venueId),
-              questRepository.observeQuestsByVenue(venueId),
+              questRepository.observeActiveQuestsByVenue(venueId),
           ) { venue, quests ->
             venue to quests
           }
