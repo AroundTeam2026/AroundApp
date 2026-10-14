@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -107,13 +108,16 @@ class CreateQuestBarTest {
     submitButton().performClick()
 
     submitButton().assertIsNotEnabled()
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SAVING, useUnmergedTree = true).assertExists()
+    // What TalkBack reads on the button while it has no text
+    submitButton().assertContentDescriptionEquals("Saving the quest…")
     compose.onNodeWithText("Create quest").assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).assertIsNotEnabled()
 
     answer.complete(Result.success("quest-9"))
     compose.waitForIdle()
     assertEquals(listOf("quest-9"), created)
+    // Still disabled while the screen closes, so a tap can't close it twice
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).assertIsNotEnabled()
   }
 
   @Test

@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -53,7 +55,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The form a venue fills in to create a quest. [onClose] leaves it without saving, but can't be
- * tapped while the quest is being saved, and [onCreated] gets the id of the quest once it is saved.
+ * tapped once the quest is being saved, and [onCreated] gets the id of the quest once it is saved.
  * A failed save shows a snackbar once and keeps the form.
  */
 @Composable
@@ -72,6 +74,8 @@ fun CreateQuestScreen(
     when (val save = state.saveState) {
       is SaveState.Saved -> currentOnCreated(save.questId)
       SaveState.Failed -> {
+        // Launched in the screen's scope, not in this effect: clearing the error changes the
+        // effect's key, which would cancel a snackbar shown from inside it
         scope.launch { snackbarHostState.showSnackbar(saveFailed) }
         // Cleared at once, so the snackbar doesn't show again when the screen is recreated
         viewModel.clearSaveError()
@@ -136,6 +140,9 @@ fun CreateQuestContent(
     Column(
         Modifier.fillMaxSize()
             .padding(padding)
+            // The bar stays under the keyboard, so the form makes room for the keyboard itself
+            .consumeWindowInsets(padding)
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(
                 horizontal = AroundSpacing.ScreenHorizontal,
@@ -143,7 +150,12 @@ fun CreateQuestContent(
             )
             .testTag(C.Tag.CREATE_QUEST_SCREEN)
     ) {
-      CreateQuestHeader(onClose, closeEnabled = state.saveState != SaveState.Saving)
+      // Also disabled once saved, as the screen is closing and a second close would pop its caller
+      CreateQuestHeader(
+          onClose,
+          closeEnabled =
+              state.saveState == SaveState.Idle || state.saveState == SaveState.Failed,
+      )
       Spacer(Modifier.height(AroundSpacing.ExtraLarge))
       QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
       Spacer(Modifier.height(AroundSpacing.Medium))

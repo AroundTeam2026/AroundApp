@@ -58,8 +58,19 @@ class CreateQuestDestinationTest {
     compose.runOnIdle { navController.navigateToCreateQuest() }
   }
 
+  /** Fills the form so it can be saved. */
+  private fun fillValid() {
+    compose.runOnIdle {
+      viewModel.updateTitle("Find the fox")
+      viewModel.updateDescription("A fox hides here.")
+      viewModel.updateRequirements("Order a drink.")
+    }
+  }
+
+  // Filled first, so a close that also saved would store the quest
   @Test
   fun closingTheFormReturnsWithoutSaving() {
+    fillValid()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
     compose.onNodeWithTag(START).assertIsDisplayed()
     assertNull(runBlocking { quests.getQuest("quest-1") })
@@ -67,11 +78,7 @@ class CreateQuestDestinationTest {
 
   @Test
   fun savingTheQuestReturnsToTheCaller() {
-    compose.runOnIdle {
-      viewModel.updateTitle("Find the fox")
-      viewModel.updateDescription("A fox hides here.")
-      viewModel.updateRequirements("Order a drink.")
-    }
+    fillValid()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
     compose.onNodeWithTag(START).assertIsDisplayed()
     assertEquals("Find the fox", runBlocking { quests.getQuest("quest-1") }?.title)

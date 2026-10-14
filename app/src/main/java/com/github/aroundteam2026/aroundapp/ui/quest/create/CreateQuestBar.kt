@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -24,6 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -34,15 +39,18 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 /**
  * The sticky bar under the quest form: a one-line summary of the quest's rules, and the "Create
  * quest" button, enabled when the quest [CreateQuestUiState.canSave], which shows progress while it
- * is saved.
+ * is saved. The keyboard covers it.
  */
 @Composable
 internal fun CreateQuestBar(state: CreateQuestUiState, onSubmit: () -> Unit) {
   Column(
       Modifier.fillMaxWidth()
           .background(MaterialTheme.colorScheme.background)
+          // Not above the keyboard: typing gets the room, and the form can't be saved mid-typing
           .windowInsetsPadding(
-              WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+              WindowInsets.safeDrawing
+                  .exclude(WindowInsets.ime)
+                  .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
           )
           .padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.Large),
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -53,6 +61,7 @@ internal fun CreateQuestBar(state: CreateQuestUiState, onSubmit: () -> Unit) {
         style = AroundTextStyles.Small,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.testTag(C.Tag.CREATE_QUEST_SUMMARY),
     )
     Button(
@@ -62,10 +71,12 @@ internal fun CreateQuestBar(state: CreateQuestUiState, onSubmit: () -> Unit) {
         modifier = Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.CREATE_QUEST_SUBMIT),
     ) {
       if (state.saveState == SaveState.Saving) {
+        // Labelled, so TalkBack doesn't read an empty button while it has no text
+        val saving = stringResource(R.string.create_quest_saving)
         CircularProgressIndicator(
             color = LocalContentColor.current,
             strokeWidth = PROGRESS_STROKE,
-            modifier = Modifier.size(PROGRESS_SIZE).testTag(C.Tag.CREATE_QUEST_SAVING),
+            modifier = Modifier.size(PROGRESS_SIZE).semantics { contentDescription = saving },
         )
       } else {
         Text(stringResource(R.string.create_quest_submit), style = AroundTextStyles.Button)

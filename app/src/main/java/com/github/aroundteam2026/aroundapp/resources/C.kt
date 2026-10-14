@@ -129,7 +129,6 @@ object C {
     const val CREATE_QUEST_CLOSE = "create_quest_close"
     const val CREATE_QUEST_SUMMARY = "create_quest_summary"
     const val CREATE_QUEST_SUBMIT = "create_quest_submit"
-    const val CREATE_QUEST_SAVING = "create_quest_saving"
     const val CREATE_QUEST_TITLE = "create_quest_title"
     const val CREATE_QUEST_TITLE_COUNTER = "create_quest_title_counter"
     const val CREATE_QUEST_TITLE_ERROR = "create_quest_title_error"
