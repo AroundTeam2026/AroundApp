@@ -53,7 +53,8 @@ class AroundAppVenuePageDeviceTest {
       val uid =
           Firebase.auth.createUserWithEmailAndPassword(email, "password123").await().user!!.uid
       UserRepositoryProvider.repository.createUser(User(uid, "Test", Role.VENUE, 0L)).getOrThrow()
-      venue = Venue(uid, "Café Lumen", null, DEFAULT_RADIUS_METERS, null, createdAt = 0L)
+      // A name no demo venue has, so the page can only show it from Firestore
+      venue = Venue(uid, "Venue $uid", null, DEFAULT_RADIUS_METERS, null, createdAt = 0L)
       VenueRepositoryProvider.repository.createVenue(venue).getOrThrow()
     }
   }
