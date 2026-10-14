@@ -265,6 +265,27 @@ class CreateQuestScreenTest {
   }
 
   @Test
+  fun emptyFieldsShowNoExampleText() {
+    // A placeholder would be the field's only text
+    val noText = SemanticsMatcher.keyNotDefined(SemanticsProperties.Text)
+    fun assertNoText(vararg tags: String) = tags.forEach {
+      compose.onNodeWithTag(it).performScrollTo().assert(noText)
+    }
+
+    assertNoText(
+        C.Tag.CREATE_QUEST_TITLE,
+        C.Tag.CREATE_QUEST_DESCRIPTION,
+        C.Tag.CREATE_QUEST_REQUIREMENTS,
+    )
+    viewModel.selectRewardType(RewardType.DISCOUNT)
+    assertNoText(C.Tag.CREATE_QUEST_REWARD_AMOUNT, C.Tag.CREATE_QUEST_REWARD_SPECIFICS)
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    assertNoText(C.Tag.CREATE_QUEST_REWARD_ITEM, C.Tag.CREATE_QUEST_REWARD_SPECIFICS)
+    viewModel.selectRewardType(RewardType.OTHER)
+    assertNoText(C.Tag.CREATE_QUEST_REWARD_DESCRIPTION)
+  }
+
+  @Test
   fun typingInTheRewardFieldsUpdatesTheReward() {
     viewModel.selectRewardType(RewardType.FREE_ITEM)
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo().performTextInput("Tea")

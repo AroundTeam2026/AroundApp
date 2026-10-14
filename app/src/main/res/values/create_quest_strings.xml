@@ -4,11 +4,8 @@
     <string name="create_quest_heading">New quest</string>
     <string name="create_quest_close">Close</string>
     <string name="create_quest_field_title">Title</string>
-    <string name="create_quest_field_title_hint">Find the hidden fox</string>
     <string name="create_quest_field_description">Description</string>
-    <string name="create_quest_field_description_hint">A tiny ceramic fox hides somewhere in the café. Spot it and snap a photo.</string>
     <string name="create_quest_field_requirements">Requirements</string>
-    <string name="create_quest_field_requirements_hint">Order any drink. One photo per party.</string>
     <string name="create_quest_counter">%1$d / %2$d</string>
     <string name="create_quest_blank">This field is required.</string>
     <plurals name="create_quest_too_long">
@@ -51,8 +48,6 @@
     <string name="create_quest_reward_none_hint">Explorers still earn points and rank</string>
     <string name="create_quest_reward_discount">Discount</string>
     <string name="create_quest_reward_amount">Discount amount</string>
-    <string name="create_quest_reward_amount_hint">15</string>
-    <string name="create_quest_reward_discount_specifics_hint">Off any hot drink. One per visit, can\'t be combined with other offers.</string>
     <string name="create_quest_reward_unit_percent">%</string>
     <string name="create_quest_reward_unit_chf">CHF</string>
     <string name="create_quest_reward_amount_not_a_number">Enter a number.</string>
@@ -62,11 +57,8 @@
     <string name="create_quest_reward_amount_too_large_chf">Use CHF %1$s or less.</string>
     <string name="create_quest_reward_free_item">Free item</string>
     <string name="create_quest_reward_other">Other</string>
-    <string name="create_quest_reward_item_hint">Mini croissant</string>
     <string name="create_quest_reward_specifics">Specifics</string>
-    <string name="create_quest_reward_specifics_hint">With any coffee. One per visit, while stocks last.</string>
     <string name="create_quest_reward_description">Describe the reward</string>
-    <string name="create_quest_reward_description_hint">Free mini croissant with any coffee. One per visit.</string>
     <string name="create_quest_reward_expires">Expires</string>
     <string name="create_quest_reward_no_expiry">No expiry</string>
     <string name="create_quest_reward_set_date">Set date</string>
