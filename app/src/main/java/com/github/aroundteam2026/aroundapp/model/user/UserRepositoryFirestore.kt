@@ -108,7 +108,12 @@ class UserRepositoryFirestore(private val db: FirebaseFirestore) : UserRepositor
     } catch (e: FirebaseFirestoreException) {
       val lostRace =
           if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) null
-          else runCatching { refusal(document.get(Source.SERVER).await()) }.getOrNull()
+          else
+              try {
+                refusal(document.get(Source.SERVER).await())
+              } catch (_: FirebaseFirestoreException) {
+                null
+              }
       Result.failure(lostRace ?: e)
     } catch (e: Exception) {
       Result.failure(e)
