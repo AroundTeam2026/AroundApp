@@ -3,8 +3,8 @@
 # Registration handoff for G2.3
 
 Issue #135 supplies `ui/auth/RegistrationFlow` for `AppRoot`'s `authFlow` and
-`roleSelection` slots. It does not activate a router in `MainActivity`: G2.3
-owns profile resolution and destination selection, and #136 owns venue entry.
+`roleSelection` slots. G2.3 activates it in `MainActivity`, using the Firestore-backed
+`UserRepositoryProvider` for profile resolution and destination selection.
 
 ## Wiring
 
@@ -44,7 +44,8 @@ the router reacts to the repository's user ID instead.
 
 `RoleNavigation(authRepository, userRepository, pendingRoleStore,
 explorerScreen = {}, venueScreen = {})` implements the repository-interface
-handoff. Both home slots are empty until their owners supply real content. It reuses
+handoff. Both home slots remain injectable; MainActivity supplies the existing Explorer
+tabs and `VenueEntryNavigation`. It reuses
 `SessionNavigation` for auth gating and per-account state cleanup. Both
 registration slots share its `ProfileSetup`; the router calls `finish()`
 on restored/new sessions and on completion or retry, then observes the
@@ -65,20 +66,27 @@ with that account. An existing stored role takes precedence.
 
 ## Production integration
 
-Production activation depends on a Firestore-backed `UserRepositoryProvider`
-from the persistent repository task. Until it is available, MainActivity
-keeps the session-only entry. Do not supply FakeUserRepository there.
+MainActivity supplies `AuthRepositoryProvider.repository`, the Firestore-backed
+`UserRepositoryProvider.repository`, and `PendingRoleStoreSharedPrefs`. No fake
+user repository is used in production. Explorer roles open `AroundApp`; Venue
+roles open `VenueEntryNavigation`, which connects existing business setup,
+location setup, Venue home and the create-quest form. Saved location replaces
+onboarding in the back stack. Entry currently begins at business setup, which
+prefills an existing venue and preserves it; skipping completed onboarding on a
+later launch belongs to the venue-entry owner.
 
-Inject the provider's repository into `RoleNavigation`, alongside the real
-auth repository and `PendingRoleStoreSharedPrefs`, and supply the Explorer
-tabs and Venue entry. Verify saved-role routing, restored sessions, missing
-profiles, registration persistence, failures, retry and sign-out against the
-Firebase emulators. Repository implementation stays in the model layer.
+The existing role tests cover missing profiles, pending choices, saved roles,
+loading, failures, retry, sign-out and account changes. `RoleRoutingActivityTest`
+checks MainActivity's real providers against Firebase emulators, including role
+persistence and recreation. `VenueEntryNavigationTest` covers the onboarding/home
+handoff, Back cleanup and the create-quest callback.
 
 The router observes missing profiles and unset roles until a role is saved.
 Roles are write-once, so that profile subscription then ends and the resolved
 home remains selected for the session. Account change or sign-out still
 cancels profile resolution through the session observer.
 
-Fake repositories are test fixtures only; home slots are empty by default.
+The role-routing fake repositories are test fixtures only; home slots are empty
+by default for callers that do not supply them. The separate quest provider still
+uses its existing demo repository; changing that provider is outside G2.3.
 The role selection form is supplied by #181, and Profile sign-out by #187.

@@ -6,14 +6,31 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.remember
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
-import com.github.aroundteam2026.aroundapp.ui.navigation.SessionNavigation
+import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
+import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
+import com.github.aroundteam2026.aroundapp.ui.navigation.RoleNavigation
+import com.github.aroundteam2026.aroundapp.ui.navigation.VenueEntryNavigation
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
-    setContent { AroundAppTheme { SessionNavigation(AuthRepositoryProvider.repository) } }
+    setContent {
+      val auth = AuthRepositoryProvider.repository
+      val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
+      AroundAppTheme {
+        RoleNavigation(
+            authRepository = auth,
+            userRepository = UserRepositoryProvider.repository,
+            pendingRoleStore = pendingRole,
+            explorerScreen = { AroundApp(onSignOut = auth::signOut) },
+            venueScreen = { VenueEntryNavigation(authRepository = auth) },
+        )
+      }
+    }
   }
 }
