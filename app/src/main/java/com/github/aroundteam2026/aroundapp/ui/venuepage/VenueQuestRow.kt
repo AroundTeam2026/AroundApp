@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,7 @@ fun VenueQuestRow(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onDetails: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
   Row(
@@ -95,24 +98,36 @@ fun VenueQuestRow(
           quest.reward,
           quest.minPartySize,
           distanceMeters = null,
-          chipStyle(),
+          venueQuestChipStyle(),
           Modifier.padding(top = AroundSpacing.ExtraSmall),
       )
     }
-    Icon(
-        painterResource(R.drawable.ic_quest_row_chevron),
-        contentDescription = null,
-        tint = colors.onSurfaceVariant,
-    )
+    if (onDetails == null) {
+      Chevron(contentDescription = null)
+    } else {
+      IconButton(onDetails, Modifier.testTag(C.Tag.VENUE_QUEST_ROW_DETAILS)) {
+        Chevron(stringResource(R.string.venue_quest_details, quest.title))
+      }
+    }
   }
 }
 
+/** The row's chevron, read out as [contentDescription]. */
+@Composable
+private fun Chevron(contentDescription: String?) {
+  Icon(
+      painterResource(R.drawable.ic_quest_row_chevron),
+      contentDescription,
+      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+}
+
 /**
- * The row's chips: a free item's reward on the tertiary colour, other rewards on the primary, both
- * after a gift; the party size ringed on the surface.
+ * The chips of a quest on the venue page: a free item's reward on the tertiary colour, other
+ * rewards on the primary, both after a gift; the party size ringed on the surface.
  */
 @Composable
-private fun chipStyle(): QuestChipStyle {
+internal fun venueQuestChipStyle(): QuestChipStyle {
   val colors = MaterialTheme.colorScheme
   return QuestChipStyle(
       reward = ChipColors(colors.primary, colors.onPrimary),
@@ -161,7 +176,7 @@ private fun VenueQuestRowPreview() {
       )
   AroundAppTheme {
     Column(Modifier.background(MaterialTheme.colorScheme.surface).padding(AroundSpacing.Large)) {
-      VenueQuestRow(quest, selected = true, onClick = {})
+      VenueQuestRow(quest, selected = true, onClick = {}, onDetails = {})
       VenueQuestRow(
           quest.copy(
               questId = "quest-1",
