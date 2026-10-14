@@ -22,7 +22,12 @@ import androidx.compose.ui.test.performClick
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
+import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import org.junit.Assert.assertEquals
@@ -117,7 +122,19 @@ class AroundAppTest {
 
   @Test
   fun theMapTabShowsTheMap() {
-    launch()
+    // The app's own map would read Firestore, so the Map tab shows the map on in-memory
+    // repositories
+    val map =
+        MapViewModel(FakeLocationRepository(null), FakeQuestRepository(), FakeVenueRepository())
+    launch {
+      AroundApp(
+          onSignOut = {},
+          screen = { tab ->
+            if (tab == Tab.MAP) MapScreen(map, onOpenVenue = { _, _ -> })
+            else Text(tab.route, Modifier.testTag(tab.screenTag))
+          },
+      )
+    }
     select(Tab.MAP)
 
     composeTestRule.onNodeWithTag(C.Tag.MAP).assertIsDisplayed()
