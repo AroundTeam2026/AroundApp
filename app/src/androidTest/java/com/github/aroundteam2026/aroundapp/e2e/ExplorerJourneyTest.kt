@@ -37,6 +37,7 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -66,11 +67,14 @@ class ExplorerJourneyTest : TestCase() {
    */
   @Before
   fun seedQuest(): Unit = runBlocking {
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    // E2eRule granted the location permission before this runs. Without a fix, as on a freshly
+    // booted CI emulator, the lookup can wait indefinitely, and the app finds none either
+    val here =
+        withTimeoutOrNull(TIMEOUT_MS) {
+          LocationRepositoryProvider.repository(context).currentLocation()
+        } ?: DEFAULT_MAP_CENTER
     withTimeout(SETUP_TIMEOUT_MS) {
-      val context = InstrumentationRegistry.getInstrumentation().targetContext
-      // E2eRule granted the location permission before this runs
-      val here =
-          LocationRepositoryProvider.repository(context).currentLocation() ?: DEFAULT_MAP_CENTER
       val app = seedApp(context)
       val auth = Firebase.auth(app)
       val db = Firebase.firestore(app)
