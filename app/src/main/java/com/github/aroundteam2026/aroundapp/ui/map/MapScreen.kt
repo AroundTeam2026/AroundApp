@@ -34,11 +34,17 @@ import com.google.maps.android.compose.MapUiSettings
  * It marks each venue on screen that has valid quests with a pin. Tapping a pin opens it into a
  * card, tapping the card opens the venue's page, and tapping the map closes the card.
  *
+ * While the location is off, a banner at the top says so, and its "Turn on" button asks for it
+ * again or opens the app's settings.
+ *
  * A "Nearby quests" pill opens the quests near the explorer over the map, in place of itself. Back
- * closes them before it leaves the map, and so does opening a card, which they would hide.
+ * closes them before it leaves the map, and so does opening a card, which they would hide. Tapping
+ * a quest's page frames its venue and opens its card; "View quest" opens the venue's page. Their
+ * filters narrow the list, not the map's pins.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
- * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
+ * @param onOpenVenue Opens the page of the venue with this id and name, when its card or "View
+ *   quest" is tapped.
  */
 @Composable
 fun MapScreen(
@@ -48,6 +54,7 @@ fun MapScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
+  val turnOnLocation = rememberTurnOnLocation(viewModel::onLocationPermissionResult)
   // Unlike the context's, these follow configuration changes
   val resources = LocalResources.current
   // The light style would glare in dark mode, which has its own
@@ -93,13 +100,24 @@ fun MapScreen(
       NearbyQuestOverlay(
           state.nearby,
           locationOn = state.showsUserLocation,
+          onQuestClick = viewModel::onNearbyQuestClick,
+          // The quests stay open, so Back from the venue's page finds them where they were
+          onViewQuest = { onOpenVenue(it.venueId, it.venueName) },
           onClose = viewModel::onNearbyClose,
+          filters = state.filters,
+          onFiltersChange = viewModel::onFiltersChange,
           modifier = Modifier.align(Alignment.BottomCenter),
       )
     } else {
       NearbyQuestsButton(
           viewModel::onNearbyOpen,
           Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Large),
+      )
+    }
+    if (state.locationRefused) {
+      LocationBanner(
+          turnOnLocation,
+          Modifier.align(Alignment.TopCenter).padding(AroundSpacing.Large),
       )
     }
   }

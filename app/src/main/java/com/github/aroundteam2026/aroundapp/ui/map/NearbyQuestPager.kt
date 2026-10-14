@@ -17,19 +17,25 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -79,6 +85,10 @@ private val SHOWN_DOT_WIDTH = 18.dp
  * @param onViewQuest Called with the shown quest when the explorer taps "View quest".
  * @param style How the pages look; by default, as in Figma, in the theme's colours.
  * @param onClose Called when the explorer taps the close button, which shows only when given.
+ * @param filters The filters [quests] already passed; while one is set, the counter names them in
+ *   place of the order.
+ * @param onFiltersChange Called with the filters the explorer picks. The filter button, which opens
+ *   and closes the filters under the header, shows only when given.
  */
 @Composable
 fun NearbyQuestPager(
@@ -89,19 +99,34 @@ fun NearbyQuestPager(
     modifier: Modifier = Modifier,
     style: MarkerStyle = NearbyQuestPagerDefaults.style(),
     onClose: (() -> Unit)? = null,
+    filters: NearbyFilters = NearbyFilters(),
+    onFiltersChange: ((NearbyFilters) -> Unit)? = null,
 ) {
+  // Saved, so the filters stay open over rotation; they close with the pager
+  var filtersOpen by rememberSaveable { mutableStateOf(false) }
+  val summary = filterSummary(filters)
+  val header: @Composable (counter: String?) -> Unit = { counter ->
+    Header(counter, onClose, filtersOpen.takeIf { onFiltersChange != null }) {
+      filtersOpen = !filtersOpen
+    }
+    if (filtersOpen && onFiltersChange != null) {
+      NearbyFilterPanel(filters, locationOn, onFiltersChange)
+    }
+  }
   Column(modifier, verticalArrangement = Arrangement.spacedBy(AroundSpacing.SectionGap)) {
     if (quests.isEmpty()) {
-      Header(counter = null, onClose)
+      header(summary)
       LocationHint(locationOn)
       Text(
-          stringResource(R.string.map_nearby_empty),
+          stringResource(
+              if (filters.isActive) R.string.map_nearby_no_match else R.string.map_nearby_empty
+          ),
           Modifier.testTag(C.Tag.NEARBY_EMPTY),
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           style = AroundTextStyles.BodyMedium,
       )
     } else {
-      Pages(quests, locationOn, onQuestClick, onViewQuest, style, onClose)
+      Pages(quests, locationOn, summary, header, onQuestClick, onViewQuest, style)
     }
   }
 }
@@ -148,10 +173,16 @@ object NearbyQuestPagerDefaults {
 }
 
 /**
- * "Nearby quests" over [counter] when there is one, and the close button when [onClose] is given.
+ * "Nearby quests" over [counter] when there is one, the filter button unless [filtersOpen] is null,
+ * filled while they are open, and the close button when [onClose] is given.
  */
 @Composable
-private fun Header(counter: String?, onClose: (() -> Unit)?) {
+private fun Header(
+    counter: String?,
+    onClose: (() -> Unit)?,
+    filtersOpen: Boolean?,
+    onToggleFilters: () -> Unit,
+) {
   Row(
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
       verticalAlignment = Alignment.CenterVertically,
@@ -171,6 +202,15 @@ private fun Header(counter: String?, onClose: (() -> Unit)?) {
         )
       }
     }
+    filtersOpen?.let { open ->
+      val description = stringResource(R.string.map_nearby_filters)
+      FilterChip(
+          selected = open,
+          onClick = onToggleFilters,
+          label = { Text(stringResource(R.string.map_nearby_filters_label)) },
+          modifier = Modifier.semantics { contentDescription = description },
+      )
+    }
     onClose?.let {
       RoundButton(
           R.drawable.ic_close,
@@ -184,23 +224,30 @@ private fun Header(counter: String?, onClose: (() -> Unit)?) {
 }
 
 /**
- * The title and counter, the pages of [quests], their dots and the arrows. Composed only while
- * there are quests, so quests arriving after an empty list start again from the first.
+ * The [header] with its counter, the pages of [quests], their dots and the arrows. Composed only
+ * while there are quests, so quests arriving after an empty list start again from the first.
+ *
+ * @param summary The filters in words, which the counter names in place of the order, or null.
  */
 @Composable
 private fun Pages(
     quests: List<NearbyQuest>,
     locationOn: Boolean,
+    summary: String?,
+    header: @Composable (counter: String) -> Unit,
     onQuestClick: (NearbyQuest) -> Unit,
     onViewQuest: (NearbyQuest) -> Unit,
     style: MarkerStyle,
-    onClose: (() -> Unit)?,
 ) {
   val pagerState = rememberPagerState { quests.size }
   // For a frame after the list shrinks, the pager's page can still be past its end
   val shown = pagerState.currentPage.coerceAtMost(quests.lastIndex)
   val order = if (locationOn) R.string.map_nearby_closest_first else R.string.map_nearby_by_name
-  Header(stringResource(order, shown + 1, quests.size), onClose)
+  header(
+      if (summary != null)
+          stringResource(R.string.map_nearby_filtered, shown + 1, quests.size, summary)
+      else stringResource(order, shown + 1, quests.size)
+  )
   LocationHint(locationOn)
   // Keyed by quest, so the shown quest keeps its page when others come and go
   HorizontalPager(

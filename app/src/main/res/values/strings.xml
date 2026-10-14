@@ -54,6 +54,27 @@
     <string name="map_nearby_previous">Previous quest</string>
     <string name="map_nearby_next">Next quest</string>
     <string name="map_nearby_close">Close nearby quests</string>
+    <string name="map_nearby_filters">Filter nearby quests</string>
+    <string name="map_nearby_filters_label">Filters</string>
+    <string name="map_nearby_filtered">%1$d of %2$d · %3$s</string>
+    <string name="map_nearby_filter_pair">%1$s · %2$s</string>
+    <string name="map_nearby_no_match">No quests match these filters.</string>
+    <string name="map_nearby_filter_distance">Distance</string>
+    <string name="map_nearby_filter_reward">Reward</string>
+    <string name="map_nearby_filter_any">Any</string>
+    <string name="map_nearby_filter_500_m">500 m</string>
+    <string name="map_nearby_filter_1_km">1 km</string>
+    <string name="map_nearby_filter_3_km">3 km</string>
+    <string name="map_nearby_filter_discount">Discount</string>
+    <string name="map_nearby_filter_other">Other</string>
+    <string name="map_nearby_within_500_m">within 500 m</string>
+    <string name="map_nearby_within_1_km">within 1 km</string>
+    <string name="map_nearby_within_3_km">within 3 km</string>
+    <string name="map_nearby_discounts">discounts</string>
+    <string name="map_nearby_other_rewards">other rewards</string>
+    <string name="map_location_off">Location is off</string>
+    <string name="map_location_off_fallback">Showing quests around Lausanne.</string>
+    <string name="map_location_turn_on">Turn on</string>
 
     <!-- Screens that are not built yet: their title, then a note that they are coming soon -->
     <string name="coming_soon">Coming soon</string>
