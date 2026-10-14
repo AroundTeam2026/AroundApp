@@ -59,7 +59,7 @@ The `reward` map has a `type` field that says which other fields it holds:
 
 | `type` | Fields |
 |---|---|
-| `DISCOUNT` | `amount` (number, at least 0.01; at most 100 for `PERCENT`), `unit` (`PERCENT` or `CHF`), `specifics` (string?, at most 200 characters) |
+| `DISCOUNT` | `amount` (number, at least 0.01; at most 100 for `PERCENT` and 1000 for `CHF`), `unit` (`PERCENT` or `CHF`), `specifics` (string?, at most 200 characters) |
 | `FREE_ITEM` | `name` (string, at most 60 characters), `specifics` (string?, at most 200 characters) |
 | `OTHER` | `description` (string, at most 200 characters) |
 

@@ -90,7 +90,8 @@ service cloud.firestore {
           && reward.keys().hasOnly(['type', 'amount', 'unit', 'specifics', 'expiresAt'])
           && reward.amount is number
           && reward.amount >= 0.01
-          && (reward.unit == 'CHF' || (reward.unit == 'PERCENT' && reward.amount <= 100))
+          && ((reward.unit == 'CHF' && reward.amount <= 1000)
+              || (reward.unit == 'PERCENT' && reward.amount <= 100))
           && isOptionalText(reward, 'specifics', 200);
     }
 

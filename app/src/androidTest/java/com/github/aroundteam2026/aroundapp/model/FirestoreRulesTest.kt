@@ -97,6 +97,7 @@ class FirestoreRulesTest {
   @Test
   fun venueIsReadableBySignedInUsersAndWritableByItsOwnerOnly() {
     val venue = newUser(Role.VENUE)
+    val otherVenue = newUser(Role.VENUE)
     val explorer = newUser(Role.EXPLORER)
 
     signInAs(venue)
@@ -104,7 +105,11 @@ class FirestoreRulesTest {
 
     signInAs(explorer)
     assertSucceeds(venueOf(venue).get(Source.SERVER))
+
+    // A venue account passes the role check, so only the owner check can deny it
+    signInAs(otherVenue)
     assertDenied(venueOf(venue).set(mapOf("name" to "Taken"), SetOptions.merge()))
+    assertDenied(venueOf(venue).delete())
 
     signOut()
     assertDenied(venueOf(venue).get(Source.SERVER))
@@ -117,6 +122,10 @@ class FirestoreRulesTest {
 
     val withoutProfile = newUser()
     assertDenied(venueOf(withoutProfile).set(venueData()), "an account without a profile")
+
+    val withoutRole = newUser()
+    assertSucceeds(user(withoutRole).set(profile(role = null)))
+    assertDenied(venueOf(withoutRole).set(venueData()), "an account that hasn't chosen a role")
   }
 
   @Test
@@ -136,6 +145,7 @@ class FirestoreRulesTest {
             "an unknown field" to valid + ("ownerUid" to venue.uid),
         ),
     )
+    assertDenied(venueOf(venue).update("radiusMeters", 500), "an update that breaks the schema")
     // Optional fields are omitted when null
     assertSucceeds(venueOf(venue).set(valid - listOf("location", "address", "featuredQuestId")))
   }
@@ -238,7 +248,11 @@ class FirestoreRulesTest {
         mapOf(
             "a discount over 100 %" to
                 mapOf("type" to "DISCOUNT", "amount" to 101, "unit" to "PERCENT"),
+            "a discount over 1000 CHF" to
+                mapOf("type" to "DISCOUNT", "amount" to 1001, "unit" to "CHF"),
             "a discount under 0.01" to mapOf("type" to "DISCOUNT", "amount" to 0, "unit" to "CHF"),
+            "an amount that is not a number" to
+                mapOf("type" to "DISCOUNT", "amount" to "ten", "unit" to "CHF"),
             "an unknown unit" to mapOf("type" to "DISCOUNT", "amount" to 5, "unit" to "EUR"),
             "a discount without an amount" to mapOf("type" to "DISCOUNT", "unit" to "CHF"),
             "an item name over 60 characters" to
@@ -385,6 +399,10 @@ class FirestoreRulesTest {
     signInAs(explorer)
     assertDenied(pending.update("status", "APPROVED"), "the explorer approving")
     assertDenied(pending.update("status", "REJECTED"), "the explorer rejecting")
+    assertDenied(
+        pending.update(mapOf("status" to "CANCELLED", "slotStart" to Timestamp.now())),
+        "the explorer moving the slot while cancelling",
+    )
     assertSucceeds(pending.update("status", "CANCELLED"))
     assertSucceeds(approved.update("status", "CANCELLED"))
   }
