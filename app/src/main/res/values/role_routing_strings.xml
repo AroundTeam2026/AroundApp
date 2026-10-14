@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
+<resources>
+    <string name="role_profile_error">Could not load your profile.</string>
+    <string name="role_profile_retry">Retry</string>
+</resources>

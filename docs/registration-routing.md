@@ -24,7 +24,7 @@ RegistrationFlow(
 )
 ```
 
-`router::retryProfile` is G2.3's callback, not part of this change. It shows
+`router::retryProfile` is G2.3's completion callback. It shows
 loading and calls `profileSetup.finish()` again. Normal sign-up never calls it:
 the router reacts to the repository's user ID instead.
 
@@ -39,3 +39,46 @@ the router reacts to the repository's user ID instead.
   Back cannot return to authentication.
 - The form's ViewModel is activity-scoped, as in `SessionNavigation`: rotation
   keeps a pending request, and a successful submit clears the credentials.
+
+## Role-routing scaffold
+
+`RoleNavigation(authRepository, userRepository, pendingRoleStore,
+explorerScreen = {}, venueScreen = {})` implements the repository-interface
+handoff. Both home slots are empty until their owners supply real content. It reuses
+`SessionNavigation` for auth gating and per-account state cleanup. Both
+registration slots share its `ProfileSetup`; the router calls `finish()`
+on restored/new sessions and on completion or retry, then observes the
+profile's stored role.
+
+| Profile state | Destination |
+| --- | --- |
+| Missing document or unset role, with no applicable pending choice | Complete registration |
+| Explorer | Supplied Explorer home |
+| Venue | Supplied Venue entry |
+| Profile setup/read in progress | Loading |
+| Failed profile setup/read | Error with retry and sign-out |
+
+These rules follow #181's two registration choices. A pending choice is
+completed before routing, including after a restart; it is never replaced
+with a guessed Explorer role. A choice bound to another account stays
+with that account. An existing stored role takes precedence.
+
+## Production integration
+
+Production activation depends on a Firestore-backed `UserRepositoryProvider`
+from the persistent repository task. Until it is available, MainActivity
+keeps the session-only entry. Do not supply FakeUserRepository there.
+
+Inject the provider's repository into `RoleNavigation`, alongside the real
+auth repository and `PendingRoleStoreSharedPrefs`, and supply the Explorer
+tabs and Venue entry. Verify saved-role routing, restored sessions, missing
+profiles, registration persistence, failures, retry and sign-out against the
+Firebase emulators. Repository implementation stays in the model layer.
+
+The router observes missing profiles and unset roles until a role is saved.
+Roles are write-once, so that profile subscription then ends and the resolved
+home remains selected for the session. Account change or sign-out still
+cancels profile resolution through the session observer.
+
+Fake repositories are test fixtures only; home slots are empty by default.
+The role selection form is supplied by #181, and Profile sign-out by #187.
