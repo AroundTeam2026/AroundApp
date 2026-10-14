@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.runtime.Composable
@@ -17,6 +18,9 @@ import com.github.aroundteam2026.aroundapp.ui.venue.VenueInitializationViewModel
 object VenueOnboardingRoutes {
   const val INITIALIZATION = "venue_initialization"
   const val LOCATION = "venue_location/{venueId}"
+
+  /** The route to the location step of the venue [venueId], encoded so any id fits. */
+  fun location(venueId: String): String = "venue_location/${android.net.Uri.encode(venueId)}"
 }
 
 /** Called by the auth screen after a successful Venue sign-up. */
@@ -46,9 +50,7 @@ fun NavGraphBuilder.venueOnboardingDestinations(
         viewModel = initializationViewModel,
         onBack = { navController.popBackStack() },
         onContinueToLocation = { venueId ->
-          navController.navigate("venue_location/${android.net.Uri.encode(venueId)}") {
-            launchSingleTop = true
-          }
+          navController.navigate(VenueOnboardingRoutes.location(venueId)) { launchSingleTop = true }
         },
     )
   }

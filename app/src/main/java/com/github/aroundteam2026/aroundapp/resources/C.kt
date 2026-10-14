@@ -24,6 +24,10 @@ object C {
     const val PROFILE_SIGN_OUT = "profile_sign_out"
 
     const val VENUE_HOME = "venue_home"
+    const val VENUE_ENTRY_LOADING = "venue_entry_loading"
+    const val VENUE_ENTRY_FAILED = "venue_entry_failed"
+    const val VENUE_ENTRY_RETRY = "venue_entry_retry"
+    const val VENUE_ENTRY_SIGN_OUT = "venue_entry_sign_out"
     const val VENUE_NAV_BAR = "venue_nav_bar"
     const val VENUE_DASHBOARD_TAB = "venue_dashboard_tab"
     const val VENUE_QUESTS_TAB = "venue_quests_tab"

@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +41,8 @@ import com.github.aroundteam2026.aroundapp.ui.auth.RegistrationFlow
  * @param userRepository reads and saves the profile whose role selects the destination.
  * @param pendingRoleStore keeps a registration choice until its profile is saved.
  * @param explorerScreen the Explorer home; empty until its owner supplies it.
- * @param venueScreen the Venue entry, given the signed-in uid; empty until its owner supplies it.
+ * @param venueScreen the Venue entry, given the signed-in uid, e.g. [VenueEntry]; empty until its
+ *   owner supplies it.
  */
 @Composable
 fun RoleNavigation(
