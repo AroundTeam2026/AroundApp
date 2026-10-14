@@ -38,6 +38,7 @@ import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.DEFAULT_RADIUS_METERS
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MAX_RADIUS_METERS
@@ -224,11 +225,20 @@ class VenueAreaScreenTest {
   }
 
   @Test
-  fun itsOwnViewModelShowsUseMyLocationWithThePermission() {
-    shadowOf(ApplicationProvider.getApplicationContext<Application>())
-        .grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
+  fun theAppsLocationShowsUseMyLocationWithThePermission() {
+    val application = ApplicationProvider.getApplicationContext<Application>()
+    shadowOf(application).grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
+    val withAppLocation =
+        VenueAreaViewModel(
+            "venue",
+            FakeVenueRepository(),
+            LocationRepositoryProvider.repository(application),
+            addresses,
+        )
 
-    composeTestRule.setContent { VenueAreaScreen("venue", onSaved = {}, onBack = {}) }
+    composeTestRule.setContent {
+      VenueAreaScreen("venue", onSaved = {}, onBack = {}, viewModel = withAppLocation)
+    }
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_AREA_USE_MY_LOCATION).assertIsDisplayed()
   }

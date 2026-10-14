@@ -23,6 +23,7 @@ import com.github.aroundteam2026.aroundapp.ui.dashboard.dashboardDestination
 import com.github.aroundteam2026.aroundapp.ui.dashboard.navigateToDashboard
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
 import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
+import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -44,7 +45,11 @@ class RoutesTest {
   private fun launchApp() {
     composeTestRule.setContent {
       navController = rememberNavController()
-      AroundApp(onSignOut = {}, navController = navController)
+      AroundApp(
+          onSignOut = {},
+          navController = navController,
+          venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+      )
     }
     composeTestRule.waitForIdle()
   }
