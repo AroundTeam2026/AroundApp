@@ -10,8 +10,10 @@ import android.net.Uri
  * Each route starts as a "Coming soon" stub. The task that builds a screen replaces its stub, and
  * the route stays the same, so nothing that navigates to it has to change.
  *
- * Explorer routes are registered in the explorer's NavHost, [AroundApp]. Venue routes are
- * registered in the venue's own NavHost, [VenueNavigation]: an explorer must not reach them.
+ * Explorer routes are registered in the explorer's NavHost, [AroundApp]. Venue routes belong to the
+ * venue's own NavHost, [VenueNavigation], so an explorer can't reach them. [VenueNavigation]
+ * registers the home and the create-quest form; the dashboard is still a tab of [VenueHome], and
+ * its route is registered when its screen is built.
  */
 object Routes {
   /** Argument of [VENUE_PAGE]: the venue's id, equal to its owner's uid. */

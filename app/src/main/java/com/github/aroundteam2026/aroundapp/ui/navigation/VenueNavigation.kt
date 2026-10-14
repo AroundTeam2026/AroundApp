@@ -17,6 +17,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
  * above it, so that their own bottom bars don't sit on the home's tabs.
  *
  * @param onSignOut signs the venue out, from the Profile tab.
+ * @param navController the venue's navigation, between the home and the screens above it.
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  */
 @Composable
