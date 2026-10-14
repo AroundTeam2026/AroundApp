@@ -38,6 +38,8 @@ object C {
     const val AUTH_VENUE_LINK = "auth_venue_link"
     const val AUTH_EMAIL = "auth_email"
     const val AUTH_PASSWORD = "auth_password"
+    const val AUTH_PASSWORD_VISIBILITY = "auth_password_visibility"
+    const val AUTH_CONFIRMATION_VISIBILITY = "auth_confirmation_visibility"
     const val AUTH_CONFIRMATION = "auth_confirmation"
     const val AUTH_SUBMIT = "auth_submit"
     const val AUTH_SWITCH_MODE = "auth_switch_mode"

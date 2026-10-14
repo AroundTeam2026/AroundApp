@@ -3,15 +3,20 @@
 package com.github.aroundteam2026.aroundapp.ui.auth
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.auth.AuthError
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
@@ -110,7 +115,13 @@ class AuthScreenTest {
     click(C.Tag.AUTH_SUBMIT)
     compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertIsDisplayed()
     for (tag in
-        listOf(C.Tag.AUTH_EMAIL, C.Tag.AUTH_PASSWORD, C.Tag.AUTH_SUBMIT, C.Tag.AUTH_SWITCH_MODE)) {
+        listOf(
+            C.Tag.AUTH_EMAIL,
+            C.Tag.AUTH_PASSWORD,
+            C.Tag.AUTH_PASSWORD_VISIBILITY,
+            C.Tag.AUTH_SUBMIT,
+            C.Tag.AUTH_SWITCH_MODE,
+        )) {
       compose.onNodeWithTag(tag).assertIsNotEnabled()
     }
     compose.runOnIdle { gate.complete(Unit) }
@@ -146,6 +157,72 @@ class AuthScreenTest {
     compose
         .onNodeWithTag(C.Tag.AUTH_ERROR)
         .assertTextEquals("Use a password with at least 6 characters.")
+  }
+
+  private fun assertRenderedPassword(tag: String, expected: String) {
+    val layouts = mutableListOf<TextLayoutResult>()
+    compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.GetTextLayoutResult) {
+      assertEquals(true, it(layouts))
+    }
+    assertEquals(expected, layouts.single().layoutInput.text.text)
+  }
+
+  @Test
+  fun passwordCanBeShownAndHiddenWithoutChangingSignInCredentials() {
+    val uid = repository.addAccount("ada@around.test", "123456")
+    launch()
+    fill()
+    assertRenderedPassword(C.Tag.AUTH_PASSWORD, "••••••")
+    compose
+        .onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY)
+        .assertContentDescriptionEquals("Show password")
+        .performClick()
+    assertRenderedPassword(C.Tag.AUTH_PASSWORD, "123456")
+    compose
+        .onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY)
+        .assertContentDescriptionEquals("Hide password")
+        .performClick()
+    assertRenderedPassword(C.Tag.AUTH_PASSWORD, "••••••")
+    click(C.Tag.AUTH_SUBMIT)
+    compose.runOnIdle { assertEquals(uid, repository.currentUserId.value) }
+  }
+
+  @Test
+  fun signUpPasswordAndConfirmationVisibilityAreIndependent() {
+    launch()
+    click(C.Tag.AUTH_SWITCH_MODE)
+    fill()
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
+    assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "••••••")
+    compose.onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY).performClick()
+    assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "••••••")
+    compose
+        .onNodeWithTag(C.Tag.AUTH_CONFIRMATION_VISIBILITY)
+        .assertContentDescriptionEquals("Show confirmation password")
+        .performClick()
+    assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "123456")
+    compose
+        .onNodeWithTag(C.Tag.AUTH_CONFIRMATION_VISIBILITY)
+        .assertContentDescriptionEquals("Hide confirmation password")
+        .performClick()
+    assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "••••••")
+    assertRenderedPassword(C.Tag.AUTH_PASSWORD, "123456")
+    click(C.Tag.AUTH_SUBMIT)
+    compose.runOnIdle { assertNotNull(repository.currentUserId.value) }
+  }
+
+  @Test
+  fun recreationRetainsPasswordVisibility() {
+    val restoration = StateRestorationTester(compose)
+    val viewModel = AuthViewModel(repository)
+    restoration.setContent { AroundAppTheme { AuthScreen(viewModel) } }
+    fill()
+    compose.onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY).performClick()
+    restoration.emulateSavedInstanceStateRestore()
+    assertRenderedPassword(C.Tag.AUTH_PASSWORD, "123456")
+    compose
+        .onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY)
+        .assertContentDescriptionEquals("Hide password")
   }
 
   @Test
