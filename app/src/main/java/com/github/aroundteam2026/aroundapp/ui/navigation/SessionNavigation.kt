@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.ui.auth.AuthScreen
 import com.github.aroundteam2026.aroundapp.ui.auth.AuthViewModel
+import com.github.aroundteam2026.aroundapp.ui.auth.GoogleCredentialSessionEffect
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 
 /**
@@ -42,6 +43,7 @@ fun SessionNavigation(
       AuthScreen(authViewModel)
     },
 ) {
+  GoogleCredentialSessionEffect(repository)
   val state by sessionViewModel.uiState.collectAsStateWithLifecycle()
   val savedFlows = rememberSaveableStateHolder()
   var savedUserId by rememberSaveable { mutableStateOf<String?>(null) }

@@ -154,6 +154,9 @@ dependencies {
 
   implementation(composeBom)
   implementation(firebaseBom)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services)
+  implementation(libs.googleid)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.appcompat)
   implementation(libs.material)

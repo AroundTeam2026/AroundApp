@@ -1,3 +1,4 @@
+# Co-authored-by: OpenAI Codex <noreply@openai.com>
 # Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 [versions]
 agp = "9.3.0"
@@ -25,9 +26,14 @@ mapsCompose = "8.2.0"
 playServicesLocation = "21.4.0"
 coroutines = "1.10.2"
 mockk = "1.14.11"
+credentials = "1.6.0"
+googleid = "1.2.1"
 
 
 [libraries]
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
