@@ -127,6 +127,29 @@ fun writeBypassingRules(path: String, fields: Map<String, Any>) {
   }
 }
 
+/**
+ * Deletes every document of the project [projectId] on the Firestore emulator, so a test starts
+ * from an empty database whatever earlier tests and runs left there. Clients drop what they cached
+ * once they next hear from the server.
+ */
+fun clearFirestore(projectId: String) {
+  val url =
+      "http://${FirebaseEmulator.HOST}:${FirebaseEmulator.FIRESTORE_PORT}" +
+          "/emulator/v1/projects/$projectId/databases/(default)/documents"
+  val connection = URL(url).openConnection() as HttpURLConnection
+  try {
+    connection.requestMethod = "DELETE"
+    connection.connectTimeout = TIMEOUT_MS.toInt()
+    connection.readTimeout = TIMEOUT_MS.toInt()
+    check(connection.responseCode == HttpURLConnection.HTTP_OK) {
+      "The emulator refused to clear $projectId: " +
+          connection.errorStream?.bufferedReader()?.readText()
+    }
+  } finally {
+    connection.disconnect()
+  }
+}
+
 /** [fields] in the REST API's format, which wraps each value in an object naming its type. */
 private fun restFields(fields: Map<*, *>): JSONObject =
     JSONObject().apply {

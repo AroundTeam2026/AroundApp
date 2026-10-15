@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
@@ -84,16 +85,23 @@ class VenueEntryNavigationTest {
     compose.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
   }
 
-  /** Root setup must not swallow the first Back or offer an arrow with nowhere to go. */
+  /** Right after sign-up, setup is the root: Back signs out instead of trapping the owner. */
   @Test
-  fun firstBackFromBusinessSetupLeavesTheFlow() {
+  fun backArrowFromBusinessSetupSignsOut() {
+    launch()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_BACK).performClick()
+    compose.runOnIdle { assertEquals(null, auth.currentUserId.value) }
+    assertEquals(0, exits)
+  }
+
+  @Test
+  fun systemBackFromBusinessSetupSignsOut() {
     launch()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_BACK).assertDoesNotExist()
     compose.waitForIdle()
     compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-    compose.runOnIdle { assertEquals(1, exits) }
-    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertIsDisplayed()
+    compose.runOnIdle { assertEquals(null, auth.currentUserId.value) }
+    assertEquals(0, exits)
   }
 
   @Test

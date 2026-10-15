@@ -45,7 +45,7 @@ the router reacts to the repository's user ID instead.
 `RoleNavigation(authRepository, userRepository, pendingRoleStore,
 explorerScreen = {}, venueScreen = {})` implements the repository-interface
 handoff. Both home slots remain injectable; MainActivity supplies the existing Explorer
-tabs and `VenueEntryNavigation`. It reuses
+tabs and `VenueEntry`. It reuses
 `SessionNavigation` for auth gating and per-account state cleanup. Both
 registration slots share its `ProfileSetup`; the router calls `finish()`
 on restored/new sessions and on completion or retry, then observes the
@@ -69,12 +69,11 @@ with that account. An existing stored role takes precedence.
 MainActivity supplies `AuthRepositoryProvider.repository`, the Firestore-backed
 `UserRepositoryProvider.repository`, and `PendingRoleStoreSharedPrefs`. No fake
 user repository is used in production. Explorer roles open `AroundApp`; Venue
-roles open `VenueEntryNavigation`, which connects existing business setup,
-location setup, Venue home and the create-quest form. Saved location replaces
-onboarding in the back stack. Entry currently begins at business setup, which
-prefills an existing venue and preserves it; skipping completed onboarding on a
-later launch belongs to #136/#226. As agreed with that owner, those changes
-will follow #221 and extend this NavHost rather than create another one.
+roles open `VenueEntry` (#136), which reads the venue and opens
+`VenueEntryNavigation` at the first step left: business setup, location setup or
+the Venue home (see `venue-onboarding-navigation.md`). That NavHost connects
+business setup, location setup, Venue home and the create-quest form. Saved
+location replaces onboarding in the back stack.
 
 The existing role tests cover missing profiles, pending choices, saved roles,
 loading, failures, retry, sign-out and account changes. `RoleRoutingActivityTest`

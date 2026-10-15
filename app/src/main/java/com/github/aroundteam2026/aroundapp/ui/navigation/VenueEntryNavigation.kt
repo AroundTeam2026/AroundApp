@@ -1,9 +1,11 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
@@ -21,7 +23,12 @@ import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
  * them.
  *
  * The location slot isolates Maps in navigation tests. [venueDestinations] owns the home and quest
- * routes; [createQuestFactory] supplies an isolated form in tests. State-based entry remains #136.
+ * routes; [createQuestFactory] supplies an isolated form in tests. [VenueEntry] chooses [start]
+ * from the venue's saved state.
+ *
+ * @param start where the graph opens: business setup, or the home of a venue already set up. A
+ *   venue resuming on its area starts at business setup, and [VenueEntry] opens the area above it.
+ * @param navController the graph's controller; [VenueEntry] and tests pass their own to drive it.
  */
 @Composable
 fun VenueEntryNavigation(
@@ -32,15 +39,22 @@ fun VenueEntryNavigation(
           VenueAreaScreen(venueId, onSaved, onBack)
         },
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
+    start: VenueEntryStart = VenueEntryStart.INITIALIZATION,
+    navController: NavHostController = rememberNavController(),
 ) {
   val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
-  val navController = rememberNavController()
-  NavHost(navController, startDestination = VenueOnboardingRoutes.INITIALIZATION) {
+  NavHost(
+      navController,
+      startDestination =
+          if (start == VenueEntryStart.HOME) Routes.VENUE_HOME
+          else VenueOnboardingRoutes.INITIALIZATION,
+  ) {
     venueOnboardingDestinations(
         navController,
         authRepository,
         venueRepository,
-        initializationOnBack = null,
+        // Setup is the root right after sign-up: Back signs out instead of trapping the owner.
+        initializationOnBack = profile::signOut,
     ) { venueId, onBack ->
       locationScreen(
           venueId,

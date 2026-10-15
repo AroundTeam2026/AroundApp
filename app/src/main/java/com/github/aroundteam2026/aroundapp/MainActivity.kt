@@ -11,9 +11,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.RoleNavigation
-import com.github.aroundteam2026.aroundapp.ui.navigation.VenueEntryNavigation
+import com.github.aroundteam2026.aroundapp.ui.navigation.VenueEntry
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
@@ -31,7 +32,9 @@ class MainActivity : ComponentActivity() {
             userRepository = UserRepositoryProvider.repository,
             pendingRoleStore = pendingRole,
             explorerScreen = { AroundApp(onSignOut = profile::signOut) },
-            venueScreen = { VenueEntryNavigation(authRepository = auth) },
+            venueScreen = { uid ->
+              VenueEntry(uid, auth, VenueRepositoryProvider.repository, profile::signOut)
+            },
         )
       }
     }
