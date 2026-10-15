@@ -149,6 +149,9 @@ configurations
     .configureEach { exclude(group = "com.google.protobuf", module = "protobuf-lite") }
 
 dependencies {
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services)
+  implementation(libs.googleid)
   val composeBom = platform(libs.compose.bom)
   val firebaseBom = platform(libs.firebase.bom)
 

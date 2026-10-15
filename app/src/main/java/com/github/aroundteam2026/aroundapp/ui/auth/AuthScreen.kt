@@ -3,14 +3,20 @@ package com.github.aroundteam2026.aroundapp.ui.auth
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.AnyRes
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -19,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,8 +33,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -45,7 +54,9 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthInputValidation
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import kotlinx.coroutines.launch
 
 /**
  * Minimal email/password form backed by [viewModel].
@@ -61,8 +72,10 @@ fun AuthScreen(
     viewModel: AuthViewModel,
     modifier: Modifier = Modifier,
     completeRegistration: Boolean = false,
+    googleSignInClient: GoogleSignInClient = rememberGoogleSignInClient(),
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val googleScope = rememberCoroutineScope()
   var isCreatingAccount by
       rememberSaveable(completeRegistration) { mutableStateOf(completeRegistration) }
   val title =
@@ -167,6 +180,33 @@ fun AuthScreen(
         )
       }
       if (!completeRegistration) {
+        GoogleSignInButton(
+            enabled = !state.isLoading,
+            onClick = {
+              if (viewModel.beginGoogleSignIn()) {
+                val role = if (isCreatingAccount) Role.EXPLORER else null
+                googleScope.launch {
+                  try {
+                    when (val result = googleSignInClient.requestToken()) {
+                      is GoogleCredentialResult.Token ->
+                          viewModel.completeGoogleSignIn(result.idToken, role)
+                      GoogleCredentialResult.Cancelled -> viewModel.cancelGoogleSignIn()
+                      GoogleCredentialResult.Unavailable ->
+                          viewModel.googleSignInFailed(AuthFormError.GOOGLE_UNAVAILABLE)
+                      GoogleCredentialResult.Misconfigured ->
+                          viewModel.googleSignInFailed(AuthFormError.GOOGLE_CONFIGURATION)
+                      GoogleCredentialResult.Failed ->
+                          viewModel.googleSignInFailed(AuthFormError.UNKNOWN)
+                    }
+                  } finally {
+                    viewModel.cancelGoogleSignIn()
+                  }
+                }
+              }
+            },
+        )
+      }
+      if (!completeRegistration) {
         TextButton(
             onClick = {
               isCreatingAccount = !isCreatingAccount
@@ -247,5 +287,37 @@ internal fun AuthFormError.messageResource(): Int =
       AuthFormError.EMAIL_TAKEN -> R.string.auth_email_taken
       AuthFormError.NETWORK -> R.string.auth_network_error
       AuthFormError.ACCOUNT_SETUP -> R.string.auth_account_setup_error
+      AuthFormError.GOOGLE_UNAVAILABLE -> R.string.auth_google_unavailable
+      AuthFormError.GOOGLE_CONFIGURATION -> R.string.auth_google_configuration
       AuthFormError.UNKNOWN -> R.string.auth_unknown_error
     }
+
+/** Figma's outlined Google action, with Google's official multicolour branding asset. */
+@Composable
+private fun GoogleSignInButton(enabled: Boolean, onClick: () -> Unit) {
+  val colors = MaterialTheme.colorScheme
+  OutlinedButton(
+      onClick = onClick,
+      enabled = enabled,
+      modifier = Modifier.fillMaxWidth().height(54.dp).testTag(C.Tag.AUTH_GOOGLE),
+      shape = RoundedCornerShape(16.dp),
+      border = BorderStroke(1.dp, colors.outline),
+      colors =
+          ButtonDefaults.outlinedButtonColors(
+              containerColor = colors.surface,
+              contentColor = colors.onSurface,
+          ),
+  ) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Image(
+          painterResource(R.drawable.google_g),
+          contentDescription = null,
+          modifier = Modifier.size(22.dp),
+      )
+      Text(stringResource(R.string.auth_google_continue), style = AroundTextStyles.Button)
+    }
+  }
+}

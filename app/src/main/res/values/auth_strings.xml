@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: OpenAI Codex -->
 <resources>
+    <string name="auth_google_continue">Continue with Google</string>
+    <string name="auth_google_unavailable">Google sign-in is unavailable. Add a Google account or use email and password.</string>
+    <string name="auth_google_configuration">Google sign-in is not configured for this build.</string>
     <string name="auth_welcome">Welcome to Around</string>
     <string name="auth_sign_in">Sign in</string>
     <string name="auth_create_account">Create account</string>

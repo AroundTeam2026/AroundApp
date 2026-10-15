@@ -38,6 +38,10 @@ enum class AuthFormError {
   ACCOUNT_SETUP,
   /** Authentication failed for an unrecognized reason. */
   UNKNOWN,
+  /** No Google credential provider or account is available. */
+  GOOGLE_UNAVAILABLE,
+  /** This build has no web OAuth client configured. */
+  GOOGLE_CONFIGURATION,
 }
 
 /**
@@ -70,6 +74,50 @@ class AuthViewModel(
     private val repository: AuthRepository,
     private val registration: RegistrationChoice? = null,
 ) : ViewModel() {
+
+  private var awaitingGoogleCredential = false
+
+  /** Reserves the form while the UI opens the Google account chooser. */
+  fun beginGoogleSignIn(): Boolean {
+    if (_uiState.value.isLoading) return false
+    awaitingGoogleCredential = true
+    _uiState.update { it.copy(isLoading = true, error = null) }
+    return true
+  }
+
+  /** Cancels only the chooser stage; an in-flight repository call survives UI recreation. */
+  fun cancelGoogleSignIn() {
+    if (!awaitingGoogleCredential) return
+    awaitingGoogleCredential = false
+    _uiState.update { it.copy(isLoading = false) }
+  }
+
+  /** Reports a credential-provider failure without changing the typed credentials. */
+  fun googleSignInFailed(error: AuthFormError) {
+    if (!awaitingGoogleCredential) return
+    awaitingGoogleCredential = false
+    _uiState.update { it.copy(isLoading = false, error = error) }
+  }
+
+  /** Exchanges the UI-provided token; [role] is supplied only for explicit registration. */
+  fun completeGoogleSignIn(idToken: String, role: Role? = null) {
+    if (!awaitingGoogleCredential) return
+    awaitingGoogleCredential = false
+    viewModelScope.launch {
+      val prepared =
+          if (role == null) registration?.discardChoice() ?: Result.success(Unit)
+          else registration?.choose(role) ?: Result.success(Unit)
+      if (prepared.isFailure) {
+        _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
+        return@launch
+      }
+      val result = repository.signInWithGoogle(idToken)
+      _uiState.update {
+        if (result.isSuccess) AuthUiState()
+        else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
+      }
+    }
+  }
 
   /** Registration paths need [registration]; auth-only callers keep the existing form. */
   val supportsRegistration: Boolean = registration != null
