@@ -177,18 +177,9 @@ class AuthViewModel(
               call = { repository.signInWithGoogle(result.idToken) },
           )
       GoogleCredentialResult.Cancelled -> _uiState.update { it.copy(isLoading = false) }
-      else ->
-          _uiState.update {
-            it.copy(
-                isLoading = false,
-                error =
-                    when (result) {
-                      GoogleCredentialResult.Unavailable -> AuthFormError.GOOGLE_UNAVAILABLE
-                      GoogleCredentialResult.Misconfigured -> AuthFormError.GOOGLE_CONFIGURATION
-                      else -> AuthFormError.UNKNOWN
-                    },
-            )
-          }
+      GoogleCredentialResult.Unavailable -> fail(AuthFormError.GOOGLE_UNAVAILABLE)
+      GoogleCredentialResult.Misconfigured -> fail(AuthFormError.GOOGLE_CONFIGURATION)
+      GoogleCredentialResult.Failed -> fail(AuthFormError.UNKNOWN)
     }
   }
 
@@ -231,6 +222,10 @@ class AuthViewModel(
     }
     _uiState.update { it.copy(isLoading = true, error = null) }
     authenticate(prepare) { call(state.email.trim(), state.password) }
+  }
+
+  private fun fail(error: AuthFormError) = _uiState.update {
+    it.copy(isLoading = false, error = error)
   }
 
   private fun authenticate(
