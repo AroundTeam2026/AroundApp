@@ -34,3 +34,10 @@ cancels the chooser; an exchange already owned by the ViewModel continues.
 Run `./gradlew check ktfmtCheck` and `connectedDebugAndroidTest` against the
 Firebase emulators. Automated tests inject chooser results, never real accounts.
 The Google button uses Google's [official SVG paths](https://developers.google.com/static/identity/images/branding_guideline_sample_nt_rd_sl.svg).
+
+## Same-email provider check
+
+On an A55 debug build, an unverified email/password account was signed in with
+Google using the same Gmail address. Signing out and signing back in with the
+original password still worked. This records the observed manual result; provider
+linking and overwrite behavior may depend on the Firebase account's state.
