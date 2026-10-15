@@ -51,14 +51,26 @@ jobs:
           GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
         run: echo "${GOOGLE_SERVICES:?secret GOOGLE_SERVICES is not set}" | base64 --decode > ./app/google-services.json
 
-      # The team's shared debug keystore: its SHA-1 is on the Maps key's
-      # restriction list, and installs can upgrade the previous release.
+      # The team's shared debug keystore, checked like in ci.yml: the map, email sign-in and
+      # Google sign-in only accept its registered SHA-1, and installs can upgrade the previous
+      # release. Any other keystore builds fine but breaks all three, so fail here instead.
+      # DEBUG_KEYSTORE_FILE points Gradle at it for the build step.
       - name: Decode shared debug keystore
         env:
           DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+          # Same as REGISTERED_SHA1 in ci.yml; see "Google Maps API key" in the README
+          REGISTERED_SHA1: BA:28:CF:28:FF:37:5A:A9:85:5D:7A:43:84:38:26:0A:1D:14:99:4D
         run: |
-          mkdir -p ~/.android
-          echo "${DEBUG_KEYSTORE:?secret DEBUG_KEYSTORE is not set}" | base64 --decode > ~/.android/debug.keystore
+          keystore="$RUNNER_TEMP/release-debug.keystore"
+          echo "${DEBUG_KEYSTORE:?secret DEBUG_KEYSTORE is not set}" | base64 --decode > "$keystore"
+          sha1=$(keytool -list -v -keystore "$keystore" -storepass android \
+            -alias androiddebugkey | sed -n 's/^[[:space:]]*SHA1: //p')
+          echo "Restored debug keystore SHA-1: $sha1"
+          if [ "$sha1" != "$REGISTERED_SHA1" ]; then
+            echo "::error::DEBUG_KEYSTORE holds a keystore with SHA-1 $sha1, not the registered $REGISTERED_SHA1. See \"Google Maps API key\" in the README."
+            exit 1
+          fi
+          echo "DEBUG_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
 
       - name: Write Maps API key
         env:

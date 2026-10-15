@@ -51,7 +51,7 @@ On CI, the key comes from the `MAPS_API_KEY` repository secret, and CI builds ar
 keytool -genkeypair -keystore around-ci-debug.keystore -storetype PKCS12 -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Around CI Debug,O=AroundTeam2026,C=CH"
 ```
 
-Its SHA-1 is `BA:28:CF:28:FF:37:5A:A9:85:5D:7A:43:84:38:26:0A:1D:14:99:4D`, and [@ferido1510](https://github.com/ferido1510) keeps the original file. To replace it, generate a new keystore with the command above, register its SHA-1 on the key, update the `DEBUG_KEYSTORE` secret, update the SHA-1 here and in `REGISTERED_SHA1` in `.github/workflows/ci.yml` (CI checks the restored keystore against it and fails if they differ), then remove the old SHA-1 from the key.
+Its SHA-1 is `BA:28:CF:28:FF:37:5A:A9:85:5D:7A:43:84:38:26:0A:1D:14:99:4D`, and [@ferido1510](https://github.com/ferido1510) keeps the original file. The same SHA-1 is also registered on the Firebase Android API key (Google Cloud console → Credentials; email sign-in needs it) and in the Android app's SHA fingerprints (Firebase console → Project settings; Google sign-in needs it). To replace it, generate a new keystore with the command above, register its SHA-1 in all three places, update the `DEBUG_KEYSTORE` secret, update the SHA-1 here and in `REGISTERED_SHA1` in `.github/workflows/ci.yml` and `.github/workflows/release.yml` (both check the restored keystore against it and fail if they differ), then remove the old SHA-1 from all three.
 
 Without a key the app still builds and runs, but the map stays empty and `MapScreenDeviceTest` fails.
 
