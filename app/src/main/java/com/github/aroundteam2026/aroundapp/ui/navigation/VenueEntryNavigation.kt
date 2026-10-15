@@ -53,7 +53,8 @@ fun VenueEntryNavigation(
         navController,
         authRepository,
         venueRepository,
-        initializationOnBack = null,
+        // Setup is the root right after sign-up: Back signs out instead of trapping the owner.
+        initializationOnBack = profile::signOut,
     ) { venueId, onBack ->
       locationScreen(
           venueId,
