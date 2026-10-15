@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
 import java.util.UUID
 
 /** The password of every account [createAccount] creates; only the Auth emulator ever sees it. */
@@ -28,7 +29,7 @@ fun ComposeTestRule.createAccount(email: String = "e2e-${UUID.randomUUID()}@arou
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
-  waitUntil(10_000) { onAllNodes(hasTestTag(C.Tag.NAV_BAR)).fetchSemanticsNodes().isNotEmpty() }
+  waitUntil(TIMEOUT_MS) { onAllNodes(hasTestTag(C.Tag.NAV_BAR)).fetchSemanticsNodes().isNotEmpty() }
   onNodeWithTag(C.Tag.NAV_BAR).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
 }
