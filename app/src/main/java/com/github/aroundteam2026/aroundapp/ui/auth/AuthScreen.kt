@@ -59,13 +59,15 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import kotlinx.coroutines.launch
 
 /**
- * Minimal email/password form backed by [viewModel].
+ * Email/password and Google authentication form backed by [viewModel].
  *
  * Account creation requires confirmation. The navigation owner observes
  * AuthRepository.currentUserId for success and decides the destination. Create account registers an
- * Explorer and the venue link a Venue. [completeRegistration] offers the same two choices without
- * asking for credentials. Use [RegistrationFlow] to provide profile setup and receive
- * account-completion notifications.
+ * Explorer and the venue link a Venue. Google users with no profile choose their role afterward.
+ * [completeRegistration] offers the same two choices without asking for credentials. Use
+ * [RegistrationFlow] to provide profile setup and receive account-completion notifications.
+ * [googleSignInClient] acquires credentials in the UI; tests supply a chooser result without
+ * opening a personal account.
  */
 @Composable
 fun AuthScreen(
@@ -184,20 +186,9 @@ fun AuthScreen(
             enabled = !state.isLoading,
             onClick = {
               if (viewModel.beginGoogleSignIn()) {
-                val role = if (isCreatingAccount) Role.EXPLORER else null
                 googleScope.launch {
                   try {
-                    when (val result = googleSignInClient.requestToken()) {
-                      is GoogleCredentialResult.Token ->
-                          viewModel.completeGoogleSignIn(result.idToken, role)
-                      GoogleCredentialResult.Cancelled -> viewModel.cancelGoogleSignIn()
-                      GoogleCredentialResult.Unavailable ->
-                          viewModel.googleSignInFailed(AuthFormError.GOOGLE_UNAVAILABLE)
-                      GoogleCredentialResult.Misconfigured ->
-                          viewModel.googleSignInFailed(AuthFormError.GOOGLE_CONFIGURATION)
-                      GoogleCredentialResult.Failed ->
-                          viewModel.googleSignInFailed(AuthFormError.UNKNOWN)
-                    }
+                    viewModel.onGoogleCredential(googleSignInClient.requestToken())
                   } finally {
                     viewModel.cancelGoogleSignIn()
                   }
@@ -313,7 +304,7 @@ private fun GoogleSignInButton(enabled: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
       Image(
-          painterResource(R.drawable.google_g),
+          painterResource(R.drawable.ic_google_g),
           contentDescription = null,
           modifier = Modifier.size(22.dp),
       )

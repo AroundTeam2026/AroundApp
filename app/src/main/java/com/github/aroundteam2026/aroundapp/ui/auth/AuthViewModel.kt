@@ -44,6 +44,24 @@ enum class AuthFormError {
   GOOGLE_CONFIGURATION,
 }
 
+/** The account chooser's result, before the repository exchanges a token with Firebase. */
+sealed interface GoogleCredentialResult {
+  /** A Google ID token ready for the repository to exchange. */
+  data class Token(val idToken: String) : GoogleCredentialResult
+
+  /** The user dismissed the chooser without selecting an account. */
+  data object Cancelled : GoogleCredentialResult
+
+  /** No usable account or credential provider is available on this device. */
+  data object Unavailable : GoogleCredentialResult
+
+  /** This build is missing its Web OAuth client configuration. */
+  data object Misconfigured : GoogleCredentialResult
+
+  /** The provider failed or returned an unsupported/malformed credential. */
+  data object Failed : GoogleCredentialResult
+}
+
 /**
  * State of the shared sign-in/sign-up form.
  *
@@ -76,48 +94,6 @@ class AuthViewModel(
 ) : ViewModel() {
 
   private var awaitingGoogleCredential = false
-
-  /** Reserves the form while the UI opens the Google account chooser. */
-  fun beginGoogleSignIn(): Boolean {
-    if (_uiState.value.isLoading) return false
-    awaitingGoogleCredential = true
-    _uiState.update { it.copy(isLoading = true, error = null) }
-    return true
-  }
-
-  /** Cancels only the chooser stage; an in-flight repository call survives UI recreation. */
-  fun cancelGoogleSignIn() {
-    if (!awaitingGoogleCredential) return
-    awaitingGoogleCredential = false
-    _uiState.update { it.copy(isLoading = false) }
-  }
-
-  /** Reports a credential-provider failure without changing the typed credentials. */
-  fun googleSignInFailed(error: AuthFormError) {
-    if (!awaitingGoogleCredential) return
-    awaitingGoogleCredential = false
-    _uiState.update { it.copy(isLoading = false, error = error) }
-  }
-
-  /** Exchanges the UI-provided token; [role] is supplied only for explicit registration. */
-  fun completeGoogleSignIn(idToken: String, role: Role? = null) {
-    if (!awaitingGoogleCredential) return
-    awaitingGoogleCredential = false
-    viewModelScope.launch {
-      val prepared =
-          if (role == null) registration?.discardChoice() ?: Result.success(Unit)
-          else registration?.choose(role) ?: Result.success(Unit)
-      if (prepared.isFailure) {
-        _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
-        return@launch
-      }
-      val result = repository.signInWithGoogle(idToken)
-      _uiState.update {
-        if (result.isSuccess) AuthUiState()
-        else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
-      }
-    }
-  }
 
   /** Registration paths need [registration]; auth-only callers keep the existing form. */
   val supportsRegistration: Boolean = registration != null
@@ -175,6 +151,47 @@ class AuthViewModel(
           call = repository::signUpWithEmail,
       )
 
+  /** Reserves the form while the UI opens the Google account chooser. */
+  fun beginGoogleSignIn(): Boolean {
+    if (_uiState.value.isLoading) return false
+    awaitingGoogleCredential = true
+    _uiState.update { it.copy(isLoading = true, error = null) }
+    return true
+  }
+
+  /** Cancels the chooser only; repository authentication survives UI recreation. */
+  fun cancelGoogleSignIn() {
+    if (!awaitingGoogleCredential) return
+    awaitingGoogleCredential = false
+    _uiState.update { it.copy(isLoading = false) }
+  }
+
+  /** Handles a plain credential outcome; the role router owns profile completion. */
+  fun onGoogleCredential(result: GoogleCredentialResult) {
+    if (!awaitingGoogleCredential) return
+    awaitingGoogleCredential = false
+    when (result) {
+      is GoogleCredentialResult.Token ->
+          authenticate(
+              prepare = { registration?.discardChoice() ?: Result.success(Unit) },
+              call = { repository.signInWithGoogle(result.idToken) },
+          )
+      GoogleCredentialResult.Cancelled -> _uiState.update { it.copy(isLoading = false) }
+      else ->
+          _uiState.update {
+            it.copy(
+                isLoading = false,
+                error =
+                    when (result) {
+                      GoogleCredentialResult.Unavailable -> AuthFormError.GOOGLE_UNAVAILABLE
+                      GoogleCredentialResult.Misconfigured -> AuthFormError.GOOGLE_CONFIGURATION
+                      else -> AuthFormError.UNKNOWN
+                    },
+            )
+          }
+    }
+  }
+
   /**
    * Records an existing account's choice without authenticating again. The router owns finish().
    */
@@ -213,12 +230,19 @@ class AuthViewModel(
       return
     }
     _uiState.update { it.copy(isLoading = true, error = null) }
+    authenticate(prepare) { call(state.email.trim(), state.password) }
+  }
+
+  private fun authenticate(
+      prepare: suspend () -> Result<Unit>,
+      call: suspend () -> Result<String>,
+  ) {
     viewModelScope.launch {
       if (prepare().isFailure) {
         _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
         return@launch
       }
-      val result = call(state.email.trim(), state.password)
+      val result = call()
       _uiState.update {
         if (result.isSuccess) AuthUiState()
         else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))

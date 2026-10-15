@@ -3,7 +3,6 @@ package com.github.aroundteam2026.aroundapp.ui.auth
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.MutableContextWrapper
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,19 +23,6 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.collectLatest
-
-/** The account chooser's result, before the repository exchanges a token with Firebase. */
-sealed interface GoogleCredentialResult {
-  data class Token(val idToken: String) : GoogleCredentialResult
-
-  data object Cancelled : GoogleCredentialResult
-
-  data object Unavailable : GoogleCredentialResult
-
-  data object Misconfigured : GoogleCredentialResult
-
-  data object Failed : GoogleCredentialResult
-}
 
 /** Android credential acquisition belongs to the UI layer, independently testable from auth. */
 fun interface GoogleSignInClient {
@@ -63,7 +49,7 @@ internal class CredentialManagerGoogleSignInClient(
           GetCredentialRequest.Builder()
               .addCredentialOption(GetSignInWithGoogleOption.Builder(configuredClientId).build())
               .build()
-      val credential = manager.getCredential(MutableContextWrapper(context), request).credential
+      val credential = manager.getCredential(context, request).credential
       if (
           credential is CustomCredential &&
               credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL

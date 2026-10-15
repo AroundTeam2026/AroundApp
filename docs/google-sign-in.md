@@ -24,19 +24,13 @@ or Play builds, register and verify their actual signing certificates.
 
 ## Registration and validation
 
-Ordinary sign-in clears abandoned registration choices and never guesses a role.
-Google on Create account explicitly registers an Explorer; an existing saved role
-wins. The Business/Venue email-registration link remains available. Accounts with
-no profile complete registration through #221's router without reauthenticating.
+Both Google actions clear abandoned registration choices and never guess a role.
+An existing saved role wins; an account without a profile chooses Explorer or
+Venue through the existing completion screen. Email/password registration keeps
+its Explorer and Business/Venue paths.
 Cancellation preserves fields, and duplicate requests are blocked. Recreation
 cancels the chooser; an exchange already owned by the ViewModel continues.
 
 Run `./gradlew check ktfmtCheck` and `connectedDebugAndroidTest` against the
 Firebase emulators. Automated tests inject chooser results, never real accounts.
-The Google button uses Google's [official G asset](https://developers.google.com/identity/images/g-logo.png).
-
-The user verified real chooser cancellation, sign-in, sign-out and re-sign-in on
-the A55 before #221 integration. The refreshed Firebase configuration and CI secret
-are installed. On the integrated APK, also verify the Business/Venue link, saved
-roles and explicit completion for an account without a profile. That manual
-role check remains pending; release signing is outside the agreed scope.
+The Google button uses Google's [official SVG paths](https://developers.google.com/static/identity/images/branding_guideline_sample_nt_rd_sl.svg).

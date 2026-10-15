@@ -336,37 +336,56 @@ class AuthViewModelTest {
       }
 
   @Test
-  fun googlePreparesTheRegistrationChoiceBeforeAuthenticating() =
+  fun googleSignInDiscardsAnAbandonedChoiceBeforeAuthenticating() =
       runTest(dispatcher) {
-        val pending = FakePendingRoleStore()
-        val setup = ProfileSetup(repo, FakeUserRepository(), pending)
-        for (role in listOf(null, Role.EXPLORER)) {
-          pending.save(PendingRole(Role.VENUE, null))
-          val observed =
-              object : AuthRepository by repo {
-                override suspend fun signInWithGoogle(idToken: String): Result<String> {
-                  assertEquals(role?.let { PendingRole(it, null) }, pending.pending)
-                  assertEquals("token", idToken)
-                  return repo.signInWithGoogle(idToken)
-                }
+        val pending = FakePendingRoleStore(PendingRole(Role.VENUE, null))
+        val users = FakeUserRepository()
+        val setup = ProfileSetup(repo, users, pending)
+        val observed =
+            object : AuthRepository by repo {
+              override suspend fun signInWithGoogle(idToken: String): Result<String> {
+                assertNull(pending.pending)
+                assertEquals("token", idToken)
+                return repo.signInWithGoogle(idToken)
               }
-          val form = AuthViewModel(observed, setup)
-          form.beginGoogleSignIn()
-          form.completeGoogleSignIn("token", role)
-          advanceUntilIdle()
-          assertNotNull(repo.currentUserId.value)
-          assertEquals(AuthUiState(), form.uiState.value)
-          repo.signOut()
+            }
+        val form = AuthViewModel(observed, setup)
+        form.beginGoogleSignIn()
+        form.onGoogleCredential(GoogleCredentialResult.Token("token"))
+        advanceUntilIdle()
+        assertNotNull(repo.currentUserId.value)
+        assertNull(users.getUser(repo.currentUserId.value!!))
+        assertEquals(AuthUiState(), form.uiState.value)
+      }
+
+  @Test
+  fun googleCredentialOutcomesReleaseTheFormWithoutChangingFields() =
+      runTest(dispatcher) {
+        fill("ada@around.test", PASSWORD)
+        val outcomes =
+            listOf(
+                GoogleCredentialResult.Cancelled to null,
+                GoogleCredentialResult.Unavailable to AuthFormError.GOOGLE_UNAVAILABLE,
+                GoogleCredentialResult.Misconfigured to AuthFormError.GOOGLE_CONFIGURATION,
+                GoogleCredentialResult.Failed to AuthFormError.UNKNOWN,
+            )
+        outcomes.forEach { (result, expected) ->
+          assertTrue(vm.beginGoogleSignIn())
+          vm.onGoogleCredential(result)
+          assertEquals(result.toString(), expected, vm.uiState.value.error)
+          assertFalse(vm.uiState.value.isLoading)
+          assertEquals(PASSWORD, vm.uiState.value.password)
+          assertNull(repo.currentUserId.value)
         }
       }
 
   @Test
   fun failedGooglePreparationNeverAuthenticates() =
       runTest(dispatcher) {
-        val pending = FakePendingRoleStore().apply { failSave = true }
+        val pending = FakePendingRoleStore().apply { failNextClear = true }
         val form = AuthViewModel(repo, ProfileSetup(repo, FakeUserRepository(), pending))
         form.beginGoogleSignIn()
-        form.completeGoogleSignIn("token", Role.EXPLORER)
+        form.onGoogleCredential(GoogleCredentialResult.Token("token"))
         advanceUntilIdle()
         assertNull(repo.currentUserId.value)
         assertEquals(AuthFormError.ACCOUNT_SETUP, form.uiState.value.error)
@@ -379,12 +398,12 @@ class AuthViewModelTest {
         fill("ada@around.test", PASSWORD)
         repo.nextError = AuthError.Network
         vm.beginGoogleSignIn()
-        vm.completeGoogleSignIn("token")
+        vm.onGoogleCredential(GoogleCredentialResult.Token("token"))
         advanceUntilIdle()
         assertEquals(AuthFormError.NETWORK, vm.uiState.value.error)
         assertEquals(PASSWORD, vm.uiState.value.password)
         assertTrue(vm.beginGoogleSignIn())
-        vm.completeGoogleSignIn("token")
+        vm.onGoogleCredential(GoogleCredentialResult.Token("token"))
         advanceUntilIdle()
         assertEquals(AuthUiState(), vm.uiState.value)
       }
@@ -404,8 +423,8 @@ class AuthViewModelTest {
             }
         val form = AuthViewModel(delayed)
         form.beginGoogleSignIn()
-        form.completeGoogleSignIn("token")
-        form.completeGoogleSignIn("duplicate")
+        form.onGoogleCredential(GoogleCredentialResult.Token("token"))
+        form.onGoogleCredential(GoogleCredentialResult.Token("duplicate"))
         advanceUntilIdle()
         form.cancelGoogleSignIn()
         assertTrue(form.uiState.value.isLoading)

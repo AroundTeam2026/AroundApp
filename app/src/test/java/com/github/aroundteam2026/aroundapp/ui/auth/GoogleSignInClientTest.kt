@@ -2,7 +2,6 @@
 package com.github.aroundteam2026.aroundapp.ui.auth
 
 import android.content.Context
-import android.content.MutableContextWrapper
 import android.os.Bundle
 import android.util.Base64
 import androidx.credentials.CredentialManager
@@ -60,7 +59,7 @@ class GoogleSignInClientTest {
           val option = request.credentialOptions.single()
           assertTrue(option is GetSignInWithGoogleOption)
           assertEquals("web-client", (option as GetSignInWithGoogleOption).serverClientId)
-          assertSame(context, firstArg<MutableContextWrapper>().baseContext)
+          assertSame(context, firstArg<Context>())
           GetCredentialResponse(token)
         }
     assertEquals(GoogleCredentialResult.Token(idToken), client().requestToken())

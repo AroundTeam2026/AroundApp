@@ -16,12 +16,10 @@ import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakePendingRoleStore
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.ProfileSetup
-import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -65,14 +63,15 @@ class GoogleAuthScreenTest {
   }
 
   @Test
-  fun googleFromCreateAccountRecordsTheExplicitExplorerChoice() {
+  fun googleFromCreateAccountLeavesTheRoleForExplicitCompletion() {
     show()
     click(C.Tag.AUTH_SWITCH_MODE)
     compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).assertIsEnabled()
     click(C.Tag.AUTH_GOOGLE)
     compose.runOnIdle {
       assertNotNull(auth.currentUserId.value)
-      assertEquals(Role.EXPLORER, pending.pending?.role)
+      assertNull(pending.pending)
+      assertNull(runBlocking { users.getUser(auth.currentUserId.value!!) })
     }
   }
 
