@@ -13,7 +13,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
 import java.util.UUID
 
-/** The password of every account [createAccount] creates; only the Auth emulator ever sees it. */
+/** The password of every account created here; only the Auth emulator ever sees it. */
 const val E2E_PASSWORD = "123456"
 
 /**
@@ -22,14 +22,30 @@ const val E2E_PASSWORD = "123456"
  *
  * @param email unique by default, so the account is new on an emulator other tests already used.
  */
-fun ComposeTestRule.createAccount(email: String = "e2e-${UUID.randomUUID()}@around.test") {
+fun ComposeTestRule.createAccount(email: String = "e2e-${UUID.randomUUID()}@around.test") =
+    register(email, C.Tag.AUTH_SUBMIT, landsOn = C.Tag.NAV_BAR)
+
+/**
+ * Creates a venue account through the "Create account" form's venue link, from the auth screen
+ * [E2eRule] starts on, and waits for the venue's first onboarding step, its business name.
+ *
+ * @param email unique by default, so the account is new on an emulator other tests already used.
+ */
+fun ComposeTestRule.createVenueAccount(email: String = "e2e-${UUID.randomUUID()}@around.test") =
+    register(email, C.Tag.AUTH_VENUE_LINK, landsOn = C.Tag.VENUE_INITIALIZATION_SCREEN)
+
+/**
+ * Fills the "Create account" form with [email], taps the button tagged [button], and waits for the
+ * screen tagged [landsOn] in place of the auth screen.
+ */
+private fun ComposeTestRule.register(email: String, button: String, landsOn: String) {
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
-  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
-  waitUntil(TIMEOUT_MS) { onAllNodes(hasTestTag(C.Tag.NAV_BAR)).fetchSemanticsNodes().isNotEmpty() }
-  onNodeWithTag(C.Tag.NAV_BAR).assertIsDisplayed()
+  onNodeWithTag(button).performScrollTo().performClick()
+  waitUntil(TIMEOUT_MS) { onAllNodes(hasTestTag(landsOn)).fetchSemanticsNodes().isNotEmpty() }
+  onNodeWithTag(landsOn).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
 }
