@@ -10,7 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
@@ -26,7 +26,6 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
-import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
 import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
 import com.google.firebase.app
@@ -37,7 +36,7 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -46,10 +45,13 @@ import org.junit.runner.RunWith
 /** The Firebase app the venue saves its quest through; see [ExplorerJourneyTest.seedApp]. */
 private const val SEED_APP = "explorer-journey-seed"
 
+/** Where the device is during the journey, and where the venue and its quest are: EPFL. */
+private val HERE = Location(46.5191, 6.5668)
+
 /**
  * An explorer's first visit, through the app as it ships on the Auth and Firestore emulators: they
- * create an account, see a venue's quest saved in Firestore on the map and in the nearby quests,
- * and view that venue's page.
+ * create an account, find a venue's quest saved in Firestore among the map's nearby quests and view
+ * that venue's page.
  */
 @RunWith(AndroidJUnit4::class)
 class ExplorerJourneyTest : TestCase() {
@@ -61,20 +63,15 @@ class ExplorerJourneyTest : TestCase() {
   private val questTitle = "Journey quest $id"
 
   /**
-   * Saves a venue and its active quest as a fresh venue account would, where the device is: the
-   * nearby quests are those within 5 km of the explorer, and the emulator's position is wherever
-   * its settings put it. Without a position, the map lists every quest, so any place will do.
+   * Puts the device at [HERE] and saves a venue and its active quest there, as a fresh venue
+   * account would: the nearby quests are those within 5 km of the explorer, so the app must find
+   * the explorer where the test put the quest, whatever fix the emulator has.
    */
   @Before
   fun seedQuest(): Unit = runBlocking {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
-    // E2eRule granted the location permission before this runs. Without a fix, as on a freshly
-    // booted CI emulator, the lookup can wait indefinitely, and the app finds none either
-    val here =
-        withTimeoutOrNull(TIMEOUT_MS) {
-          LocationRepositoryProvider.repository(context).currentLocation()
-        } ?: DEFAULT_MAP_CENTER
     withTimeout(SETUP_TIMEOUT_MS) {
+      mockDeviceLocation(HERE)
       val app = seedApp(context)
       val auth = Firebase.auth(app)
       val db = Firebase.firestore(app)
@@ -87,7 +84,7 @@ class ExplorerJourneyTest : TestCase() {
       // The rules let only an account with the VENUE role write a venue and its quests
       UserRepositoryFirestore(db).createUser(User(uid, "Test", Role.VENUE, 0L)).getOrThrow()
       VenueRepositoryFirestore(db)
-          .createVenue(Venue(uid, venueName, here, DEFAULT_RADIUS_METERS, null, createdAt = 0L))
+          .createVenue(Venue(uid, venueName, HERE, DEFAULT_RADIUS_METERS, null, createdAt = 0L))
           .getOrThrow()
       QuestRepositoryFirestore(db)
           .createQuest(
@@ -95,7 +92,7 @@ class ExplorerJourneyTest : TestCase() {
                   id = "",
                   venueId = uid,
                   venueName = venueName,
-                  location = here,
+                  location = HERE,
                   radiusMeters = QuestLimits.DEFAULT_RADIUS_METERS,
                   title = questTitle,
                   description = "Find the hidden fox",
@@ -113,6 +110,8 @@ class ExplorerJourneyTest : TestCase() {
       auth.signOut()
     }
   }
+
+  @After fun stopMockingLocation() = runBlocking { stopMockingDeviceLocation() }
 
   @Test
   fun aNewExplorerFindsTheSeededQuestAndOpensItsVenuesPage() = run {
