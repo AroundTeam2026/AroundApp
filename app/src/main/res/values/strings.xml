@@ -1,7 +1,6 @@
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
     <string name="app_name">Around</string>
-    <string name="title_activity_main">MainActivity</string>
     <string name="tab_quests">Quests</string>
     <string name="tab_map">Map</string>
     <string name="tab_profile">Profile</string>
