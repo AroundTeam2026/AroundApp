@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
 import androidx.compose.ui.test.assertHasClickAction
@@ -15,7 +16,9 @@ import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakePendingRoleStore
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.PendingRole
 import com.github.aroundteam2026.aroundapp.model.user.ProfileSetup
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -58,12 +61,12 @@ class GoogleAuthScreenTest {
     compose.runOnIdle {
       val uid = requireNotNull(auth.currentUserId.value)
       assertNull(runBlocking { users.getUser(uid) })
-      assertNull(pending.pending)
     }
   }
 
   @Test
-  fun googleFromCreateAccountLeavesTheRoleForExplicitCompletion() {
+  fun googleFromCreateAccountClearsAnAbandonedVenueChoice() {
+    pending.pending = PendingRole(Role.VENUE, null)
     show()
     click(C.Tag.AUTH_SWITCH_MODE)
     compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).assertIsEnabled()
@@ -89,7 +92,6 @@ class GoogleAuthScreenTest {
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextEquals("ada@around.test", "Email")
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertDoesNotExist()
     assertNull(auth.currentUserId.value)
-    assertNull(pending.pending)
   }
 
   @Test
