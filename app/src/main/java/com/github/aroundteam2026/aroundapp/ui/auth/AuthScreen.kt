@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
 import androidx.activity.compose.BackHandler
@@ -196,8 +197,6 @@ fun AuthScreen(
               }
             },
         )
-      }
-      if (!completeRegistration) {
         TextButton(
             onClick = {
               isCreatingAccount = !isCreatingAccount
