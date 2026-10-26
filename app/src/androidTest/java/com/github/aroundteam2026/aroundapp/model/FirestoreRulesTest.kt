@@ -348,6 +348,30 @@ class FirestoreRulesTest {
   }
 
   @Test
+  fun reservationLimitsThePartyAndTheSlotStart() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
+    val valid = reservation(quest, venue, listOf(explorer))
+    fun partyOf(size: Int) = listOf(explorer.uid) + List(size - 1) { "friend-$it" }
+
+    assertOnlyValidWriteSucceeds(
+        newReservation(),
+        valid,
+        mapOf(
+            "the same explorer twice" to
+                valid + ("explorerUids" to listOf(explorer.uid, explorer.uid)),
+            "a party of 11" to valid + ("explorerUids" to partyOf(11)),
+            "a slot that started 10 minutes ago" to valid + ("slotStart" to minutesAgo(10)),
+        ),
+    )
+    assertSucceeds(newReservation().set(valid + ("explorerUids" to partyOf(10))))
+    assertSucceeds(
+        newReservation().set(valid + ("slotStart" to minutesAgo(1))),
+    )
+  }
+
+  @Test
   fun reservationIsReadableByItsVenueAndPartyOnly() {
     val venue = newUser(Role.VENUE)
     val quest = questOf(venue)
@@ -516,6 +540,9 @@ class FirestoreRulesTest {
           "status" to status,
           "createdAt" to Timestamp.now(),
       )
+
+  /** A time [minutes] before now, by this device's clock. */
+  private fun minutesAgo(minutes: Int) = Timestamp(Timestamp.now().seconds - minutes * 60L, 0)
 
   /**
    * Asserts that writing each of [invalid], keyed by what is wrong with it, to [document] is

@@ -71,8 +71,8 @@ Every type may also have `expiresAt` (timestamp?): when the reward stops being v
 |---|---|---|
 | `questId` | string | |
 | `venueId` | string | Id of the venue that owns the quest. |
-| `explorerUids` | list of string | The party. Non-empty (enforced by `Reservation`), and the creator must be in the list (enforced by the rules). |
-| `slotStart` | timestamp | Start of the booked slot. |
+| `explorerUids` | list of string | The party. Non-empty (enforced by `Reservation`). The creator must be in the list, which holds at most 10 explorers, each listed once (enforced by the rules). |
+| `slotStart` | timestamp | Start of the booked slot. On creation it can't be more than 5 minutes in the past, to allow for a phone clock that is behind (enforced by the rules). |
 | `status` | `PENDING`, `APPROVED`, `REJECTED` or `CANCELLED` | Set to `PENDING` by the repository on creation. |
 | `createdAt` | timestamp | Set by the repository. |
 
