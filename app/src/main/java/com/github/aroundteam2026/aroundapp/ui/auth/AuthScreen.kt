@@ -49,6 +49,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -333,7 +334,8 @@ private fun BackButton(enabled: Boolean, onClick: () -> Unit) {
 /**
  * A field with its label above it, as in Figma.
  *
- * @param label the visible label, also given to [field] for its accessibility description.
+ * @param label the visible label, also given to [field] for its accessibility description, so
+ *   screen readers announce it once, on the field.
  */
 @Composable
 private fun LabeledField(label: String, field: @Composable (label: String) -> Unit) {
@@ -342,6 +344,7 @@ private fun LabeledField(label: String, field: @Composable (label: String) -> Un
         label,
         style = AroundTextStyles.FieldLabel,
         color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.clearAndSetSemantics {},
     )
     field(label)
   }

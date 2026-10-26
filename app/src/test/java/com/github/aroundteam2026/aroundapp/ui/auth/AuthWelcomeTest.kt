@@ -11,10 +11,14 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -119,6 +123,22 @@ class AuthWelcomeTest {
     click(C.Tag.AUTH_SUBMIT)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assert(!hasError)
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assert(hasError)
+  }
+
+  @Test
+  fun screenReadersAnnounceEachFieldLabelOnceOnTheField() {
+    launch()
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    for ((label, tag) in
+        listOf(
+            "Email" to C.Tag.AUTH_EMAIL,
+            "Password" to C.Tag.AUTH_PASSWORD,
+            "Confirm password" to C.Tag.AUTH_CONFIRMATION,
+        )) {
+      compose.onAllNodesWithText(label, useUnmergedTree = true).assertCountEquals(0)
+      compose.onAllNodesWithContentDescription(label).assertCountEquals(1)
+      compose.onNodeWithTag(tag).assertContentDescriptionEquals(label)
+    }
   }
 
   @Test

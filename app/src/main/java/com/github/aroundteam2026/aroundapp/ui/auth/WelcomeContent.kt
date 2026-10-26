@@ -3,7 +3,6 @@ package com.github.aroundteam2026.aroundapp.ui.auth
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -53,12 +52,7 @@ private const val SIGN_IN_BORDER_ALPHA = 0.35f
 @Composable
 internal fun WelcomeContent(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
   val primary = MaterialTheme.colorScheme.primary
-  BoxWithConstraints(
-      Modifier.fillMaxSize()
-          .background(MaterialTheme.colorScheme.background)
-          .safeDrawingPadding()
-          .testTag(C.Tag.AUTH_WELCOME)
-  ) {
+  BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().testTag(C.Tag.AUTH_WELCOME)) {
     Column(
         modifier =
             Modifier.fillMaxWidth()
