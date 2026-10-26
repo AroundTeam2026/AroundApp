@@ -6,7 +6,8 @@ import kotlinx.coroutines.CompletableDeferred
 
 /**
  * A [FakeVenueRepository] holding [venue] whose first [failures] reads fail as if offline. A read
- * that doesn't fail waits for [gate] when given, and returns what completes it.
+ * that doesn't fail waits for [gate] when given, and returns the venue that completes it, or the
+ * stored venue when the gate completes with null.
  */
 class FlakyVenueRepository
 private constructor(

@@ -47,7 +47,7 @@ class VenueEntryNavigationTest {
 
   private fun launch(
       restoration: StateRestorationTester? = null,
-      start: VenueEntryStart = VenueEntryStart.INITIALIZATION,
+      start: VenueEntryStart = VenueEntryStart.Initialization,
   ) {
     compose.activity.onBackPressedDispatcher.addCallback(
         object : OnBackPressedCallback(true) {
@@ -71,7 +71,6 @@ class VenueEntryNavigationTest {
             },
             createQuestFactory = createQuestFactoryOnFakes(),
             start = start,
-            venueId = "venue-owner",
         )
       }
     }
@@ -180,7 +179,7 @@ class VenueEntryNavigationTest {
     runBlocking {
       venues.createVenue(testVenue(id = "venue-owner", name = "Cafe", location = null))
     }
-    launch(start = VenueEntryStart.AREA)
+    launch(start = VenueEntryStart.Area("venue-owner"))
     compose.onNodeWithTag("location").assertTextEquals("venue-owner")
     compose.onNodeWithTag("location-back").performClick()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).assertTextContains("Cafe")
@@ -194,7 +193,7 @@ class VenueEntryNavigationTest {
       venues.createVenue(testVenue(id = "venue-owner", name = "Cafe", location = null))
     }
     val restoration = StateRestorationTester(compose)
-    launch(restoration, start = VenueEntryStart.AREA)
+    launch(restoration, start = VenueEntryStart.Area("venue-owner"))
     compose.onNodeWithTag("location-back").performClick()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertIsDisplayed()
     restoration.emulateSavedInstanceStateRestore()

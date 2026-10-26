@@ -48,7 +48,6 @@ val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
  *
  * @param start where the graph opens: business setup, its area, or the home of a venue already set
  *   up. A venue resuming on its area starts at business setup with the area opened above it.
- * @param venueId the venue whose area opens when [start] is [VenueEntryStart.AREA]; required then.
  * @param navController the graph's controller; [VenueEntry] and tests pass their own to drive it.
  */
 @Composable
@@ -57,15 +56,14 @@ fun VenueEntryNavigation(
     venueRepository: VenueRepository = VenueRepositoryProvider.repository,
     locationScreen: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
-    start: VenueEntryStart = VenueEntryStart.INITIALIZATION,
-    venueId: String? = null,
+    start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {
   val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
   NavHost(
       navController,
       startDestination =
-          if (start == VenueEntryStart.HOME) Routes.VENUE_HOME
+          if (start == VenueEntryStart.Home) Routes.VENUE_HOME
           else VenueOnboardingRoutes.INITIALIZATION,
   ) {
     venueOnboardingDestinations(
@@ -88,9 +86,7 @@ fun VenueEntryNavigation(
     }
     venueDestinations(navController, profile::signOut, createQuestFactory)
   }
-  if (start == VenueEntryStart.AREA) {
-    ResumeOnArea(checkNotNull(venueId) { "start = AREA needs the venue id" }, navController)
-  }
+  if (start is VenueEntryStart.Area) ResumeOnArea(start.venueId, navController)
 }
 
 /**

@@ -70,7 +70,6 @@ fun VenueEntry(
           locationScreen = areaStep,
           createQuestFactory = createQuestFactory,
           start = state.start,
-          venueId = userId,
           navController = navController,
       )
     }

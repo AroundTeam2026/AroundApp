@@ -35,17 +35,17 @@ class VenueEntryViewModelTest {
 
   @Test
   fun noVenueStartsAtInitialization() {
-    assertEquals(VenueEntryStart.INITIALIZATION, startFor(null))
+    assertEquals(VenueEntryStart.Initialization, startFor(null))
   }
 
   @Test
   fun aVenueWithoutALocationStartsAtTheArea() {
-    assertEquals(VenueEntryStart.AREA, startFor(testVenue(location = null)))
+    assertEquals(VenueEntryStart.Area("venue"), startFor(testVenue(id = "venue", location = null)))
   }
 
   @Test
   fun aVenueWithALocationStartsAtHome() {
-    assertEquals(VenueEntryStart.HOME, startFor(testVenue(location = Location(46.5, 6.6))))
+    assertEquals(VenueEntryStart.Home, startFor(testVenue(location = Location(46.5, 6.6))))
   }
 
   @Test
@@ -55,7 +55,7 @@ class VenueEntryViewModelTest {
 
     runCurrent()
 
-    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.AREA), viewModel.uiState.value)
+    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.Area(USER)), viewModel.uiState.value)
   }
 
   @Test
@@ -63,7 +63,7 @@ class VenueEntryViewModelTest {
     val viewModel = viewModel(FakeVenueRepository(listOf(testVenue(id = "someone-else"))))
     runCurrent()
 
-    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.INITIALIZATION), viewModel.uiState.value)
+    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.Initialization), viewModel.uiState.value)
   }
 
   @Test
@@ -77,7 +77,7 @@ class VenueEntryViewModelTest {
     assertEquals(VenueEntryUiState.Loading, viewModel.uiState.value)
     runCurrent()
 
-    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.HOME), viewModel.uiState.value)
+    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.Home), viewModel.uiState.value)
     assertEquals(2, repository.reads)
   }
 
@@ -90,7 +90,7 @@ class VenueEntryViewModelTest {
     viewModel.onRetry()
     runCurrent()
 
-    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.INITIALIZATION), viewModel.uiState.value)
+    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.Initialization), viewModel.uiState.value)
     assertEquals(1, repository.reads)
   }
 
