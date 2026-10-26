@@ -150,6 +150,33 @@ class RegistrationFlowTest {
   }
 
   @Test
+  fun venueLinkNavigatesWithoutValidatingOrCreatingAnAccountAndBackReturnsToExplorer() {
+    launch()
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_EXPLORER_CARD)
+    click(C.Tag.AUTH_VENUE_LINK)
+    compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Create venue account")
+    compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertDoesNotExist()
+    assertNull(auth.currentUserId.value)
+    assertNull(pending.pending)
+    back()
+    compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Create account")
+    click(C.Tag.AUTH_BACK)
+    compose.onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).assertIsDisplayed()
+  }
+
+  @Test
+  fun businessCardOpensVenueCredentialsAndBackReturnsToAccountTypeChoice() {
+    launch()
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_BUSINESS_CARD)
+    compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Create venue account")
+    click(C.Tag.AUTH_BACK)
+    compose.onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).assertIsDisplayed()
+    assertNull(pending.pending)
+  }
+
+  @Test
   fun missingProfileCompletesAsExplorerWithoutAuthenticatingAgain() {
     completeExisting(Role.EXPLORER, existingProfile = false)
   }
@@ -216,14 +243,16 @@ class RegistrationFlowTest {
     compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertIsDisplayed()
     val tags =
         if (completeExplorer) listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_VENUE_LINK)
-        else listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_VENUE_LINK, C.Tag.AUTH_BACK)
+        else listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_BACK)
     tags.forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
     back()
     assertEquals(0, backFallbacks)
     if (!completeExplorer) assertNull(auth.currentUserId.value)
     compose
         .onNodeWithTag(C.Tag.AUTH_TITLE)
-        .assertTextContains(if (completeExplorer) "Complete registration" else "Create account")
+        .assertTextContains(
+            if (completeExplorer) "Complete registration" else "Create venue account"
+        )
     compose.runOnIdle { gate.complete(Unit) }
     assertFinished(if (completeExplorer) Role.EXPLORER else Role.VENUE)
   }

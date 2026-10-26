@@ -96,6 +96,7 @@ class MainActivityTest : TestCase() {
   @Test
   fun activityRecreationKeepsUnsubmittedAuthFields() {
     composeTestRule.onNodeWithTag(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_EXPLORER_CARD).performClick()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("typing@around.test")
     composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     composeTestRule.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")

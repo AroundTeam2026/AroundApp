@@ -52,7 +52,10 @@ class AuthScreenTest {
 
   private fun openSignIn() = click(C.Tag.AUTH_WELCOME_SIGN_IN)
 
-  private fun openCreateAccount() = click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+  private fun openCreateAccount() {
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_EXPLORER_CARD)
+  }
 
   @Test
   fun signInUsesEnteredCredentials() {
@@ -147,6 +150,7 @@ class AuthScreenTest {
     click(C.Tag.AUTH_SUBMIT)
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertIsDisplayed()
 
+    click(C.Tag.AUTH_BACK)
     click(C.Tag.AUTH_BACK)
     openSignIn()
 

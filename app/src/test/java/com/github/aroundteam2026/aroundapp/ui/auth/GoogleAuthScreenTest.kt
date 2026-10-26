@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -42,6 +43,7 @@ class GoogleAuthScreenTest {
   private fun show(
       restoration: StateRestorationTester? = null,
       form: String = C.Tag.AUTH_WELCOME_SIGN_IN,
+      accountType: String = C.Tag.AUTH_EXPLORER_CARD,
       result: suspend () -> GoogleCredentialResult = { GoogleCredentialResult.Token("token") },
   ) {
     val content: @androidx.compose.runtime.Composable () -> Unit = {
@@ -49,6 +51,7 @@ class GoogleAuthScreenTest {
     }
     if (restoration == null) compose.setContent(content) else restoration.setContent(content)
     click(form)
+    if (form == C.Tag.AUTH_WELCOME_CREATE_ACCOUNT) click(accountType)
   }
 
   private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
@@ -78,6 +81,17 @@ class GoogleAuthScreenTest {
       assertNull(pending.pending)
       assertNull(runBlocking { users.getUser(auth.currentUserId.value!!) })
     }
+  }
+
+  @Test
+  fun businessSignupDoesNotOfferGoogleBeforeVenueRoleHandoff() {
+    show(
+        form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT,
+        accountType = C.Tag.AUTH_BUSINESS_CARD,
+    )
+    compose.onNodeWithTag(C.Tag.AUTH_GOOGLE).assertDoesNotExist()
+    compose.onNodeWithText("or").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).assertIsEnabled()
   }
 
   @Test

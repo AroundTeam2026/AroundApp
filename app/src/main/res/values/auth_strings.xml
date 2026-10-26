@@ -9,6 +9,15 @@
     <string name="auth_or">or</string>
     <string name="auth_sign_in">Sign in</string>
     <string name="auth_create_account">Create account</string>
+    <string name="auth_choose_account_type">Create your account</string>
+    <string name="auth_account_type_prompt">How will you use Around?</string>
+    <string name="auth_explorer">Sign up as an explorer</string>
+    <string name="auth_explorer_description">Find and complete quests near you.</string>
+    <string name="auth_business">Sign up as a business</string>
+    <string name="auth_business_description">Create a venue account and reach new customers.</string>
+    <string name="auth_sign_up">Sign up</string>
+    <string name="auth_already_have_account">Already have an account?</string>
+    <string name="auth_venue_account">Create venue account</string>
     <string name="auth_complete_registration">Complete registration</string>
     <string name="auth_venue_link">Signing up a business? Create a venue account</string>
     <string name="auth_account_setup_error">Could not save your account type. Please try again.</string>

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -77,24 +78,25 @@ private val GoogleIconSize = 22.dp
 private val OutlineWidth = 1.dp
 private const val DIVIDER_ALPHA = 0.2f
 
-/** Where a signed-out user is in the auth entry; Welcome leads to the two forms. */
+/** Where a signed-out user is in the auth entry. */
 internal enum class AuthStep {
   WELCOME,
   SIGN_IN,
+  ACCOUNT_TYPE,
   CREATE_ACCOUNT,
+  VENUE_ACCOUNT,
 }
 
 /**
  * Email/password and Google authentication backed by [viewModel], starting on the Welcome step.
  *
- * Welcome opens the Sign in or Create account form, and back from a form returns to Welcome.
- * Account creation requires confirmation. The navigation owner observes
- * AuthRepository.currentUserId for success and decides the destination. Create account registers an
- * Explorer and the venue link a Venue. Google users with no profile choose their role afterward.
- * [completeRegistration] skips Welcome and offers the same two choices without asking for
- * credentials. Use [RegistrationFlow] to provide profile setup and receive account-completion
- * notifications. [googleSignInClient] acquires credentials in the UI; tests supply a chooser result
- * without opening a personal account.
+ * Welcome opens Sign in or an account-type choice. Explorer and Business use the same credentials
+ * fields but submit their own role. Back follows the path used to open the Venue form. The
+ * navigation owner observes AuthRepository.currentUserId for success and decides the destination.
+ * Google users with no profile choose their role afterward. [completeRegistration] skips Welcome
+ * and offers the same two choices without asking for credentials. Use [RegistrationFlow] to provide
+ * profile setup and receive account-completion notifications. [googleSignInClient] acquires
+ * credentials in the UI; tests supply a chooser result without opening a personal account.
  */
 @Composable
 fun AuthScreen(
@@ -108,13 +110,23 @@ fun AuthScreen(
       rememberSaveable(completeRegistration) {
         mutableStateOf(if (completeRegistration) AuthStep.CREATE_ACCOUNT else AuthStep.WELCOME)
       }
+  var venueOrigin by rememberSaveable { mutableStateOf(AuthStep.ACCOUNT_TYPE) }
   val openStep = { next: AuthStep ->
     step = next
     viewModel.onModeChange()
   }
+  val back = {
+    openStep(
+        when (step) {
+          AuthStep.VENUE_ACCOUNT -> venueOrigin
+          AuthStep.CREATE_ACCOUNT -> AuthStep.ACCOUNT_TYPE
+          else -> AuthStep.WELCOME
+        }
+    )
+  }
   // Leaving mid-request would drop the form while the account choice is being recorded.
   BackHandler(enabled = state.isLoading || (!completeRegistration && step != AuthStep.WELCOME)) {
-    if (!state.isLoading) openStep(AuthStep.WELCOME)
+    if (!state.isLoading) back()
   }
   Box(
       modifier
@@ -124,18 +136,163 @@ fun AuthScreen(
   ) {
     if (step == AuthStep.WELCOME) {
       WelcomeContent(
-          onCreateAccount = { openStep(AuthStep.CREATE_ACCOUNT) },
+          onCreateAccount = { openStep(AuthStep.ACCOUNT_TYPE) },
+          onSignIn = { openStep(AuthStep.SIGN_IN) },
+      )
+    } else if (step == AuthStep.ACCOUNT_TYPE) {
+      AccountTypeChoice(
+          enabled = !state.isLoading,
+          onBack = back,
+          onExplorer = { openStep(AuthStep.CREATE_ACCOUNT) },
+          onBusiness = {
+            venueOrigin = AuthStep.ACCOUNT_TYPE
+            openStep(AuthStep.VENUE_ACCOUNT)
+          },
           onSignIn = { openStep(AuthStep.SIGN_IN) },
       )
     } else {
       AuthForm(
           viewModel = viewModel,
           state = state,
-          isCreatingAccount = step == AuthStep.CREATE_ACCOUNT,
+          isCreatingAccount = step != AuthStep.SIGN_IN,
+          isVenue = step == AuthStep.VENUE_ACCOUNT,
           completeRegistration = completeRegistration,
           googleSignInClient = googleSignInClient,
-          onBack = { openStep(AuthStep.WELCOME) },
+          onBack = back,
+          onVenue = {
+            venueOrigin = AuthStep.CREATE_ACCOUNT
+            openStep(AuthStep.VENUE_ACCOUNT)
+          },
       )
+    }
+  }
+}
+
+/** Account type choice from Welcome, before either credentials form. */
+@Composable
+private fun AccountTypeChoice(
+    enabled: Boolean,
+    onBack: () -> Unit,
+    onExplorer: () -> Unit,
+    onBusiness: () -> Unit,
+    onSignIn: () -> Unit,
+) {
+  BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
+    Column(
+        Modifier.fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .heightIn(min = maxHeight)
+            .padding(
+                start = AroundSpacing.ScreenHorizontal,
+                end = AroundSpacing.ScreenHorizontal,
+                top = AroundSpacing.HeroTop,
+                bottom = AroundSpacing.ScreenBottom,
+            )
+    ) {
+      BackButton(enabled = enabled, onClick = onBack)
+      Spacer(Modifier.height(AroundSpacing.Large))
+      Text(
+          stringResource(R.string.auth_choose_account_type),
+          style = MaterialTheme.typography.headlineLarge,
+          color = MaterialTheme.colorScheme.onBackground,
+          modifier = Modifier.testTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).semantics { heading() },
+      )
+      Spacer(Modifier.height(AroundSpacing.Small))
+      Text(
+          stringResource(R.string.auth_account_type_prompt),
+          style = MaterialTheme.typography.titleLarge,
+          color = MaterialTheme.colorScheme.onBackground,
+      )
+      Spacer(Modifier.height(AroundSpacing.ScreenBottom))
+      Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
+        AccountTypeCard(
+            title = stringResource(R.string.auth_explorer),
+            description = stringResource(R.string.auth_explorer_description),
+            icon = R.drawable.auth_explorer_icon,
+            business = false,
+            enabled = enabled,
+            onClick = onExplorer,
+            modifier = Modifier.weight(1f).testTag(C.Tag.AUTH_EXPLORER_CARD),
+        )
+        AccountTypeCard(
+            title = stringResource(R.string.auth_business),
+            description = stringResource(R.string.auth_business_description),
+            icon = R.drawable.auth_business_icon,
+            business = true,
+            enabled = enabled,
+            onClick = onBusiness,
+            modifier = Modifier.weight(1f).testTag(C.Tag.AUTH_BUSINESS_CARD),
+        )
+      }
+      Spacer(Modifier.weight(1f).heightIn(min = AroundSpacing.Medium))
+      Text(
+          stringResource(R.string.auth_already_have_account),
+          style = AroundTextStyles.InlineBody,
+          color = MaterialTheme.colorScheme.onBackground,
+          modifier = Modifier.align(Alignment.CenterHorizontally),
+      )
+      Spacer(Modifier.height(AroundSpacing.Medium))
+      AuthSignInButton(
+          onClick = onSignIn,
+          enabled = enabled,
+          modifier = Modifier.testTag(C.Tag.AUTH_CHOICE_SIGN_IN),
+      )
+    }
+  }
+}
+
+@Composable
+private fun AccountTypeCard(
+    title: String,
+    description: String,
+    icon: Int,
+    business: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  val colors = MaterialTheme.colorScheme
+  val foreground = if (business) colors.onPrimary else colors.onSurface
+  val cardColor = if (business) colors.primary else colors.surface
+  Surface(
+      onClick = onClick,
+      enabled = enabled,
+      shape = RoundedCornerShape(20.dp),
+      border = BorderStroke(2.dp, colors.primary),
+      color = cardColor,
+      modifier = modifier.height(280.dp),
+  ) {
+    Column(Modifier.padding(AroundSpacing.Large)) {
+      Box(
+          Modifier.size(48.dp)
+              .background(
+                  if (business) colors.background else colors.primary.copy(alpha = 0.12f),
+                  RoundedCornerShape(24.dp),
+              ),
+          contentAlignment = Alignment.Center,
+      ) {
+        Image(painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp))
+      }
+      Spacer(Modifier.height(AroundSpacing.CompactGap))
+      Text(title, style = MaterialTheme.typography.titleMedium, color = foreground)
+      Spacer(Modifier.height(AroundSpacing.CompactGap))
+      Text(description, style = MaterialTheme.typography.bodySmall, color = foreground)
+      Spacer(Modifier.weight(1f))
+      Box(
+          Modifier.fillMaxWidth()
+              .height(37.dp)
+              .background(
+                  if (business) colors.background else colors.primary,
+                  RoundedCornerShape(12.dp),
+              ),
+          contentAlignment = Alignment.Center,
+      ) {
+        Text(
+            stringResource(R.string.auth_sign_up),
+            style = AroundTextStyles.Button,
+            color = if (business) colors.primary else colors.onPrimary,
+        )
+      }
     }
   }
 }
@@ -144,21 +301,25 @@ fun AuthScreen(
  * The Sign in or Create account form, or the role choices alone in [completeRegistration] mode.
  *
  * @param isCreatingAccount shows the confirmation field and the registration actions.
- * @param onBack returns to Welcome; not offered in [completeRegistration] mode.
+ * @param onBack returns to the step that opened this form; not offered in [completeRegistration]
+ *   mode.
  */
 @Composable
 private fun AuthForm(
     viewModel: AuthViewModel,
     state: AuthUiState,
     isCreatingAccount: Boolean,
+    isVenue: Boolean,
     completeRegistration: Boolean,
     googleSignInClient: GoogleSignInClient,
     onBack: () -> Unit,
+    onVenue: () -> Unit,
 ) {
   val googleScope = rememberCoroutineScope()
   val title =
       when {
         completeRegistration -> R.string.auth_complete_registration
+        isVenue -> R.string.auth_venue_account
         isCreatingAccount -> R.string.auth_create_account
         else -> R.string.auth_sign_in
       }
@@ -261,9 +422,9 @@ private fun AuthForm(
         )
       }
       Spacer(Modifier.weight(1f).heightIn(min = AroundSpacing.ExtraLarge))
-      if (viewModel.supportsRegistration && isCreatingAccount) {
+      if (viewModel.supportsRegistration && isCreatingAccount && !isVenue) {
         TextButton(
-            onClick = { register(Role.VENUE) },
+            onClick = { if (completeRegistration) register(Role.VENUE) else onVenue() },
             enabled = !state.isLoading,
             modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_VENUE_LINK),
             // The default primary colour is unreadable on the dark background.
@@ -274,19 +435,24 @@ private fun AuthForm(
         Spacer(Modifier.height(AroundSpacing.Small))
       }
       Button(
-          onClick = { if (isCreatingAccount) register(Role.EXPLORER) else viewModel.signIn() },
+          onClick = {
+            if (isCreatingAccount) register(if (isVenue) Role.VENUE else Role.EXPLORER)
+            else viewModel.signIn()
+          },
           enabled = !state.isLoading,
           shape = MaterialTheme.shapes.medium,
           modifier = Modifier.fillMaxWidth().height(AuthButtonHeight).testTag(C.Tag.AUTH_SUBMIT),
       ) {
         Text(
             stringResource(
-                if (isCreatingAccount) R.string.auth_create_account else R.string.auth_sign_in
+                if (isVenue) R.string.auth_venue_account
+                else if (isCreatingAccount) R.string.auth_create_account else R.string.auth_sign_in
             ),
             style = AroundTextStyles.Button,
         )
       }
-      if (!completeRegistration) {
+      // Venue Google signup needs the role handoff added in the next change.
+      if (!completeRegistration && !isVenue) {
         Spacer(Modifier.height(AroundSpacing.InsetPadding))
         OrDivider()
         Spacer(Modifier.height(AroundSpacing.InsetPadding))
@@ -309,7 +475,7 @@ private fun AuthForm(
   }
 }
 
-/** Figma's round back button, which returns to Welcome. */
+/** Figma's round back button for the current auth step. */
 @Composable
 private fun BackButton(enabled: Boolean, onClick: () -> Unit) {
   Surface(

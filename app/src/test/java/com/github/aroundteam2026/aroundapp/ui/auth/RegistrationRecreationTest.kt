@@ -87,7 +87,7 @@ class RegistrationRecreationTest {
         controller.visible()
       }
       assertNotSame(before, controller.get())
-      compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextContains("Create account")
+      compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextContains("Create venue account")
       compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextContains("venue@around.test")
       compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).assertIsNotEnabled().performClick()
       compose.onNodeWithTag(C.Tag.AUTH_BACK).assertIsNotEnabled()

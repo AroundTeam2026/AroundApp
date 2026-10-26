@@ -82,9 +82,13 @@ class AuthWelcomeTest {
   fun welcomeButtonsOpenTheirFormAndTheBackButtonReturns() {
     launch()
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    compose.onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).assertTextEquals("Create your account")
+    click(C.Tag.AUTH_EXPLORER_CARD)
     compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Create account")
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.AUTH_GOOGLE).assertIsDisplayed()
+    click(C.Tag.AUTH_BACK)
+    compose.onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).assertIsDisplayed()
     click(C.Tag.AUTH_BACK)
     assertOnWelcome()
 
@@ -109,10 +113,20 @@ class AuthWelcomeTest {
   }
 
   @Test
+  fun accountTypeChoiceSignInOpensTheExistingSignInForm() {
+    launch()
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_CHOICE_SIGN_IN)
+    compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Sign in")
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertDoesNotExist()
+  }
+
+  @Test
   fun validationErrorsOutlineTheFieldTheyAreAbout() {
     val hasError = SemanticsMatcher.keyIsDefined(SemanticsProperties.Error)
     launch()
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_EXPLORER_CARD)
     click(C.Tag.AUTH_SUBMIT)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assert(hasError)
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).assert(!hasError)
@@ -129,6 +143,7 @@ class AuthWelcomeTest {
   fun screenReadersAnnounceEachFieldLabelOnceOnTheField() {
     launch()
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_EXPLORER_CARD)
     for ((label, tag) in
         listOf(
             "Email" to C.Tag.AUTH_EMAIL,
@@ -158,6 +173,7 @@ class AuthWelcomeTest {
     assertCorner(capture("sign-in-$mode"), expected)
     click(C.Tag.AUTH_BACK)
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_EXPLORER_CARD)
     assertCorner(capture("create-account-$mode"), expected)
   }
 
