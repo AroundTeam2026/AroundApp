@@ -74,7 +74,8 @@ class RoleRoutingActivityTest {
           .getOrThrow()
       auth.signOut()
     }
-    awaitTag(C.Tag.AUTH_EMAIL)
+    awaitTag(C.Tag.AUTH_WELCOME_SIGN_IN)
+    compose.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
@@ -102,7 +103,8 @@ class RoleRoutingActivityTest {
           .getOrThrow()
     }
     compose.runOnIdle { AuthRepositoryProvider.repository.signOut() }
-    awaitTag(C.Tag.AUTH_EMAIL)
+    awaitTag(C.Tag.AUTH_WELCOME_SIGN_IN)
+    compose.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()

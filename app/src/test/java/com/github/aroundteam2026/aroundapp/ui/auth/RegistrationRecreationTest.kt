@@ -90,7 +90,7 @@ class RegistrationRecreationTest {
       compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextContains("Create account")
       compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextContains("venue@around.test")
       compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).assertIsNotEnabled().performClick()
-      compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).assertIsNotEnabled()
+      compose.onNodeWithTag(C.Tag.AUTH_BACK).assertIsNotEnabled()
       assertEquals(1, signUps)
       assertEquals(Role.VENUE, pending.pending?.role)
       compose.runOnUiThread { gate.complete(Unit) }

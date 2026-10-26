@@ -67,6 +67,7 @@ class MainActivityTest : TestCase() {
     composeTestRule.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
@@ -94,7 +95,7 @@ class MainActivityTest : TestCase() {
 
   @Test
   fun activityRecreationKeepsUnsubmittedAuthFields() {
-    composeTestRule.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+    composeTestRule.onNodeWithTag(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT).performClick()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("typing@around.test")
     composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     composeTestRule.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
