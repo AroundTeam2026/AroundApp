@@ -9,7 +9,7 @@ Where a signed-in **Venue** user enters the app, and how onboarding is wired
 ## Where a venue lands
 
 Role routing (`RoleNavigation`, G2.3) sends a signed-in user whose role is
-`VENUE` to C2's `venueEntry` slot, giving it the user's uid. That slot holds
+`VENUE` to its `venueScreen` slot, giving it the user's uid. That slot holds
 `VenueEntry`:
 
 ```kotlin

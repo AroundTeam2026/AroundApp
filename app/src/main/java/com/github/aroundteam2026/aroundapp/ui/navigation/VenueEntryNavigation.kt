@@ -21,6 +21,21 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
 
 /**
+ * Draws the area step of onboarding for the venue [venueId].
+ *
+ * @param venueId id of the venue whose area is set.
+ * @param onSaved called once the area is saved.
+ * @param onBack called when the venue goes back from the area.
+ */
+typealias VenueAreaStep =
+    @Composable (venueId: String, onSaved: () -> Unit, onBack: () -> Unit) -> Unit
+
+/** The real area step: a [VenueAreaScreen], shared by [VenueEntry] and [VenueEntryNavigation]. */
+val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
+  VenueAreaScreen(venueId, onSaved, onBack)
+}
+
+/**
  * Owns the existing venue onboarding and home graphs inside the authenticated session. Business
  * setup reuses an existing venue instead of overwriting it. Saving its location replaces onboarding
  * with the home, so Back cannot reopen setup or authentication. The session gate clears the whole
@@ -40,10 +55,7 @@ import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
 fun VenueEntryNavigation(
     authRepository: AuthRepository,
     venueRepository: VenueRepository = VenueRepositoryProvider.repository,
-    locationScreen: @Composable (String, onSaved: () -> Unit, onBack: () -> Unit) -> Unit =
-        { venueId, onSaved, onBack ->
-          VenueAreaScreen(venueId, onSaved, onBack)
-        },
+    locationScreen: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     start: VenueEntryStart = VenueEntryStart.INITIALIZATION,
     venueId: String? = null,

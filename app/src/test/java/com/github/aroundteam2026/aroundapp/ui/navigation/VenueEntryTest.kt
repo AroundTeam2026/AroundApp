@@ -29,11 +29,10 @@ import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
-import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
-import java.io.IOException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -266,15 +265,7 @@ class VenueEntryTest {
 
   @Test
   fun aFailedReadOffersRetryAndSignOut() {
-    var failures = 1
-    val saved = FakeVenueRepository(listOf(testVenue(id = USER)))
-    venues =
-        object : VenueRepository by saved {
-          override suspend fun getVenue(venueId: String): Venue? {
-            if (failures-- > 0) throw IOException("offline")
-            return saved.getVenue(venueId)
-          }
-        }
+    venues = FlakyVenueRepository(failures = 1, venue = testVenue(id = USER))
     enter()
 
     node(C.Tag.VENUE_ENTRY_FAILED).assertIsDisplayed()

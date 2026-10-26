@@ -4,13 +4,12 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
-import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
@@ -69,7 +68,7 @@ class VenueEntryViewModelTest {
 
   @Test
   fun aFailedReadFailsAndRetryingReadsAgain() = test {
-    val repository = ScriptedVenues(failures = 1, venue = testVenue(id = USER))
+    val repository = FlakyVenueRepository(failures = 1, venue = testVenue(id = USER))
     val viewModel = viewModel(repository)
     runCurrent()
     assertEquals(VenueEntryUiState.Failed, viewModel.uiState.value)
@@ -84,7 +83,7 @@ class VenueEntryViewModelTest {
 
   @Test
   fun retryingWithoutAFailureDoesNothing() = test {
-    val repository = ScriptedVenues(failures = 0, venue = null)
+    val repository = FlakyVenueRepository(failures = 0, venue = null)
     val viewModel = viewModel(repository)
     runCurrent()
 
@@ -98,7 +97,7 @@ class VenueEntryViewModelTest {
   @Test
   fun retryingWhileLoadingDoesNothing() = test {
     val gate = CompletableDeferred<Venue?>()
-    val repository = ScriptedVenues(failures = 0, venue = null, gate = gate)
+    val repository = FlakyVenueRepository(failures = 0, venue = null, gate = gate)
     val viewModel = viewModel(repository)
     runCurrent()
 
@@ -107,35 +106,6 @@ class VenueEntryViewModelTest {
     runCurrent()
 
     assertEquals(1, repository.reads)
-  }
-
-  /** Reads [venue], failing the first [failures] reads, and waiting for [gate] when given. */
-  private class ScriptedVenues(
-      private var failures: Int,
-      private val venue: Venue?,
-      private val gate: CompletableDeferred<Venue?>? = null,
-  ) : VenueRepository {
-    var reads = 0
-
-    override suspend fun getVenue(venueId: String): Venue? {
-      reads++
-      if (failures > 0) {
-        failures--
-        throw IOException("offline")
-      }
-      return gate?.await() ?: venue
-    }
-
-    override fun observeVenue(venueId: String): Flow<Venue?> = throw UnsupportedOperationException()
-
-    override suspend fun createVenue(venue: Venue) = throw UnsupportedOperationException()
-
-    override suspend fun setArea(
-        venueId: String,
-        location: Location,
-        radiusMeters: Int,
-        address: String?,
-    ) = throw UnsupportedOperationException()
   }
 
   private companion object {
