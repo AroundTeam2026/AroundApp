@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.util.Log
@@ -33,10 +34,12 @@ fun NavGraphBuilder.venuePageDestination(
   }
 }
 
-/** A venue's page as the app shows it, with the app's repositories. */
+/**
+ * A venue's page as the app shows it to the explorer [explorerUid], with the app's repositories.
+ */
 @Composable
-fun VenuePage(venueId: String, onBack: () -> Unit) =
-    VenuePageScreen(viewModel(factory = VenuePageViewModel.factory(venueId)), onBack)
+fun VenuePage(venueId: String, explorerUid: String, onBack: () -> Unit) =
+    VenuePageScreen(viewModel(factory = VenuePageViewModel.factory(venueId, explorerUid)), onBack)
 
 /**
  * Opens the page of the venue with [venueId]. Not single-top, so opening another venue's page from

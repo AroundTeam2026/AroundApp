@@ -1,9 +1,11 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.rewardExpiringAt
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -45,7 +47,14 @@ class VenuePageViewModelTest {
   private var venueRepository: VenueRepository = venues
 
   private val viewModel by lazy {
-    VenuePageViewModel(VENUE_ID, venueRepository, questRepository, clock)
+    VenuePageViewModel(
+        VENUE_ID,
+        venueRepository,
+        questRepository,
+        FakeReservationRepository(),
+        "explorer",
+        clock,
+    )
   }
 
   private val state

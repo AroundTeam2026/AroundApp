@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.util.Log
@@ -12,6 +13,11 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
 import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
+import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -32,14 +38,16 @@ import kotlinx.coroutines.launch
 /**
  * Holds the page of the venue [venueId]: its header and the quests explorers can take there.
  *
- * It listens to the venue and its active quests, the only ones the repository sends, and keeps up
- * as they change and as rewards expire, by [clock]. If listening fails, the page shows
- * [VenuePageStatus.FAILED] until [onRetry].
+ * It listens to the venue, its active quests, the only ones the repository sends, and the
+ * reservations of the explorer [explorerUid], and keeps up as they change and as rewards expire, by
+ * [clock]. If listening fails, the page shows [VenuePageStatus.FAILED] until [onRetry].
  */
 class VenuePageViewModel(
     private val venueId: String,
     private val venueRepository: VenueRepository,
     private val questRepository: QuestRepository,
+    private val reservationRepository: ReservationRepository,
+    private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(VenuePageUiState())
@@ -67,6 +75,30 @@ class VenuePageViewModel(
     mutableUiState.update { it.copy(detailQuestId = null) }
   }
 
+  /**
+   * Called when the explorer accepts the picked quest: books it as a pending reservation of a party
+   * of just themself, for a slot starting now. Does nothing when no quest is picked, when the quest
+   * is already accepted, or while a quest is being accepted, so a double tap books once. A failure
+   * keeps the quest picked and shows [AcceptStatus.FAILED]; calling this again retries.
+   */
+  fun accept() {
+    val current = mutableUiState.value
+    val quest = current.selectedQuest ?: return
+    if (current.acceptingQuestId != null || quest.questId in current.acceptedParties) return
+    mutableUiState.update { it.copy(acceptingQuestId = quest.questId, failedQuestId = null) }
+    viewModelScope.launch {
+      // On success the page stays "accepting" until the reservation shows up in the listener
+      reservationRepository
+          .createReservation(newPendingReservation(quest.questId, venueId, explorerUid, clock()))
+          .onFailure {
+            Log.w(TAG, "Accepting quest ${quest.questId} failed", it)
+            mutableUiState.update { state ->
+              state.copy(acceptingQuestId = null, failedQuestId = quest.questId)
+            }
+          }
+    }
+  }
+
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
   fun onRetry() {
     if (mutableUiState.value.status != VenuePageStatus.FAILED) return
@@ -75,8 +107,9 @@ class VenuePageViewModel(
   }
 
   /**
-   * Listens to the venue and its quests until the ViewModel is cleared or listening fails. The
-   * quests are checked again each time a reward expires, even when nothing else changes.
+   * Listens to the venue, its quests and the explorer's reservations until the ViewModel is cleared
+   * or listening fails. The quests are checked again each time a reward expires, even when nothing
+   * else changes.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen() {
@@ -85,13 +118,14 @@ class VenuePageViewModel(
       combine(
               venueRepository.observeVenue(venueId),
               questRepository.observeActiveQuestsByVenue(venueId),
-          ) { venue, quests ->
-            venue to quests
+              reservationRepository.observeForExplorer(explorerUid),
+          ) { venue, quests, reservations ->
+            Triple(venue, quests, acceptedParties(reservations, venueId))
           }
-          .transformLatest { (venue, quests) ->
+          .transformLatest { (venue, quests, accepted) ->
             while (true) {
               val now = clock()
-              emit(venue to venuePageQuests(quests, venue?.featuredQuestId, now))
+              emit(Triple(venue, venuePageQuests(quests, venue?.featuredQuestId, now), accepted))
               val nextExpiry = quests.nextExpiryAfter(now) ?: break
               delay(nextExpiry - now)
             }
@@ -100,23 +134,31 @@ class VenuePageViewModel(
             Log.w(TAG, "Listening to venue $venueId failed", it)
             mutableUiState.value = VenuePageUiState(status = VenuePageStatus.FAILED)
           }
-          .collect { (venue, quests) -> mutableUiState.update { it.showing(venue, quests) } }
+          .collect { (venue, quests, accepted) ->
+            mutableUiState.update { it.showing(venue, quests, accepted) }
+          }
     }
   }
 
   companion object {
     private const val TAG = "VenuePageViewModel"
 
-    /** Builds the [VenuePageViewModel] of the venue [venueId] with the app's repositories. */
-    fun factory(venueId: String): ViewModelProvider.Factory = viewModelFactory {
-      initializer {
-        VenuePageViewModel(
-            venueId,
-            VenueRepositoryProvider.repository,
-            QuestRepositoryProvider.repository,
-        )
-      }
-    }
+    /**
+     * Builds the [VenuePageViewModel] of the venue [venueId] for the explorer [explorerUid], with
+     * the app's repositories.
+     */
+    fun factory(venueId: String, explorerUid: String): ViewModelProvider.Factory =
+        viewModelFactory {
+          initializer {
+            VenuePageViewModel(
+                venueId,
+                VenueRepositoryProvider.repository,
+                QuestRepositoryProvider.repository,
+                ReservationRepositoryProvider.repository,
+                explorerUid,
+            )
+          }
+        }
   }
 }
 
@@ -134,10 +176,28 @@ internal fun venuePageQuests(
         .sortedWith(compareBy<Quest> { it.id != featuredQuestId }.then(NEWEST_FIRST))
         .map { it.toVenuePageQuest() }
 
-/** This page showing [venue] and its valid [quests], or "not found" when [venue] is null. */
+/**
+ * The size of the party the explorer has for each quest of the venue [venueId] they accepted, keyed
+ * by quest id. Only pending and approved reservations count; of several for one quest, the biggest
+ * party counts.
+ */
+internal fun acceptedParties(reservations: List<Reservation>, venueId: String): Map<String, Int> =
+    reservations
+        .filter {
+          it.venueId == venueId &&
+              (it.status == ReservationStatus.PENDING || it.status == ReservationStatus.APPROVED)
+        }
+        .groupBy { it.questId }
+        .mapValues { (_, same) -> same.maxOf { it.explorerUids.size } }
+
+/**
+ * This page showing [venue], its valid [quests] and the parties of the [accepted] ones, or "not
+ * found" when [venue] is null. A quest being accepted that is now accepted is done accepting.
+ */
 private fun VenuePageUiState.showing(
     venue: Venue?,
     quests: List<VenuePageQuest>,
+    accepted: Map<String, Int>,
 ): VenuePageUiState =
     if (venue == null) {
       VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
@@ -147,6 +207,8 @@ private fun VenuePageUiState.showing(
               venueName = venue.name,
               avatar = INITIALS_AVATAR(venue, venue.name),
               address = venue.address,
+              acceptedParties = accepted,
+              acceptingQuestId = acceptingQuestId?.takeUnless { it in accepted },
           )
           .withQuests(quests)
     }

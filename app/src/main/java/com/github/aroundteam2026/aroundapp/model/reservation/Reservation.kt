@@ -27,6 +27,29 @@ data class Reservation(
   }
 }
 
+/**
+ * The reservation an explorer makes by accepting the quest [questId] of the venue [venueId]: a
+ * party of just [explorerUid], pending, for a slot starting at [slotStart].
+ *
+ * Pass it to [ReservationRepository.createReservation], which assigns the id and creation time; the
+ * ones here are placeholders.
+ */
+fun newPendingReservation(
+    questId: String,
+    venueId: String,
+    explorerUid: String,
+    slotStart: Long,
+) =
+    Reservation(
+        id = "",
+        questId = questId,
+        venueId = venueId,
+        explorerUids = listOf(explorerUid),
+        slotStart = slotStart,
+        status = ReservationStatus.PENDING,
+        createdAt = slotStart,
+    )
+
 /** Lifecycle state of a reservation. */
 enum class ReservationStatus {
   /** Requested by the explorers; waiting for the venue's answer. */

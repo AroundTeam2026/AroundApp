@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
@@ -111,7 +112,7 @@ class AroundAppVenuePageDeviceTest {
   private fun openVenuePage() {
     composeTestRule.setContent {
       navController = rememberNavController()
-      AroundApp(onSignOut = {}, navController = navController)
+      AroundApp(explorerUid = "explorer", onSignOut = {}, navController = navController)
     }
     composeTestRule.runOnUiThread { navController.navigateToVenuePage(venue.id) }
   }

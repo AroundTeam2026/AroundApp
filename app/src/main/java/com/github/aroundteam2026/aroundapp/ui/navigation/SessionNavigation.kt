@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.runtime.Composable
@@ -33,10 +34,10 @@ import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 fun SessionNavigation(
     repository: AuthRepository,
     sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.factory(repository)),
-    mainScreen: @Composable (userId: String) -> Unit = {
+    mainScreen: @Composable (userId: String) -> Unit = { userId ->
       val profileViewModel: ProfileViewModel =
           viewModel(factory = ProfileViewModel.factory(repository))
-      AroundApp(onSignOut = profileViewModel::signOut)
+      AroundApp(explorerUid = userId, onSignOut = profileViewModel::signOut)
     },
     authFlow: @Composable () -> Unit = {
       val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(repository))

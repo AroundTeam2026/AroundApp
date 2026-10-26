@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
@@ -47,6 +48,7 @@ class RoutesTest {
     composeTestRule.setContent {
       navController = rememberNavController()
       AroundApp(
+          explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
           venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },

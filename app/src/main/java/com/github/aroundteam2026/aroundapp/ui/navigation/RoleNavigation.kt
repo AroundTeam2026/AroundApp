@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +40,8 @@ import com.github.aroundteam2026.aroundapp.ui.auth.RegistrationFlow
  * @param authRepository the session source, shared with the session gate and registration.
  * @param userRepository reads and saves the profile whose role selects the destination.
  * @param pendingRoleStore keeps a registration choice until its profile is saved.
- * @param explorerScreen the Explorer home; empty until its owner supplies it.
+ * @param explorerScreen the Explorer home, given the signed-in uid; empty until its owner supplies
+ *   it.
  * @param venueScreen the Venue entry, given the signed-in uid, e.g. [VenueEntry]; empty until its
  *   owner supplies it.
  */
@@ -48,7 +50,7 @@ fun RoleNavigation(
     authRepository: AuthRepository,
     userRepository: UserRepository,
     pendingRoleStore: PendingRoleStore,
-    explorerScreen: @Composable () -> Unit = {},
+    explorerScreen: @Composable (userId: String) -> Unit = {},
     venueScreen: @Composable (userId: String) -> Unit = {},
 ) {
   val setup =
@@ -88,7 +90,7 @@ fun RoleNavigation(
                   completeRegistration = true,
               )
             },
-            explorerHome = explorerScreen,
+            explorerHome = { explorerScreen(uid) },
             venueEntry = { venueScreen(uid) },
             profileError = { ProfileError(router::retryProfile, router::signOut) },
         )

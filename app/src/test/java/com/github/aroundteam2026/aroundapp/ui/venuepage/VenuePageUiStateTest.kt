@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -123,5 +124,47 @@ class VenuePageUiStateTest {
     assertNull(left.detailQuestId)
 
     assertNull(left.withQuests(listOf(quest("a"), quest("b"))).detailQuestId)
+  }
+
+  @Test
+  fun showsNothingToAcceptUntilAQuestIsPicked() {
+    assertEquals(AcceptStatus.NONE, loaded.acceptStatus)
+    assertEquals(0, loaded.morePeopleNeeded)
+  }
+
+  @Test
+  fun showsAcceptingFailedOrAcceptedForThePickedQuestOnly() {
+    val picked = loaded.withQuestTapped("a")
+
+    assertEquals(AcceptStatus.NONE, picked.acceptStatus)
+    assertEquals(AcceptStatus.ACCEPTING, picked.copy(acceptingQuestId = "a").acceptStatus)
+    assertEquals(AcceptStatus.FAILED, picked.copy(failedQuestId = "a").acceptStatus)
+    assertEquals(AcceptStatus.ACCEPTED, picked.copy(acceptedParties = mapOf("a" to 1)).acceptStatus)
+    // The attempt and the failure belong to another quest
+    assertEquals(AcceptStatus.NONE, picked.copy(acceptingQuestId = "b").acceptStatus)
+    assertEquals(AcceptStatus.NONE, picked.copy(failedQuestId = "b").acceptStatus)
+    assertEquals(AcceptStatus.NONE, picked.copy(acceptedParties = mapOf("b" to 1)).acceptStatus)
+  }
+
+  @Test
+  fun acceptedWinsOverAnAttemptThatIsStillSettling() {
+    val state =
+        loaded.withQuestTapped("a").copy(acceptingQuestId = "a", acceptedParties = mapOf("a" to 1))
+
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+  }
+
+  @Test
+  fun countsTheMissingPeopleAgainstTheMinimumPartySize() {
+    val state =
+        VenuePageUiState(
+            quests = listOf(quest("a").copy(minPartySize = 4)),
+            selectedQuestId = "a",
+        )
+
+    assertEquals(3, state.morePeopleNeeded) // the explorer alone
+    assertEquals(2, state.copy(acceptedParties = mapOf("a" to 2)).morePeopleNeeded)
+    assertEquals(0, state.copy(acceptedParties = mapOf("a" to 4)).morePeopleNeeded)
+    assertEquals(0, state.copy(acceptedParties = mapOf("a" to 6)).morePeopleNeeded)
   }
 }

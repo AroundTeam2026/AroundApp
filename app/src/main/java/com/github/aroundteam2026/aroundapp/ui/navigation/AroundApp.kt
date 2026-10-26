@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.annotation.DrawableRes
@@ -54,18 +55,20 @@ private val START_TAB = Tab.QUESTS
  *
  * @param onSignOut supplies the Profile sign-out action.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
+ * @param explorerUid the signed-in explorer, who accepts quests on a venue's page.
  * @param venuePage draws a venue's page, given its id and back action; tests pass their own so the
  *   page doesn't read Firestore.
  */
 @Composable
 fun AroundApp(
+    explorerUid: String,
     navController: NavHostController = rememberNavController(),
     onSignOut: () -> Unit,
     screen: @Composable (Tab) -> Unit = {
       TabScreen(it, navController::openVenueFromMap, onSignOut)
     },
     venuePage: @Composable (venueId: String, onBack: () -> Unit) -> Unit = { venueId, onBack ->
-      VenuePage(venueId, onBack)
+      VenuePage(venueId, explorerUid, onBack)
     },
 ) {
   BottomTabScaffold(
