@@ -50,10 +50,15 @@ class AuthScreenTest {
     compose.onNodeWithTag(tag).performScrollTo().performClick()
   }
 
+  private fun openSignIn() = click(C.Tag.AUTH_WELCOME_SIGN_IN)
+
+  private fun openCreateAccount() = click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+
   @Test
   fun signInUsesEnteredCredentials() {
     val uid = repository.addAccount("ada@around.test", "123456")
     launch()
+    openSignIn()
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertDoesNotExist()
     fill()
     click(C.Tag.AUTH_SUBMIT)
@@ -66,7 +71,7 @@ class AuthScreenTest {
   fun accountCreationRejectsMismatchThenSucceedsAfterCorrection() {
     repository.nextError = AuthError.Network
     launch()
-    click(C.Tag.AUTH_SWITCH_MODE)
+    openCreateAccount()
     // Without ProfileSetup a Venue choice could not be recorded, so the link is not offered.
     compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).assertDoesNotExist()
     fill()
@@ -87,6 +92,7 @@ class AuthScreenTest {
     val uid = repository.addAccount("ada@around.test", "123456")
     repository.nextError = AuthError.Network
     launch()
+    openSignIn()
     fill()
     click(C.Tag.AUTH_SUBMIT)
     compose
@@ -100,7 +106,7 @@ class AuthScreenTest {
   }
 
   @Test
-  fun pendingRequestDisablesTheFormAndModeSwitch() {
+  fun pendingRequestDisablesTheFormAndBack() {
     val gate = CompletableDeferred<Unit>()
     val gatedRepository =
         object : AuthRepository by repository {
@@ -111,6 +117,7 @@ class AuthScreenTest {
         }
     repository.addAccount("ada@around.test", "123456")
     launch(gatedRepository)
+    openSignIn()
     fill()
     click(C.Tag.AUTH_SUBMIT)
     compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertIsDisplayed()
@@ -120,7 +127,8 @@ class AuthScreenTest {
             C.Tag.AUTH_PASSWORD,
             C.Tag.AUTH_PASSWORD_VISIBILITY,
             C.Tag.AUTH_SUBMIT,
-            C.Tag.AUTH_SWITCH_MODE,
+            C.Tag.AUTH_GOOGLE,
+            C.Tag.AUTH_BACK,
         )) {
       compose.onNodeWithTag(tag).assertIsNotEnabled()
     }
@@ -131,26 +139,28 @@ class AuthScreenTest {
   }
 
   @Test
-  fun switchingToSignInClearsMismatchAndHidesConfirmation() {
+  fun backToWelcomeClearsMismatchAndSignInHidesConfirmation() {
     launch()
-    click(C.Tag.AUTH_SWITCH_MODE)
+    openCreateAccount()
     fill()
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("different")
     click(C.Tag.AUTH_SUBMIT)
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertIsDisplayed()
 
-    click(C.Tag.AUTH_SWITCH_MODE)
+    click(C.Tag.AUTH_BACK)
+    openSignIn()
 
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertDoesNotExist()
-    click(C.Tag.AUTH_SWITCH_MODE)
-    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertTextEquals("", "Confirm password")
+    click(C.Tag.AUTH_BACK)
+    openCreateAccount()
+    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertTextEquals("")
   }
 
   @Test
   fun shortPasswordShowsFormattedPluralMessage() {
     launch()
-    click(C.Tag.AUTH_SWITCH_MODE)
+    openCreateAccount()
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("12345")
     click(C.Tag.AUTH_SUBMIT)
@@ -171,6 +181,7 @@ class AuthScreenTest {
   fun passwordCanBeShownAndHiddenWithoutChangingSignInCredentials() {
     val uid = repository.addAccount("ada@around.test", "123456")
     launch()
+    openSignIn()
     fill()
     assertRenderedPassword(C.Tag.AUTH_PASSWORD, "••••••")
     compose
@@ -190,7 +201,7 @@ class AuthScreenTest {
   @Test
   fun signUpPasswordAndConfirmationVisibilityAreIndependent() {
     launch()
-    click(C.Tag.AUTH_SWITCH_MODE)
+    openCreateAccount()
     fill()
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
     assertRenderedPassword(C.Tag.AUTH_CONFIRMATION, "••••••")
@@ -212,13 +223,15 @@ class AuthScreenTest {
   }
 
   @Test
-  fun recreationRetainsPasswordVisibility() {
+  fun recreationRetainsTheFormAndPasswordVisibility() {
     val restoration = StateRestorationTester(compose)
     val viewModel = AuthViewModel(repository)
     restoration.setContent { AroundAppTheme { AuthScreen(viewModel) } }
+    openSignIn()
     fill()
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY).performClick()
     restoration.emulateSavedInstanceStateRestore()
+    compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Sign in")
     assertRenderedPassword(C.Tag.AUTH_PASSWORD, "123456")
     compose
         .onNodeWithTag(C.Tag.AUTH_PASSWORD_VISIBILITY)

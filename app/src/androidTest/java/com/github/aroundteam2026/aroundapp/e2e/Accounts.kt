@@ -40,7 +40,7 @@ fun ComposeTestRule.createVenueAccount(email: String = "e2e-${UUID.randomUUID()}
  */
 private fun ComposeTestRule.register(email: String, button: String, landsOn: String) {
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
-  onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+  onNodeWithTag(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT).performClick()
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)

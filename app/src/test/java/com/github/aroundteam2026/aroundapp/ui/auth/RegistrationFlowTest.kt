@@ -136,8 +136,9 @@ class RegistrationFlowTest {
     assertFinished(Role.EXPLORER)
     // A new auth composition must not reuse the previous account's credentials.
     compose.runOnIdle { auth.signOut() }
-    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextEquals("", "Email")
-    compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).assertTextEquals("", "Password")
+    click(C.Tag.AUTH_WELCOME_SIGN_IN)
+    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextEquals("")
+    compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).assertTextEquals("")
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertDoesNotExist()
   }
 
@@ -164,7 +165,7 @@ class RegistrationFlowTest {
     auth.nextError = AuthError.Network
     launch()
     compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextContains("Complete registration")
-    listOf(C.Tag.AUTH_EMAIL, C.Tag.AUTH_PASSWORD, C.Tag.AUTH_CONFIRMATION, C.Tag.AUTH_SWITCH_MODE)
+    listOf(C.Tag.AUTH_EMAIL, C.Tag.AUTH_PASSWORD, C.Tag.AUTH_CONFIRMATION, C.Tag.AUTH_BACK)
         .forEach { compose.onNodeWithTag(it).assertDoesNotExist() }
     click(if (role == Role.VENUE) C.Tag.AUTH_VENUE_LINK else C.Tag.AUTH_SUBMIT)
     assertFinished(role)
@@ -215,7 +216,7 @@ class RegistrationFlowTest {
     compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertIsDisplayed()
     val tags =
         if (completeExplorer) listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_VENUE_LINK)
-        else listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_VENUE_LINK, C.Tag.AUTH_SWITCH_MODE)
+        else listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_VENUE_LINK, C.Tag.AUTH_BACK)
     tags.forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
     back()
     assertEquals(0, backFallbacks)
