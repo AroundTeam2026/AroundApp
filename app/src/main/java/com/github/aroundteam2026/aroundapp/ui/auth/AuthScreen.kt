@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,6 +70,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 internal val AuthButtonHeight = 54.dp
@@ -350,126 +352,202 @@ private fun AuthForm(
           modifier = Modifier.testTag(C.Tag.AUTH_TITLE).semantics { heading() },
       )
       Spacer(Modifier.height(AroundSpacing.SetupGap))
-      if (!completeRegistration) {
-        LabeledField(stringResource(R.string.auth_email)) { label ->
-          OutlinedTextField(
-              value = state.email,
-              onValueChange = viewModel::onEmailChange,
-              singleLine = true,
-              enabled = !state.isLoading,
-              isError = state.error == AuthFormError.INVALID_EMAIL,
-              shape = MaterialTheme.shapes.small,
-              colors = questFieldColors(),
-              textStyle = AroundTextStyles.FieldValue,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-              modifier =
-                  Modifier.fillMaxWidth().testTag(C.Tag.AUTH_EMAIL).semantics {
-                    contentDescription = label
-                  },
-          )
-        }
-        Spacer(Modifier.height(AroundSpacing.Large))
-        PasswordField(
-            value = state.password,
-            onValueChange = viewModel::onPasswordChange,
-            label = stringResource(R.string.auth_password),
-            showLabel = stringResource(R.string.auth_show_password),
-            hideLabel = stringResource(R.string.auth_hide_password),
-            enabled = !state.isLoading,
-            isError =
-                state.error == AuthFormError.EMPTY_PASSWORD ||
-                    state.error == AuthFormError.PASSWORD_TOO_SHORT,
-            fieldTag = C.Tag.AUTH_PASSWORD,
-            toggleTag = C.Tag.AUTH_PASSWORD_VISIBILITY,
-        )
-        if (isCreatingAccount) {
-          Spacer(Modifier.height(AroundSpacing.Large))
-          PasswordField(
-              value = state.passwordConfirmation,
-              onValueChange = viewModel::onPasswordConfirmationChange,
-              label = stringResource(R.string.auth_confirm_password),
-              showLabel = stringResource(R.string.auth_show_confirmation_password),
-              hideLabel = stringResource(R.string.auth_hide_confirmation_password),
-              enabled = !state.isLoading,
-              isError = state.error == AuthFormError.PASSWORD_MISMATCH,
-              fieldTag = C.Tag.AUTH_CONFIRMATION,
-              toggleTag = C.Tag.AUTH_CONFIRMATION_VISIBILITY,
-          )
-        }
-      }
-      state.error?.let { error ->
-        Spacer(Modifier.height(AroundSpacing.Small))
-        Text(
-            if (error == AuthFormError.PASSWORD_TOO_SHORT) {
-              pluralStringResource(
-                  error.messageResource(),
-                  AuthInputValidation.MIN_PASSWORD_LENGTH,
-                  AuthInputValidation.MIN_PASSWORD_LENGTH,
-              )
-            } else {
-              stringResource(error.messageResource())
-            },
-            style = AroundTextStyles.Caption,
-            color = MaterialTheme.colorScheme.error,
-            modifier =
-                Modifier.testTag(C.Tag.AUTH_ERROR).semantics { liveRegion = LiveRegionMode.Polite },
-        )
-      }
-      if (state.isLoading) {
-        Spacer(Modifier.height(AroundSpacing.Large))
-        CircularProgressIndicator(
-            Modifier.align(Alignment.CenterHorizontally).testTag(C.Tag.AUTH_LOADING)
-        )
-      }
+      AuthCredentials(viewModel, state, isCreatingAccount, showCredentials = !completeRegistration)
+      AuthFormStatus(state)
       Spacer(Modifier.weight(1f).heightIn(min = AroundSpacing.ExtraLarge))
-      if (viewModel.supportsRegistration && isCreatingAccount && !isVenue) {
-        TextButton(
-            onClick = { if (completeRegistration) register(Role.VENUE) else onVenue() },
-            enabled = !state.isLoading,
-            modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_VENUE_LINK),
-            // The default primary colour is unreadable on the dark background.
-            colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
-        ) {
-          Text(stringResource(R.string.auth_venue_link))
-        }
-        Spacer(Modifier.height(AroundSpacing.Small))
-      }
-      Button(
-          onClick = {
-            if (isCreatingAccount) register(if (isVenue) Role.VENUE else Role.EXPLORER)
-            else viewModel.signIn()
-          },
-          enabled = !state.isLoading,
-          shape = MaterialTheme.shapes.medium,
-          modifier = Modifier.fillMaxWidth().height(AuthButtonHeight).testTag(C.Tag.AUTH_SUBMIT),
-      ) {
-        Text(
-            stringResource(
-                if (isVenue) R.string.auth_venue_account
-                else if (isCreatingAccount) R.string.auth_create_account else R.string.auth_sign_in
-            ),
-            style = AroundTextStyles.Button,
-        )
-      }
-      // Venue Google signup needs the role handoff added in the next change.
-      if (!completeRegistration && !isVenue) {
-        Spacer(Modifier.height(AroundSpacing.InsetPadding))
-        OrDivider()
-        Spacer(Modifier.height(AroundSpacing.InsetPadding))
-        GoogleSignInButton(
-            enabled = !state.isLoading,
-            onClick = {
-              if (viewModel.beginGoogleSignIn()) {
-                googleScope.launch {
-                  try {
-                    viewModel.onGoogleCredential(googleSignInClient.requestToken())
-                  } finally {
-                    viewModel.cancelGoogleSignIn()
-                  }
-                }
-              }
+      AuthFormActions(
+          viewModel,
+          state,
+          isCreatingAccount,
+          isVenue,
+          completeRegistration,
+          googleSignInClient,
+          googleScope,
+          onVenue,
+          register,
+      )
+    }
+  }
+}
+
+@Composable
+private fun AuthCredentials(
+    viewModel: AuthViewModel,
+    state: AuthUiState,
+    isCreatingAccount: Boolean,
+    showCredentials: Boolean,
+) {
+  if (!showCredentials) return
+  LabeledField(stringResource(R.string.auth_email)) { label ->
+    OutlinedTextField(
+        value = state.email,
+        onValueChange = viewModel::onEmailChange,
+        singleLine = true,
+        enabled = !state.isLoading,
+        isError = state.error == AuthFormError.INVALID_EMAIL,
+        shape = MaterialTheme.shapes.small,
+        colors = questFieldColors(),
+        textStyle = AroundTextStyles.FieldValue,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+        modifier =
+            Modifier.fillMaxWidth().testTag(C.Tag.AUTH_EMAIL).semantics {
+              contentDescription = label
             },
-        )
+    )
+  }
+  Spacer(Modifier.height(AroundSpacing.Large))
+  PasswordField(
+      value = state.password,
+      onValueChange = viewModel::onPasswordChange,
+      label = stringResource(R.string.auth_password),
+      showLabel = stringResource(R.string.auth_show_password),
+      hideLabel = stringResource(R.string.auth_hide_password),
+      enabled = !state.isLoading,
+      isError =
+          state.error == AuthFormError.EMPTY_PASSWORD ||
+              state.error == AuthFormError.PASSWORD_TOO_SHORT,
+      fieldTag = C.Tag.AUTH_PASSWORD,
+      toggleTag = C.Tag.AUTH_PASSWORD_VISIBILITY,
+  )
+  if (isCreatingAccount) {
+    Spacer(Modifier.height(AroundSpacing.Large))
+    PasswordField(
+        value = state.passwordConfirmation,
+        onValueChange = viewModel::onPasswordConfirmationChange,
+        label = stringResource(R.string.auth_confirm_password),
+        showLabel = stringResource(R.string.auth_show_confirmation_password),
+        hideLabel = stringResource(R.string.auth_hide_confirmation_password),
+        enabled = !state.isLoading,
+        isError = state.error == AuthFormError.PASSWORD_MISMATCH,
+        fieldTag = C.Tag.AUTH_CONFIRMATION,
+        toggleTag = C.Tag.AUTH_CONFIRMATION_VISIBILITY,
+    )
+  }
+}
+
+@Composable
+private fun ColumnScope.AuthFormStatus(state: AuthUiState) {
+  state.error?.let { error ->
+    Spacer(Modifier.height(AroundSpacing.Small))
+    Text(
+        if (error == AuthFormError.PASSWORD_TOO_SHORT) {
+          pluralStringResource(
+              error.messageResource(),
+              AuthInputValidation.MIN_PASSWORD_LENGTH,
+              AuthInputValidation.MIN_PASSWORD_LENGTH,
+          )
+        } else {
+          stringResource(error.messageResource())
+        },
+        style = AroundTextStyles.Caption,
+        color = MaterialTheme.colorScheme.error,
+        modifier =
+            Modifier.testTag(C.Tag.AUTH_ERROR).semantics { liveRegion = LiveRegionMode.Polite },
+    )
+  }
+  if (state.isLoading) {
+    Spacer(Modifier.height(AroundSpacing.Large))
+    CircularProgressIndicator(
+        Modifier.align(Alignment.CenterHorizontally).testTag(C.Tag.AUTH_LOADING)
+    )
+  }
+}
+
+@Composable
+private fun ColumnScope.AuthFormActions(
+    viewModel: AuthViewModel,
+    state: AuthUiState,
+    isCreatingAccount: Boolean,
+    isVenue: Boolean,
+    completeRegistration: Boolean,
+    googleSignInClient: GoogleSignInClient,
+    googleScope: CoroutineScope,
+    onVenue: () -> Unit,
+    register: (Role) -> Unit,
+) {
+  if (viewModel.supportsRegistration && isCreatingAccount && !isVenue) {
+    TextButton(
+        onClick = { if (completeRegistration) register(Role.VENUE) else onVenue() },
+        enabled = !state.isLoading,
+        modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_VENUE_LINK),
+        // The default primary colour is unreadable on the dark background.
+        colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
+    ) {
+      Text(stringResource(R.string.auth_venue_link))
+    }
+    Spacer(Modifier.height(AroundSpacing.Small))
+  }
+  AuthSubmitButton(viewModel, state, isCreatingAccount, isVenue, register)
+  if (!completeRegistration && !isVenue) {
+    AuthGoogleAction(viewModel, state, googleSignInClient, googleScope)
+  }
+}
+
+@Composable
+private fun AuthSubmitButton(
+    viewModel: AuthViewModel,
+    state: AuthUiState,
+    isCreatingAccount: Boolean,
+    isVenue: Boolean,
+    register: (Role) -> Unit,
+) {
+  Button(
+      onClick = { submitAuthForm(viewModel, isCreatingAccount, isVenue, register) },
+      enabled = !state.isLoading,
+      shape = MaterialTheme.shapes.medium,
+      modifier = Modifier.fillMaxWidth().height(AuthButtonHeight).testTag(C.Tag.AUTH_SUBMIT),
+  ) {
+    Text(
+        stringResource(authSubmitLabel(isCreatingAccount, isVenue)),
+        style = AroundTextStyles.Button,
+    )
+  }
+}
+
+private fun submitAuthForm(
+    viewModel: AuthViewModel,
+    isCreatingAccount: Boolean,
+    isVenue: Boolean,
+    register: (Role) -> Unit,
+) {
+  if (isCreatingAccount) register(if (isVenue) Role.VENUE else Role.EXPLORER)
+  else viewModel.signIn()
+}
+
+private fun authSubmitLabel(isCreatingAccount: Boolean, isVenue: Boolean): Int =
+    when {
+      isVenue -> R.string.auth_venue_account
+      isCreatingAccount -> R.string.auth_create_account
+      else -> R.string.auth_sign_in
+    }
+
+@Composable
+private fun AuthGoogleAction(
+    viewModel: AuthViewModel,
+    state: AuthUiState,
+    googleSignInClient: GoogleSignInClient,
+    googleScope: CoroutineScope,
+) {
+  Spacer(Modifier.height(AroundSpacing.InsetPadding))
+  OrDivider()
+  Spacer(Modifier.height(AroundSpacing.InsetPadding))
+  GoogleSignInButton(
+      enabled = !state.isLoading,
+      onClick = { startGoogleSignIn(viewModel, googleSignInClient, googleScope) },
+  )
+}
+
+private fun startGoogleSignIn(
+    viewModel: AuthViewModel,
+    googleSignInClient: GoogleSignInClient,
+    scope: CoroutineScope,
+) {
+  if (viewModel.beginGoogleSignIn()) {
+    scope.launch {
+      try {
+        viewModel.onGoogleCredential(googleSignInClient.requestToken())
+      } finally {
+        viewModel.cancelGoogleSignIn()
       }
     }
   }
