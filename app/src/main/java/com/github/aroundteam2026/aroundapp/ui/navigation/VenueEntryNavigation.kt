@@ -3,6 +3,11 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -26,8 +31,9 @@ import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
  * routes; [createQuestFactory] supplies an isolated form in tests. [VenueEntry] chooses [start]
  * from the venue's saved state.
  *
- * @param start where the graph opens: business setup, or the home of a venue already set up. A
- *   venue resuming on its area starts at business setup, and [VenueEntry] opens the area above it.
+ * @param start where the graph opens: business setup, its area, or the home of a venue already set
+ *   up. A venue resuming on its area starts at business setup with the area opened above it.
+ * @param venueId the venue whose area opens when [start] is [VenueEntryStart.AREA]; required then.
  * @param navController the graph's controller; [VenueEntry] and tests pass their own to drive it.
  */
 @Composable
@@ -40,6 +46,7 @@ fun VenueEntryNavigation(
         },
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     start: VenueEntryStart = VenueEntryStart.INITIALIZATION,
+    venueId: String? = null,
     navController: NavHostController = rememberNavController(),
 ) {
   val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
@@ -68,5 +75,24 @@ fun VenueEntryNavigation(
       )
     }
     venueDestinations(navController, profile::signOut, createQuestFactory)
+  }
+  if (start == VenueEntryStart.AREA) {
+    ResumeOnArea(checkNotNull(venueId) { "start = AREA needs the venue id" }, navController)
+  }
+}
+
+/**
+ * Opens the area of the venue [venueId] above its business name, so Back from the area returns to
+ * the saved name, as for a venue that just gave it.
+ */
+@Composable
+private fun ResumeOnArea(venueId: String, navController: NavHostController) {
+  // Once only, and not again after recreation: the back stack is saved with the area on top
+  var resumed by rememberSaveable { mutableStateOf(false) }
+  LaunchedEffect(Unit) {
+    if (!resumed) {
+      resumed = true
+      navController.navigate(VenueOnboardingRoutes.location(venueId)) { launchSingleTop = true }
+    }
   }
 }

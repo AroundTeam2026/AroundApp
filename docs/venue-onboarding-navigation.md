@@ -41,7 +41,8 @@ fails, it offers to retry or to sign out.
 Once it knows where the venue starts, `VenueEntry` shows
 `VenueEntryNavigation` (#221), the venue's NavHost, separate from the
 explorer's `AroundApp`. It opens on the venue home for a venue already set up,
-and on initialization otherwise. It registers:
+and on initialization otherwise; for a venue resuming on its area, it opens
+the area above initialization itself. It registers:
 
 - `venueOnboardingDestinations(...)`: initialization and location, with the
   real `VenueAreaScreen(venueId, onSaved, onBack)` (contract C4) as the
@@ -67,7 +68,8 @@ The dashboard has no route here: it is the venue home's own Dashboard tab, so
   navigation signal is consumed once handled, so returning doesn't move
   forward again.
 - A venue resuming on the area has initialization under it, so Back behaves
-  as above. `VenueEntry` opens the area once, not again after recreation.
+  as above. `VenueEntryNavigation` opens the area once, not again after
+  recreation.
 
 ## Tests
 
@@ -77,7 +79,9 @@ The dashboard has no route here: it is the venue home's own Dashboard tab, so
   screen whose map Robolectric can't draw): each start point, setup in one go,
   saving the area, Back from the area, resuming after signing in again, the
   venue routes and sign-out.
-- `VenueEntryNavigationTest`: the NavHost from business setup, on its own.
+- `VenueEntryNavigationTest`: the NavHost on its own, from business setup or
+  resuming on the area, including that the area doesn't reopen after
+  recreation.
 - `RoleRoutingActivityTest` (Firebase emulators): a set-up venue signing in
   opens its home.
 - `VenueOnboardingNavigationTest`: the onboarding graph on its own.

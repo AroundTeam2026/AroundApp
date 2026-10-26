@@ -12,11 +12,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -88,25 +83,9 @@ fun VenueEntry(
           locationScreen = areaStep,
           createQuestFactory = createQuestFactory,
           start = state.start,
+          venueId = userId,
           navController = navController,
       )
-      if (state.start == VenueEntryStart.AREA) ResumeOnArea(userId, navController)
-    }
-  }
-}
-
-/**
- * Opens the area of the venue [venueId] above its business name, so Back from the area returns to
- * the saved name, as for a venue that just gave it.
- */
-@Composable
-private fun ResumeOnArea(venueId: String, navController: NavHostController) {
-  // Once only, and not again after recreation: the back stack is saved with the area on top
-  var resumed by rememberSaveable { mutableStateOf(false) }
-  LaunchedEffect(Unit) {
-    if (!resumed) {
-      resumed = true
-      navController.navigate(VenueOnboardingRoutes.location(venueId)) { launchSingleTop = true }
     }
   }
 }

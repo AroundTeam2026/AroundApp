@@ -68,14 +68,6 @@ class VenueEntryViewModelTest {
   }
 
   @Test
-  fun aSetUpVenueStartsAtHome() = test {
-    val viewModel = viewModel(FakeVenueRepository(listOf(testVenue(id = USER))))
-    runCurrent()
-
-    assertEquals(VenueEntryUiState.Ready(VenueEntryStart.HOME), viewModel.uiState.value)
-  }
-
-  @Test
   fun aFailedReadFailsAndRetryingReadsAgain() = test {
     val repository = ScriptedVenues(failures = 1, venue = testVenue(id = USER))
     val viewModel = viewModel(repository)
