@@ -55,6 +55,7 @@ object AroundTextStyles {
   val OverlayTitle = heading(22, tracking = 0.0)
   val AvatarLarge = heading(20, tracking = 0.0)
   val AvatarSmall = heading(13, tracking = 0.0)
+  val Tagline = body(17)
   val BodyLarge = body(16, 24)
   val TextArea = body(16, 23)
   val FieldValue = body(16)

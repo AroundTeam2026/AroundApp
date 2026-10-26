@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
@@ -99,9 +100,14 @@ class SessionNavigationTest {
     }
   }
 
-  private fun submit() {
+  private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
+
+  /** Opens Sign in, or Create account if [createAccount], from Welcome and submits it. */
+  private fun submit(createAccount: Boolean = false) {
+    click(if (createAccount) C.Tag.AUTH_WELCOME_CREATE_ACCOUNT else C.Tag.AUTH_WELCOME_SIGN_IN)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
+    if (createAccount) compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
     compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
     compose.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
@@ -209,9 +215,7 @@ class SessionNavigationTest {
   fun accountCreationLeavesNoAuthBackStack() {
     installBackFallback()
     launch(FakeAuthRepository())
-    compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
-    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
-    submit()
+    submit(createAccount = true)
     assertBackLeavesFlow()
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
   }
@@ -221,7 +225,7 @@ class SessionNavigationTest {
     val restoration = StateRestorationTester(compose)
     val repo = FakeAuthRepository()
     restoration.setContent { SessionNavigation(repo) }
-    compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
@@ -273,6 +277,7 @@ class SessionNavigationTest {
           mainScreen = { Text("home", Modifier.testTag(C.Tag.QUESTS_SCREEN)) },
       )
     }
+    click(C.Tag.AUTH_WELCOME_SIGN_IN)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
@@ -291,7 +296,8 @@ class SessionNavigationTest {
 
   private fun assertFreshAuthFormAfterSignOut(repo: FakeAuthRepository) {
     compose.runOnIdle { repo.signOut() }
-    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.AUTH_WELCOME).assertIsDisplayed()
+    click(C.Tag.AUTH_WELCOME_SIGN_IN)
     compose
         .onNodeWithTag(C.Tag.AUTH_EMAIL)
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
@@ -300,7 +306,8 @@ class SessionNavigationTest {
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
+    click(C.Tag.AUTH_BACK)
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
     compose
         .onNodeWithTag(C.Tag.AUTH_CONFIRMATION)
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
@@ -319,9 +326,7 @@ class SessionNavigationTest {
   fun sessionLossAfterSignUpReturnsToAnEmptyAuthForm() {
     val repo = FakeAuthRepository()
     launch(repo)
-    compose.onNodeWithTag(C.Tag.AUTH_SWITCH_MODE).performScrollTo().performClick()
-    compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
-    submit()
+    submit(createAccount = true)
     assertFreshAuthFormAfterSignOut(repo)
   }
 

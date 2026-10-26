@@ -38,14 +38,17 @@ class GoogleAuthScreenTest {
   private val pending = FakePendingRoleStore()
   private val vm = AuthViewModel(auth, ProfileSetup(auth, users, pending))
 
+  /** Shows the screen and opens the form whose Welcome button is tagged [form]. */
   private fun show(
       restoration: StateRestorationTester? = null,
+      form: String = C.Tag.AUTH_WELCOME_SIGN_IN,
       result: suspend () -> GoogleCredentialResult = { GoogleCredentialResult.Token("token") },
   ) {
     val content: @androidx.compose.runtime.Composable () -> Unit = {
       AroundAppTheme { AuthScreen(vm, googleSignInClient = GoogleSignInClient { result() }) }
     }
     if (restoration == null) compose.setContent(content) else restoration.setContent(content)
+    click(form)
   }
 
   private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
@@ -67,8 +70,7 @@ class GoogleAuthScreenTest {
   @Test
   fun googleFromCreateAccountClearsAnAbandonedVenueChoice() {
     pending.pending = PendingRole(Role.VENUE, null)
-    show()
-    click(C.Tag.AUTH_SWITCH_MODE)
+    show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
     compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).assertIsEnabled()
     click(C.Tag.AUTH_GOOGLE)
     compose.runOnIdle {
@@ -81,15 +83,15 @@ class GoogleAuthScreenTest {
   @Test
   fun cancellationPreservesFieldsAndReleasesAllRegistrationActions() {
     val gate = CompletableDeferred<GoogleCredentialResult>()
-    show { gate.await() }
-    click(C.Tag.AUTH_SWITCH_MODE)
+    show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT) { gate.await() }
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
     click(C.Tag.AUTH_GOOGLE)
-    listOf(C.Tag.AUTH_GOOGLE, C.Tag.AUTH_SUBMIT, C.Tag.AUTH_SWITCH_MODE, C.Tag.AUTH_VENUE_LINK)
-        .forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
+    listOf(C.Tag.AUTH_GOOGLE, C.Tag.AUTH_SUBMIT, C.Tag.AUTH_BACK, C.Tag.AUTH_VENUE_LINK).forEach {
+      compose.onNodeWithTag(it).assertIsNotEnabled()
+    }
     compose.runOnIdle { gate.complete(GoogleCredentialResult.Cancelled) }
     compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).assertIsEnabled()
-    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextEquals("ada@around.test", "Email")
+    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextEquals("ada@around.test")
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertDoesNotExist()
     assertNull(auth.currentUserId.value)
   }
@@ -103,7 +105,7 @@ class GoogleAuthScreenTest {
     click(C.Tag.AUTH_GOOGLE)
     restoration.emulateSavedInstanceStateRestore()
     compose.onNodeWithTag(C.Tag.AUTH_GOOGLE).assertIsEnabled()
-    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextEquals("ada@around.test", "Email")
+    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertTextEquals("ada@around.test")
     assertNull(auth.currentUserId.value)
   }
 
