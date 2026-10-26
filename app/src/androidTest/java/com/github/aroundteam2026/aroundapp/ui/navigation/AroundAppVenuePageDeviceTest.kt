@@ -112,7 +112,9 @@ class AroundAppVenuePageDeviceTest {
   private fun openVenuePage() {
     composeTestRule.setContent {
       navController = rememberNavController()
-      AroundApp(explorerUid = "explorer", onSignOut = {}, navController = navController)
+      // The page listens to this uid's reservations, which the rules only let the signed-in user
+      // read
+      AroundApp(explorerUid = venue.id, onSignOut = {}, navController = navController)
     }
     composeTestRule.runOnUiThread { navController.navigateToVenuePage(venue.id) }
   }
