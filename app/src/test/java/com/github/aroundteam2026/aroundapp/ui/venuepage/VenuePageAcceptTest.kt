@@ -15,9 +15,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -27,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -303,18 +306,132 @@ class VenuePageAcceptTest {
   }
 
   @Test
-  fun aFailingReservationListenerFailsThePage() = test {
-    reservationRepository =
-        object : ReservationRepository by fake {
-          override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
-            throw IOException("denied")
-          }
-        }
+  fun aSecondQuestCanBeAcceptedWhileTheFirstIsStillBeingAccepted() = test {
+    openAndPick("a")
+    val gate = CompletableDeferred<Unit>().also { reservations.gate = it }
+    viewModel.accept()
+    viewModel.onQuestSelected("b")
 
-    viewModel
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
+
+    gate.complete(Unit)
+    runCurrent()
+    assertEquals(setOf("a", "b"), stored().map { it.questId }.toSet())
+  }
+
+  @Test
+  fun oneQuestFailingDoesNotEndTheOthersAccepting() = test {
+    openAndPick("a")
+    val gate = CompletableDeferred<Unit>().also { reservations.gate = it }
+    reservations.failOnCall = 1 // fails at once, while the second call waits for the gate
+    viewModel.accept()
+    viewModel.onQuestSelected("b")
+    viewModel.accept()
     runCurrent()
 
-    assertEquals(VenuePageStatus.FAILED, state.status)
+    assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
+    viewModel.onQuestSelected("a")
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+
+    gate.complete(Unit)
+    runCurrent()
+    viewModel.onQuestSelected("b")
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+  }
+
+  @Test
+  fun aWriteTheServerRefusesShowsFailedAndCanBeRetried() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus) // the local copy of the write
+
+    server.list.value = emptyList() // the rules refuse it, so the copy goes away
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+    assertEquals("a", state.selectedQuestId)
+
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    assertEquals("server-2", server.list.value.single().id)
+  }
+
+  @Test
+  fun aReservationTheVenueAnswersIsNotARefusal() = test {
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+
+    fake.updateStatus(stored().single().id, ReservationStatus.REJECTED)
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+  }
+
+  @Test
+  fun aReservationNotShownYetIsNotARefusal() = test {
+    val server =
+        ScriptedReservationRepository()
+            .apply { showsWrites = false }
+            .also { reservationRepository = it }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+
+    // The listener emits again, still without the new reservation
+    server.list.value = listOf(newPendingReservation("b", VENUE_ID, EXPLORER, START).copy(id = "x"))
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
+    assertTrue(state.failedQuestIds.isEmpty())
+  }
+
+  @Test
+  fun aFailingReservationListenerKeepsThePageAndStopsAccepting() = test {
+    reservationRepository = FailingListenerRepository(fake, shownFirst = null)
+    openAndPick("a")
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertEquals(listOf("a", "b"), state.quests.map { it.questId })
+    assertFalse(state.acceptAvailable)
+
+    viewModel.accept()
+    runCurrent()
+    assertTrue(stored().isEmpty())
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+  }
+
+  @Test
+  fun aListenerThatFailsWhileAcceptingStopsShowingAccepting() = test {
+    val server =
+        ScriptedReservationRepository()
+            .apply { showsWrites = false }
+            .also { reservationRepository = it }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
+
+    server.broken = true
+    server.list.value = listOf(newPendingReservation("b", VENUE_ID, EXPLORER, START).copy(id = "x"))
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+    assertFalse(state.acceptAvailable)
+  }
+
+  @Test
+  fun aListenerThatFailsLaterKeepsWhatItShowed() = test {
+    val accepted = newPendingReservation("a", VENUE_ID, EXPLORER, START).copy(id = "r")
+    reservationRepository = FailingListenerRepository(fake, shownFirst = listOf(accepted))
+    openAndPick("a")
+
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    assertFalse(state.acceptAvailable)
   }
 
   private companion object {
@@ -328,12 +445,49 @@ class VenuePageAcceptTest {
 private class GatedReservationRepository(private val inner: ReservationRepository) :
     ReservationRepository by inner {
   var gate: CompletableDeferred<Unit>? = null
+  /** The 1-based number of the [createReservation] call that fails at once, or null for none. */
+  var failOnCall: Int? = null
   var calls = 0
     private set
 
   override suspend fun createReservation(reservation: Reservation): Result<String> {
-    calls++
+    val call = ++calls
+    if (call == failOnCall) return Result.failure(IOException("offline"))
     gate?.await()
     return inner.createReservation(reservation)
+  }
+}
+
+/**
+ * A repository whose reservations are [list], which a test sets to play what the server does after
+ * a write: [createReservation] adds a pending copy at once, as Firestore's local copy does, unless
+ * [showsWrites] is off.
+ */
+private class ScriptedReservationRepository : ReservationRepository by FakeReservationRepository() {
+  val list = MutableStateFlow<List<Reservation>>(emptyList())
+  var showsWrites = true
+  /** While set, the listener fails the next time the list changes. */
+  var broken = false
+  private var next = 1
+
+  override suspend fun createReservation(reservation: Reservation): Result<String> {
+    val id = "server-${next++}"
+    if (showsWrites) list.value += reservation.copy(id = id)
+    return Result.success(id)
+  }
+
+  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = list.map {
+    if (broken) throw IOException("denied") else it
+  }
+}
+
+/** Delegates to [inner], but its explorer listener shows [shownFirst], if any, then fails. */
+private class FailingListenerRepository(
+    private val inner: ReservationRepository,
+    private val shownFirst: List<Reservation>?,
+) : ReservationRepository by inner {
+  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
+    shownFirst?.let { emit(it) }
+    throw IOException("denied")
   }
 }

@@ -6,6 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VenuePageUiStateTest {
@@ -127,6 +128,11 @@ class VenuePageUiStateTest {
   }
 
   @Test
+  fun acceptingIsAvailableUntilTheReservationsCantBeRead() {
+    assertTrue(VenuePageUiState().acceptAvailable)
+  }
+
+  @Test
   fun showsNothingToAcceptUntilAQuestIsPicked() {
     assertEquals(AcceptStatus.NONE, loaded.acceptStatus)
     assertEquals(0, loaded.morePeopleNeeded)
@@ -137,19 +143,21 @@ class VenuePageUiStateTest {
     val picked = loaded.withQuestTapped("a")
 
     assertEquals(AcceptStatus.NONE, picked.acceptStatus)
-    assertEquals(AcceptStatus.ACCEPTING, picked.copy(acceptingQuestId = "a").acceptStatus)
-    assertEquals(AcceptStatus.FAILED, picked.copy(failedQuestId = "a").acceptStatus)
+    assertEquals(AcceptStatus.ACCEPTING, picked.copy(acceptingQuestIds = setOf("a")).acceptStatus)
+    assertEquals(AcceptStatus.FAILED, picked.copy(failedQuestIds = setOf("a")).acceptStatus)
     assertEquals(AcceptStatus.ACCEPTED, picked.copy(acceptedParties = mapOf("a" to 1)).acceptStatus)
     // The attempt and the failure belong to another quest
-    assertEquals(AcceptStatus.NONE, picked.copy(acceptingQuestId = "b").acceptStatus)
-    assertEquals(AcceptStatus.NONE, picked.copy(failedQuestId = "b").acceptStatus)
+    assertEquals(AcceptStatus.NONE, picked.copy(acceptingQuestIds = setOf("b")).acceptStatus)
+    assertEquals(AcceptStatus.NONE, picked.copy(failedQuestIds = setOf("b")).acceptStatus)
     assertEquals(AcceptStatus.NONE, picked.copy(acceptedParties = mapOf("b" to 1)).acceptStatus)
   }
 
   @Test
   fun acceptedWinsOverAnAttemptThatIsStillSettling() {
     val state =
-        loaded.withQuestTapped("a").copy(acceptingQuestId = "a", acceptedParties = mapOf("a" to 1))
+        loaded
+            .withQuestTapped("a")
+            .copy(acceptingQuestIds = setOf("a"), acceptedParties = mapOf("a" to 1))
 
     assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
   }

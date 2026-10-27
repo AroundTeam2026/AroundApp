@@ -31,6 +31,11 @@ data class Reservation(
  * The reservation an explorer makes by accepting the quest [questId] of the venue [venueId]: a
  * party of just [explorerUid], pending, for a slot starting at [slotStart].
  *
+ * Accepting a quest doesn't pick a slot yet, so the venue page passes the time of the tap: by the
+ * time the venue reads the reservation, that slot has already started. Until explorers choose a
+ * slot, it only dates the request, and a screen showing reservations must not treat a pending one
+ * with a past [slotStart] as expired.
+ *
  * Pass it to [ReservationRepository.createReservation], which assigns the id and creation time; the
  * ones here are placeholders.
  */

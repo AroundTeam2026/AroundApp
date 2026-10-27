@@ -22,8 +22,11 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property detailQuestId Id of the quest whose details are open in a sheet, or null when none is.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
  *   its party has. A pending or approved reservation counts; a rejected or cancelled one does not.
- * @property acceptingQuestId Id of the quest being accepted right now, or null when none is.
- * @property failedQuestId Id of the quest whose last accept failed, or null when none did.
+ * @property acceptingQuestIds Ids of the quests being accepted right now.
+ * @property failedQuestIds Ids of the quests whose last accept failed: the write could not be
+ *   issued, or the server refused it afterwards.
+ * @property acceptAvailable False once the explorer's reservations can't be read, since then the
+ *   page can't tell what they accepted and so doesn't book anything.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -34,8 +37,9 @@ data class VenuePageUiState(
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
-    val acceptingQuestId: String? = null,
-    val failedQuestId: String? = null,
+    val acceptingQuestIds: Set<String> = emptySet(),
+    val failedQuestIds: Set<String> = emptySet(),
+    val acceptAvailable: Boolean = true,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -51,8 +55,8 @@ data class VenuePageUiState(
       val id = selectedQuestId ?: return AcceptStatus.NONE
       return when {
         id in acceptedParties -> AcceptStatus.ACCEPTED
-        id == acceptingQuestId -> AcceptStatus.ACCEPTING
-        id == failedQuestId -> AcceptStatus.FAILED
+        id in acceptingQuestIds -> AcceptStatus.ACCEPTING
+        id in failedQuestIds -> AcceptStatus.FAILED
         else -> AcceptStatus.NONE
       }
     }
