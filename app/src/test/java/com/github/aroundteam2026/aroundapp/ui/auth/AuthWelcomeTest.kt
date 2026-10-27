@@ -1,13 +1,16 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -25,6 +28,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.Density
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
@@ -32,6 +36,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,7 +52,7 @@ class AuthWelcomeTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private var backFallbacks = 0
 
-  private fun launch(darkTheme: Boolean = false) {
+  private fun launch(darkTheme: Boolean = false, fontScale: Float? = null) {
     compose.runOnUiThread {
       compose.activity.onBackPressedDispatcher.addCallback(
           object : OnBackPressedCallback(true) {
@@ -58,7 +63,18 @@ class AuthWelcomeTest {
       )
     }
     val viewModel = AuthViewModel(FakeAuthRepository())
-    compose.setContent { AroundAppTheme(darkTheme = darkTheme) { AuthScreen(viewModel) } }
+    compose.setContent {
+      AroundAppTheme(darkTheme = darkTheme) {
+        if (fontScale == null) AuthScreen(viewModel)
+        else {
+          CompositionLocalProvider(
+              LocalDensity provides Density(LocalDensity.current.density, fontScale)
+          ) {
+            AuthScreen(viewModel)
+          }
+        }
+      }
+    }
   }
 
   private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
@@ -119,6 +135,21 @@ class AuthWelcomeTest {
     click(C.Tag.AUTH_CHOICE_SIGN_IN)
     compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Sign in")
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).assertDoesNotExist()
+    click(C.Tag.AUTH_BACK)
+    compose.onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).assertIsDisplayed()
+    click(C.Tag.AUTH_CHOICE_SIGN_IN)
+    compose.pressBack()
+    compose.onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).assertIsDisplayed()
+  }
+
+  @Test
+  fun accountCardsGrowTogetherForLargeText() {
+    launch(fontScale = 2f)
+    click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    val explorer = compose.onNodeWithTag(C.Tag.AUTH_EXPLORER_CARD).fetchSemanticsNode()
+    val business = compose.onNodeWithTag(C.Tag.AUTH_BUSINESS_CARD).fetchSemanticsNode()
+    assertTrue(explorer.boundsInRoot.height > 280f)
+    assertEquals(explorer.boundsInRoot.height, business.boundsInRoot.height, 1f)
   }
 
   @Test
@@ -173,8 +204,12 @@ class AuthWelcomeTest {
     assertCorner(capture("sign-in-$mode"), expected)
     click(C.Tag.AUTH_BACK)
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    assertCorner(capture("account-type-$mode"), expected)
     click(C.Tag.AUTH_EXPLORER_CARD)
     assertCorner(capture("create-account-$mode"), expected)
+    click(C.Tag.AUTH_BACK)
+    click(C.Tag.AUTH_BUSINESS_CARD)
+    assertCorner(capture("venue-account-$mode"), expected)
   }
 
   private fun capture(name: String): ImageBitmap {

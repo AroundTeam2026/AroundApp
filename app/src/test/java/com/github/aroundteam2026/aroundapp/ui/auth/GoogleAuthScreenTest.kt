@@ -95,6 +95,15 @@ class GoogleAuthScreenTest {
   }
 
   @Test
+  fun venueLinkSignupDoesNotOfferGoogleBeforeVenueRoleHandoff() {
+    show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_VENUE_LINK)
+    compose.onNodeWithTag(C.Tag.AUTH_GOOGLE).assertDoesNotExist()
+    compose.onNodeWithText("or").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).assertIsEnabled()
+  }
+
+  @Test
   fun cancellationPreservesFieldsAndReleasesAllRegistrationActions() {
     val gate = CompletableDeferred<GoogleCredentialResult>()
     show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT) { gate.await() }
