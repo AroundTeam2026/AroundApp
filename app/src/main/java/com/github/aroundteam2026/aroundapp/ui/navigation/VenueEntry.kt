@@ -12,11 +12,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -32,21 +27,10 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
-import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
 
 /**
- * Draws the area step of onboarding for the venue [venueId].
- *
- * @param venueId id of the venue whose area is set.
- * @param onSaved called once the area is saved.
- * @param onBack called when the venue goes back from the area.
- */
-typealias VenueAreaStep =
-    @Composable (venueId: String, onSaved: () -> Unit, onBack: () -> Unit) -> Unit
-
-/**
- * Where a signed-in venue user enters the app: C2's `venueEntry` slot, which role routing fills
- * with the user's uid. It reads the user's venue, then opens [VenueEntryNavigation] at the first
+ * Where a signed-in venue user enters the app: role routing's `venueScreen`, which it fills with
+ * the user's uid. It reads the user's venue, then opens [VenueEntryNavigation] at the first
  * onboarding step left (see [startFor]): the business name, the area, or the venue home.
  *
  * @param userId uid of the signed-in venue user, which is also its venue's id.
@@ -55,7 +39,7 @@ typealias VenueAreaStep =
  * @param onSignOut signs the venue out when its venue can't be read.
  * @param viewModel chooses where the venue starts.
  * @param navController the venue's NavHost controller; tests pass their own to read it.
- * @param areaStep draws the area step; a [VenueAreaScreen] unless replaced, e.g. by tests.
+ * @param areaStep draws the area step; [defaultVenueAreaStep] unless replaced, e.g. by tests.
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  */
 @Composable
@@ -67,9 +51,7 @@ fun VenueEntry(
     viewModel: VenueEntryViewModel =
         viewModel(key = userId, factory = VenueEntryViewModel.factory(userId, venueRepository)),
     navController: NavHostController = rememberNavController(),
-    areaStep: VenueAreaStep = { venueId, onSaved, onBack ->
-      VenueAreaScreen(venueId, onSaved, onBack)
-    },
+    areaStep: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
 ) {
   when (val state = viewModel.uiState.collectAsStateWithLifecycle().value) {
@@ -90,23 +72,6 @@ fun VenueEntry(
           start = state.start,
           navController = navController,
       )
-      if (state.start == VenueEntryStart.AREA) ResumeOnArea(userId, navController)
-    }
-  }
-}
-
-/**
- * Opens the area of the venue [venueId] above its business name, so Back from the area returns to
- * the saved name, as for a venue that just gave it.
- */
-@Composable
-private fun ResumeOnArea(venueId: String, navController: NavHostController) {
-  // Once only, and not again after recreation: the back stack is saved with the area on top
-  var resumed by rememberSaveable { mutableStateOf(false) }
-  LaunchedEffect(Unit) {
-    if (!resumed) {
-      resumed = true
-      navController.navigate(VenueOnboardingRoutes.location(venueId)) { launchSingleTop = true }
     }
   }
 }

@@ -45,7 +45,10 @@ class VenueEntryNavigationTest {
   private val venues = FakeVenueRepository()
   private var exits = 0
 
-  private fun launch(restoration: StateRestorationTester? = null) {
+  private fun launch(
+      restoration: StateRestorationTester? = null,
+      start: VenueEntryStart = VenueEntryStart.Initialization,
+  ) {
     compose.activity.onBackPressedDispatcher.addCallback(
         object : OnBackPressedCallback(true) {
           override fun handleOnBackPressed() {
@@ -67,6 +70,7 @@ class VenueEntryNavigationTest {
               }
             },
             createQuestFactory = createQuestFactoryOnFakes(),
+            start = start,
         )
       }
     }
@@ -167,6 +171,34 @@ class VenueEntryNavigationTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
     compose.onNodeWithTag(C.Tag.VENUE_HOME).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
+  }
+
+  /** A venue resuming on its area gets it from the graph itself, above its saved name. */
+  @Test
+  fun resumingOnTheAreaOpensItAboveTheSavedName() {
+    runBlocking {
+      venues.createVenue(testVenue(id = "venue-owner", name = "Cafe", location = null))
+    }
+    launch(start = VenueEntryStart.Area("venue-owner"))
+    compose.onNodeWithTag("location").assertTextEquals("venue-owner")
+    compose.onNodeWithTag("location-back").performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).assertTextContains("Cafe")
+    compose.onNodeWithTag("location").assertDoesNotExist()
+  }
+
+  /** The area opens once: after Back to the name, recreation must not open it again. */
+  @Test
+  fun aResumedAreaDoesNotReopenAfterRecreation() {
+    runBlocking {
+      venues.createVenue(testVenue(id = "venue-owner", name = "Cafe", location = null))
+    }
+    val restoration = StateRestorationTester(compose)
+    launch(restoration, start = VenueEntryStart.Area("venue-owner"))
+    compose.onNodeWithTag("location-back").performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertIsDisplayed()
+    restoration.emulateSavedInstanceStateRestore()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag("location").assertDoesNotExist()
   }
 
   /**

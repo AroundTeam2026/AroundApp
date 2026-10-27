@@ -16,13 +16,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /** Where a signed-in venue starts: the first onboarding step it hasn't done, or its home. */
-enum class VenueEntryStart {
+sealed interface VenueEntryStart {
   /** It has no venue yet, so it starts by giving its business name. */
-  INITIALIZATION,
-  /** It named its venue but hasn't placed it, so it resumes on the area screen. */
-  AREA,
+  data object Initialization : VenueEntryStart
+
+  /** It named the venue [venueId] but hasn't placed it, so it resumes on that venue's area. */
+  data class Area(val venueId: String) : VenueEntryStart
+
   /** Its venue is set up, so it opens on the venue home. */
-  HOME,
+  data object Home : VenueEntryStart
 }
 
 /** What the venue entry shows while it works out where the venue starts. */
@@ -90,12 +92,12 @@ class VenueEntryViewModel(
 }
 
 /**
- * Where a venue user starts: [VenueEntryStart.INITIALIZATION] without a [venue], the area screen
+ * Where a venue user starts: [VenueEntryStart.Initialization] without a [venue], the area screen
  * while it has no location, and its home once it has one.
  */
 internal fun startFor(venue: Venue?): VenueEntryStart =
     when {
-      venue == null -> VenueEntryStart.INITIALIZATION
-      venue.location == null -> VenueEntryStart.AREA
-      else -> VenueEntryStart.HOME
+      venue == null -> VenueEntryStart.Initialization
+      venue.location == null -> VenueEntryStart.Area(venue.id)
+      else -> VenueEntryStart.Home
     }
