@@ -117,11 +117,12 @@ Every create and update must match its collection's table above: only the listed
 | `reservations` | The venue and the listed explorers | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one that lists them, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards only `status` changes, along an allowed transition: the venue makes any of them, and a listed explorer can only cancel. No delete. |
 | `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
 
-## Deferred to Sprint 3
+## Decided changes
 
-Proposed in the review of this PR (#25). The schema above keeps what `main` does until the team decides.
+Decided in #259, from the review of #25 and from R2. The tables above still describe `main`; each task updates them when it lands.
 
-- **Copied venue fields in `quests`.** `venueName` and `location` go stale when a venue renames itself or moves its area. Proposal: read them from `venues/{venueId}` instead.
-- **Party membership.** `explorerUids` loses who withdrew from a party. Proposal: a party document plus one membership document per explorer (party_user), so a withdrawal keeps its history.
-- **Ids copied into `completions`.** `questId`, `venueId` and `explorerUid` can be reached through the reservation and the party. Proposal: drop them. The venue's rules and queries currently need `venueId` on the document, so the rules change with it.
-- **Text proof.** Quests allow `TEXT` proof, but `proofUrl` can't tell a typed answer from an uploaded photo. Proposal: separate fields for a photo and for a text answer.
+- **Copied venue fields in `quests`: adopted.** `venueName` and `location` go stale once a venue can rename itself or move its area, and dropping them later would mean migrating every stored quest. Readers take them from `venues/{venueId}` with `observeVenues`, one query for all the venues on screen, as the overview already does. F4a moves the map and nearby quests to the venue; then F4b stops writing the copies, and the rules reject them.
+- **Party membership: adopted, in steps.** `explorerUids` loses who withdrew from a party. A party document plus one membership document per explorer keeps that history. This sprint, P1 decides the model and P2a adds it with a fake repository. Moving the reservation's readers off `explorerUids` (the venue page, the overview, `observeForExplorer` and the read rule) comes with the parties stretch in Sprint 4; until then reservations keep `explorerUids`.
+- **Ids copied into `completions`: only `questId` is dropped.** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules will check them against the reservation on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields. Task: F5.
+- **Text proof: adopted.** `proofUrl` can't tell a typed answer from an uploaded photo. A completion holds `photoUrl` for a `PHOTO` quest or `textAnswer` for a `TEXT` quest, never both. Task: F5, before Sprint 4 builds proof submission.
+- **The explorer's name copied into `reservations`: kept.** A user can read only their own `users/{uid}`, so the venue has no other way to show who reserved. The copy is the name at booking time, which is what the venue needs for a short-lived reservation. Task: R2.
