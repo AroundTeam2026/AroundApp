@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The arrow of the active quest card's "Directions" button, from Figma; tinted where it is drawn -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16.3577dp"
+    android:height="16.3577dp"
+    android:viewportWidth="16.3577"
+    android:viewportHeight="16.3577">
+    <path
+        android:pathData="M15.4057,0.951972L1.40573,6.95197L7.40573,8.95197L9.40573,14.952L15.4057,0.951972Z"
+        android:fillColor="@android:color/black"
+        android:strokeWidth="1"
+        android:strokeColor="@android:color/black" />
+</vector>
