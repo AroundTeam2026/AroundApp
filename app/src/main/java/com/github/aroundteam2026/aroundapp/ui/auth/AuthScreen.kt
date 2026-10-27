@@ -340,7 +340,8 @@ private fun AccountTypeCard(
 }
 
 /**
- * The Sign in or Create account form, or the role choices alone in [completeRegistration] mode.
+ * The Sign in, Create account or Create venue account form, or the role choices alone during role
+ * completion.
  *
  * @param mode selects the credentials, role and actions shown by the form.
  * @param onBack returns to the step that opened this form; not offered during role completion.

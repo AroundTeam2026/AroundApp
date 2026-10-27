@@ -29,6 +29,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
@@ -148,7 +149,7 @@ class AuthWelcomeTest {
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
     val explorer = compose.onNodeWithTag(C.Tag.AUTH_EXPLORER_CARD).fetchSemanticsNode()
     val business = compose.onNodeWithTag(C.Tag.AUTH_BUSINESS_CARD).fetchSemanticsNode()
-    assertTrue(explorer.boundsInRoot.height > 280f)
+    assertTrue(explorer.boundsInRoot.height > with(compose.density) { 280.dp.toPx() })
     assertEquals(explorer.boundsInRoot.height, business.boundsInRoot.height, 1f)
   }
 
