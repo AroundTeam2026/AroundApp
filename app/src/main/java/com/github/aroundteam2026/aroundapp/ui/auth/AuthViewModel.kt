@@ -94,6 +94,7 @@ class AuthViewModel(
 ) : ViewModel() {
 
   private var awaitingGoogleCredential = false
+  private var googleRegistrationRole: Role? = null
 
   /** Registration paths need [registration]; auth-only callers keep the existing form. */
   val supportsRegistration: Boolean = registration != null
@@ -151,9 +152,14 @@ class AuthViewModel(
           call = repository::signUpWithEmail,
       )
 
-  /** Reserves the form while the UI opens the Google account chooser. */
-  fun beginGoogleSignIn(): Boolean {
+  /**
+   * Reserves the form while the UI opens the Google chooser.
+   *
+   * @param role the selected signup role, or null for ordinary sign-in.
+   */
+  fun beginGoogleSignIn(role: Role? = null): Boolean {
     if (_uiState.value.isLoading) return false
+    googleRegistrationRole = role
     awaitingGoogleCredential = true
     _uiState.update { it.copy(isLoading = true, error = null) }
     return true
@@ -163,17 +169,29 @@ class AuthViewModel(
   fun cancelGoogleSignIn() {
     if (!awaitingGoogleCredential) return
     awaitingGoogleCredential = false
+    googleRegistrationRole = null
     _uiState.update { it.copy(isLoading = false) }
   }
 
-  /** Handles a plain credential outcome; the role router owns profile completion. */
+  /**
+   * Handles the credential outcome, recording the selected signup role or clearing an abandoned
+   * choice for sign-in. The role router owns profile completion.
+   */
   fun onGoogleCredential(result: GoogleCredentialResult) {
     if (!awaitingGoogleCredential) return
     awaitingGoogleCredential = false
+    val role = googleRegistrationRole
+    googleRegistrationRole = null
     when (result) {
       is GoogleCredentialResult.Token ->
           authenticate(
-              prepare = { registration?.discardChoice() ?: Result.success(Unit) },
+              prepare = {
+                when {
+                  registration == null -> Result.success(Unit)
+                  role == null -> registration.discardChoice()
+                  else -> registration.choose(role)
+                }
+              },
               call = { repository.signInWithGoogle(result.idToken) },
           )
       GoogleCredentialResult.Cancelled -> _uiState.update { it.copy(isLoading = false) }

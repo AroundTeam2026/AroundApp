@@ -10,7 +10,6 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -24,6 +23,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -71,36 +71,45 @@ class GoogleAuthScreenTest {
   }
 
   @Test
-  fun googleFromCreateAccountClearsAnAbandonedVenueChoice() {
+  fun googleFromExplorerSignupReplacesAnAbandonedVenueChoice() {
     pending.pending = PendingRole(Role.VENUE, null)
     show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
     compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).assertIsEnabled()
     click(C.Tag.AUTH_GOOGLE)
     compose.runOnIdle {
       assertNotNull(auth.currentUserId.value)
-      assertNull(pending.pending)
-      assertNull(runBlocking { users.getUser(auth.currentUserId.value!!) })
+      assertEquals(Role.EXPLORER, pending.pending?.role)
+      assertEquals(
+          Role.EXPLORER,
+          (runBlocking { ProfileSetup(auth, users, pending).finish().getOrThrow() }
+                  as com.github.aroundteam2026.aroundapp.model.user.ProfileStatus.Ready)
+              .role,
+      )
     }
   }
 
   @Test
-  fun businessSignupDoesNotOfferGoogleBeforeVenueRoleHandoff() {
+  fun businessSignupGoogleRecordsVenueBeforeAuthentication() {
     show(
         form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT,
         accountType = C.Tag.AUTH_BUSINESS_CARD,
     )
-    compose.onNodeWithTag(C.Tag.AUTH_GOOGLE).assertDoesNotExist()
-    compose.onNodeWithText("or").assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).assertIsEnabled()
+    click(C.Tag.AUTH_GOOGLE)
+    compose.runOnIdle {
+      assertNotNull(auth.currentUserId.value)
+      assertEquals(Role.VENUE, pending.pending?.role)
+    }
   }
 
   @Test
-  fun venueLinkSignupDoesNotOfferGoogleBeforeVenueRoleHandoff() {
+  fun venueLinkSignupGoogleRecordsVenueBeforeAuthentication() {
     show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
     click(C.Tag.AUTH_VENUE_LINK)
-    compose.onNodeWithTag(C.Tag.AUTH_GOOGLE).assertDoesNotExist()
-    compose.onNodeWithText("or").assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).assertIsEnabled()
+    click(C.Tag.AUTH_GOOGLE)
+    compose.runOnIdle {
+      assertNotNull(auth.currentUserId.value)
+      assertEquals(Role.VENUE, pending.pending?.role)
+    }
   }
 
   @Test

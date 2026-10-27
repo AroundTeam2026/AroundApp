@@ -332,7 +332,7 @@ private fun AccountTypeCard(
         Text(
             stringResource(R.string.auth_sign_up),
             style = AroundTextStyles.Button,
-            color = if (highlighted) colors.primary else colors.onPrimary,
+            color = if (highlighted) AroundTheme.colors.accentText else colors.onPrimary,
         )
       }
     }
@@ -511,8 +511,8 @@ private fun ColumnScope.AuthFormActions(
     Spacer(Modifier.height(AroundSpacing.Small))
   }
   AuthSubmitButton(viewModel, state, mode)
-  if (mode == AuthFormMode.SIGN_IN || mode == AuthFormMode.EXPLORER_SIGN_UP) {
-    AuthGoogleAction(viewModel, state, googleSignInClient, googleScope)
+  if (mode != AuthFormMode.COMPLETE_REGISTRATION) {
+    AuthGoogleAction(viewModel, state, mode, googleSignInClient, googleScope)
   }
 }
 
@@ -554,6 +554,7 @@ private fun authSubmitLabel(mode: AuthFormMode): Int =
 private fun AuthGoogleAction(
     viewModel: AuthViewModel,
     state: AuthUiState,
+    mode: AuthFormMode,
     googleSignInClient: GoogleSignInClient,
     googleScope: CoroutineScope,
 ) {
@@ -562,16 +563,23 @@ private fun AuthGoogleAction(
   Spacer(Modifier.height(AroundSpacing.InsetPadding))
   GoogleSignInButton(
       enabled = !state.isLoading,
-      onClick = { startGoogleSignIn(viewModel, googleSignInClient, googleScope) },
+      onClick = { startGoogleSignIn(viewModel, mode, googleSignInClient, googleScope) },
   )
 }
 
 private fun startGoogleSignIn(
     viewModel: AuthViewModel,
+    mode: AuthFormMode,
     googleSignInClient: GoogleSignInClient,
     scope: CoroutineScope,
 ) {
-  if (viewModel.beginGoogleSignIn()) {
+  val role =
+      when (mode) {
+        AuthFormMode.EXPLORER_SIGN_UP -> Role.EXPLORER
+        AuthFormMode.VENUE_SIGN_UP -> Role.VENUE
+        else -> null
+      }
+  if (viewModel.beginGoogleSignIn(role)) {
     scope.launch {
       try {
         viewModel.onGoogleCredential(googleSignInClient.requestToken())
