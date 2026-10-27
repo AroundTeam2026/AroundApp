@@ -121,10 +121,11 @@ private fun formMode(step: AuthStep, completeRegistration: Boolean): AuthFormMod
  * Welcome opens Sign in or an account-type choice. Explorer and Business use the same credentials
  * fields but submit their own role. Back follows the path used to open the Venue form. The
  * navigation owner observes AuthRepository.currentUserId for success and decides the destination.
- * Google users with no profile choose their role afterward. [completeRegistration] skips Welcome
- * and offers the same two choices without asking for credentials. Use [RegistrationFlow] to provide
- * profile setup and receive account-completion notifications. [googleSignInClient] acquires
- * credentials in the UI; tests supply a chooser result without opening a personal account.
+ * Google sign-in users with no profile choose their role afterward; Google signup carries the role
+ * chosen here. [completeRegistration] skips Welcome and offers the same two choices without
+ * credentials. Use [RegistrationFlow] to provide profile setup and receive account-completion
+ * notifications. [googleSignInClient] acquires credentials in the UI; tests supply a chooser result
+ * without opening a personal account.
  */
 @Composable
 fun AuthScreen(
