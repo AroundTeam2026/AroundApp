@@ -133,6 +133,23 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: the reservation an explorer makes by accepting a quest ([newPendingReservation], what the
+   * venue page creates) does not pass the deployed rules, so accepting fails on the server after
+   * the call has returned: a solo party of the signed-in explorer, pending, for an active quest.
+   */
+  @Test
+  fun createReservation_forAnAcceptedQuest_isAcceptedByTheRules() = withTimeoutBlocking {
+    val accepted = newPendingReservation(questId, venueId, explorerUid, SLOT_START)
+
+    val id = createAndSync(accepted)
+
+    assertEquals(
+        accepted.copy(id = id, createdAt = FIXED_NOW),
+        fetchAsVenue(id),
+    )
+  }
+
+  /**
    * Bug: the document does not follow the schema (a time stored as a Long, the status stored as an
    * ordinal, the party stored as a map) or the id is also stored as a field. A round trip cannot
    * see any of these.

@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
@@ -41,12 +42,17 @@ class AroundAppTest {
 
   private lateinit var navController: NavHostController
 
-  private fun launch(app: @Composable () -> Unit = { AroundApp(onSignOut = {}) }) =
-      composeTestRule.setContent(app)
+  private fun launch(
+      app: @Composable () -> Unit = { AroundApp(explorerUid = "explorer", onSignOut = {}) }
+  ) = composeTestRule.setContent(app)
 
   /** Shows the app with stand-ins for the tabs' screens, to check the navigation alone. */
   private fun launchTabs() = launch {
-    AroundApp(onSignOut = {}, screen = { Text(it.route, Modifier.testTag(it.screenTag)) })
+    AroundApp(
+        explorerUid = "explorer",
+        onSignOut = {},
+        screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
+    )
   }
 
   /**
@@ -56,6 +62,7 @@ class AroundAppTest {
   private fun launchWithNavController() = launch {
     navController = rememberNavController()
     AroundApp(
+        explorerUid = "explorer",
         onSignOut = {},
         navController = navController,
         screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
@@ -120,6 +127,7 @@ class AroundAppTest {
         MapViewModel(FakeLocationRepository(null), FakeQuestRepository(), FakeVenueRepository())
     launch {
       AroundApp(
+          explorerUid = "explorer",
           onSignOut = {},
           screen = { tab ->
             if (tab == Tab.MAP) MapScreen(map, onOpenVenue = { _, _ -> })
@@ -222,7 +230,7 @@ class AroundAppTest {
   // if switching tabs did not save it.
   @Test
   fun eachTabKeepsItsOwnState() {
-    launch { AroundApp(onSignOut = {}, screen = { CounterScreen(it) }) }
+    launch { AroundApp(explorerUid = "explorer", onSignOut = {}, screen = { CounterScreen(it) }) }
     select(Tab.MAP)
     repeat(2) { composeTestRule.onNodeWithTag(Tab.MAP.screenTag).performClick() }
 

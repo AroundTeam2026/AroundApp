@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -316,6 +318,8 @@ class VenuePageScreenTest {
             VENUE_ID,
             FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumen"))),
             ScriptedQuestRepository(activeQuestsByVenue = activeQuestsByVenue),
+            FakeReservationRepository(),
+            "explorer",
         )
     compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }
   }

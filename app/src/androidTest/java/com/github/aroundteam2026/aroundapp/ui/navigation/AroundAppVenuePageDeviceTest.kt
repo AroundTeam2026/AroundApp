@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
@@ -49,10 +50,12 @@ class AroundAppVenuePageDeviceTest {
   private lateinit var navController: NavHostController
   private lateinit var venue: Venue
   private lateinit var quest: Quest
+  private lateinit var explorerUid: String
 
   /**
    * Signs in a fresh venue account and saves its venue and one active quest: the rules let only a
    * signed-in user whose profile has the VENUE role write them, as registration sets up in the app.
+   * Then it signs in a fresh explorer, who opens the page, as a real explorer does.
    */
   @Before
   fun setUp(): Unit = runBlocking {
@@ -85,6 +88,20 @@ class AroundAppVenuePageDeviceTest {
       // createQuest doesn't wait for the server, so without this the page could show the quest from
       // the local cache even if the rules refused it
       Firebase.firestore.waitForPendingWrites().await()
+
+      Firebase.auth.signOut()
+      explorerUid =
+          Firebase.auth
+              .createUserWithEmailAndPassword(
+                  "explorer-page-${UUID.randomUUID()}@around.test",
+                  "password123",
+              )
+              .await()
+              .user!!
+              .uid
+      UserRepositoryProvider.repository
+          .createUser(User(explorerUid, "Explorer", Role.EXPLORER, 0L))
+          .getOrThrow()
     }
   }
 
@@ -111,7 +128,7 @@ class AroundAppVenuePageDeviceTest {
   private fun openVenuePage() {
     composeTestRule.setContent {
       navController = rememberNavController()
-      AroundApp(onSignOut = {}, navController = navController)
+      AroundApp(explorerUid = explorerUid, onSignOut = {}, navController = navController)
     }
     composeTestRule.runOnUiThread { navController.navigateToVenuePage(venue.id) }
   }

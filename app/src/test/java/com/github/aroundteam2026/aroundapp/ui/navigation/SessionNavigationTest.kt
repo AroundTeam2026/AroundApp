@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
@@ -64,6 +65,7 @@ class SessionNavigationTest {
             repo,
             mainScreen = {
               AroundApp(
+                  explorerUid = "explorer",
                   onSignOut = {},
                   screen = {
                     var count by rememberSaveable { mutableIntStateOf(0) }
@@ -135,7 +137,11 @@ class SessionNavigationTest {
           delayed,
           vm,
           mainScreen = {
-            AroundApp(onSignOut = {}, screen = { Text(it.route, Modifier.testTag(it.screenTag)) })
+            AroundApp(
+                explorerUid = "explorer",
+                onSignOut = {},
+                screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
+            )
           },
       )
     }
@@ -403,6 +409,7 @@ class SessionNavigationTest {
   @Composable
   private fun TabsWithProbe(probes: MutableList<TabViewModel>) {
     AroundApp(
+        explorerUid = "explorer",
         onSignOut = {},
         screen = { tab ->
           if (tab == Tab.MAP) {
@@ -493,7 +500,11 @@ class SessionNavigationTest {
           delayed,
           vm,
           mainScreen = {
-            AroundApp(onSignOut = {}, screen = { Text(it.route, Modifier.testTag(it.screenTag)) })
+            AroundApp(
+                explorerUid = "explorer",
+                onSignOut = {},
+                screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
+            )
           },
       )
     }

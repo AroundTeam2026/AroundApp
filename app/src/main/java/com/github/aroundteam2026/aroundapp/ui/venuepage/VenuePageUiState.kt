@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -19,6 +20,13 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
  * @property detailQuestId Id of the quest whose details are open in a sheet, or null when none is.
+ * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
+ *   its party has. A pending or approved reservation counts; a rejected or cancelled one does not.
+ * @property acceptingQuestIds Ids of the quests being accepted right now.
+ * @property failedQuestIds Ids of the quests whose last accept failed: the write could not be
+ *   issued, or the server refused it afterwards.
+ * @property acceptAvailable False once the explorer's reservations can't be read, since then the
+ *   page can't tell what they accepted and so doesn't book anything.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -28,6 +36,10 @@ data class VenuePageUiState(
     val quests: List<VenuePageQuest> = emptyList(),
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
+    val acceptedParties: Map<String, Int> = emptyMap(),
+    val acceptingQuestIds: Set<String> = emptySet(),
+    val failedQuestIds: Set<String> = emptySet(),
+    val acceptAvailable: Boolean = true,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -36,6 +48,30 @@ data class VenuePageUiState(
   /** The quest whose details are open, or null when none are or it is no longer in [quests]. */
   val detailQuest: VenuePageQuest?
     get() = detailQuestId?.let { id -> quests.find { it.questId == id } }
+
+  /** How accepting stands for the picked quest; [AcceptStatus.NONE] when none is picked. */
+  val acceptStatus: AcceptStatus
+    get() {
+      val id = selectedQuestId ?: return AcceptStatus.NONE
+      return when {
+        id in acceptedParties -> AcceptStatus.ACCEPTED
+        id in acceptingQuestIds -> AcceptStatus.ACCEPTING
+        id in failedQuestIds -> AcceptStatus.FAILED
+        else -> AcceptStatus.NONE
+      }
+    }
+
+  /**
+   * How many more people the picked quest needs: its minimum party size less the party's size,
+   * never below 0. Until the quest is accepted the party is the explorer alone. 0 when none is
+   * picked.
+   */
+  val morePeopleNeeded: Int
+    get() {
+      val quest = selectedQuest ?: return 0
+      val party = acceptedParties[quest.questId] ?: SOLO_PARTY
+      return (quest.minPartySize - party).coerceAtLeast(0)
+    }
 
   /**
    * This page listing [quests] instead. A picked quest that isn't among them is unpicked, so it
@@ -67,6 +103,21 @@ data class VenuePageUiState(
         else -> copy(selectedQuestId = questId)
       }
 }
+
+/** How accepting the picked quest stands. */
+enum class AcceptStatus {
+  /** Not accepted, and not being accepted. */
+  NONE,
+  /** The reservation is being created. */
+  ACCEPTING,
+  /** The explorer has a pending or approved reservation for the quest. */
+  ACCEPTED,
+  /** The last try failed; accepting again retries. */
+  FAILED,
+}
+
+/** The party of an explorer who has not formed one yet: themself. */
+private const val SOLO_PARTY = 1
 
 /** Where the venue page stands. */
 enum class VenuePageStatus {

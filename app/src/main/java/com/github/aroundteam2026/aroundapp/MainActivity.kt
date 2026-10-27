@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp
 
 import android.os.Bundle
@@ -31,7 +32,7 @@ class MainActivity : ComponentActivity() {
             authRepository = auth,
             userRepository = UserRepositoryProvider.repository,
             pendingRoleStore = pendingRole,
-            explorerScreen = { AroundApp(onSignOut = profile::signOut) },
+            explorerScreen = { uid -> AroundApp(explorerUid = uid, onSignOut = profile::signOut) },
             venueScreen = { uid ->
               VenueEntry(uid, auth, VenueRepositoryProvider.repository, profile::signOut)
             },

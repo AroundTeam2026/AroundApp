@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -94,6 +95,7 @@ class MapScreenDeviceTest {
     var camera: CameraPositionState? = null
     composeTestRule.setContent {
       AroundApp(
+          explorerUid = "explorer",
           onSignOut = {},
           screen = { tab ->
             if (tab == Tab.MAP) {
