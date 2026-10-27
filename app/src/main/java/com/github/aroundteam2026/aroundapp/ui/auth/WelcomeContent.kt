@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
@@ -46,12 +47,11 @@ private const val SIGN_IN_BORDER_ALPHA = 0.35f
 /**
  * The signed-out entry: the wordmark, the tagline and the two ways in.
  *
- * @param onCreateAccount opens the Create account form.
+ * @param onCreateAccount opens the account-type choice.
  * @param onSignIn opens the Sign in form.
  */
 @Composable
 internal fun WelcomeContent(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
-  val primary = MaterialTheme.colorScheme.primary
   BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().testTag(C.Tag.AUTH_WELCOME)) {
     Column(
         modifier =
@@ -96,21 +96,32 @@ internal fun WelcomeContent(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
         Text(stringResource(R.string.auth_create_account), style = AroundTextStyles.Button)
       }
       Spacer(Modifier.height(AroundSpacing.Medium))
-      OutlinedButton(
-          onClick = onSignIn,
-          shape = MaterialTheme.shapes.medium,
-          border = BorderStroke(SignInBorderWidth, primary.copy(alpha = SIGN_IN_BORDER_ALPHA)),
-          colors =
-              ButtonDefaults.outlinedButtonColors(
-                  containerColor = primary.copy(alpha = SIGN_IN_FILL_ALPHA),
-                  contentColor = AroundTheme.colors.accentText,
-              ),
-          modifier =
-              Modifier.fillMaxWidth().height(AuthButtonHeight).testTag(C.Tag.AUTH_WELCOME_SIGN_IN),
-      ) {
-        Text(stringResource(R.string.auth_sign_in), style = AroundTextStyles.Button)
-      }
+      AuthSignInButton(onSignIn, modifier = Modifier.testTag(C.Tag.AUTH_WELCOME_SIGN_IN))
     }
+  }
+}
+
+/** The light Sign in action shared by Welcome and the account-type choice. */
+@Composable
+internal fun AuthSignInButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+  val primary = MaterialTheme.colorScheme.primary
+  OutlinedButton(
+      onClick = onClick,
+      enabled = enabled,
+      shape = MaterialTheme.shapes.medium,
+      border = BorderStroke(SignInBorderWidth, primary.copy(alpha = SIGN_IN_BORDER_ALPHA)),
+      colors =
+          ButtonDefaults.outlinedButtonColors(
+              containerColor = primary.copy(alpha = SIGN_IN_FILL_ALPHA),
+              contentColor = AroundTheme.colors.accentText,
+          ),
+      modifier = modifier.fillMaxWidth().height(AuthButtonHeight),
+  ) {
+    Text(stringResource(R.string.auth_sign_in), style = AroundTextStyles.Button)
   }
 }
 

@@ -39,6 +39,10 @@ object C {
 
     const val AUTH_SCREEN = "auth_screen"
     const val AUTH_TITLE = "auth_title"
+    const val AUTH_ACCOUNT_TYPE_TITLE = "auth_account_type_title"
+    const val AUTH_EXPLORER_CARD = "auth_explorer_card"
+    const val AUTH_BUSINESS_CARD = "auth_business_card"
+    const val AUTH_CHOICE_SIGN_IN = "auth_choice_sign_in"
     const val AUTH_VENUE_LINK = "auth_venue_link"
     const val AUTH_EMAIL = "auth_email"
     const val AUTH_PASSWORD = "auth_password"

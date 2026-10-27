@@ -14,15 +14,16 @@ class RegistrationScreen(private val semantics: SemanticsNodeInteractionsProvide
   /** Creates an Explorer account through the normal Create account entry. */
   fun registerExplorer(email: String, password: String) = register(email, password, venue = false)
 
-  /** Fills the same form and creates a Venue account through the venue hyperlink. */
+  /** Creates a Venue account through the Business choice. */
   fun registerVenue(email: String, password: String) = register(email, password, venue = true)
 
   private fun register(email: String, password: String, venue: Boolean) {
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(if (venue) C.Tag.AUTH_BUSINESS_CARD else C.Tag.AUTH_EXPLORER_CARD)
     semantics.onNodeWithTag(C.Tag.AUTH_EMAIL).performScrollTo().performTextInput(email)
     semantics.onNodeWithTag(C.Tag.AUTH_PASSWORD).performScrollTo().performTextInput(password)
     semantics.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performScrollTo().performTextInput(password)
-    click(if (venue) C.Tag.AUTH_VENUE_LINK else C.Tag.AUTH_SUBMIT)
+    click(C.Tag.AUTH_SUBMIT)
   }
 
   private fun click(tag: String) = semantics.onNodeWithTag(tag).performScrollTo().performClick()

@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.e2e
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -23,28 +24,43 @@ const val E2E_PASSWORD = "123456"
  * @param email unique by default, so the account is new on an emulator other tests already used.
  */
 fun ComposeTestRule.createAccount(email: String = "e2e-${UUID.randomUUID()}@around.test") =
-    register(email, C.Tag.AUTH_SUBMIT, landsOn = C.Tag.NAV_BAR)
+    register(email, C.Tag.AUTH_EXPLORER_CARD, landsOn = C.Tag.NAV_BAR)
 
 /**
- * Creates a venue account through the "Create account" form's venue link, from the auth screen
- * [E2eRule] starts on, and waits for the venue's first onboarding step, its business name.
+ * Creates a venue account through the Explorer form's venue link, from the auth screen [E2eRule]
+ * starts on, and waits for the venue's first onboarding step, its business name.
  *
  * @param email unique by default, so the account is new on an emulator other tests already used.
  */
 fun ComposeTestRule.createVenueAccount(email: String = "e2e-${UUID.randomUUID()}@around.test") =
-    register(email, C.Tag.AUTH_VENUE_LINK, landsOn = C.Tag.VENUE_INITIALIZATION_SCREEN)
+    register(
+        email,
+        C.Tag.AUTH_EXPLORER_CARD,
+        landsOn = C.Tag.VENUE_INITIALIZATION_SCREEN,
+        viaVenueLink = true,
+    )
 
 /**
- * Fills the "Create account" form with [email], taps the button tagged [button], and waits for the
- * screen tagged [landsOn] in place of the auth screen.
+ * Chooses [accountType], fills credentials, submits, and waits for the screen tagged [landsOn] in
+ * place of the auth screen.
  */
-private fun ComposeTestRule.register(email: String, button: String, landsOn: String) {
+private fun ComposeTestRule.register(
+    email: String,
+    accountType: String,
+    landsOn: String,
+    viaVenueLink: Boolean = false,
+) {
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT).performClick()
+  onNodeWithTag(accountType).performClick()
+  if (viaVenueLink) {
+    onNodeWithTag(C.Tag.AUTH_VENUE_LINK).performScrollTo().performClick()
+    onNodeWithTag(C.Tag.AUTH_TITLE).assertTextEquals("Create venue account")
+  }
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
-  onNodeWithTag(button).performScrollTo().performClick()
+  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
   waitUntil(TIMEOUT_MS) { onAllNodes(hasTestTag(landsOn)).fetchSemanticsNodes().isNotEmpty() }
   onNodeWithTag(landsOn).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()

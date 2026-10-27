@@ -105,6 +105,7 @@ class SessionNavigationTest {
   /** Opens Sign in, or Create account if [createAccount], from Welcome and submits it. */
   private fun submit(createAccount: Boolean = false) {
     click(if (createAccount) C.Tag.AUTH_WELCOME_CREATE_ACCOUNT else C.Tag.AUTH_WELCOME_SIGN_IN)
+    if (createAccount) click(C.Tag.AUTH_EXPLORER_CARD)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     if (createAccount) compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
@@ -226,6 +227,7 @@ class SessionNavigationTest {
     val repo = FakeAuthRepository()
     restoration.setContent { SessionNavigation(repo) }
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_EXPLORER_CARD)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput("ada@around.test")
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
     compose.onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput("123456")
@@ -308,6 +310,7 @@ class SessionNavigationTest {
     compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertDoesNotExist()
     click(C.Tag.AUTH_BACK)
     click(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT)
+    click(C.Tag.AUTH_EXPLORER_CARD)
     compose
         .onNodeWithTag(C.Tag.AUTH_CONFIRMATION)
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
