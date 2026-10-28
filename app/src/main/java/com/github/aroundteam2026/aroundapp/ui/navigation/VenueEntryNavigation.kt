@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
+import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
 
 /**
@@ -43,8 +44,8 @@ val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
  * them.
  *
  * The location slot isolates Maps in navigation tests. [venueDestinations] owns the home and quest
- * routes; [createQuestFactory] supplies an isolated form in tests. [VenueEntry] chooses [start]
- * from the venue's saved state.
+ * routes; [createQuestFactory] and [venueQuestsFactory] supply an isolated form and quest list in
+ * tests. [VenueEntry] chooses [start] from the venue's saved state.
  *
  * @param start where the graph opens: business setup, its area, or the home of a venue already set
  *   up. A venue resuming on its area starts at business setup with the area opened above it.
@@ -56,6 +57,7 @@ fun VenueEntryNavigation(
     venueRepository: VenueRepository = VenueRepositoryProvider.repository,
     locationScreen: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
+    venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
     start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -84,7 +86,7 @@ fun VenueEntryNavigation(
           onBack,
       )
     }
-    venueDestinations(navController, profile::signOut, createQuestFactory)
+    venueDestinations(navController, profile::signOut, createQuestFactory, venueQuestsFactory)
   }
   if (start is VenueEntryStart.Area) ResumeOnArea(start.venueId, navController)
 }

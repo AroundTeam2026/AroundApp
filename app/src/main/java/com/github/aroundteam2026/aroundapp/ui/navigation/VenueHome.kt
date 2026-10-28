@@ -4,27 +4,19 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsScreen
+import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 
 /** The venue's top-level destinations, one per tab of its bottom bar. */
 enum class VenueTab(
@@ -64,20 +56,24 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * The venue's home, where a signed-in venue lands: the selected tab's screen above a bottom bar of
  * Dashboard, Quests and Profile (see [BottomTabScaffold]).
  *
- * The dashboard and the list of quests are "Coming soon" stubs until their own tasks build them.
- * The Quests tab's "New quest" button calls [onCreateQuest], so the venue's NavHost opens the
- * create-quest form full screen above the home (see [venueDestinations]).
+ * The dashboard is a "Coming soon" stub until its own task builds it. The Quests tab lists the
+ * venue's quests (see [VenueQuestsScreen]); its "New quest" buttons call [onCreateQuest], so the
+ * venue's NavHost opens the create-quest form full screen above the home (see [venueDestinations]).
  *
  * @param onCreateQuest opens the form where the venue creates a quest.
  * @param onSignOut signs the venue out, from the Profile tab.
+ * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  */
 @Composable
 fun VenueHome(
     onCreateQuest: () -> Unit,
     onSignOut: () -> Unit,
+    venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (VenueTab) -> Unit = { VenueTabScreen(it, onCreateQuest, onSignOut) },
+    screen: @Composable (VenueTab) -> Unit = {
+      VenueTabScreen(it, onCreateQuest, onSignOut, venueQuestsFactory)
+    },
 ) {
   BottomTabScaffold(
       tabs = VenueTab.entries,
@@ -91,48 +87,23 @@ fun VenueHome(
 
 /** The screen of [tab]. */
 @Composable
-private fun VenueTabScreen(tab: VenueTab, onCreateQuest: () -> Unit, onSignOut: () -> Unit) =
+private fun VenueTabScreen(
+    tab: VenueTab,
+    onCreateQuest: () -> Unit,
+    onSignOut: () -> Unit,
+    venueQuestsFactory: ViewModelProvider.Factory,
+) =
     when (tab) {
       // The tab keeps its own tag, whatever the dashboard becomes
       VenueTab.DASHBOARD ->
           Box(Modifier.fillMaxSize().testTag(tab.screenTag)) {
             ComingSoonScreen(R.string.dashboard_title, C.Tag.DASHBOARD_STUB)
           }
-      VenueTab.QUESTS -> VenueQuestsTab(onCreateQuest, Modifier.testTag(tab.screenTag))
+      VenueTab.QUESTS ->
+          VenueQuestsScreen(
+              viewModel(factory = venueQuestsFactory),
+              onCreateQuest,
+              Modifier.testTag(tab.screenTag),
+          )
       VenueTab.PROFILE -> ProfileScreen(onSignOut)
     }
-
-/**
- * The Quests tab: the venue's quests under a heading with a "New quest" button. Until the list of
- * quests is built, a "Coming soon" note stands in for it.
- *
- * @param onCreateQuest opens the form where the venue creates a quest.
- * @param modifier modifier applied to the tab's screen.
- */
-@Composable
-private fun VenueQuestsTab(onCreateQuest: () -> Unit, modifier: Modifier = Modifier) {
-  Column(modifier.fillMaxSize().padding(AroundSpacing.ScreenHorizontal)) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      Text(
-          stringResource(R.string.venue_quests_title),
-          style = MaterialTheme.typography.headlineMedium,
-          modifier = Modifier.weight(1f),
-      )
-      FilledIconButton(
-          onClick = onCreateQuest,
-          modifier = Modifier.testTag(C.Tag.VENUE_NEW_QUEST),
-      ) {
-        Icon(
-            painterResource(R.drawable.ic_plus),
-            contentDescription = stringResource(R.string.create_quest_heading),
-        )
-      }
-    }
-    Box(
-        Modifier.fillMaxWidth().weight(1f).testTag(C.Tag.VENUE_QUESTS_STUB),
-        contentAlignment = Alignment.Center,
-    ) {
-      Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.bodyLarge)
-    }
-  }
-}

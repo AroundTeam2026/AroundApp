@@ -27,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
+import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -70,6 +71,7 @@ class VenueEntryNavigationTest {
               }
             },
             createQuestFactory = createQuestFactoryOnFakes(),
+            venueQuestsFactory = venueQuestsFactoryOnFakes(),
             start = start,
         )
       }
@@ -215,6 +217,7 @@ class VenueEntryNavigationTest {
                   auth,
                   venues,
                   createQuestFactory = createQuestFactoryOnFakes(),
+                  venueQuestsFactory = venueQuestsFactoryOnFakes(),
                   locationScreen = { uid, onSaved, _ ->
                     Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
                   },
@@ -253,6 +256,7 @@ class VenueEntryNavigationTest {
               Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
             },
             createQuestFactory = viewModelFactory { initializer { form } },
+            venueQuestsFactory = venueQuestsFactoryOnFakes(),
         )
       }
     }

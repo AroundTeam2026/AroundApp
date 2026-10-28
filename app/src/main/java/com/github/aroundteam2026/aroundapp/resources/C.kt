@@ -35,7 +35,12 @@ object C {
     const val VENUE_DASHBOARD_SCREEN = "venue_dashboard_screen"
     const val VENUE_QUESTS_SCREEN = "venue_quests_screen"
     const val VENUE_NEW_QUEST = "venue_new_quest"
-    const val VENUE_QUESTS_STUB = "venue_quests_stub"
+    const val VENUE_QUESTS_LIST = "venue_quests_list"
+    const val VENUE_QUEST_TITLE = "venue_quest_title"
+    const val VENUE_QUEST_STATUS = "venue_quest_status"
+    const val VENUE_QUESTS_EMPTY = "venue_quests_empty"
+    const val VENUE_QUESTS_CREATE_FIRST = "venue_quests_create_first"
+    const val VENUE_QUESTS_FAILED = "venue_quests_failed"
 
     const val AUTH_SCREEN = "auth_screen"
     const val AUTH_TITLE = "auth_title"
