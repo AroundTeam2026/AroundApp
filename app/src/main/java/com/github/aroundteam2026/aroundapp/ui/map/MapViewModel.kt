@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -227,7 +228,8 @@ class MapViewModel(
    * The active quests, their venues, the explorer's position and the time, again whenever quests or
    * their venues change, when a reward expires, and once the explorer is located. Without quests,
    * or when they fail, there are none; without venues there are none either, as each quest is shown
-   * at its venue's location, under its name.
+   * at its venue's location, under its name. A failure to load the venues is logged, as the empty
+   * map alone can't tell it from an area without quests.
    *
    * The quests are listened to once, for both the pins and the nearby list, and their venues again
    * only when the set of venues changes, as each new listener costs Firestore reads.
@@ -245,7 +247,10 @@ class MapViewModel(
             .map { it.mapTo(mutableSetOf()) { quest -> quest.venueId } }
             .distinctUntilChanged()
             .flatMapLatest { venueIds ->
-              venueRepository.observeVenues(venueIds).catch { emit(emptyList()) } // NOSONAR
+              venueRepository.observeVenues(venueIds).catch { // NOSONAR
+                Log.w(TAG, "Listening to venues $venueIds failed", it)
+                emit(emptyList())
+              }
             }
     return combine(quests, venues, explorer) { current, known, here ->
           Triple(current, known.associateBy { it.id }, here)
@@ -285,6 +290,8 @@ class MapViewModel(
   )
 
   companion object {
+    private const val TAG = "MapViewModel"
+
     /** The map frames this distance around the explorer, and lists the quests within it. */
     const val NEARBY_RADIUS_METERS = 5_000.0
 
