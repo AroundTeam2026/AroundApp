@@ -65,7 +65,7 @@ internal fun CreateQuestBar(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
   ) {
-    if (state.venueLoadFailed) VenueLoadFailed(onRetryVenue)
+    if (state.venueLoadFailed) VenueLoadFailed(onRetryVenue, retrying = state.retryingVenue)
     Text(
         questSummary(state),
         style = AroundTextStyles.Small,
@@ -101,9 +101,12 @@ internal fun CreateQuestBar(
   }
 }
 
-/** Why the quest can't be saved while the venue is unknown, and a button to read it again. */
+/**
+ * Why the quest can't be saved while the venue is unknown, and a button to read it again, disabled
+ * while [retrying].
+ */
 @Composable
-private fun VenueLoadFailed(onRetry: () -> Unit) {
+private fun VenueLoadFailed(onRetry: () -> Unit, retrying: Boolean) {
   Text(
       stringResource(R.string.create_quest_venue_failed),
       style = AroundTextStyles.Caption,
@@ -113,6 +116,7 @@ private fun VenueLoadFailed(onRetry: () -> Unit) {
   )
   TextButton(
       onClick = onRetry,
+      enabled = !retrying,
       modifier = Modifier.testTag(C.Tag.CREATE_QUEST_VENUE_RETRY),
       // The default primary colour is unreadable on the dark background
       colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),

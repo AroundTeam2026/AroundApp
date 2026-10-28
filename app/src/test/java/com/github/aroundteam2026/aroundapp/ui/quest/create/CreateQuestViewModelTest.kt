@@ -299,14 +299,17 @@ class CreateQuestViewModelTest {
   }
 
   @Test
-  fun aRetryThatFailsShowsTheFailureAgain() {
+  fun aRetryKeepsTheFailureShownUntilItFailsToo() {
     viewModel = newViewModel(FlakyVenueRepository(failures = 2, venue(OFFLINE_VENUE_RADIUS)))
     loadVenue()
 
     viewModel.retryVenue()
+    assertTrue(state.venueLoadFailed)
+    assertTrue(state.retryingVenue)
     loadVenue()
 
     assertTrue(state.venueLoadFailed)
+    assertFalse(state.retryingVenue)
   }
 
   @Test

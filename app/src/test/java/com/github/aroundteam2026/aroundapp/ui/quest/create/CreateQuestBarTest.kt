@@ -21,6 +21,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -142,7 +143,8 @@ class CreateQuestBarTest {
 
   @Test
   fun aVenueThatCannotBeReadIsExplainedUntilARetryLoadsIt() {
-    show(venues = FlakyVenueRepository(failures = 1, testVenue(id = VENUE_ID)))
+    val read = CompletableDeferred<Venue?>()
+    show(venues = FlakyVenueRepository(failures = 1, testVenue(id = VENUE_ID), gate = read))
     fillValid()
     val failed = compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_FAILED)
     failed.assertTextEquals(
@@ -151,8 +153,13 @@ class CreateQuestBarTest {
     )
     submitButton().assertIsNotEnabled()
 
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_RETRY).performClick()
+    val retry = compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_RETRY)
+    retry.performClick()
+    // While the venue is read again, the explanation stays and can't be retried twice
+    failed.assertExists()
+    retry.assertIsNotEnabled()
 
+    read.complete(null)
     failed.assertDoesNotExist()
     submitButton().assertIsEnabled()
   }

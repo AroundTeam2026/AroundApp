@@ -183,11 +183,12 @@ class CreateQuestViewModel(
 
   /**
    * Reads the venue again after it couldn't be read, keeping the form as filled in. Does nothing
-   * otherwise, so a retry already under way isn't started twice.
+   * otherwise, or while a retry is already under way.
    */
   fun retryVenue() {
-    if (!mutableUiState.value.venueLoadFailed) return
-    mutableUiState.update { it.copy(venueLoadFailed = false) }
+    val form = mutableUiState.value
+    if (!form.venueLoadFailed || form.retryingVenue) return
+    mutableUiState.update { it.copy(retryingVenue = true) }
     viewModelScope.launch { loadVenue() }
   }
 
@@ -208,7 +209,7 @@ class CreateQuestViewModel(
   /**
    * Reads the signed-in venue: its location for the radius map, and its radius as the starting one,
    * unless the venue has already chosen one. A read that fails is shown as
-   * [CreateQuestUiState.venueLoadFailed].
+   * [CreateQuestUiState.venueLoadFailed] until a read succeeds.
    */
   private suspend fun loadVenue() {
     val venueId = authRepository.currentUserId.value ?: return
@@ -219,9 +220,11 @@ class CreateQuestViewModel(
           throw cancelled
         } catch (_: Exception) {
           // The form stays filled in; without the venue's location it can't be saved until a retry
-          mutableUiState.update { it.copy(venueLoadFailed = true) }
+          mutableUiState.update { it.copy(venueLoadFailed = true, retryingVenue = false) }
           return
-        } ?: return
+        }
+    mutableUiState.update { it.copy(venueLoadFailed = false, retryingVenue = false) }
+    if (venue == null) return
     this.venue = venue
     val radius = clampRadius(venue.radiusMeters)
     mutableUiState.update {
