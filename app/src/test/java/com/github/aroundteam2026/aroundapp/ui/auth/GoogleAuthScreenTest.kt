@@ -113,6 +113,22 @@ class GoogleAuthScreenTest {
   }
 
   @Test
+  fun cancellingBusinessGoogleSignupLeavesNoRoleOrSession() {
+    show(
+        form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT,
+        accountType = C.Tag.AUTH_BUSINESS_CARD,
+        result = { GoogleCredentialResult.Cancelled },
+    )
+    click(C.Tag.AUTH_GOOGLE)
+    compose.onNodeWithTag(C.Tag.AUTH_GOOGLE).assertIsEnabled()
+    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).assertIsEnabled()
+    compose.runOnIdle {
+      assertNull(pending.pending)
+      assertNull(auth.currentUserId.value)
+    }
+  }
+
+  @Test
   fun cancellationPreservesFieldsAndReleasesAllRegistrationActions() {
     val gate = CompletableDeferred<GoogleCredentialResult>()
     show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT) { gate.await() }
