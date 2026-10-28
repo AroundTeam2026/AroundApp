@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
 <resources>
     <!-- A venue's page, where explorers see its quests -->
     <string name="venue_page_not_found">This venue isn\'t on Around anymore.</string>
@@ -21,4 +22,16 @@
     <string name="quest_detail_proof_photo">Send a photo</string>
     <string name="quest_detail_proof_text">Send a text answer</string>
     <string name="quest_detail_reward">Reward details</string>
+
+    <!-- The bar under the quests, where the explorer accepts the picked quest -->
+    <string name="accept_quest">Accept quest</string>
+    <string name="accept_quest_accepting">Accepting the quest…</string>
+    <string name="accept_quest_accepted">Accepted, waiting for the venue</string>
+    <string name="accept_quest_failed">Couldn\'t accept this quest. Try again.</string>
+    <string name="accept_quest_retry">Try again</string>
+    <string name="accept_quest_unavailable">Can\'t accept quests right now. Open this page again to try.</string>
+    <plurals name="accept_quest_needs_more">
+        <item quantity="one">Needs %1$d more person to take this quest</item>
+        <item quantity="other">Needs %1$d more people to take this quest</item>
+    </plurals>
 </resources>

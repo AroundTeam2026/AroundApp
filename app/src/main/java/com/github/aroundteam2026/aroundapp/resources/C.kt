@@ -1,6 +1,7 @@
 // Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.resources
 
 // Like R, but C
@@ -111,6 +112,11 @@ object C {
     const val VENUE_PAGE_EMPTY = "venue_page_empty"
     const val VENUE_PAGE_QUESTS_CARD = "venue_page_quests_card"
     const val VENUE_PAGE_QUEST_COUNT = "venue_page_quest_count"
+    const val ACCEPT_QUEST_BAR = "accept_quest_bar"
+    const val ACCEPT_QUEST_BUTTON = "accept_quest_button"
+    const val ACCEPT_QUEST_NEEDS_MORE = "accept_quest_needs_more"
+    const val ACCEPT_QUEST_FAILED = "accept_quest_failed"
+    const val ACCEPT_QUEST_UNAVAILABLE = "accept_quest_unavailable"
     const val VENUE_QUEST_ROW = "venue_quest_row"
     const val VENUE_QUEST_ROW_TITLE = "venue_quest_row_title"
     const val VENUE_QUEST_ROW_DESCRIPTION = "venue_quest_row_description"
