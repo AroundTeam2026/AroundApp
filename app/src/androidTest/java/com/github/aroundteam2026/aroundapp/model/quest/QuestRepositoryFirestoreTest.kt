@@ -12,7 +12,6 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
 import java.util.Date
 import kotlinx.coroutines.CoroutineStart
@@ -111,7 +110,9 @@ class QuestRepositoryFirestoreTest {
     // so the reads go to the server, after it has saved every write.
     db.waitForPendingWrites().await()
     val full = db.collection(QUESTS).document(fullId).get(Source.SERVER).await()
-    assertTrue(full.get("location") is GeoPoint)
+    // The venue's name and location are read from the venue, never copied onto the quest
+    assertFalse("venueName must not be stored", full.contains("venueName"))
+    assertFalse("location must not be stored", full.contains("location"))
     assertTrue(full.get("createdAt") is Timestamp)
     assertTrue(full.get("updatedAt") is Timestamp)
     assertEquals("DRAFT", full.get("status"))
