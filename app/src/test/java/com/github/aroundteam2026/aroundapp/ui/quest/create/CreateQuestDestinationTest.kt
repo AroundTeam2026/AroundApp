@@ -1,11 +1,12 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.viewmodel.initializer
@@ -32,7 +33,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class CreateQuestDestinationTest {
-  @get:Rule val compose = createComposeRule()
+  @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val quests = FakeQuestRepository()
   private val viewModel =
       CreateQuestViewModel(
