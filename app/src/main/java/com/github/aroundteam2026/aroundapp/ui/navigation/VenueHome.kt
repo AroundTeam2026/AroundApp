@@ -16,7 +16,6 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsScreen
-import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 
 /** The venue's top-level destinations, one per tab of its bottom bar. */
 enum class VenueTab(
@@ -69,7 +68,7 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
 fun VenueHome(
     onCreateQuest: () -> Unit,
     onSignOut: () -> Unit,
-    venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
+    venueQuestsFactory: ViewModelProvider.Factory,
     navController: NavHostController = rememberNavController(),
     screen: @Composable (VenueTab) -> Unit = {
       VenueTabScreen(it, onCreateQuest, onSignOut, venueQuestsFactory)

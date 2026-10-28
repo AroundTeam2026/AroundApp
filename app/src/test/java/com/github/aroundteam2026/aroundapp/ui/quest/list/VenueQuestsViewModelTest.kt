@@ -8,6 +8,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -33,8 +35,13 @@ class VenueQuestsViewModelTest {
   private fun viewModel(quests: QuestRepository) =
       VenueQuestsViewModel(FakeAuthRepository(VENUE_ID), quests)
 
+  /** Keeps [viewModel]'s state collected, as the tab does: it only listens while watched. */
+  private fun TestScope.watch(viewModel: VenueQuestsViewModel) = viewModel.also {
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { it.uiState.collect {} }
+  }
+
   @Test
-  fun listsOnlyTheVenuesQuestsNewestFirst() {
+  fun listsOnlyTheVenuesQuestsNewestFirst() = runTest {
     val older = testQuest(id = "older", venueId = VENUE_ID, createdAt = OLDER)
     val newer =
         testQuest(
@@ -48,14 +55,14 @@ class VenueQuestsViewModelTest {
 
     assertEquals(
         VenueQuestsUiState.Loaded(listOf(newer, older)),
-        viewModel(quests).uiState.value,
+        watch(viewModel(quests)).uiState.value,
     )
   }
 
   @Test
   fun aQuestSavedLaterIsListed() = runTest {
     val quests = FakeQuestRepository()
-    val viewModel = viewModel(quests)
+    val viewModel = watch(viewModel(quests))
     assertEquals(VenueQuestsUiState.Loaded(emptyList()), viewModel.uiState.value)
 
     val id = quests.createQuest(testQuest(venueId = VENUE_ID)).getOrThrow()
@@ -67,9 +74,9 @@ class VenueQuestsViewModelTest {
   }
 
   @Test
-  fun aFailedListenerCanBeRetried() {
+  fun aFailedListenerCanBeRetried() = runTest {
     val failingOnce = failingFirstListen(FakeQuestRepository())
-    val viewModel = viewModel(failingOnce)
+    val viewModel = watch(viewModel(failingOnce))
     assertEquals(VenueQuestsUiState.Failed, viewModel.uiState.value)
 
     viewModel.retry()
@@ -81,7 +88,7 @@ class VenueQuestsViewModelTest {
   fun aVenueThatSignsInLaterGetsItsQuests() = runTest {
     val auth = FakeAuthRepository()
     val quests = FakeQuestRepository()
-    val viewModel = VenueQuestsViewModel(auth, quests)
+    val viewModel = watch(VenueQuestsViewModel(auth, quests))
     assertEquals(VenueQuestsUiState.Loading, viewModel.uiState.value)
 
     val venueId = auth.signInWithGoogle(GOOGLE_ID_TOKEN).getOrThrow()

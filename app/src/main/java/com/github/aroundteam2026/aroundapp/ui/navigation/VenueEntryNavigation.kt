@@ -18,7 +18,6 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
-import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
 
 /**
@@ -57,7 +56,7 @@ fun VenueEntryNavigation(
     venueRepository: VenueRepository = VenueRepositoryProvider.repository,
     locationScreen: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
-    venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
+    venueQuestsFactory: ViewModelProvider.Factory,
     start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {

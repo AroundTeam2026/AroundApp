@@ -39,7 +39,7 @@ sealed interface VenueQuestsUiState {
  * Holds the quests of the signed-in venue, whatever their status, newest first. It follows the
  * signed-in venue as it changes, and keeps up as its quests change, so a quest saved from the form
  * is listed when the venue returns to the tab. After [VenueQuestsUiState.Failed], [retry] listens
- * again.
+ * again. It only listens while the tab is watched, so a hidden tab costs no reads.
  */
 class VenueQuestsViewModel(authRepository: AuthRepository, questRepository: QuestRepository) :
     ViewModel() {
@@ -61,7 +61,11 @@ class VenueQuestsViewModel(authRepository: AuthRepository, questRepository: Ques
                     // The repository's flow throws if the backend stops the listener
                     .catch { emit(VenueQuestsUiState.Failed) }
           }
-          .stateIn(viewModelScope, SharingStarted.Eagerly, VenueQuestsUiState.Loading)
+          .stateIn(
+              viewModelScope,
+              SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+              VenueQuestsUiState.Loading,
+          )
 
   /** Listens to the venue's quests again, after listening failed. */
   fun retry() {
@@ -69,6 +73,9 @@ class VenueQuestsViewModel(authRepository: AuthRepository, questRepository: Ques
   }
 
   companion object {
+    /** How long the listener outlives the tab, so a quick rotation doesn't restart it. */
+    private const val STOP_TIMEOUT_MS = 5_000L
+
     /** Builds the [VenueQuestsViewModel] of the signed-in venue with the app's repositories. */
     fun factory(): ViewModelProvider.Factory = viewModelFactory {
       initializer {
