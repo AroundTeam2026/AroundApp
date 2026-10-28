@@ -56,7 +56,8 @@ import kotlinx.coroutines.launch
 /**
  * The form a venue fills in to create a quest. [onClose] leaves it without saving, but can't be
  * tapped once the quest is being saved, and [onCreated] gets the id of the quest once it is saved.
- * A failed save shows a snackbar once and keeps the form.
+ * A failed save shows a snackbar once and keeps the form. A venue that couldn't be read can be read
+ * again from the form.
  */
 @Composable
 fun CreateQuestScreen(
@@ -111,12 +112,16 @@ fun CreateQuestScreen(
           ),
       onSubmit = viewModel::submit,
       onClose = onClose,
+      onRetryVenue = viewModel::retryVenue,
       snackbarHostState = snackbarHostState,
       modifier = modifier,
   )
 }
 
-/** Stateless form, scrolling above the sticky [CreateQuestBar]. */
+/**
+ * Stateless form, scrolling above the sticky [CreateQuestBar]. [onRetryVenue] reads the venue again
+ * after it couldn't be read.
+ */
 @Composable
 fun CreateQuestContent(
     state: CreateQuestUiState,
@@ -127,6 +132,7 @@ fun CreateQuestContent(
     rewardActions: QuestRewardActions,
     onSubmit: () -> Unit,
     onClose: () -> Unit,
+    onRetryVenue: () -> Unit,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -135,7 +141,7 @@ fun CreateQuestContent(
       containerColor = MaterialTheme.colorScheme.background,
       contentWindowInsets = WindowInsets.safeDrawing,
       snackbarHost = { SnackbarHost(snackbarHostState) },
-      bottomBar = { CreateQuestBar(state, onSubmit) },
+      bottomBar = { CreateQuestBar(state, onSubmit, onRetryVenue) },
   ) { padding ->
     Column(
         Modifier.fillMaxSize()

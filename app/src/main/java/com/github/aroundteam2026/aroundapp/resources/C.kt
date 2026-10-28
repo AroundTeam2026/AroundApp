@@ -144,6 +144,8 @@ object C {
     const val CREATE_QUEST_CLOSE = "create_quest_close"
     const val CREATE_QUEST_SUMMARY = "create_quest_summary"
     const val CREATE_QUEST_SUBMIT = "create_quest_submit"
+    const val CREATE_QUEST_VENUE_FAILED = "create_quest_venue_failed"
+    const val CREATE_QUEST_VENUE_RETRY = "create_quest_venue_retry"
     const val CREATE_QUEST_TITLE = "create_quest_title"
     const val CREATE_QUEST_TITLE_COUNTER = "create_quest_title_counter"
     const val CREATE_QUEST_TITLE_ERROR = "create_quest_title_error"

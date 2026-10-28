@@ -74,4 +74,6 @@
     <string name="create_quest_submit">Create quest</string>
     <string name="create_quest_saving">Saving the quest…</string>
     <string name="create_quest_save_failed">Couldn\'t save the quest. Try again.</string>
+    <string name="create_quest_venue_failed">Couldn\'t load your venue, so the quest can\'t be saved yet. Check your connection and try again.</string>
+    <string name="create_quest_venue_retry">Try again</string>
 </resources>

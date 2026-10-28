@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import android.content.Context
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -10,6 +11,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -17,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.IOException
@@ -36,14 +40,15 @@ class CreateQuestBarTest {
   private lateinit var viewModel: CreateQuestViewModel
   private val created = mutableListOf<String>()
 
-  /** Shows the form of a placed venue, whose radius is 50 m, saving to [questRepository]. */
-  private fun show(questRepository: QuestRepository = quests) {
-    viewModel =
-        CreateQuestViewModel(
-            FakeAuthRepository(VENUE_ID),
-            FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
-            questRepository,
-        )
+  /**
+   * Shows the form of the venue read from [venues], by default a placed venue whose radius is 50 m,
+   * saving to [questRepository].
+   */
+  private fun show(
+      questRepository: QuestRepository = quests,
+      venues: VenueRepository = FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
+  ) {
+    viewModel = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues, questRepository)
     compose.setContent {
       AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}, onCreated = { created += it }) }
     }
@@ -132,6 +137,25 @@ class CreateQuestBarTest {
     assertEquals(SaveState.Idle, viewModel.uiState.value.saveState)
     submitButton().assertIsEnabled()
     assertEquals(emptyList<String>(), created)
+  }
+
+  @Test
+  fun aVenueThatCannotBeReadIsExplainedUntilARetryLoadsIt() {
+    val venues = OfflineVenueRepository(listOf(testVenue(id = VENUE_ID)))
+    show(venues = venues)
+    fillValid()
+    val failed = compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_FAILED)
+    failed.assertTextEquals(
+        ApplicationProvider.getApplicationContext<Context>()
+            .getString(R.string.create_quest_venue_failed)
+    )
+    submitButton().assertIsNotEnabled()
+
+    venues.offline = false
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_RETRY).performClick()
+
+    failed.assertDoesNotExist()
+    submitButton().assertIsEnabled()
   }
 
   private companion object {
