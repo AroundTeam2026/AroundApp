@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.Context
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -38,6 +39,11 @@ class AcceptQuestBarTest {
   private fun show(state: VenuePageUiState) {
     compose.setContent { AroundAppTheme { AcceptQuestBar(state, onAccept = { accepts++ }) } }
   }
+
+  private fun plural(@PluralsRes id: Int, count: Int) =
+      ApplicationProvider.getApplicationContext<Context>()
+          .resources
+          .getQuantityString(id, count, count)
 
   private fun text(@StringRes id: Int, vararg args: Any) =
       ApplicationProvider.getApplicationContext<Context>().getString(id, *args)
@@ -106,11 +112,7 @@ class AcceptQuestBarTest {
 
     compose
         .onNodeWithTag(C.Tag.ACCEPT_QUEST_NEEDS_MORE)
-        .assertTextContains(
-            ApplicationProvider.getApplicationContext<Context>()
-                .resources
-                .getQuantityString(R.plurals.accept_quest_needs_more, 2, 2)
-        )
+        .assertTextContains(plural(R.plurals.accept_quest_needs_more, 2))
     button.assertIsEnabled().performClick()
 
     assertEquals(1, accepts)
@@ -129,11 +131,7 @@ class AcceptQuestBarTest {
 
     compose
         .onNodeWithTag(C.Tag.ACCEPT_QUEST_NEEDS_MORE)
-        .assertTextContains(
-            ApplicationProvider.getApplicationContext<Context>()
-                .resources
-                .getQuantityString(R.plurals.accept_quest_needs_more, 1, 1)
-        )
+        .assertTextContains(plural(R.plurals.accept_quest_needs_more, 1))
   }
 
   @Test
@@ -144,6 +142,29 @@ class AcceptQuestBarTest {
     button.assertIsNotEnabled().performClick()
 
     assertEquals(0, accepts)
+  }
+
+  @Test
+  fun aFailureWithAcceptingUnavailableSaysOnlyThatAndOffersNoRetry() {
+    show(LOADED.copy(selectedQuestId = "a", failedQuestIds = setOf("a"), acceptAvailable = false))
+
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_UNAVAILABLE).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_FAILED).assertDoesNotExist()
+    button.assertIsNotEnabled().assertTextContains(text(R.string.accept_quest))
+  }
+
+  @Test
+  fun anAcceptedQuestDoesNotAlsoSayAcceptingIsUnavailable() {
+    show(
+        LOADED.copy(
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1),
+            acceptAvailable = false,
+        )
+    )
+
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_UNAVAILABLE).assertDoesNotExist()
+    button.assertIsNotEnabled().assertTextContains(text(R.string.accept_quest_accepted))
   }
 
   private companion object {

@@ -301,6 +301,26 @@ class VenuePageScreenTest {
   }
 
   @Test
+  fun withoutABottomBarThePageShowsTheAcceptBarForThePickedQuest() {
+    var accepts = 0
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageContent(
+            LOADED.copy(selectedQuestId = "a"),
+            onBack = {},
+            onQuestTapped = {},
+            onRetry = {},
+            onAccept = { accepts++ },
+        )
+      }
+    }
+
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).performClick()
+
+    assertEquals(1, accepts)
+  }
+
+  @Test
   fun acceptingThePickedQuestBooksItThroughTheViewModel() {
     val reservations = FakeReservationRepository()
     showScreen(

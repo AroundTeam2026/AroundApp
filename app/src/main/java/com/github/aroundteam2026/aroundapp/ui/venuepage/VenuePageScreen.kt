@@ -84,6 +84,9 @@ fun VenuePageScreen(
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val acceptBar: @Composable (VenuePageQuest?) -> Unit = {
+    AcceptQuestBar(state, viewModel::accept)
+  }
   VenuePageContent(
       state = state,
       onBack = onBack,
@@ -94,7 +97,7 @@ fun VenuePageScreen(
       onAccept = viewModel::accept,
       modifier = modifier,
       questRow = questRow,
-      bottomBar = bottomBar,
+      bottomBar = bottomBar ?: acceptBar,
   )
 }
 
@@ -114,7 +117,9 @@ fun VenuePageContent(
     onQuestDetailsClosed: () -> Unit = {},
     onAccept: () -> Unit = {},
     questRow: VenuePageQuestRow = DefaultQuestRow,
-    bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
+    bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {
+      AcceptQuestBar(state, onAccept)
+    },
 ) {
   Column(
       modifier
@@ -151,7 +156,7 @@ fun VenuePageContent(
             }
           }
         }
-        if (bottomBar != null) bottomBar(state.selectedQuest) else AcceptQuestBar(state, onAccept)
+        bottomBar(state.selectedQuest)
         state.detailQuest?.let { quest ->
           key(quest.questId) { QuestDetailSheet(quest, onQuestDetailsClosed) }
         }

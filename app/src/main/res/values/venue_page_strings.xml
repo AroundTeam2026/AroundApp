@@ -27,7 +27,7 @@
     <string name="accept_quest">Accept quest</string>
     <string name="accept_quest_accepting">Accepting the quest…</string>
     <string name="accept_quest_accepted">Accepted, waiting for the venue</string>
-    <string name="accept_quest_failed">Couldn\'t accept this quest. Try again.</string>
+    <string name="accept_quest_failed">Couldn\'t accept this quest.</string>
     <string name="accept_quest_retry">Try again</string>
     <string name="accept_quest_unavailable">Can\'t accept quests right now. Open this page again to try.</string>
     <plurals name="accept_quest_needs_more">

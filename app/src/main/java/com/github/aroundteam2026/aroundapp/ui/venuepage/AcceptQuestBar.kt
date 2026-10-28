@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -69,10 +70,11 @@ fun AcceptQuestBar(state: VenuePageUiState, onAccept: () -> Unit, modifier: Modi
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
       horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    if (!state.acceptAvailable) {
+    // One explanation of the button: an accepted quest is done whatever the listener does, and a
+    // failure can't be retried while accepting is unavailable
+    if (!state.acceptAvailable && status != AcceptStatus.ACCEPTED) {
       Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
-    }
-    if (status == AcceptStatus.FAILED) {
+    } else if (status == AcceptStatus.FAILED) {
       Note(
           stringResource(R.string.accept_quest_failed),
           C.Tag.ACCEPT_QUEST_FAILED,
@@ -101,8 +103,7 @@ private fun AcceptButton(status: AcceptStatus, enabled: Boolean, onAccept: () ->
       onClick = onAccept,
       enabled = enabled && status != AcceptStatus.ACCEPTED,
       shape = AroundPillShape,
-      // Done, not unavailable: readable in the soft colour of a finished thing, not Material's
-      // faded
+      // Accepted is done, not unavailable: container colours instead of Material's 38% fade
       colors =
           if (status == AcceptStatus.ACCEPTED) {
             ButtonDefaults.buttonColors(
@@ -116,11 +117,16 @@ private fun AcceptButton(status: AcceptStatus, enabled: Boolean, onAccept: () ->
   ) {
     when (status) {
       AcceptStatus.ACCEPTED -> {
-        Icon(painterResource(R.drawable.ic_check), contentDescription = null, Modifier.size(16.dp))
+        Icon(
+            painterResource(R.drawable.ic_check),
+            contentDescription = null,
+            Modifier.size(CHECK_ICON_SIZE),
+        )
         Spacer(Modifier.width(AroundSpacing.Small))
         Text(stringResource(R.string.accept_quest_accepted), style = AroundTextStyles.Button)
       }
-      AcceptStatus.FAILED ->
+      // Without a working button there is nothing to try again
+      AcceptStatus.FAILED if enabled ->
           Text(stringResource(R.string.accept_quest_retry), style = AroundTextStyles.Button)
       else -> Text(stringResource(R.string.accept_quest), style = AroundTextStyles.Button)
     }
@@ -159,7 +165,7 @@ private fun AcceptingSkeleton(description: String) {
 private fun Note(
     text: String,
     tag: String,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
   Text(
       text,
@@ -172,6 +178,7 @@ private fun Note(
 
 /** The popup's "Accept quest" button is 52 dp high. */
 private val BUTTON_HEIGHT = 52.dp
+private val CHECK_ICON_SIZE = 16.dp
 private const val SKELETON_PULSE_MS = 800
 private const val SKELETON_ALPHA_LOW = 0.14f
 private const val SKELETON_ALPHA_HIGH = 0.32f
