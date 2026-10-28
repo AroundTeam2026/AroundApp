@@ -20,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -141,8 +142,7 @@ class CreateQuestBarTest {
 
   @Test
   fun aVenueThatCannotBeReadIsExplainedUntilARetryLoadsIt() {
-    val venues = OfflineVenueRepository(listOf(testVenue(id = VENUE_ID)))
-    show(venues = venues)
+    show(venues = FlakyVenueRepository(failures = 1, testVenue(id = VENUE_ID)))
     fillValid()
     val failed = compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_FAILED)
     failed.assertTextEquals(
@@ -151,7 +151,6 @@ class CreateQuestBarTest {
     )
     submitButton().assertIsNotEnabled()
 
-    venues.offline = false
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_RETRY).performClick()
 
     failed.assertDoesNotExist()

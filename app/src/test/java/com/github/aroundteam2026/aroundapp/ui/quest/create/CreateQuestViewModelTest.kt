@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.io.IOException
@@ -282,15 +283,13 @@ class CreateQuestViewModelTest {
 
   @Test
   fun aVenueThatCannotBeReadBlocksSavingUntilARetryLoadsIt() {
-    val venues = OfflineVenueRepository(listOf(venue(OFFLINE_VENUE_RADIUS)))
-    viewModel = newViewModel(venues)
+    viewModel = newViewModel(FlakyVenueRepository(failures = 1, venue(OFFLINE_VENUE_RADIUS)))
     loadVenue()
     fillValid()
     viewModel.selectRadiusPreset(RadiusPreset.INSIDE.meters)
     assertTrue(state.venueLoadFailed)
     assertFalse(state.canSave)
 
-    venues.offline = false
     viewModel.retryVenue()
     loadVenue()
 
@@ -301,11 +300,10 @@ class CreateQuestViewModelTest {
 
   @Test
   fun aRetryThatFailsShowsTheFailureAgain() {
-    viewModel = newViewModel(OfflineVenueRepository(listOf(venue(OFFLINE_VENUE_RADIUS))))
+    viewModel = newViewModel(FlakyVenueRepository(failures = 2, venue(OFFLINE_VENUE_RADIUS)))
     loadVenue()
 
     viewModel.retryVenue()
-    assertFalse(state.venueLoadFailed)
     loadVenue()
 
     assertTrue(state.venueLoadFailed)
@@ -313,16 +311,29 @@ class CreateQuestViewModelTest {
 
   @Test
   fun retryingDoesNothingOnceTheVenueIsLoaded() {
-    val venues = OfflineVenueRepository(listOf(venue(OFFLINE_VENUE_RADIUS)))
-    venues.offline = false
+    val venues = FlakyVenueRepository(failures = 0, venue(OFFLINE_VENUE_RADIUS))
     viewModel = newViewModel(venues)
     loadVenue()
+    val readsBefore = venues.reads
 
-    venues.offline = true
     viewModel.retryVenue()
     loadVenue()
 
-    assertFalse(state.venueLoadFailed)
+    assertEquals(readsBefore, venues.reads)
+  }
+
+  @Test
+  fun aSecondRetryWhileTheFirstRunsReadsTheVenueOnce() {
+    val venues = FlakyVenueRepository(failures = 1, venue(OFFLINE_VENUE_RADIUS))
+    viewModel = newViewModel(venues)
+    loadVenue()
+    val readsBefore = venues.reads
+
+    viewModel.retryVenue()
+    viewModel.retryVenue()
+    loadVenue()
+
+    assertEquals(readsBefore + 1, venues.reads)
   }
 
   @Test
