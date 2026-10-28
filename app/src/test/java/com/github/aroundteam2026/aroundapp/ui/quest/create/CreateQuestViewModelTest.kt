@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.io.IOException
@@ -279,6 +280,64 @@ class CreateQuestViewModelTest {
         runCurrent()
         assertEquals(QuestLimits.DEFAULT_RADIUS_METERS, state.radiusMeters)
       }
+
+  @Test
+  fun aVenueThatCannotBeReadBlocksSavingUntilARetryLoadsIt() {
+    viewModel = newViewModel(FlakyVenueRepository(failures = 1, venue(OFFLINE_VENUE_RADIUS)))
+    loadVenue()
+    fillValid()
+    viewModel.selectRadiusPreset(RadiusPreset.INSIDE.meters)
+    assertTrue(state.venueLoadFailed)
+    assertFalse(state.canSave)
+
+    viewModel.retryVenue()
+    loadVenue()
+
+    assertFalse(state.venueLoadFailed)
+    assertTrue(state.canSave)
+    assertEquals(RadiusPreset.INSIDE.meters, state.radiusMeters)
+  }
+
+  @Test
+  fun aRetryKeepsTheFailureShownUntilItFailsToo() {
+    viewModel = newViewModel(FlakyVenueRepository(failures = 2, venue(OFFLINE_VENUE_RADIUS)))
+    loadVenue()
+
+    viewModel.retryVenue()
+    assertTrue(state.venueLoadFailed)
+    assertTrue(state.retryingVenue)
+    loadVenue()
+
+    assertTrue(state.venueLoadFailed)
+    assertFalse(state.retryingVenue)
+  }
+
+  @Test
+  fun retryingDoesNothingOnceTheVenueIsLoaded() {
+    val venues = FlakyVenueRepository(failures = 0, venue(OFFLINE_VENUE_RADIUS))
+    viewModel = newViewModel(venues)
+    loadVenue()
+    val readsBefore = venues.reads
+
+    viewModel.retryVenue()
+    loadVenue()
+
+    assertEquals(readsBefore, venues.reads)
+  }
+
+  @Test
+  fun aSecondRetryWhileTheFirstRunsReadsTheVenueOnce() {
+    val venues = FlakyVenueRepository(failures = 1, venue(OFFLINE_VENUE_RADIUS))
+    viewModel = newViewModel(venues)
+    loadVenue()
+    val readsBefore = venues.reads
+
+    viewModel.retryVenue()
+    viewModel.retryVenue()
+    loadVenue()
+
+    assertEquals(readsBefore + 1, venues.reads)
+  }
 
   @Test
   fun selectingAPresetSetsItsRadiusAndLeavesCustom() {
@@ -662,6 +721,8 @@ class CreateQuestViewModelTest {
   private companion object {
     const val VENUE_ID = "venue-1"
     const val SAVED_AT = 5_000L
+    /** A venue radius that is a preset, but not the default one. */
+    val OFFLINE_VENUE_RADIUS = RadiusPreset.ON_THE_STREET.meters
     val ZONE: ZoneId = ZoneOffset.UTC
   }
 }
