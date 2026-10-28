@@ -13,6 +13,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservati
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -219,13 +221,13 @@ class OverviewViewModelTest {
   }
 
   @Test
-  fun aTieOnTheSlotAndCreationGoesToTheSmallestId() = test {
-    val first = book("cake")
-    val second = book("fox")
-    viewModel
-    runCurrent()
+  fun aTieOnTheSlotAndCreationGoesToTheSmallestId() {
+    val tied = newPendingReservation("fox", CAFE, EXPLORER, START)
+    val first = tied.copy(id = "reservation-1")
+    val second = tied.copy(id = "reservation-2")
 
-    assertEquals(listOf(first, second), state.rows.map { it.reservationId })
+    // Given in reverse, so only the tie-break on the id puts them in order.
+    assertEquals(listOf(first, second), activeReservations(listOf(second, first)))
   }
 
   @Test
@@ -287,6 +289,21 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), state)
+  }
+
+  @Test
+  fun aFailingVenueListenerShowsFailed() = test {
+    book("fox")
+    val broken =
+        object : VenueRepository by venues {
+          override fun observeVenues(venueIds: Set<String>): Flow<List<Venue>> = flow {
+            throw IOException("denied")
+          }
+        }
+    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, broken)
+    runCurrent()
+
+    assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
   }
 
   @Test
