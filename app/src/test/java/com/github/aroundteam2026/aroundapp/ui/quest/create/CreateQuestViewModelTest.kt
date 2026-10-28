@@ -281,6 +281,51 @@ class CreateQuestViewModelTest {
       }
 
   @Test
+  fun aVenueThatCannotBeReadBlocksSavingUntilARetryLoadsIt() {
+    val venues = OfflineVenueRepository(listOf(venue(OFFLINE_VENUE_RADIUS)))
+    viewModel = newViewModel(venues)
+    loadVenue()
+    fillValid()
+    viewModel.selectRadiusPreset(RadiusPreset.INSIDE.meters)
+    assertTrue(state.venueLoadFailed)
+    assertFalse(state.canSave)
+
+    venues.offline = false
+    viewModel.retryVenue()
+    loadVenue()
+
+    assertFalse(state.venueLoadFailed)
+    assertTrue(state.canSave)
+    assertEquals(RadiusPreset.INSIDE.meters, state.radiusMeters)
+  }
+
+  @Test
+  fun aRetryThatFailsShowsTheFailureAgain() {
+    viewModel = newViewModel(OfflineVenueRepository(listOf(venue(OFFLINE_VENUE_RADIUS))))
+    loadVenue()
+
+    viewModel.retryVenue()
+    assertFalse(state.venueLoadFailed)
+    loadVenue()
+
+    assertTrue(state.venueLoadFailed)
+  }
+
+  @Test
+  fun retryingDoesNothingOnceTheVenueIsLoaded() {
+    val venues = OfflineVenueRepository(listOf(venue(OFFLINE_VENUE_RADIUS)))
+    venues.offline = false
+    viewModel = newViewModel(venues)
+    loadVenue()
+
+    venues.offline = true
+    viewModel.retryVenue()
+    loadVenue()
+
+    assertFalse(state.venueLoadFailed)
+  }
+
+  @Test
   fun selectingAPresetSetsItsRadiusAndLeavesCustom() {
     viewModel.selectCustomRadius()
     viewModel.updateRadius(130)
@@ -662,6 +707,8 @@ class CreateQuestViewModelTest {
   private companion object {
     const val VENUE_ID = "venue-1"
     const val SAVED_AT = 5_000L
+    /** A venue radius that is a preset, but not the default one. */
+    val OFFLINE_VENUE_RADIUS = RadiusPreset.ON_THE_STREET.meters
     val ZONE: ZoneId = ZoneOffset.UTC
   }
 }

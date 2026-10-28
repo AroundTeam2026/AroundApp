@@ -33,7 +33,8 @@ import kotlinx.coroutines.launch
  * The radius starts at the venue's own radius once it is loaded, unless the venue has already
  * chosen one; until then, or if the venue can't be read, it is [QuestLimits.DEFAULT_RADIUS_METERS].
  * The venue's location, once loaded, centres the radius map and is where the saved quest takes
- * place. [clock] tells which day it is, to reject a reward expiry that has already passed.
+ * place. If the venue can't be read, the form says so and [retryVenue] reads it again. [clock]
+ * tells which day it is, to reject a reward expiry that has already passed.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
@@ -180,6 +181,16 @@ class CreateQuestViewModel(
     }
   }
 
+  /**
+   * Reads the venue again after it couldn't be read, keeping the form as filled in. Does nothing
+   * otherwise, so a retry already under way isn't started twice.
+   */
+  fun retryVenue() {
+    if (!mutableUiState.value.venueLoadFailed) return
+    mutableUiState.update { it.copy(venueLoadFailed = false) }
+    viewModelScope.launch { loadVenue() }
+  }
+
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
 
   private fun updateReward(transform: (RewardFormState) -> RewardFormState) {
@@ -196,7 +207,8 @@ class CreateQuestViewModel(
 
   /**
    * Reads the signed-in venue: its location for the radius map, and its radius as the starting one,
-   * unless the venue has already chosen one.
+   * unless the venue has already chosen one. A read that fails is shown as
+   * [CreateQuestUiState.venueLoadFailed].
    */
   private suspend fun loadVenue() {
     val venueId = authRepository.currentUserId.value ?: return
@@ -206,8 +218,9 @@ class CreateQuestViewModel(
         } catch (cancelled: CancellationException) {
           throw cancelled
         } catch (_: Exception) {
-          // The default radius still makes a valid quest, so the form stays usable
-          null
+          // The form stays filled in; without the venue's location it can't be saved until a retry
+          mutableUiState.update { it.copy(venueLoadFailed = true) }
+          return
         } ?: return
     this.venue = venue
     val radius = clampRadius(venue.radiusMeters)
