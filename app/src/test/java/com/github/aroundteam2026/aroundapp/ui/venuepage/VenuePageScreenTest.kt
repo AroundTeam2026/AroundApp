@@ -15,6 +15,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
@@ -37,8 +38,10 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -298,6 +301,43 @@ class VenuePageScreenTest {
   }
 
   @Test
+  fun withoutABottomBarThePageShowsTheAcceptBarForThePickedQuest() {
+    var accepts = 0
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageContent(
+            LOADED.copy(selectedQuestId = "a"),
+            onBack = {},
+            onQuestTapped = {},
+            onRetry = {},
+            onAccept = { accepts++ },
+        )
+      }
+    }
+
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).performClick()
+
+    assertEquals(1, accepts)
+  }
+
+  @Test
+  fun acceptingThePickedQuestBooksItThroughTheViewModel() {
+    val reservations = FakeReservationRepository()
+    showScreen(
+        activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) },
+        reservations = reservations,
+    )
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
+
+    compose.onNodeWithText("Order the secret menu").performClick()
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).performClick()
+
+    val booked = runBlocking { reservations.observeForExplorer("explorer").first() }
+    assertEquals(listOf("a"), booked.map { it.questId })
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertIsNotEnabled()
+  }
+
+  @Test
   fun theScreenRetriesThroughItsViewModel() {
     var calls = 0
     showScreen(
@@ -312,13 +352,16 @@ class VenuePageScreenTest {
     compose.onNodeWithText("Order the secret menu").assertIsDisplayed()
   }
 
-  private fun showScreen(activeQuestsByVenue: (String) -> Flow<List<Quest>>) {
+  private fun showScreen(
+      activeQuestsByVenue: (String) -> Flow<List<Quest>>,
+      reservations: FakeReservationRepository = FakeReservationRepository(),
+  ) {
     val viewModel =
         VenuePageViewModel(
             VENUE_ID,
             FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumen"))),
             ScriptedQuestRepository(activeQuestsByVenue = activeQuestsByVenue),
-            FakeReservationRepository(),
+            reservations,
             "explorer",
         )
     compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }

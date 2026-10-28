@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.res.Configuration
@@ -71,7 +72,8 @@ typealias VenuePageQuestRow =
  * @param viewModel Loads the venue and its quests, and keeps the picked one.
  * @param onBack Called when the explorer taps the back arrow.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
- * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null.
+ * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
+ *   [AcceptQuestBar] that accepts through [viewModel] unless replaced.
  */
 @Composable
 fun VenuePageScreen(
@@ -79,9 +81,12 @@ fun VenuePageScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     questRow: VenuePageQuestRow = DefaultQuestRow,
-    bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {},
+    bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val acceptBar: @Composable (VenuePageQuest?) -> Unit = {
+    AcceptQuestBar(state, viewModel::accept)
+  }
   VenuePageContent(
       state = state,
       onBack = onBack,
@@ -89,15 +94,17 @@ fun VenuePageScreen(
       onRetry = viewModel::onRetry,
       onQuestDetails = viewModel::onQuestDetailsOpened,
       onQuestDetailsClosed = viewModel::onQuestDetailsClosed,
+      onAccept = viewModel::accept,
       modifier = modifier,
       questRow = questRow,
-      bottomBar = bottomBar,
+      bottomBar = bottomBar ?: acceptBar,
   )
 }
 
 /**
  * Stateless page: the top bar, then what [state] says the page can show, with the details of
- * [VenuePageUiState.detailQuest] in a sheet on top.
+ * [VenuePageUiState.detailQuest] in a sheet on top. Under the list sits [bottomBar], or by default
+ * an [AcceptQuestBar] whose button calls [onAccept].
  */
 @Composable
 fun VenuePageContent(
@@ -108,8 +115,11 @@ fun VenuePageContent(
     modifier: Modifier = Modifier,
     onQuestDetails: (questId: String) -> Unit = {},
     onQuestDetailsClosed: () -> Unit = {},
+    onAccept: () -> Unit = {},
     questRow: VenuePageQuestRow = DefaultQuestRow,
-    bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {},
+    bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {
+      AcceptQuestBar(state, onAccept)
+    },
 ) {
   Column(
       modifier
