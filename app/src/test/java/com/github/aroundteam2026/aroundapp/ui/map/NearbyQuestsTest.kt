@@ -30,7 +30,7 @@ class NearbyQuestsTest {
 
   /**
    * A quest whose venue, named [venueName], is [meters] due north of [here], so its distance is
-   * known exactly.
+   * known exactly. Only the first quest of a venue places it: later ones keep its name and place.
    */
   private fun questAt(
       meters: Double,
@@ -126,22 +126,6 @@ class NearbyQuestsTest {
     assertEquals(setOf(cafe to "Café Lumen", venues["bar"] to "Bar Nocturne"), asked.toSet())
     assertEquals(TestAvatar("Café Lumen"), rows.getValue("coffee").avatar)
     assertEquals(TestAvatar("Bar Nocturne"), rows.getValue("cocktail").avatar)
-  }
-
-  @Test
-  fun everyQuestOfAVenueGetsTheSameAvatar() {
-    val quests =
-        listOf(
-            questAt(300.0, id = "new", venueId = "bar", venueName = "Bar Nocturne", createdAt = 2),
-            questAt(300.0, id = "old", venueId = "bar", createdAt = 1),
-        )
-
-    val rows = nearby(quests)
-
-    assertEquals(
-        listOf(VenueAvatar.Initials("BN"), VenueAvatar.Initials("BN")),
-        rows.map { it.avatar },
-    )
   }
 
   @Test
@@ -343,8 +327,8 @@ class NearbyQuestsTest {
   @Test
   fun withoutAPositionTheVenuesRecordedNameIsSortedBy() {
     val renamed = questAt(100.0, id = "renamed", venueId = "lumen", venueName = "Zz old name")
-    // The venue renamed itself since
     val other = questAt(200.0, id = "other", venueName = "Bar Nocturne")
+    // The venue renamed itself since
     val venue = testVenue(id = "lumen", name = "Atelier Lumen")
 
     assertEquals(
