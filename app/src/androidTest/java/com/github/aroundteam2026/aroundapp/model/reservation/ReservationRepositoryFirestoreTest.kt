@@ -191,36 +191,64 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: a reservation the rules refuse is stored anyway, or createReservation reports the refusal
-   * as a failure although, like createQuest, it must not wait for the server. The rules only let an
-   * explorer reserve for a party they belong to.
+   * Bug: a reservation the rules refuse is reported as created, so the explorer sees it accepted
+   * until it silently vanishes, or it is stored anyway. The rules only let an explorer reserve for
+   * a party they belong to.
    */
   @Test
-  fun createReservation_whenTheSignedInUserIsNotInTheParty_succeedsButTheServerRejectsTheWrite() =
+  fun createReservation_whenTheSignedInUserIsNotInTheParty_returnsPermissionDenied() =
       withTimeoutBlocking {
-        val id = createAndSync(reservation(party = listOf(FRIEND_UID)))
+        val result = explorerRepository.createReservation(reservation(party = listOf(FRIEND_UID)))
 
-        val stored = venueRepository.observeForVenue(venueId).first()
-
-        assertTrue(stored.none { it.id == id })
+        assertPermissionDenied(result)
+        assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
       }
 
   /**
-   * Bug: createReservation waits for the server, so it hangs or fails while the device is offline.
+   * Bug: a reservation for a quest that is no longer active is reported as created. The rules
+   * refuse it, which is what happens when the venue deactivates a quest while an explorer accepts.
    */
   @Test
-  fun createReservation_whileOffline_succeedsAndIsSentOnceBackOnline() = withTimeoutBlocking {
-    explorerDb.disableNetwork().await()
-    val id: String
-    try {
-      id = explorerRepository.createReservation(reservation()).getOrThrow()
-    } finally {
-      explorerDb.enableNetwork().await()
-    }
-    explorerDb.waitForPendingWrites().await()
+  fun createReservation_forAQuestThatIsNotActive_returnsPermissionDenied() = withTimeoutBlocking {
+    val result = explorerRepository.createReservation(reservation().copy(questId = "missing"))
 
-    assertEquals(id, fetchAsVenue(id).id)
+    assertPermissionDenied(result)
   }
+
+  /**
+   * Bug: createReservation returns before the server has the reservation, so a success says nothing
+   * about whether the write was accepted.
+   */
+  @Test
+  fun createReservation_returnsOnceTheServerHasTheReservation() = withTimeoutBlocking {
+    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+
+    // No waitForPendingWrites: the server must already have it
+    assertTrue(venueDb.collection(RESERVATIONS).document(id).get(Source.SERVER).await().exists())
+  }
+
+  /**
+   * Bug: createReservation waits for the server without a limit, so it hangs while the device is
+   * offline, or fails instead of leaving the write queued until the device is back online.
+   */
+  @Test
+  fun createReservation_whileOffline_succeedsAfterTheTimeoutAndIsSentOnceBackOnline() =
+      withTimeoutBlocking {
+        val repository =
+            ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) {
+              FIXED_NOW
+            }
+        explorerDb.disableNetwork().await()
+        val id: String
+        try {
+          id = repository.createReservation(reservation()).getOrThrow()
+        } finally {
+          explorerDb.enableNetwork().await()
+        }
+        explorerDb.waitForPendingWrites().await()
+
+        assertEquals(id, fetchAsVenue(id).id)
+      }
 
   /** Bug: an exception escapes createReservation instead of becoming a failure. */
   @Test
@@ -501,6 +529,9 @@ class ReservationRepositoryFirestoreTest {
 
     /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
     const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
+
+    /** A confirmation timeout far below [TIMEOUT_MS], so the offline test outlasts it quickly. */
+    const val SHORT_TIMEOUT_MS = 500L
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
