@@ -71,20 +71,37 @@ class VenueQuestsViewModelTest {
   }
 
   @Test
-  fun aListenerThatFailsShowsTheError() {
-    val failing =
-        object : QuestRepository by FakeQuestRepository() {
-          override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> = flow {
-            throw IOException()
-          }
+  fun aFailedListenerCanBeRetried() {
+    val quests = FakeQuestRepository()
+    var listens = 0
+    val failingOnce =
+        object : QuestRepository by quests {
+          override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> =
+              if (listens++ == 0) flow { throw IOException() }
+              else quests.observeQuestsByVenue(venueId)
         }
-    assertEquals(VenueQuestsUiState.Failed, viewModel(failing).uiState.value)
+    val viewModel = viewModel(failingOnce)
+    assertEquals(VenueQuestsUiState.Failed, viewModel.uiState.value)
+
+    viewModel.retry()
+
+    assertEquals(VenueQuestsUiState.Loaded(emptyList()), viewModel.uiState.value)
   }
 
   @Test
-  fun nothingIsListedWithoutASignedInVenue() {
-    val viewModel = VenueQuestsViewModel(FakeAuthRepository(), FakeQuestRepository())
+  fun aVenueThatSignsInLaterGetsItsQuests() = runTest {
+    val auth = FakeAuthRepository()
+    val quests = FakeQuestRepository()
+    val viewModel = VenueQuestsViewModel(auth, quests)
     assertEquals(VenueQuestsUiState.Loading, viewModel.uiState.value)
+
+    val venueId = auth.signInWithGoogle(GOOGLE_ID_TOKEN).getOrThrow()
+    val questId = quests.createQuest(testQuest(venueId = venueId)).getOrThrow()
+
+    assertEquals(
+        listOf(questId),
+        (viewModel.uiState.value as VenueQuestsUiState.Loaded).quests.map { it.id },
+    )
   }
 
   private companion object {
@@ -92,5 +109,6 @@ class VenueQuestsViewModelTest {
     const val OTHER_VENUE_ID = "venue-2"
     const val OLDER = 1_000L
     const val NEWER = 2_000L
+    const val GOOGLE_ID_TOKEN = "google-id-token"
   }
 }

@@ -11,12 +11,17 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 
 /** What the venue's Quests tab shows. */
 sealed interface VenueQuestsUiState {
@@ -31,23 +36,37 @@ sealed interface VenueQuestsUiState {
 }
 
 /**
- * Holds the quests of the signed-in venue, whatever their status, newest first. It keeps up as they
- * change, so a quest saved from the form is listed when the venue returns to the tab.
+ * Holds the quests of the signed-in venue, whatever their status, newest first. It follows the
+ * signed-in venue as it changes, and keeps up as its quests change, so a quest saved from the form
+ * is listed when the venue returns to the tab. After [VenueQuestsUiState.Failed], [retry] listens
+ * again.
  */
 class VenueQuestsViewModel(authRepository: AuthRepository, questRepository: QuestRepository) :
     ViewModel() {
+  /** Bumped by [retry]: each new value restarts the listener, even for the same venue. */
+  private val retries = MutableStateFlow(0)
+
   /** What the tab shows now. */
+  @OptIn(ExperimentalCoroutinesApi::class)
   val uiState: StateFlow<VenueQuestsUiState> =
-      (authRepository.currentUserId.value?.let { venueId ->
-            questRepository
-                .observeQuestsByVenue(venueId)
-                .map<List<Quest>, VenueQuestsUiState> { quests ->
-                  VenueQuestsUiState.Loaded(quests.sortedByDescending(Quest::createdAt))
-                }
-                // The repository's flow throws if the backend stops the listener
-                .catch { emit(VenueQuestsUiState.Failed) }
-          } ?: emptyFlow())
+      combine(authRepository.currentUserId, retries) { venueId, _ -> venueId }
+          .flatMapLatest { venueId ->
+            if (venueId == null) flowOf(VenueQuestsUiState.Loading)
+            else
+                questRepository
+                    .observeQuestsByVenue(venueId)
+                    .map<List<Quest>, VenueQuestsUiState> { quests ->
+                      VenueQuestsUiState.Loaded(quests.sortedByDescending(Quest::createdAt))
+                    }
+                    // The repository's flow throws if the backend stops the listener
+                    .catch { emit(VenueQuestsUiState.Failed) }
+          }
           .stateIn(viewModelScope, SharingStarted.Eagerly, VenueQuestsUiState.Loading)
+
+  /** Listens to the venue's quests again, after listening failed. */
+  fun retry() {
+    retries.update { it + 1 }
+  }
 
   companion object {
     /** Builds the [VenueQuestsViewModel] of the signed-in venue with the app's repositories. */
