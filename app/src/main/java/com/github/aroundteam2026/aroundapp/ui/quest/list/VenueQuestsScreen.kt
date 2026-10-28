@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -57,14 +58,15 @@ fun VenueQuestsScreen(
     modifier: Modifier = Modifier,
 ) {
   val state by viewModel.uiState.collectAsState()
-  VenueQuestsContent(state, onCreateQuest, modifier)
+  VenueQuestsContent(state, onCreateQuest, viewModel::retry, modifier)
 }
 
-/** Stateless Quests tab showing [state]. */
+/** Stateless Quests tab showing [state]; [onRetry] listens to the quests again after a failure. */
 @Composable
 internal fun VenueQuestsContent(
     state: VenueQuestsUiState,
     onCreateQuest: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val empty = state is VenueQuestsUiState.Loaded && state.quests.isEmpty()
@@ -89,11 +91,9 @@ internal fun VenueQuestsContent(
       }
     }
     when (state) {
-      VenueQuestsUiState.Loading -> Unit
-      VenueQuestsUiState.Failed ->
-          Centered {
-            Message(R.string.venue_quests_failed, Modifier.testTag(C.Tag.VENUE_QUESTS_FAILED))
-          }
+      VenueQuestsUiState.Loading ->
+          Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_QUESTS_LOADING)) }
+      VenueQuestsUiState.Failed -> Centered { LoadFailed(onRetry) }
       is VenueQuestsUiState.Loaded ->
           if (empty) Centered { NoQuests(onCreateQuest) } else QuestList(state.quests)
     }
@@ -190,6 +190,20 @@ private fun NoQuests(onCreateQuest: () -> Unit) {
             Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.VENUE_QUESTS_CREATE_FIRST),
     ) {
       Text(stringResource(R.string.venue_quests_create_first), style = AroundTextStyles.Button)
+    }
+  }
+}
+
+/** Why the quests couldn't be loaded, and a button to try again. */
+@Composable
+private fun LoadFailed(onRetry: () -> Unit) {
+  Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
+  ) {
+    Message(R.string.venue_quests_failed, Modifier.testTag(C.Tag.VENUE_QUESTS_FAILED))
+    Button(onRetry, Modifier.testTag(C.Tag.VENUE_QUESTS_RETRY)) {
+      Text(stringResource(R.string.venue_quests_retry), style = AroundTextStyles.Button)
     }
   }
 }

@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -30,7 +32,7 @@ class VenueQuestsScreenTest {
 
   private fun show(state: VenueQuestsUiState) {
     compose.setContent {
-      AroundAppTheme { VenueQuestsContent(state, onCreateQuest = { formsOpened++ }) }
+      AroundAppTheme { VenueQuestsContent(state, onCreateQuest = { formsOpened++ }, onRetry = {}) }
     }
   }
 
@@ -76,12 +78,29 @@ class VenueQuestsScreenTest {
   }
 
   @Test
-  fun aLoadErrorIsShown() {
-    show(VenueQuestsUiState.Failed)
-
+  fun tryingAgainAfterALoadErrorListsTheQuests() {
+    val failingOnce = failingFirstListen(FakeQuestRepository())
+    val viewModel = VenueQuestsViewModel(FakeAuthRepository(VENUE_ID), failingOnce)
+    compose.setContent {
+      AroundAppTheme { VenueQuestsScreen(viewModel, onCreateQuest = { formsOpened++ }) }
+    }
     compose
         .onNodeWithTag(C.Tag.VENUE_QUESTS_FAILED)
         .assertTextEquals(string(R.string.venue_quests_failed))
-    compose.onNodeWithTag(C.Tag.VENUE_QUESTS_LIST).assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.VENUE_QUESTS_RETRY).performClick()
+
+    compose.onNodeWithTag(C.Tag.VENUE_QUESTS_FAILED).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_QUESTS_EMPTY).assertIsDisplayed()
+  }
+
+  @Test
+  fun loadingShowsProgress() {
+    show(VenueQuestsUiState.Loading)
+    compose.onNodeWithTag(C.Tag.VENUE_QUESTS_LOADING).assertIsDisplayed()
+  }
+
+  private companion object {
+    const val VENUE_ID = "venue-1"
   }
 }

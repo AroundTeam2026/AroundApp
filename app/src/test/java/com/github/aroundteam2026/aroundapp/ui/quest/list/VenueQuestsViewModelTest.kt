@@ -3,15 +3,11 @@ package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
-import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.testQuest
-import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -72,14 +68,7 @@ class VenueQuestsViewModelTest {
 
   @Test
   fun aFailedListenerCanBeRetried() {
-    val quests = FakeQuestRepository()
-    var listens = 0
-    val failingOnce =
-        object : QuestRepository by quests {
-          override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> =
-              if (listens++ == 0) flow { throw IOException() }
-              else quests.observeQuestsByVenue(venueId)
-        }
+    val failingOnce = failingFirstListen(FakeQuestRepository())
     val viewModel = viewModel(failingOnce)
     assertEquals(VenueQuestsUiState.Failed, viewModel.uiState.value)
 

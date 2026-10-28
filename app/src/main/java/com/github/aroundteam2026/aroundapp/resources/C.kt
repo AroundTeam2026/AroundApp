@@ -41,6 +41,8 @@ object C {
     const val VENUE_QUESTS_EMPTY = "venue_quests_empty"
     const val VENUE_QUESTS_CREATE_FIRST = "venue_quests_create_first"
     const val VENUE_QUESTS_FAILED = "venue_quests_failed"
+    const val VENUE_QUESTS_RETRY = "venue_quests_retry"
+    const val VENUE_QUESTS_LOADING = "venue_quests_loading"
 
     const val AUTH_SCREEN = "auth_screen"
     const val AUTH_TITLE = "auth_title"

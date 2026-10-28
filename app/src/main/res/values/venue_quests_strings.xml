@@ -7,5 +7,6 @@
     <string name="venue_quests_empty_title">No quests yet</string>
     <string name="venue_quests_empty_body">Create a quest to bring new people through your door.</string>
     <string name="venue_quests_create_first">Create your first quest</string>
-    <string name="venue_quests_failed">Couldn\'t load your quests. Check your connection and try again.</string>
+    <string name="venue_quests_failed">Couldn\'t load your quests. Try again.</string>
+    <string name="venue_quests_retry">Try again</string>
 </resources>
