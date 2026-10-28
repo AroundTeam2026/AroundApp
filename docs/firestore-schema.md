@@ -43,7 +43,7 @@ The venue's name and location are not copied here: they are read from `venues/{v
 | Field | Type | Notes |
 |---|---|---|
 | `venueId` | string | The venue owner's uid. |
-| `radiusMeters` | int | Distance from the venue's `location` within which a visit counts. 20 to 200; the create-quest form starts from the venue's radius. |
+| `radiusMeters` | int | Distance from the venue's `location` within which a visit counts, so moving the venue's area re-centres every quest's area too. 20 to 200; the create-quest form starts from the venue's radius. |
 | `title` | string | At most 60 characters. |
 | `description` | string | At most 500 characters. |
 | `requirements` | string | At most 300 characters. |
