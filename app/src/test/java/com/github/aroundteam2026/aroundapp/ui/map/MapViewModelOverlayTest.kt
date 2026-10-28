@@ -38,12 +38,10 @@ class MapViewModelOverlayTest {
       testQuest(
           id = "cafe-1",
           venueId = "cafe",
-          venueName = "Café Lumen",
-          location = Location(46.5220, 6.6330),
       )
   private val lausanne = GeoBounds(south = 46.50, west = 6.60, north = 46.55, east = 6.66)
   private val quests = MutableStateFlow(listOf(cafe))
-  // The venue moved, off screen, after its quest copied its location: its pin follows the venue
+  // The venue, off screen
   private val venueLocation = Location(46.6000, 6.7000)
   /**
    * The explorer, away from the map's default centre but near the venue; tests hold their position

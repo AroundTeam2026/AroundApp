@@ -435,8 +435,6 @@ class CreateQuestViewModelTest {
             Quest(
                 id = "quest-1",
                 venueId = VENUE_ID,
-                venueName = venue(50).name,
-                location = requireNotNull(venue(50).location),
                 radiusMeters = 100,
                 title = "Find the fox",
                 description = "A fox hides here.",

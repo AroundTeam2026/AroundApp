@@ -226,7 +226,8 @@ class MapViewModel(
   /**
    * The active quests, their venues, the explorer's position and the time, again whenever quests or
    * their venues change, when a reward expires, and once the explorer is located. Without quests,
-   * or when they fail, there are none; without venues, the quests' own copies stand in for them.
+   * or when they fail, there are none; without venues there are none either, as each quest is shown
+   * at its venue's location, under its name.
    *
    * The quests are listened to once, for both the pins and the nearby list, and their venues again
    * only when the set of venues changes, as each new listener costs Firestore reads.

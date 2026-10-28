@@ -54,21 +54,22 @@ class MapViewModelPinsTest {
   private val lausanneView = GeoBounds(south = 46.50, west = 6.60, north = 46.55, east = 6.66)
   private val genevaView = GeoBounds(south = 46.19, west = 6.12, north = 46.22, east = 6.16)
 
-  private val cafeQuest =
-      testQuest(id = "cafe-1", venueId = "cafe", venueName = "Café Lumen", location = cafeLocation)
-  private val barQuest =
-      testQuest(id = "bar-1", venueId = "bar", venueName = "Bar Nocturne", location = barLocation)
-  private val genevaQuest =
-      testQuest(
-          id = "geneva-1",
-          venueId = "geneva",
-          venueName = "Atelier",
-          location = genevaLocation,
+  private val cafeQuest = testQuest(id = "cafe-1", venueId = "cafe")
+  private val barQuest = testQuest(id = "bar-1", venueId = "bar")
+  private val genevaQuest = testQuest(id = "geneva-1", venueId = "geneva")
+
+  private val cafe = testVenue(id = "cafe", name = "Café Lumen", location = cafeLocation)
+  private val venues =
+      listOf(
+          cafe,
+          testVenue(id = "bar", name = "Bar Nocturne", location = barLocation),
+          testVenue(id = "geneva", name = "Atelier", location = genevaLocation),
+          testVenue(id = "museum", name = "Musée", location = museumLocation),
       )
 
   private val quests = MutableStateFlow(listOf(cafeQuest, barQuest, genevaQuest))
   private var questRepository = ScriptedQuestRepository.of(quests)
-  private var venueRepository: VenueRepository = FakeVenueRepository()
+  private var venueRepository: VenueRepository = FakeVenueRepository(venues)
   private val locationRepository = FakeLocationRepository(null)
 
   private val viewModel by lazy {
@@ -136,7 +137,7 @@ class MapViewModelPinsTest {
   fun aNewQuestShowsUpWithoutMovingTheMap() = test {
     showing()
 
-    quests.value += testQuest(id = "cafe-2", venueId = "cafe", location = cafeLocation)
+    quests.value += testQuest(id = "cafe-2", venueId = "cafe")
     runCurrent()
 
     assertEquals(1, state.pins.single { it.venueId == "cafe" }.otherQuestCount)
@@ -204,9 +205,7 @@ class MapViewModelPinsTest {
     val newer = cafeQuest.copy(id = "cafe-newer", createdAt = cafeQuest.createdAt + 1)
     quests.value = listOf(cafeQuest, newer)
     venueRepository =
-        FakeVenueRepository(
-            listOf(testVenue(id = "cafe", location = cafeLocation, featuredQuestId = "cafe-1"))
-        )
+        FakeVenueRepository(listOf(cafe.copy(featuredQuestId = "cafe-1")) + venues.drop(1))
     showing()
 
     assertEquals("cafe-1", state.pins.single().featuredQuest.id)
@@ -214,11 +213,11 @@ class MapViewModelPinsTest {
 
   @Test
   fun aVenueThatMovesTakesItsPinWithIt() = test {
-    val venues = FakeVenueRepository(listOf(testVenue(id = "cafe", location = cafeLocation)))
-    venueRepository = venues
+    val moving = FakeVenueRepository(venues)
+    venueRepository = moving
     showing()
 
-    venues.setArea("cafe", Location(46.53, 6.64), radiusMeters = 50, address = null)
+    moving.setArea("cafe", Location(46.53, 6.64), radiusMeters = 50, address = null)
     runCurrent()
 
     assertEquals(Location(46.53, 6.64), state.pins.single { it.venueId == "cafe" }.location)
@@ -228,7 +227,7 @@ class MapViewModelPinsTest {
   fun onlyTheVenuesOfTheQuestsAreAskedFor() = test {
     // Firestore reads venues by id; reading every venue would cost a read each
     val asked = mutableListOf<Set<String>>()
-    venueRepository = RecordingVenueRepository(asked)
+    venueRepository = RecordingVenueRepository(asked, venues)
     showing()
 
     assertEquals(setOf("cafe", "bar", "geneva"), asked.last())
@@ -238,10 +237,10 @@ class MapViewModelPinsTest {
   fun aQuestChangeAtTheSameVenuesKeepsListeningToThem() = test {
     // On Firestore, asking again would restart the venue listeners and pay for their reads again
     val asked = mutableListOf<Set<String>>()
-    venueRepository = RecordingVenueRepository(asked)
+    venueRepository = RecordingVenueRepository(asked, venues)
     showing()
 
-    quests.value += testQuest(id = "cafe-2", venueId = "cafe", location = cafeLocation)
+    quests.value += testQuest(id = "cafe-2", venueId = "cafe")
     runCurrent()
     quests.value = quests.value.filterNot { it.id == "bar-1" } + barQuest.copy(title = "Renamed")
     runCurrent()
@@ -255,10 +254,10 @@ class MapViewModelPinsTest {
   @Test
   fun aQuestAtAnotherVenueAsksForTheNewSetOfVenues() = test {
     val asked = mutableListOf<Set<String>>()
-    venueRepository = RecordingVenueRepository(asked)
+    venueRepository = RecordingVenueRepository(asked, venues)
     showing()
 
-    quests.value += testQuest(id = "museum-1", venueId = "museum", location = museumLocation)
+    quests.value += testQuest(id = "museum-1", venueId = "museum")
     runCurrent()
     quests.value = quests.value.filterNot { it.venueId == "geneva" }
     runCurrent()
@@ -281,7 +280,7 @@ class MapViewModelPinsTest {
     questRepository = ScriptedQuestRepository(activeQuests = quests.onStart { listeners++ })
     showing()
 
-    quests.value += testQuest(id = "museum-1", venueId = "museum", location = museumLocation)
+    quests.value += testQuest(id = "museum-1", venueId = "museum")
     runCurrent()
 
     assertEquals(1, listeners)
@@ -294,7 +293,7 @@ class MapViewModelPinsTest {
 
     advanceTimeBy(400)
     runCurrent()
-    quests.value += testQuest(id = "museum-1", venueId = "museum", location = museumLocation)
+    quests.value += testQuest(id = "museum-1", venueId = "museum")
     runCurrent()
     assertEquals(setOf("cafe", "bar", "museum"), pinIds)
 
@@ -319,7 +318,6 @@ class MapViewModelPinsTest {
         testQuest(
             id = "museum-1",
             venueId = "museum",
-            location = museumLocation,
             reward = rewardExpiringAt(START + 1_000),
         )
     runCurrent()
@@ -345,14 +343,12 @@ class MapViewModelPinsTest {
   }
 
   @Test
-  fun failingVenuesStillShowEveryPinWithItsNewestQuest() = test {
-    val newer = cafeQuest.copy(id = "cafe-newer", createdAt = cafeQuest.createdAt + 1)
-    quests.value = listOf(cafeQuest, newer, barQuest)
-    venueRepository = RecordingVenueRepository(mutableListOf(), fail = true)
+  fun failingVenuesShowNoPins() = test {
+    // A pin stands where its venue is, so without the venues there is nowhere to draw it
+    venueRepository = RecordingVenueRepository(mutableListOf(), venues, fail = true)
     showing()
 
-    assertEquals(setOf("cafe", "bar"), pinIds)
-    assertEquals("cafe-newer", state.pins.single { it.venueId == "cafe" }.featuredQuest.id)
+    assertEquals(emptyList<VenuePin>(), state.pins)
   }
 
   @Test
@@ -473,7 +469,7 @@ class MapViewModelPinsTest {
     viewModel.onPinClick("cafe")
     runCurrent()
 
-    quests.value += testQuest(id = "cafe-2", venueId = "cafe", location = cafeLocation)
+    quests.value += testQuest(id = "cafe-2", venueId = "cafe")
     runCurrent()
 
     assertEquals("cafe", state.selectedVenueId)
@@ -523,16 +519,20 @@ class MapViewModelPinsTest {
   }
 }
 
-/** Records which venues it is asked for; with [fail], every request fails. */
+/**
+ * Records which venues it is asked for and serves them from [venues]; with [fail], every request
+ * fails.
+ */
 private class RecordingVenueRepository(
     private val asked: MutableList<Set<String>>,
+    private val venues: List<Venue>,
     private val fail: Boolean = false,
 ) : VenueRepository {
   override fun observeVenues(venueIds: Set<String>): Flow<List<Venue>> {
     asked += venueIds
     return flow {
       if (fail) throw IOException("offline")
-      emit(emptyList())
+      emit(venues.filter { it.id in venueIds })
     }
   }
 

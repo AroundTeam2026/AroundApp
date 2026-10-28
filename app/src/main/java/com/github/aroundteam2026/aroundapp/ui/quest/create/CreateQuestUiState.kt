@@ -157,8 +157,6 @@ data class CreateQuestUiState(
       Quest(
           id = "",
           venueId = venue.id,
-          venueName = venue.name,
-          location = requireNotNull(venue.location),
           radiusMeters = radiusMeters,
           title = title.trim(),
           description = description.trim(),

@@ -38,12 +38,12 @@ One venue per account in v1, so the document id is the owner's uid.
 
 ### `quests/{questId}`
 
+The venue's name and location are not copied here: they are read from `venues/{venueId}`, so they never go stale.
+
 | Field | Type | Notes |
 |---|---|---|
 | `venueId` | string | The venue owner's uid. |
-| `venueName` | string | Copied from the venue at creation, so the map needs a single query. |
-| `location` | GeoPoint | Copied from the venue at creation. |
-| `radiusMeters` | int | Distance from `location` within which a visit counts. 20 to 200; the create-quest form starts from the venue's radius. |
+| `radiusMeters` | int | Distance from the venue's `location` within which a visit counts. 20 to 200; the create-quest form starts from the venue's radius. |
 | `title` | string | At most 60 characters. |
 | `description` | string | At most 500 characters. |
 | `requirements` | string | At most 300 characters. |
@@ -121,7 +121,6 @@ Every create and update must match its collection's table above: only the listed
 
 Proposed in the review of this PR (#25). The schema above keeps what `main` does until the team decides.
 
-- **Copied venue fields in `quests`.** `venueName` and `location` go stale when a venue renames itself or moves its area. Proposal: read them from `venues/{venueId}` instead.
 - **Party membership.** `explorerUids` loses who withdrew from a party. Proposal: a party document plus one membership document per explorer (party_user), so a withdrawal keeps its history.
 - **Ids copied into `completions`.** `questId`, `venueId` and `explorerUid` can be reached through the reservation and the party. Proposal: drop them. The venue's rules and queries currently need `venueId` on the document, so the rules change with it.
 - **Text proof.** Quests allow `TEXT` proof, but `proofUrl` can't tell a typed answer from an uploaded photo. Proposal: separate fields for a photo and for a text answer.

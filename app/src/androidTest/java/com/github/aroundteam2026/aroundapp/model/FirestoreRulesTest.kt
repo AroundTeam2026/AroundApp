@@ -220,7 +220,8 @@ class FirestoreRulesTest {
             "an exactPartySize that is not a boolean" to valid + ("exactPartySize" to "yes"),
             "an unknown proof type" to valid + ("proofType" to "VIDEO"),
             "an unknown status" to valid + ("status" to "LIVE"),
-            "no venueName" to valid - "venueName",
+            "a copied venueName" to valid + ("venueName" to "Café"),
+            "a copied location" to valid + ("location" to GeoPoint(46.52, 6.57)),
             "an unknown field" to valid + ("rating" to 5),
         ),
     )
@@ -513,8 +514,6 @@ class FirestoreRulesTest {
   private fun questData(venue: TestUser) =
       mapOf(
           "venueId" to venue.uid,
-          "venueName" to "Café",
-          "location" to GeoPoint(46.52, 6.57),
           "radiusMeters" to 50,
           "title" to "Find the hidden owl",
           "description" to "An owl hides somewhere in the café.",

@@ -3,7 +3,6 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
@@ -425,8 +424,6 @@ class ReservationRepositoryFirestoreTest {
         Quest(
             id = "",
             venueId = venueId,
-            venueName = "Cafe",
-            location = Location(46.52, 6.57),
             radiusMeters = 50,
             title = "Title",
             description = "Description",
