@@ -28,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,7 +114,11 @@ private fun VenueLoadFailed(onRetry: () -> Unit, retrying: Boolean) {
       style = AroundTextStyles.Caption,
       color = MaterialTheme.colorScheme.error,
       textAlign = TextAlign.Center,
-      modifier = Modifier.testTag(C.Tag.CREATE_QUEST_VENUE_FAILED),
+      // Announced by TalkBack, as it appears after the screen, to say why saving is disabled
+      modifier =
+          Modifier.testTag(C.Tag.CREATE_QUEST_VENUE_FAILED).semantics {
+            liveRegion = LiveRegionMode.Polite
+          },
   )
   TextButton(
       onClick = onRetry,

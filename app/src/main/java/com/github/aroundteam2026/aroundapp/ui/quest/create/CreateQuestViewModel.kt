@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -218,7 +219,8 @@ class CreateQuestViewModel(
           venueRepository.getVenue(venueId)
         } catch (cancelled: CancellationException) {
           throw cancelled
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+          Log.w(TAG, "Reading venue $venueId failed", e)
           // The form stays filled in; without the venue's location it can't be saved until a retry
           mutableUiState.update { it.copy(venueLoadFailed = true, retryingVenue = false) }
           return
@@ -242,6 +244,8 @@ class CreateQuestViewModel(
       meters.coerceIn(QuestLimits.MIN_RADIUS_METERS, QuestLimits.MAX_RADIUS_METERS)
 
   companion object {
+    private const val TAG = "CreateQuestViewModel"
+
     /** Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories. */
     fun factory(): ViewModelProvider.Factory = viewModelFactory {
       initializer {

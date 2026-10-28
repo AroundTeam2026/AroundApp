@@ -2,6 +2,10 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import android.content.Context
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -147,6 +151,9 @@ class CreateQuestBarTest {
     show(venues = FlakyVenueRepository(failures = 1, testVenue(id = VENUE_ID), gate = read))
     fillValid()
     val failed = compose.onNodeWithTag(C.Tag.CREATE_QUEST_VENUE_FAILED)
+    failed.assert(
+        SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
+    )
     failed.assertTextEquals(
         ApplicationProvider.getApplicationContext<Context>()
             .getString(R.string.create_quest_venue_failed)
