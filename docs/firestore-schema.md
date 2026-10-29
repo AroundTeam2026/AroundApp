@@ -75,6 +75,7 @@ Every type may also have `expiresAt` (timestamp?): when the reward stops being v
 | `slotStart` | timestamp | Start of the booked slot. On creation it can't be more than 5 minutes in the past, to allow for a phone clock that is behind (enforced by the rules). |
 | `status` | `PENDING`, `APPROVED`, `REJECTED` or `CANCELLED` | Set to `PENDING` by the repository on creation. |
 | `createdAt` | timestamp | Set by the repository. |
+| `explorerName` | string | Display name of the explorer who made the reservation, copied from their `users` profile on creation so the venue sees who reserved (the venue can't read profiles). Must equal that profile's `displayName` (enforced by the rules). Not updated on a rename. Reservations made before this field existed lack it; the app reads them with an empty name. |
 
 ### `completions/{id}`
 
@@ -116,7 +117,7 @@ Every create and update must match its collection's table above: only the listed
 | `users` | Only the owner | The owner creates and updates it; `role` must be null, `EXPLORER` or `VENUE`, and can't change once set. No delete. |
 | `venues` | Any signed-in user | Only the owner (document id is their uid), whose `users` document has role `VENUE`. |
 | `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
-| `reservations` | The venue and the listed explorers | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one that lists them, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards only `status` changes, along an allowed transition: the venue makes any of them, and a listed explorer can only cancel. No delete. |
+| `reservations` | The venue and the listed explorers | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one that lists them and carries their profile's `displayName` as `explorerName`, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards only `status` changes, along an allowed transition: the venue makes any of them, and a listed explorer can only cancel. No delete. |
 | `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
 
 ## Deferred to Sprint 3

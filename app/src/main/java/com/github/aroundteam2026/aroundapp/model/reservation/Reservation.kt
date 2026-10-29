@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 /**
@@ -11,6 +12,9 @@ package com.github.aroundteam2026.aroundapp.model.reservation
  * @property slotStart Start of the booked slot, in epoch milliseconds.
  * @property status Lifecycle state; see [canTransition] for the allowed changes.
  * @property createdAt Creation time, in epoch milliseconds.
+ * @property explorerName Display name of the explorer who made the reservation, copied from their
+ *   profile when it was made, so the venue can see who reserved without reading profiles it may not
+ *   read. It does not follow later renames. Empty for reservations made before it was stored.
  * @throws IllegalArgumentException if [explorerUids] is empty.
  */
 data class Reservation(
@@ -21,6 +25,7 @@ data class Reservation(
     val slotStart: Long,
     val status: ReservationStatus,
     val createdAt: Long,
+    val explorerName: String = "",
 ) {
   init {
     require(explorerUids.isNotEmpty()) { "A reservation needs at least one explorer" }
@@ -29,7 +34,8 @@ data class Reservation(
 
 /**
  * The reservation an explorer makes by accepting the quest [questId] of the venue [venueId]: a
- * party of just [explorerUid], pending, for a slot starting at [slotStart].
+ * party of just [explorerUid], named [explorerName] in their profile, pending, for a slot starting
+ * at [slotStart].
  *
  * Accepting a quest doesn't pick a slot yet, so the venue page passes the time of the tap: by the
  * time the venue reads the reservation, that slot has already started. Until explorers choose a
@@ -43,6 +49,7 @@ fun newPendingReservation(
     questId: String,
     venueId: String,
     explorerUid: String,
+    explorerName: String,
     slotStart: Long,
 ) =
     Reservation(
@@ -53,6 +60,7 @@ fun newPendingReservation(
         slotStart = slotStart,
         status = ReservationStatus.PENDING,
         createdAt = slotStart,
+        explorerName = explorerName,
     )
 
 /** Lifecycle state of a reservation. */

@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.rewardExpiringAt
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
@@ -52,6 +53,7 @@ class VenuePageViewModelTest {
         venueRepository,
         questRepository,
         FakeReservationRepository(),
+        testUsers("explorer"),
         "explorer",
         clock,
     )
