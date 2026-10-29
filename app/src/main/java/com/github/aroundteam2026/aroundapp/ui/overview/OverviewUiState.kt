@@ -10,11 +10,33 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property status Whether the overview is loading, shown, or failed.
  * @property rows One row per pending or approved reservation, soonest slot first. Empty until
  *   [status] is [OverviewStatus.LOADED], and may stay empty then.
+ * @property cancellingIds Ids of the reservations being cancelled right now, among [rows].
+ * @property failedCancelIds Ids of the reservations whose last cancel failed, among [rows].
  */
 data class OverviewUiState(
     val status: OverviewStatus = OverviewStatus.LOADING,
     val rows: List<OverviewRow> = emptyList(),
-)
+    val cancellingIds: Set<String> = emptySet(),
+    val failedCancelIds: Set<String> = emptySet(),
+) {
+  /** How cancelling the reservation [reservationId] stands, for its card. */
+  fun cancelStatusOf(reservationId: String): CancelStatus =
+      when (reservationId) {
+        in cancellingIds -> CancelStatus.CANCELLING
+        in failedCancelIds -> CancelStatus.FAILED
+        else -> CancelStatus.NONE
+      }
+}
+
+/** How cancelling a row's reservation stands. */
+enum class CancelStatus {
+  /** Not cancelled, and not being cancelled. */
+  NONE,
+  /** The cancel is being written. */
+  CANCELLING,
+  /** The last try failed; cancelling again retries. */
+  FAILED,
+}
 
 /**
  * One accepted quest in the overview: the reservation, with its quest and venue.
