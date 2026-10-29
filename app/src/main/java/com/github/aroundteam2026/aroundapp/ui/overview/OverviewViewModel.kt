@@ -14,6 +14,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -173,9 +174,7 @@ class OverviewViewModel(
  */
 internal fun activeReservations(reservations: List<Reservation>): List<Reservation> =
     reservations
-        .filter {
-          it.status == ReservationStatus.PENDING || it.status == ReservationStatus.APPROVED
-        }
+        .filter { it.status.isActive }
         .sortedWith(
             compareBy<Reservation> { it.slotStart }
                 .thenByDescending { it.createdAt }

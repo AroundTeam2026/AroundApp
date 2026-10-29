@@ -17,6 +17,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
@@ -325,10 +326,7 @@ internal fun venuePageQuests(
  */
 internal fun acceptedPartiesOf(reservations: List<Reservation>, venueId: String): Map<String, Int> =
     reservations
-        .filter {
-          it.venueId == venueId &&
-              (it.status == ReservationStatus.PENDING || it.status == ReservationStatus.APPROVED)
-        }
+        .filter { it.venueId == venueId && it.status.isActive }
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxOf { it.explorerUids.size } }
 

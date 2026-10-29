@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus.APPROVED
@@ -8,7 +9,10 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus.R
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Tests [canTransition] for reservations and the construction rules of [Reservation]. */
+/**
+ * Tests [canTransition] and [isActive] for reservations, and the construction rules of
+ * [Reservation].
+ */
 class ReservationStatusTest {
   private val allowed =
       setOf(
@@ -25,6 +29,15 @@ class ReservationStatusTest {
       for (to in ReservationStatus.entries) {
         assertEquals("$from -> $to", (from to to) in allowed, canTransition(from, to))
       }
+    }
+  }
+
+  /** Checks every status, so a new one has to be listed here as active or not. */
+  @Test
+  fun isActive_isTrueForPendingAndApprovedOnly() {
+    val active = setOf(PENDING, APPROVED)
+    for (status in ReservationStatus.entries) {
+      assertEquals("$status", status in active, status.isActive)
     }
   }
 
