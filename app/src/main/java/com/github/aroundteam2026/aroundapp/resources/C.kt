@@ -1,6 +1,7 @@
 // Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.resources
 
 // Like R, but C
@@ -35,7 +36,14 @@ object C {
     const val VENUE_DASHBOARD_SCREEN = "venue_dashboard_screen"
     const val VENUE_QUESTS_SCREEN = "venue_quests_screen"
     const val VENUE_NEW_QUEST = "venue_new_quest"
-    const val VENUE_QUESTS_STUB = "venue_quests_stub"
+    const val VENUE_QUESTS_LIST = "venue_quests_list"
+    const val VENUE_QUEST_TITLE = "venue_quest_title"
+    const val VENUE_QUEST_STATUS = "venue_quest_status"
+    const val VENUE_QUESTS_EMPTY = "venue_quests_empty"
+    const val VENUE_QUESTS_CREATE_FIRST = "venue_quests_create_first"
+    const val VENUE_QUESTS_FAILED = "venue_quests_failed"
+    const val VENUE_QUESTS_RETRY = "venue_quests_retry"
+    const val VENUE_QUESTS_LOADING = "venue_quests_loading"
 
     const val AUTH_SCREEN = "auth_screen"
     const val AUTH_TITLE = "auth_title"
@@ -111,6 +119,11 @@ object C {
     const val VENUE_PAGE_EMPTY = "venue_page_empty"
     const val VENUE_PAGE_QUESTS_CARD = "venue_page_quests_card"
     const val VENUE_PAGE_QUEST_COUNT = "venue_page_quest_count"
+    const val ACCEPT_QUEST_BAR = "accept_quest_bar"
+    const val ACCEPT_QUEST_BUTTON = "accept_quest_button"
+    const val ACCEPT_QUEST_NEEDS_MORE = "accept_quest_needs_more"
+    const val ACCEPT_QUEST_FAILED = "accept_quest_failed"
+    const val ACCEPT_QUEST_UNAVAILABLE = "accept_quest_unavailable"
     const val VENUE_QUEST_ROW = "venue_quest_row"
     const val VENUE_QUEST_ROW_TITLE = "venue_quest_row_title"
     const val VENUE_QUEST_ROW_DESCRIPTION = "venue_quest_row_description"
@@ -144,6 +157,8 @@ object C {
     const val CREATE_QUEST_CLOSE = "create_quest_close"
     const val CREATE_QUEST_SUMMARY = "create_quest_summary"
     const val CREATE_QUEST_SUBMIT = "create_quest_submit"
+    const val CREATE_QUEST_VENUE_FAILED = "create_quest_venue_failed"
+    const val CREATE_QUEST_VENUE_RETRY = "create_quest_venue_retry"
     const val CREATE_QUEST_TITLE = "create_quest_title"
     const val CREATE_QUEST_TITLE_COUNTER = "create_quest_title_counter"
     const val CREATE_QUEST_TITLE_ERROR = "create_quest_title_error"

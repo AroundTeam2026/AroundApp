@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <string name="venue_quests_status_draft">Draft</string>
+    <string name="venue_quests_status_active">Active</string>
+    <string name="venue_quests_status_archived">Archived</string>
+    <string name="venue_quests_empty_title">No quests yet</string>
+    <string name="venue_quests_empty_body">Create a quest to bring new people through your door.</string>
+    <string name="venue_quests_create_first">Create your first quest</string>
+    <string name="venue_quests_failed">Couldn\'t load your quests. Try again.</string>
+    <string name="venue_quests_retry">Try again</string>
+</resources>

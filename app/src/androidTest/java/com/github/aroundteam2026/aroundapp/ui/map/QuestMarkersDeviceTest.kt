@@ -29,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -52,6 +53,8 @@ class QuestMarkersDeviceTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val here = Location(47.3769, 8.5417)
+  /** The venues [quest] placed, by id. */
+  private val venues = mutableMapOf<String, Venue>()
   // Venues of the test's own, in Zürich: the demo data's are in Lausanne
   private val cafe = quest("cafe", "Café Zürich", here)
   // About 3 km south: the café's open card grows upwards and covers most of a small screen's width,
@@ -65,7 +68,7 @@ class QuestMarkersDeviceTest {
             override suspend fun currentLocation() = here
           },
           FakeQuestRepository(initialQuests = listOf(cafe, bar, geneva)),
-          FakeVenueRepository(),
+          FakeVenueRepository(venues.values.toList()),
       )
   private val camera = CameraPositionState()
   // Written on the main thread, read on the test thread
@@ -127,14 +130,14 @@ class QuestMarkersDeviceTest {
 
   /** Taps an open card just above its pointer. */
   private fun tapCard(quest: Quest) {
-    tapAbove(quest.location, (MarkerDefaults.dimensions.pointerHeight.value + 16f))
+    tapAbove(quest.location(), (MarkerDefaults.dimensions.pointerHeight.value + 16f))
   }
 
   /** Taps the middle of [quest]'s round pin, which stands on its location, until its card opens. */
   private fun openCard(quest: Quest) {
     val dimensions = MarkerDefaults.dimensions
     val pin =
-        pointAbove(quest.location, (dimensions.pointerHeight + dimensions.pinDiameter / 2).value)
+        pointAbove(quest.location(), (dimensions.pointerHeight + dimensions.pinDiameter / 2).value)
     composeTestRule.tapMapUntil(C.Tag.MAP, { pin }) { state.selectedVenueId == quest.venueId }
     awaitSelected(quest.venueId)
   }
@@ -205,7 +208,7 @@ class QuestMarkersDeviceTest {
   @Test
   fun panningToAnotherCityShowsItsVenues() {
     composeTestRule.runOnUiThread {
-      camera.move(CameraUpdateFactory.newLatLngZoom(geneva.location.toLatLng(), 13f))
+      camera.move(CameraUpdateFactory.newLatLngZoom(geneva.location().toLatLng(), 13f))
     }
 
     awaitPins("geneva")
@@ -227,20 +230,25 @@ class QuestMarkersDeviceTest {
     awaitPins("cafe", "bar")
   }
 
-  private fun quest(venueId: String, venueName: String, location: Location) =
-      Quest(
-          id = "$venueId-quest",
-          venueId = venueId,
-          venueName = venueName,
-          location = location,
-          radiusMeters = 50,
-          title = "Order the secret menu",
-          description = "Description",
-          requirements = "Requirements",
-          proofType = ProofType.PHOTO,
-          reward = Reward.Other("Free coffee"),
-          status = QuestStatus.ACTIVE,
-          createdAt = 1_000L,
-          updatedAt = 1_000L,
-      )
+  /** Where [Quest]'s venue, and so its pin, is. */
+  private fun Quest.location() = checkNotNull(venues.getValue(venueId).location)
+
+  /** A quest of a venue named [venueName] at [location], which it adds to [venues]. */
+  private fun quest(venueId: String, venueName: String, location: Location): Quest {
+    venues[venueId] =
+        Venue(venueId, venueName, location, radiusMeters = 50, address = null, createdAt = 0L)
+    return Quest(
+        id = "$venueId-quest",
+        venueId = venueId,
+        radiusMeters = 50,
+        title = "Order the secret menu",
+        description = "Description",
+        requirements = "Requirements",
+        proofType = ProofType.PHOTO,
+        reward = Reward.Other("Free coffee"),
+        status = QuestStatus.ACTIVE,
+        createdAt = 1_000L,
+        updatedAt = 1_000L,
+    )
+  }
 }

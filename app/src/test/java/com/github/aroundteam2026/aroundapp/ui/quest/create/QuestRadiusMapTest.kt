@@ -31,6 +31,7 @@ class QuestRadiusMapTest {
             rewardActions = QuestRewardActions(),
             onSubmit = {},
             onClose = {},
+            onRetryVenue = {},
         )
       }
     }

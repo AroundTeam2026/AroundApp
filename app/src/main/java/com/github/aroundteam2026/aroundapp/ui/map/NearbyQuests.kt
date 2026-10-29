@@ -40,8 +40,8 @@ data class NearbyQuest(
  * One row per quest valid at [now], by the same rule as the map's pins.
  *
  * Each row shows its venue as the venue's pin does (see [shownVenue]): its name and location from
- * [venues] when known there, else from the venue's featured quest, so every quest of a venue gets
- * the same name, avatar and distance.
+ * [venues], so every quest of a venue gets the same name, avatar and distance. A venue missing from
+ * [venues], or without a location yet, has no rows.
  *
  * With the explorer's position [from], it lists the quests within [NEARBY_RADIUS_METERS] of it,
  * nearest first. Without it, there is nothing to measure from: it lists every valid quest, by venue
@@ -49,7 +49,7 @@ data class NearbyQuest(
  * beside another venue at the same distance or with the same name, newest first, then by smallest
  * id.
  *
- * @param venues The known venues, by id; venues missing from it are drawn from their quests.
+ * @param venues The known venues, by id.
  * @param from The explorer's position, or null when unknown.
  * @param locale The language whose rules sort venue names when [from] is unknown.
  * @param avatarOf What the pager shows for a venue, given its record when known and its name, as
@@ -68,8 +68,8 @@ fun nearbyQuests(
           .filter { it.isValidAt(now) }
           .groupBy { it.venueId }
           .flatMap { (venueId, own) ->
-            val venue = venues[venueId]
-            val shown = shownVenue(own, venue)
+            val venue = venues[venueId] ?: return@flatMap emptyList()
+            val shown = shownVenue(own, venue) ?: return@flatMap emptyList()
             val distance = from?.distanceTo(shown.location)
             if (distance != null && distance > NEARBY_RADIUS_METERS) return@flatMap emptyList()
             val avatar = avatarOf(venue, shown.name)

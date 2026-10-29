@@ -11,7 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
+import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import java.util.UUID
 
 /** The password of every account created here; only the Auth emulator ever sees it. */
@@ -61,7 +61,8 @@ private fun ComposeTestRule.register(
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
-  waitUntil(TIMEOUT_MS) { onAllNodes(hasTestTag(landsOn)).fetchSemanticsNodes().isNotEmpty() }
+  // Signing up creates the Auth account and writes the profile, which is slow on a cold emulator
+  waitUntil(SETUP_TIMEOUT_MS) { onAllNodes(hasTestTag(landsOn)).fetchSemanticsNodes().isNotEmpty() }
   onNodeWithTag(landsOn).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
 }

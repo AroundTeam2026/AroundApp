@@ -1,6 +1,8 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus.APPROVED
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus.PENDING
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus.REJECTED
@@ -8,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Tests [canTransition] and the construction rules of [Completion]. */
+/** Tests [canTransition] and the construction rules of [Completion] and its [Proof]. */
 class CompletionStatusTest {
   private val allowed = setOf(PENDING to APPROVED, PENDING to REJECTED)
 
@@ -17,10 +19,9 @@ class CompletionStatusTest {
       Completion(
           id = "c1",
           reservationId = "r1",
-          questId = "q1",
           venueId = "v1",
           explorerUid = "u1",
-          proofUrl = "https://example.com/proof.jpg",
+          proof = Proof.Photo("https://example.com/proof.jpg"),
           status = status,
           rejectReason = rejectReason,
           submittedAt = 0L,
@@ -64,5 +65,24 @@ class CompletionStatusTest {
   @Test(expected = IllegalArgumentException::class)
   fun approvedCompletion_withReason_isRejected() {
     completion(APPROVED, "Photo is blurry")
+  }
+
+  /** Each kind of proof gives its own type, which is what the quest's proof type is checked on. */
+  @Test
+  fun proof_hasTheTypeOfItsKind() {
+    assertEquals(ProofType.PHOTO, Proof.Photo("https://example.com/proof.jpg").type)
+    assertEquals(ProofType.TEXT, Proof.Text("A fox behind the bar").type)
+  }
+
+  /** A photo proof without its URL points at nothing, so it is refused. */
+  @Test(expected = IllegalArgumentException::class)
+  fun photoProof_withBlankUrl_isRejected() {
+    Proof.Photo(" ")
+  }
+
+  /** An answer made only of spaces says nothing, so it is refused. */
+  @Test(expected = IllegalArgumentException::class)
+  fun textProof_withBlankAnswer_isRejected() {
+    Proof.Text("  ")
   }
 }

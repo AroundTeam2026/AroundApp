@@ -38,12 +38,12 @@ One venue per account in v1, so the document id is the owner's uid.
 
 ### `quests/{questId}`
 
+The venue's name and location are not copied here: they are read from `venues/{venueId}`, so they never go stale.
+
 | Field | Type | Notes |
 |---|---|---|
 | `venueId` | string | The venue owner's uid. |
-| `venueName` | string | Copied from the venue at creation, so the map needs a single query. |
-| `location` | GeoPoint | Copied from the venue at creation. |
-| `radiusMeters` | int | Distance from `location` within which a visit counts. 20 to 200; the create-quest form starts from the venue's radius. |
+| `radiusMeters` | int | Distance from the venue's `location` within which a visit counts, so moving the venue's area re-centres every quest's area too. 20 to 200; the create-quest form starts from the venue's radius. |
 | `title` | string | At most 60 characters. |
 | `description` | string | At most 500 characters. |
 | `requirements` | string | At most 300 characters. |
@@ -80,14 +80,16 @@ Every type may also have `expiresAt` (timestamp?): when the reward stops being v
 
 | Field | Type | Notes |
 |---|---|---|
-| `reservationId` | string | |
-| `questId` | string | |
+| `reservationId` | string | The quest is the reservation's, so it isn't stored here. |
 | `venueId` | string | Id of the venue that owns the quest. |
 | `explorerUid` | string | |
-| `proofUrl` | string | Cloud Storage URL. |
+| `photoUrl` | string? | Cloud Storage URL of the photo, for a `PHOTO` quest. |
+| `textAnswer` | string? | The written answer, for a `TEXT` quest. |
 | `status` | `PENDING`, `APPROVED` or `REJECTED` | |
 | `rejectReason` | string? | Required when `status` is `REJECTED`; must be absent otherwise. Enforced in `Completion`. |
 | `submittedAt` | timestamp | |
+
+Exactly one of `photoUrl` and `textAnswer` is present, and it isn't blank (enforced by `Proof`). Which one must match the quest's `proofType`; the rules will check that.
 
 Model only for now: there is no completions repository yet.
 
@@ -119,10 +121,10 @@ Every create and update must match its collection's table above: only the listed
 
 ## Decided changes
 
-Decided in #259, from the review of #25 and from R2. The tables above still describe `main`; each task updates them when it lands.
+Decided in #259, from the review of #25 and from R2 (#274). The tables above describe `main`; a change still in progress updates them when it lands.
 
-- **Copied venue fields in `quests`: adopted.** `venueName` and `location` go stale once a venue can rename itself or move its area, and dropping them later would mean migrating every stored quest. Readers take them from `venues/{venueId}` with `observeVenues`, one query for all the venues on screen, as the overview already does. F4a moves the map and nearby quests to the venue; then F4b stops writing the copies, and the rules reject them.
-- **Party membership: adopted, in steps.** `explorerUids` loses who withdrew from a party. A party document plus one membership document per explorer keeps that history. This sprint, P1 decides the model and P2a adds it with a fake repository. Moving the reservation's readers off `explorerUids` (the venue page, the overview, `observeForExplorer` and the read rule) comes with the parties stretch in Sprint 4; until then reservations keep `explorerUids`.
-- **Ids copied into `completions`: only `questId` is dropped.** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules will check them against the reservation on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields. Task: F5.
-- **Text proof: adopted.** `proofUrl` can't tell a typed answer from an uploaded photo. A completion holds `photoUrl` for a `PHOTO` quest or `textAnswer` for a `TEXT` quest, never both. Task: F5, before Sprint 4 builds proof submission.
-- **The explorer's name copied into `reservations`: kept.** A user can read only their own `users/{uid}`, so the venue has no other way to show who reserved. The copy is the name at booking time, which is what the venue needs for a short-lived reservation. Task: R2.
+- **Copied venue fields in `quests`: adopted, done in #279 (F4a and F4b).** `venueName` and `location` go stale once a venue can rename itself or move its area, and dropping them later would mean migrating every stored quest. Readers take them from `venues/{venueId}` with `observeVenues`, one `in` query per 30 venues, as the overview (#269) does, and the rules reject the copies. The quests already stored on `around-67942` keep them until #283 removes them.
+- **Party membership: adopted, in #281.** `explorerUids` loses who withdrew from a party. One membership document per explorer and reservation (`party_user`) keeps that history. #281 replaces `explorerUids` this sprint and moves its readers (the venue page, the overview, `observeForExplorer` and the read rule) onto the memberships.
+- **Ids copied into `completions`: only `questId` is dropped, done in #272 (F5).** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules will check them against the reservation and its memberships on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields.
+- **Text proof: adopted, done in #272 (F5).** `proofUrl` couldn't tell a typed answer from an uploaded photo, so a completion holds `photoUrl` for a `PHOTO` quest or `textAnswer` for a `TEXT` quest, never both.
+- **The explorer's name copied into `reservations`: kept, in #274 (R2).** A user can read only their own `users/{uid}`, so the venue has no other way to show who reserved. The copy is the name at booking time, which is what the venue needs for a short-lived reservation.

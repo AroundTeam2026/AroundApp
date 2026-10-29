@@ -91,8 +91,6 @@ class ExplorerJourneyTest : TestCase() {
               Quest(
                   id = "",
                   venueId = uid,
-                  venueName = venueName,
-                  location = HERE,
                   radiusMeters = QuestLimits.DEFAULT_RADIUS_METERS,
                   title = questTitle,
                   description = "Find the hidden fox",

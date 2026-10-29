@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -33,7 +34,8 @@ import kotlinx.coroutines.launch
  * The radius starts at the venue's own radius once it is loaded, unless the venue has already
  * chosen one; until then, or if the venue can't be read, it is [QuestLimits.DEFAULT_RADIUS_METERS].
  * The venue's location, once loaded, centres the radius map and is where the saved quest takes
- * place. [clock] tells which day it is, to reject a reward expiry that has already passed.
+ * place. If the venue can't be read, the form says so and [retryVenue] reads it again. [clock]
+ * tells which day it is, to reject a reward expiry that has already passed.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
@@ -180,6 +182,17 @@ class CreateQuestViewModel(
     }
   }
 
+  /**
+   * Reads the venue again after it couldn't be read, keeping the form as filled in. Does nothing
+   * otherwise, or while a retry is already under way.
+   */
+  fun retryVenue() {
+    val form = mutableUiState.value
+    if (!form.venueLoadFailed || form.retryingVenue) return
+    mutableUiState.update { it.copy(retryingVenue = true) }
+    viewModelScope.launch { loadVenue() }
+  }
+
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
 
   private fun updateReward(transform: (RewardFormState) -> RewardFormState) {
@@ -196,7 +209,8 @@ class CreateQuestViewModel(
 
   /**
    * Reads the signed-in venue: its location for the radius map, and its radius as the starting one,
-   * unless the venue has already chosen one.
+   * unless the venue has already chosen one. A read that fails is shown as
+   * [CreateQuestUiState.venueLoadFailed] until a read succeeds.
    */
   private suspend fun loadVenue() {
     val venueId = authRepository.currentUserId.value ?: return
@@ -205,10 +219,14 @@ class CreateQuestViewModel(
           venueRepository.getVenue(venueId)
         } catch (cancelled: CancellationException) {
           throw cancelled
-        } catch (_: Exception) {
-          // The default radius still makes a valid quest, so the form stays usable
-          null
-        } ?: return
+        } catch (e: Exception) {
+          Log.w(TAG, "Reading venue $venueId failed", e)
+          // The form stays filled in; without the venue's location it can't be saved until a retry
+          mutableUiState.update { it.copy(venueLoadFailed = true, retryingVenue = false) }
+          return
+        }
+    mutableUiState.update { it.copy(venueLoadFailed = false, retryingVenue = false) }
+    if (venue == null) return
     this.venue = venue
     val radius = clampRadius(venue.radiusMeters)
     mutableUiState.update {
@@ -226,6 +244,8 @@ class CreateQuestViewModel(
       meters.coerceIn(QuestLimits.MIN_RADIUS_METERS, QuestLimits.MAX_RADIUS_METERS)
 
   companion object {
+    private const val TAG = "CreateQuestViewModel"
+
     /** Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories. */
     fun factory(): ViewModelProvider.Factory = viewModelFactory {
       initializer {

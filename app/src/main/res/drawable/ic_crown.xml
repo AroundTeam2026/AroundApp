@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The crown of the venue dashboard's "Leader" tag, from Figma; tinted where it is drawn -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="12dp"
+    android:height="8dp"
+    android:viewportWidth="12"
+    android:viewportHeight="8">
+    <path
+        android:fillColor="@android:color/black"
+        android:pathData="M0,8L1,1L4,4L6,0L8,4L11,1L12,8H0Z" />
+</vector>

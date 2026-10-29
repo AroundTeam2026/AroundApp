@@ -87,6 +87,10 @@ sealed interface SaveState {
  *   which shows the radius slider.
  * @property venueLocation Where the venue is, to centre the radius map; null until it is loaded, or
  *   if the venue has no location.
+ * @property venueLoadFailed Whether reading the venue failed, so the form explains why it can't be
+ *   saved and offers to read it again.
+ * @property retryingVenue Whether the venue is being read again after it failed; the explanation
+ *   stays meanwhile, and another retry can't start.
  * @property minPartySize Smallest party allowed, never below [QuestLimits.MIN_PARTY_SIZE].
  * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
  *   least that many.
@@ -104,6 +108,8 @@ data class CreateQuestUiState(
     val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
     val customRadius: Boolean = false,
     val venueLocation: Location? = null,
+    val venueLoadFailed: Boolean = false,
+    val retryingVenue: Boolean = false,
     val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
     val exactPartySize: Boolean = false,
     val reward: RewardFormState = RewardFormState(),
@@ -157,8 +163,6 @@ data class CreateQuestUiState(
       Quest(
           id = "",
           venueId = venue.id,
-          venueName = venue.name,
-          location = requireNotNull(venue.location),
           radiusMeters = radiusMeters,
           title = title.trim(),
           description = description.trim(),
