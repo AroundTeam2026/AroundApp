@@ -241,28 +241,38 @@ class PartyRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: the read rule lets someone outside the party, or a member who withdrew, read it, instead
-   * of the flow ending with PERMISSION_DENIED as the KDoc promises.
+   * Bug: the read rule lets someone outside the party read it, instead of the flow ending with
+   * PERMISSION_DENIED as the KDoc promises.
    */
   @Test
-  fun observeMembers_byAnOutsiderOrAWithdrawnMember_failsWithPermissionDenied() =
-      withTimeoutBlocking {
-        friend.join(reservationId, friendUid).getOrThrow()
-        // A later clock, since the rules refuse a withdrawal that leaves updatedAt unchanged
-        PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
-            .withdraw(reservationId, friendUid)
-            .getOrThrow()
-        signInNewUser(OUTSIDER_APP, Role.EXPLORER)
-        val outsiderDb = emulatorClient(OUTSIDER_APP)
-        try {
-          val outsider = PartyRepositoryFirestore(outsiderDb)
+  fun observeMembers_byAnOutsider_failsWithPermissionDenied() = withTimeoutBlocking {
+    signInNewUser(OUTSIDER_APP, Role.EXPLORER)
+    val outsiderDb = emulatorClient(OUTSIDER_APP)
+    try {
+      val outsider = PartyRepositoryFirestore(outsiderDb)
 
-          assertPermissionDenied(runCatching { outsider.observeMembers(reservationId).first() })
-          assertPermissionDenied(runCatching { friend.observeMembers(reservationId).first() })
-        } finally {
-          outsiderDb.terminate().await()
-        }
-      }
+      assertPermissionDenied(runCatching { outsider.observeMembers(reservationId).first() })
+    } finally {
+      outsiderDb.terminate().await()
+    }
+  }
+
+  /**
+   * Bug: the read rule refuses a member who withdrew, so a withdrawn creator, who still sees the
+   * reservation, can no longer list its party.
+   */
+  @Test
+  fun observeMembers_byAWithdrawnMember_listsTheParty() = withTimeoutBlocking {
+    friend.join(reservationId, friendUid).getOrThrow()
+    // A later clock, since the rules refuse a withdrawal that leaves updatedAt unchanged
+    PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
+        .withdraw(reservationId, friendUid)
+        .getOrThrow()
+
+    val members = friend.observeMembers(reservationId).first { it.size == 2 }
+
+    assertEquals(setOf(explorerUid, friendUid), members.map { it.uid }.toSet())
+  }
 
   /** Bug: a malformed document crashes the listener or ends the flow instead of being skipped. */
   @Test
