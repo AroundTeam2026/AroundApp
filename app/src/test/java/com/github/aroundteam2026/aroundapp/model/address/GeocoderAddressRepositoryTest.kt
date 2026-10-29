@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.address
 
 import android.location.Address
@@ -12,6 +13,7 @@ import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import java.io.IOException
 import java.util.Locale
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -236,6 +238,7 @@ class GeocoderAddressRepositoryTest {
     assertEquals(setOf(true, false), geocoding.calls.map { it.within != null }.toSet())
   }
 
+  @OptIn(ExperimentalCoroutinesApi::class)
   @Test
   fun bothLookupsRunAtTheSameTime() = runTest {
     val nearbyGate = CompletableDeferred<Unit>()
