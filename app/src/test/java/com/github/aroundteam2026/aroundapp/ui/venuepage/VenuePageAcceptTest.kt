@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
@@ -361,6 +362,74 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun aWriteWaitingForTheServerShowsAcceptingNotAccepted() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    val answer = CompletableDeferred<Result<Unit>>().also { server.answer = it }
+    openAndPick("a")
+
+    viewModel.accept()
+    runCurrent()
+    assertEquals(1, server.list.value.size) // Firestore already lists the local copy
+    assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
+
+    answer.complete(Result.success(Unit))
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+  }
+
+  @Test
+  fun aWriteRefusedWhileWaitingNeverShowsAccepted() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    val answer = CompletableDeferred<Result<Unit>>().also { server.answer = it }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+
+    // The refusal arrives before Firestore drops its local copy
+    answer.complete(Result.failure(IOException("denied")))
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+
+    server.list.value = emptyList()
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+  }
+
+  @Test
+  fun aWriteRefusedAfterItsCopyIsDroppedShowsFailed() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    val answer = CompletableDeferred<Result<Unit>>().also { server.answer = it }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+
+    server.list.value = emptyList()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
+
+    answer.complete(Result.failure(IOException("denied")))
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+  }
+
+  @Test
+  fun aQuestRefusedWhileWaitingCanBeAcceptedAgain() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    server.answer = CompletableDeferred(Result.failure<Unit>(IOException("denied")))
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+    server.list.value = emptyList() // Firestore drops the refused copy
+
+    server.answer = null
+    viewModel.accept()
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+  }
+
+  @Test
   fun aReservationTheVenueAnswersIsNotARefusal() = test {
     openAndPick("a")
     viewModel.accept()
@@ -461,11 +530,13 @@ private class GatedReservationRepository(private val inner: ReservationRepositor
 /**
  * A repository whose reservations are [list], which a test sets to play what the server does after
  * a write: [createReservation] adds a pending copy at once, as Firestore's local copy does, unless
- * [showsWrites] is off.
+ * [showsWrites] is off, then returns at once or, while [answer] is set, once the server answers.
  */
 private class ScriptedReservationRepository : ReservationRepository by FakeReservationRepository() {
   val list = MutableStateFlow<List<Reservation>>(emptyList())
   var showsWrites = true
+  /** While set, [createReservation] waits for this answer and fails if the server refuses. */
+  var answer: CompletableDeferred<Result<Unit>>? = null
   /** While set, the listener fails the next time the list changes. */
   var broken = false
   private var next = 1
@@ -473,6 +544,9 @@ private class ScriptedReservationRepository : ReservationRepository by FakeReser
   override suspend fun createReservation(reservation: Reservation): Result<String> {
     val id = "server-${next++}"
     if (showsWrites) list.value += reservation.copy(id = id)
+    answer?.await()?.onFailure {
+      return Result.failure(it)
+    }
     return Result.success(id)
   }
 
