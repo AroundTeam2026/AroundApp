@@ -10,10 +10,14 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property status Whether the overview is loading, shown, or failed.
  * @property rows One row per pending or approved reservation, soonest slot first. Empty until
  *   [status] is [OverviewStatus.LOADED], and may stay empty then.
+ * @property cancellingIds Ids of the reservations being cancelled right now, among [rows].
+ * @property failedCancelIds Ids of the reservations whose last cancel failed, among [rows].
  */
 data class OverviewUiState(
     val status: OverviewStatus = OverviewStatus.LOADING,
     val rows: List<OverviewRow> = emptyList(),
+    val cancellingIds: Set<String> = emptySet(),
+    val failedCancelIds: Set<String> = emptySet(),
 )
 
 /**
