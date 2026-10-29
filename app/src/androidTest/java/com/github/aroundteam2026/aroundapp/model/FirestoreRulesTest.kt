@@ -479,6 +479,20 @@ class FirestoreRulesTest {
     )
   }
 
+  /** The creator joins in the same batch that creates the reservation, which getAfter sees. */
+  @Test
+  fun explorerJoinsAReservationCreatedInTheSameBatch() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = newReservation()
+
+    val batch = db.batch()
+    batch.set(reservation, reservation(quest, venue, listOf(explorer)))
+    batch.set(membership(reservation.id, explorer), member(reservation.id, explorer))
+    assertSucceeds(batch.commit())
+  }
+
   @Test
   fun partyMemberMustFollowTheSchema() {
     val venue = newUser(Role.VENUE)
@@ -515,6 +529,7 @@ class FirestoreRulesTest {
         membership.update(withdrawal + ("joinedAt" to Timestamp.now())),
         "a withdrawal that moves joinedAt",
     )
+    assertDenied(membership.update("status", "WITHDRAWN"), "a withdrawal without updatedAt")
     assertSucceeds(membership.update(withdrawal))
     assertDenied(membership.update("status", "JOINED"), "WITHDRAWN -> JOINED")
     assertDenied(membership.set(member(reservation.id, explorer)), "joining again")
