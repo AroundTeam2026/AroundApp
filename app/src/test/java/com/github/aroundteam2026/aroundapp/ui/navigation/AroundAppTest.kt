@@ -29,6 +29,13 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.map.MapViewModel
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewContent
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRow
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRowStatus
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewStatus
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewUiState
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import org.junit.Assert.assertEquals
@@ -43,7 +50,9 @@ class AroundAppTest {
   private lateinit var navController: NavHostController
 
   private fun launch(
-      app: @Composable () -> Unit = { AroundApp(explorerUid = "explorer", onSignOut = {}) }
+      app: @Composable () -> Unit = {
+        AroundApp(explorerUid = "explorer", onSignOut = {}, overview = { OverviewOnFakes(it) })
+      }
   ) = composeTestRule.setContent(app)
 
   /** Shows the app with stand-ins for the tabs' screens, to check the navigation alone. */
@@ -145,7 +154,39 @@ class AroundAppTest {
     launch()
 
     composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.OVERVIEW_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.OVERVIEW_TITLE).assertIsDisplayed()
+  }
+
+  // The row passes its venue's id, and Back returns to the overview in the Quests tab
+  @Test
+  fun aRowOfTheOverviewOpensItsVenuesPage() {
+    launch {
+      navController = rememberNavController()
+      AroundApp(
+          explorerUid = "explorer",
+          onSignOut = {},
+          navController = navController,
+          venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+          overview = { onOpenVenue ->
+            OverviewContent(
+                OverviewUiState(OverviewStatus.LOADED, listOf(overviewRow())),
+                onOpenVenue,
+                onRetry = {},
+            )
+          },
+      )
+    }
+    composeTestRule.onNodeWithTag("${C.Tag.OVERVIEW_ROW}_reservation-1").performClick()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    val venueId = composeTestRule.runOnUiThread {
+      navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
+    }
+    assertEquals("venue-1", venueId)
+
+    composeTestRule.pressBack()
+    assertShowing(Tab.QUESTS)
+    composeTestRule.onNodeWithTag(C.Tag.OVERVIEW_TITLE).assertIsDisplayed()
   }
 
   // Otherwise no tab is selected while a screen opened from a tab is shown
@@ -241,6 +282,22 @@ class AroundAppTest {
     composeTestRule.onNodeWithTag(Tab.MAP.screenTag).assertTextEquals("2")
   }
 }
+
+/** An accepted quest at the venue `venue-1`. */
+private fun overviewRow() =
+    OverviewRow(
+        reservationId = "reservation-1",
+        questId = "fox",
+        venueId = "venue-1",
+        questTitle = "Find the hidden fox",
+        reward = null,
+        venueName = "Café Lumen",
+        address = null,
+        avatar = VenueAvatar.Initials("CL"),
+        slotStart = 0L,
+        partySize = 1,
+        status = OverviewRowStatus.WAITING,
+    )
 
 /** Counts its taps; the count outlives leaving the tab only if navigation saved its state. */
 @Composable

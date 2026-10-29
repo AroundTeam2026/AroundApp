@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
-    <!-- A card of the Quests tab: one quest the explorer accepted -->
+    <!-- The Quests tab: the quests the explorer accepted -->
+    <string name="overview_title">My quests</string>
+    <plurals name="overview_count">
+        <item quantity="one">%1$d accepted</item>
+        <item quantity="other">%1$d accepted</item>
+    </plurals>
+    <string name="overview_failed">Couldn\'t load your quests. Check your connection and try again.</string>
+    <string name="overview_retry">Try again</string>
+    <string name="overview_empty_title">No quests yet</string>
+    <string name="overview_empty_body">Accept a quest on a venue\'s page and it shows up here.</string>
     <!-- Where a reservation stands with its venue -->
     <string name="overview_status_waiting">Waiting for the venue</string>
     <string name="overview_status_approved">Approved</string>
@@ -14,6 +23,6 @@
         <item quantity="one">%1$d person</item>
         <item quantity="other">%1$d people</item>
     </plurals>
-    <!-- What tapping a card does, read by screen readers; the argument is the venue's name -->
+    <!-- What tapping a row does, read by screen readers; the argument is the venue's name -->
     <string name="overview_open_venue">Open %1$s</string>
 </resources>

@@ -22,6 +22,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.dashboardDestination
 import com.github.aroundteam2026.aroundapp.ui.dashboard.navigateToDashboard
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
@@ -52,6 +53,7 @@ class RoutesTest {
           onSignOut = {},
           navController = navController,
           venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+          overview = { OverviewOnFakes(it) },
       )
     }
     composeTestRule.waitForIdle()
