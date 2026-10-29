@@ -138,6 +138,28 @@ class PartyRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: join waits for the server without a limit, so it hangs while the device is offline, or
+   * fails instead of leaving the write queued until the device is back online.
+   */
+  @Test
+  fun join_whileOffline_succeedsAfterTheTimeoutAndIsSentOnceBackOnline() = withTimeoutBlocking {
+    val repository =
+        PartyRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) { JOINED_AT }
+    explorerDb.disableNetwork().await()
+    try {
+      repository.join(reservationId, explorerUid).getOrThrow()
+    } finally {
+      explorerDb.enableNetwork().await()
+    }
+    explorerDb.waitForPendingWrites().await()
+
+    assertEquals(
+        listOf(explorerUid),
+        venue.observeMembers(reservationId).first { it.isNotEmpty() }.map { it.uid },
+    )
+  }
+
+  /**
    * Bug: withdrawing deletes the membership, so the party's history is lost, does not record when
    * it happened, or can happen twice.
    */
@@ -220,6 +242,28 @@ class PartyRepositoryFirestoreTest {
     }
   }
 
+  /**
+   * Bug: the read rule lets someone outside the party, or a member who withdrew, read it, instead
+   * of the flow ending with PERMISSION_DENIED as the KDoc promises.
+   */
+  @Test
+  fun observeMembers_byAnOutsiderOrAWithdrawnMember_failsWithPermissionDenied() =
+      withTimeoutBlocking {
+        explorer.join(reservationId, explorerUid).getOrThrow()
+        friend.join(reservationId, friendUid).getOrThrow()
+        friend.withdraw(reservationId, friendUid).getOrThrow()
+        signInNewUser(OUTSIDER_APP, Role.EXPLORER)
+        val outsiderDb = emulatorClient(OUTSIDER_APP)
+        try {
+          val outsider = PartyRepositoryFirestore(outsiderDb)
+
+          assertPermissionDenied(runCatching { outsider.observeMembers(reservationId).first() })
+          assertPermissionDenied(runCatching { friend.observeMembers(reservationId).first() })
+        } finally {
+          outsiderDb.terminate().await()
+        }
+      }
+
   /** Bug: a malformed document crashes the listener or ends the flow instead of being skipped. */
   @Test
   fun observeMembers_skipsMalformedDocuments() = withTimeoutBlocking {
@@ -280,12 +324,16 @@ class PartyRepositoryFirestoreTest {
     const val EXPLORER_APP = "party-test-explorer"
     const val FRIEND_APP = "party-test-friend"
     const val VENUE_APP = "party-test-venue"
+    const val OUTSIDER_APP = "party-test-outsider"
 
     /** The display name signInNewUser gives every profile; the rules require it on reservations. */
     const val EXPLORER_NAME = "Test"
 
     /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
     const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
+
+    /** A confirmation timeout far below [TIMEOUT_MS], so the offline test outlasts it quickly. */
+    const val SHORT_TIMEOUT_MS = 500L
 
     /** Join and withdrawal times; the non-zero ms catch precision loss. */
     const val JOINED_AT = 1_700_000_000_123L
