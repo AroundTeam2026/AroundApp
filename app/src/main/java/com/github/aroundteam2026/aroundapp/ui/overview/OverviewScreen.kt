@@ -220,47 +220,29 @@ private val ILLUSTRATION_ICON_SIZE = 48.dp
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun OverviewPreview() {
-  val row =
-      OverviewRow(
-          reservationId = "reservation-1",
-          questId = "fox",
-          venueId = "cafe",
-          questTitle = "Find the hidden fox",
-          reward = Reward.FreeItem("croissant", specifics = null),
-          venueName = "Café Lumière",
-          address = "Rue de Bourg 12",
-          avatar = VenueAvatar.Initials("CL"),
-          slotStart = System.currentTimeMillis(),
-          partySize = 3,
-          status = OverviewRowStatus.APPROVED,
-      )
   AroundAppTheme {
     OverviewContent(
         OverviewUiState(
             status = OverviewStatus.LOADED,
             rows =
                 listOf(
-                    row,
-                    row.copy(
-                        reservationId = "reservation-2",
-                        questTitle = "Brunch for six",
-                        venueName = "Boulangerie Soleil",
-                        avatar = VenueAvatar.Initials("BS"),
-                        partySize = 6,
-                        status = OverviewRowStatus.WAITING,
-                    ),
+                    OverviewRow(
+                        reservationId = "reservation-1",
+                        questId = "fox",
+                        venueId = "cafe",
+                        questTitle = "Find the hidden fox",
+                        reward = Reward.FreeItem("croissant", specifics = null),
+                        venueName = "Café Lumière",
+                        address = "Rue de Bourg 12",
+                        avatar = VenueAvatar.Initials("CL"),
+                        slotStart = System.currentTimeMillis(),
+                        partySize = 3,
+                        status = OverviewRowStatus.APPROVED,
+                    )
                 ),
         ),
         onOpenVenue = {},
         onRetry = {},
     )
-  }
-}
-
-@Preview(name = "Empty")
-@Composable
-private fun OverviewEmptyPreview() {
-  AroundAppTheme {
-    OverviewContent(OverviewUiState(status = OverviewStatus.LOADED), onOpenVenue = {}, onRetry = {})
   }
 }
