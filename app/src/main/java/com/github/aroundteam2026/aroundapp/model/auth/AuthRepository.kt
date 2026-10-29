@@ -46,6 +46,12 @@ interface AuthRepository {
    */
   suspend fun signInWithGoogle(idToken: String): Result<String>
 
+  /**
+   * Creates an account with a Google credential. An existing Google account is rejected without
+   * publishing a signed-in session; callers can direct its owner to [signInWithGoogle] instead.
+   */
+  suspend fun signUpWithGoogle(idToken: String): Result<String>
+
   /** Signs the current user out. Does nothing if nobody is signed in. */
   fun signOut()
 }

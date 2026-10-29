@@ -49,11 +49,14 @@ class RoleRoutingActivityTest {
     }
     compose.waitUntil(SETUP_TIMEOUT_MS) {
       compose.onAllNodes(hasTestTag(C.Tag.AUTH_EMAIL)).fetchSemanticsNodes().isEmpty() &&
-          compose.onAllNodes(hasTestTag(C.Tag.AUTH_SUBMIT)).fetchSemanticsNodes().isNotEmpty()
+          compose
+              .onAllNodes(hasTestTag(C.Tag.AUTH_EXPLORER_CARD))
+              .fetchSemanticsNodes()
+              .isNotEmpty()
     }
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_EXPLORER_CARD).performScrollTo().performClick()
     awaitTag(C.Tag.NAV_BAR)
     assertEquals(
         Role.EXPLORER,

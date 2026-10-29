@@ -18,7 +18,9 @@
     <string name="auth_sign_up">Sign up</string>
     <string name="auth_already_have_account">Already have an account?</string>
     <string name="auth_venue_account">Create venue account</string>
-    <string name="auth_complete_registration">Complete registration</string>
+    <string name="auth_complete_registration">Choose your account type</string>
+    <string name="auth_choose_explorer">Continue as an explorer</string>
+    <string name="auth_choose_business">Continue as a venue</string>
     <string name="auth_venue_link">Signing up a business? Create a venue account</string>
     <string name="auth_account_setup_error">Could not save your account type. Please try again.</string>
     <string name="auth_email">Email</string>
@@ -36,7 +38,7 @@
     </plurals>
     <string name="auth_password_mismatch">Passwords do not match.</string>
     <string name="auth_wrong_credentials">The email or password is incorrect.</string>
-    <string name="auth_email_taken">An account already exists with this email.</string>
+    <string name="auth_email_taken">An account already exists with this email. Sign in instead.</string>
     <string name="auth_network_error">Could not connect. Check your connection and try again.</string>
     <string name="auth_unknown_error">Something went wrong. Please try again.</string>
     <string name="auth_sign_out">Sign out</string>

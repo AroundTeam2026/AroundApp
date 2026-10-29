@@ -192,10 +192,12 @@ class RegistrationFlowTest {
     if (existingProfile) runBlocking { users.createUser(User(uid, "Ada", null, 42L)).getOrThrow() }
     auth.nextError = AuthError.Network
     launch()
-    compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextContains("Complete registration")
+    compose
+        .onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE)
+        .assertTextEquals("Choose your account type")
     listOf(C.Tag.AUTH_EMAIL, C.Tag.AUTH_PASSWORD, C.Tag.AUTH_CONFIRMATION, C.Tag.AUTH_BACK)
         .forEach { compose.onNodeWithTag(it).assertDoesNotExist() }
-    click(if (role == Role.VENUE) C.Tag.AUTH_VENUE_LINK else C.Tag.AUTH_SUBMIT)
+    click(if (role == Role.VENUE) C.Tag.AUTH_BUSINESS_CARD else C.Tag.AUTH_EXPLORER_CARD)
     assertFinished(role)
     assertEquals(uid, auth.currentUserId.value)
     assertEquals(AuthError.Network, auth.nextError)
@@ -208,12 +210,12 @@ class RegistrationFlowTest {
     runBlocking { auth.signUpWithEmail("existing@around.test", "123456").getOrThrow() }
     pending.failSave = true
     launch()
-    click(C.Tag.AUTH_VENUE_LINK)
+    click(C.Tag.AUTH_BUSINESS_CARD)
     compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertIsDisplayed()
     assertEquals(0, completionNotifications)
     assertNull(runBlocking { users.getUser(requireNotNull(auth.currentUserId.value)) })
     pending.failSave = false
-    click(C.Tag.AUTH_VENUE_LINK)
+    click(C.Tag.AUTH_BUSINESS_CARD)
     assertFinished(Role.VENUE)
     assertEquals(1, completionNotifications)
   }
@@ -239,21 +241,23 @@ class RegistrationFlowTest {
         }
     if (completeExplorer) runBlocking { auth.signUpWithEmail("existing@around.test", "123456") }
     launch(store)
-    if (completeExplorer) click(C.Tag.AUTH_SUBMIT)
+    if (completeExplorer) click(C.Tag.AUTH_EXPLORER_CARD)
     else RegistrationScreen(compose).registerVenue("venue@around.test", "123456")
     compose.onNodeWithTag(C.Tag.AUTH_LOADING).assertIsDisplayed()
     val tags =
-        if (completeExplorer) listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_VENUE_LINK)
+        if (completeExplorer) listOf(C.Tag.AUTH_EXPLORER_CARD, C.Tag.AUTH_BUSINESS_CARD)
         else listOf(C.Tag.AUTH_SUBMIT, C.Tag.AUTH_BACK)
     tags.forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
     back()
     assertEquals(0, backFallbacks)
     if (!completeExplorer) assertNull(auth.currentUserId.value)
-    compose
-        .onNodeWithTag(C.Tag.AUTH_TITLE)
-        .assertTextContains(
-            if (completeExplorer) "Complete registration" else "Create venue account"
-        )
+    if (completeExplorer) {
+      compose
+          .onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE)
+          .assertTextEquals("Choose your account type")
+    } else {
+      compose.onNodeWithTag(C.Tag.AUTH_TITLE).assertTextContains("Create venue account")
+    }
     compose.runOnIdle { gate.complete(Unit) }
     assertFinished(if (completeExplorer) Role.EXPLORER else Role.VENUE)
   }

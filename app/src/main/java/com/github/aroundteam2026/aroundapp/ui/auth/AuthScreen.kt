@@ -104,12 +104,10 @@ private enum class AuthFormMode(@param:StringRes val title: Int) {
   SIGN_IN(R.string.auth_sign_in),
   EXPLORER_SIGN_UP(R.string.auth_create_account),
   VENUE_SIGN_UP(R.string.auth_venue_account),
-  COMPLETE_REGISTRATION(R.string.auth_complete_registration),
 }
 
-private fun formMode(step: AuthStep, completeRegistration: Boolean): AuthFormMode =
+private fun formMode(step: AuthStep): AuthFormMode =
     when {
-      completeRegistration -> AuthFormMode.COMPLETE_REGISTRATION
       step == AuthStep.SIGN_IN -> AuthFormMode.SIGN_IN
       step == AuthStep.VENUE_ACCOUNT -> AuthFormMode.VENUE_SIGN_UP
       else -> AuthFormMode.EXPLORER_SIGN_UP
@@ -122,7 +120,7 @@ private fun formMode(step: AuthStep, completeRegistration: Boolean): AuthFormMod
  * fields but submit their own role. Back follows the path used to open the Venue form. The
  * navigation owner observes AuthRepository.currentUserId for success and decides the destination.
  * Google sign-in users with no profile choose their role afterward; Google signup carries the role
- * chosen here. [completeRegistration] skips Welcome and offers the same two choices without
+ * chosen here. [completeRegistration] skips Welcome and presents the role cards without
  * credentials. Use [RegistrationFlow] to provide profile setup and receive account-completion
  * notifications. [googleSignInClient] acquires credentials in the UI; tests supply a chooser result
  * without opening a personal account.
@@ -137,7 +135,7 @@ fun AuthScreen(
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   var step by
       rememberSaveable(completeRegistration) {
-        mutableStateOf(if (completeRegistration) AuthStep.CREATE_ACCOUNT else AuthStep.WELCOME)
+        mutableStateOf(if (completeRegistration) AuthStep.ACCOUNT_TYPE else AuthStep.WELCOME)
       }
   var venueOrigin by rememberSaveable { mutableStateOf(AuthStep.ACCOUNT_TYPE) }
   var signInOrigin by rememberSaveable { mutableStateOf(AuthStep.WELCOME) }
@@ -175,12 +173,19 @@ fun AuthScreen(
       )
     } else if (step == AuthStep.ACCOUNT_TYPE) {
       AccountTypeChoice(
-          enabled = !state.isLoading,
+          state = state,
+          completeRegistration = completeRegistration,
           onBack = back,
-          onExplorer = { openStep(AuthStep.CREATE_ACCOUNT) },
+          onExplorer = {
+            if (completeRegistration) viewModel.completeRegistration(Role.EXPLORER)
+            else openStep(AuthStep.CREATE_ACCOUNT)
+          },
           onBusiness = {
-            venueOrigin = AuthStep.ACCOUNT_TYPE
-            openStep(AuthStep.VENUE_ACCOUNT)
+            if (completeRegistration) viewModel.completeRegistration(Role.VENUE)
+            else {
+              venueOrigin = AuthStep.ACCOUNT_TYPE
+              openStep(AuthStep.VENUE_ACCOUNT)
+            }
           },
           onSignIn = {
             signInOrigin = AuthStep.ACCOUNT_TYPE
@@ -191,7 +196,7 @@ fun AuthScreen(
       AuthForm(
           viewModel = viewModel,
           state = state,
-          mode = formMode(step, completeRegistration),
+          mode = formMode(step),
           googleSignInClient = googleSignInClient,
           onBack = back,
           onVenue = {
@@ -203,10 +208,11 @@ fun AuthScreen(
   }
 }
 
-/** Account type choice from Welcome, before either credentials form. */
+/** Account type choice before signup, or for a signed-in user without a saved role. */
 @Composable
 private fun AccountTypeChoice(
-    enabled: Boolean,
+    state: AuthUiState,
+    completeRegistration: Boolean,
     onBack: () -> Unit,
     onExplorer: () -> Unit,
     onBusiness: () -> Unit,
@@ -224,10 +230,15 @@ private fun AccountTypeChoice(
                 bottom = AroundSpacing.ScreenBottom,
             )
     ) {
-      BackButton(enabled = enabled, onClick = onBack)
-      Spacer(Modifier.height(AroundSpacing.Large))
+      if (!completeRegistration) {
+        BackButton(enabled = !state.isLoading, onClick = onBack)
+        Spacer(Modifier.height(AroundSpacing.Large))
+      }
       Text(
-          stringResource(R.string.auth_choose_account_type),
+          stringResource(
+              if (completeRegistration) R.string.auth_complete_registration
+              else R.string.auth_choose_account_type
+          ),
           style = MaterialTheme.typography.headlineLarge,
           color = MaterialTheme.colorScheme.onBackground,
           modifier = Modifier.testTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE).semantics { heading() },
@@ -244,37 +255,48 @@ private fun AccountTypeChoice(
           horizontalArrangement = Arrangement.spacedBy(AccountCardGap),
       ) {
         AccountTypeCard(
-            title = stringResource(R.string.auth_explorer),
+            title =
+                stringResource(
+                    if (completeRegistration) R.string.auth_choose_explorer
+                    else R.string.auth_explorer
+                ),
             description = stringResource(R.string.auth_explorer_description),
             icon = R.drawable.auth_explorer_icon,
             highlighted = false,
-            enabled = enabled,
+            enabled = !state.isLoading,
             onClick = onExplorer,
             modifier = Modifier.weight(1f).testTag(C.Tag.AUTH_EXPLORER_CARD),
         )
         AccountTypeCard(
-            title = stringResource(R.string.auth_business),
+            title =
+                stringResource(
+                    if (completeRegistration) R.string.auth_choose_business
+                    else R.string.auth_business
+                ),
             description = stringResource(R.string.auth_business_description),
             icon = R.drawable.auth_business_icon,
             highlighted = true,
-            enabled = enabled,
+            enabled = !state.isLoading,
             onClick = onBusiness,
             modifier = Modifier.weight(1f).testTag(C.Tag.AUTH_BUSINESS_CARD),
         )
       }
+      AuthFormStatus(state)
       Spacer(Modifier.weight(1f).heightIn(min = AroundSpacing.Medium))
-      Text(
-          stringResource(R.string.auth_already_have_account),
-          style = AroundTextStyles.InlineBody,
-          color = MaterialTheme.colorScheme.onBackground,
-          modifier = Modifier.align(Alignment.CenterHorizontally),
-      )
-      Spacer(Modifier.height(AroundSpacing.Medium))
-      AuthSignInButton(
-          onClick = onSignIn,
-          enabled = enabled,
-          modifier = Modifier.testTag(C.Tag.AUTH_CHOICE_SIGN_IN),
-      )
+      if (!completeRegistration) {
+        Text(
+            stringResource(R.string.auth_already_have_account),
+            style = AroundTextStyles.InlineBody,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        Spacer(Modifier.height(AroundSpacing.Medium))
+        AuthSignInButton(
+            onClick = onSignIn,
+            enabled = !state.isLoading,
+            modifier = Modifier.testTag(C.Tag.AUTH_CHOICE_SIGN_IN),
+        )
+      }
     }
   }
 }
@@ -370,10 +392,8 @@ private fun AuthForm(
                     bottom = AroundSpacing.ScreenBottom,
                 ),
     ) {
-      if (mode != AuthFormMode.COMPLETE_REGISTRATION) {
-        BackButton(enabled = !state.isLoading, onClick = onBack)
-        Spacer(Modifier.height(AroundSpacing.Large))
-      }
+      BackButton(enabled = !state.isLoading, onClick = onBack)
+      Spacer(Modifier.height(AroundSpacing.Large))
       Text(
           stringResource(mode.title),
           style = MaterialTheme.typography.headlineLarge,
@@ -385,7 +405,6 @@ private fun AuthForm(
           viewModel,
           state,
           isCreatingAccount = mode != AuthFormMode.SIGN_IN,
-          showCredentials = mode != AuthFormMode.COMPLETE_REGISTRATION,
       )
       AuthFormStatus(state)
       Spacer(Modifier.weight(1f).heightIn(min = AroundSpacing.ExtraLarge))
@@ -406,9 +425,7 @@ private fun AuthCredentials(
     viewModel: AuthViewModel,
     state: AuthUiState,
     isCreatingAccount: Boolean,
-    showCredentials: Boolean,
 ) {
-  if (!showCredentials) return
   LabeledField(stringResource(R.string.auth_email)) { label ->
     OutlinedTextField(
         value = state.email,
@@ -493,15 +510,9 @@ private fun ColumnScope.AuthFormActions(
     googleScope: CoroutineScope,
     onVenue: () -> Unit,
 ) {
-  if (
-      viewModel.supportsRegistration &&
-          (mode == AuthFormMode.EXPLORER_SIGN_UP || mode == AuthFormMode.COMPLETE_REGISTRATION)
-  ) {
+  if (viewModel.supportsRegistration && mode == AuthFormMode.EXPLORER_SIGN_UP) {
     TextButton(
-        onClick = {
-          if (mode == AuthFormMode.COMPLETE_REGISTRATION) viewModel.completeRegistration(Role.VENUE)
-          else onVenue()
-        },
+        onClick = onVenue,
         enabled = !state.isLoading,
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_VENUE_LINK),
         // The default primary colour is unreadable on the dark background.
@@ -512,9 +523,7 @@ private fun ColumnScope.AuthFormActions(
     Spacer(Modifier.height(AroundSpacing.Small))
   }
   AuthSubmitButton(viewModel, state, mode)
-  if (mode != AuthFormMode.COMPLETE_REGISTRATION) {
-    AuthGoogleAction(viewModel, state, mode, googleSignInClient, googleScope)
-  }
+  AuthGoogleAction(viewModel, state, mode, googleSignInClient, googleScope)
 }
 
 @Composable
@@ -538,7 +547,6 @@ private fun submitAuthForm(viewModel: AuthViewModel, mode: AuthFormMode) {
     AuthFormMode.SIGN_IN -> viewModel.signIn()
     AuthFormMode.EXPLORER_SIGN_UP -> viewModel.signUp(Role.EXPLORER)
     AuthFormMode.VENUE_SIGN_UP -> viewModel.signUp(Role.VENUE)
-    AuthFormMode.COMPLETE_REGISTRATION -> viewModel.completeRegistration(Role.EXPLORER)
   }
 }
 
@@ -547,8 +555,7 @@ private fun authSubmitLabel(mode: AuthFormMode): Int =
     when (mode) {
       AuthFormMode.VENUE_SIGN_UP -> R.string.auth_venue_account
       AuthFormMode.SIGN_IN -> R.string.auth_sign_in
-      AuthFormMode.EXPLORER_SIGN_UP,
-      AuthFormMode.COMPLETE_REGISTRATION -> R.string.auth_create_account
+      AuthFormMode.EXPLORER_SIGN_UP -> R.string.auth_create_account
     }
 
 @Composable
