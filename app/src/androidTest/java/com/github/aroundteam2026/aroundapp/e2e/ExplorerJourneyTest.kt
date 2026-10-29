@@ -182,7 +182,9 @@ class ExplorerJourneyTest : TestCase() {
               .getString(R.string.overview_status_waiting)
       composeTestRule
           .onNode(
-              hasText(waiting) and hasAnyAncestor(hasTestTag(C.Tag.OVERVIEW_ROW_STATUS)),
+              // The card shows its status in capitals
+              hasText(waiting, ignoreCase = true) and
+                  hasAnyAncestor(hasTestTag(C.Tag.OVERVIEW_ROW_STATUS)),
               useUnmergedTree = true,
           )
           .assertIsDisplayed()
