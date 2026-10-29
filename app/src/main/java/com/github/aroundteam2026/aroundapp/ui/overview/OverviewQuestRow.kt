@@ -33,7 +33,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
-import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
@@ -255,36 +254,23 @@ private val DETAIL_ICON_SIZE = 13.dp
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun OverviewQuestRowPreview() {
-  val row =
-      OverviewRow(
-          reservationId = "reservation-1",
-          questId = "fox",
-          venueId = "cafe",
-          questTitle = "Find the hidden fox",
-          reward = Reward.FreeItem("croissant", specifics = null),
-          venueName = "Café Lumière",
-          address = "Rue de Bourg 12",
-          avatar = VenueAvatar.Initials("CL"),
-          slotStart = System.currentTimeMillis(),
-          partySize = 3,
-          status = OverviewRowStatus.APPROVED,
-      )
   AroundAppTheme {
-    Column(
-        Modifier.background(MaterialTheme.colorScheme.background).padding(AroundSpacing.ExtraLarge),
-        verticalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
+    Box(
+        Modifier.background(MaterialTheme.colorScheme.background).padding(AroundSpacing.ExtraLarge)
     ) {
-      OverviewQuestRow(row, onClick = {})
       OverviewQuestRow(
-          row.copy(
-              reservationId = "reservation-2",
-              questTitle = "Brunch for six",
-              reward = Reward.Discount(15.0, DiscountUnit.PERCENT, specifics = null),
-              venueName = "Boulangerie Soleil",
-              avatar = VenueAvatar.Initials("BS"),
-              slotStart = 1_800_000_000_000L,
-              partySize = 6,
-              status = OverviewRowStatus.WAITING,
+          OverviewRow(
+              reservationId = "reservation-1",
+              questId = "fox",
+              venueId = "cafe",
+              questTitle = "Find the hidden fox",
+              reward = Reward.FreeItem("croissant", specifics = null),
+              venueName = "Café Lumière",
+              address = "Rue de Bourg 12",
+              avatar = VenueAvatar.Initials("CL"),
+              slotStart = System.currentTimeMillis(),
+              partySize = 3,
+              status = OverviewRowStatus.APPROVED,
           ),
           onClick = {},
       )

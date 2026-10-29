@@ -95,6 +95,18 @@ class OverviewQuestRowTest {
     part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("$day · ${time(later)}")
   }
 
+  // The app passes no clock, so the card reads the device's: a quest booked now is today
+  @Test
+  fun withoutAClockTheCardUsesTheDevicesDay() {
+    compose.setContent {
+      AroundAppTheme {
+        OverviewQuestRow(row(slotStart = System.currentTimeMillis()), onClick = { clicks++ })
+      }
+    }
+
+    part(C.Tag.OVERVIEW_ROW_SLOT).assert(hasText("Today · ", substring = true))
+  }
+
   @Test
   fun aCardWithoutAddressOrRewardLeavesThemOut() {
     show(row(address = null, reward = null))
