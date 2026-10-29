@@ -21,8 +21,12 @@ class VenuePinsTest {
 
   private val now = 10_000L
 
+  /** The pins for [quests], with [venues] and a default record for every other venue. */
   private fun pins(quests: List<Quest>, vararg venues: Venue) =
-      buildVenuePins(quests, venues.associateBy { it.id }, now)
+      buildVenuePins(quests, withRecords(quests, *venues), now)
+
+  private fun withRecords(quests: List<Quest>, vararg venues: Venue): Map<String, Venue> =
+      quests.associate { it.venueId to testVenue(id = it.venueId) } + venues.associateBy { it.id }
 
   @Test
   fun noQuestsMeanNoPins() {
@@ -31,13 +35,14 @@ class VenuePinsTest {
 
   @Test
   fun aVenueWithOneQuestGetsAPinShowingIt() {
-    val quest = testQuest(id = "q1", venueId = "cafe", venueName = "Café Lumen")
+    val quest = testQuest(id = "q1", venueId = "cafe")
+    val venue = testVenue(id = "cafe", name = "Café Lumen", location = Location(2.0, 2.0))
 
-    val pin = pins(listOf(quest)).single()
+    val pin = pins(listOf(quest), venue).single()
 
     assertEquals("cafe", pin.venueId)
     assertEquals("Café Lumen", pin.venueName)
-    assertEquals(quest.location, pin.location)
+    assertEquals(Location(2.0, 2.0), pin.location)
     assertEquals(quest, pin.featuredQuest)
     assertEquals(0, pin.otherQuestCount)
   }
@@ -200,55 +205,21 @@ class VenuePinsTest {
   }
 
   @Test
-  fun aKnownVenueGivesThePinItsCurrentNameAndPlace() {
-    // Quests copy both at creation, so the venue's own record is newer when the map has it
-    val quests =
-        listOf(testQuest(venueId = "cafe", venueName = "Old name", location = Location(1.0, 1.0)))
-    val venue = testVenue(id = "cafe", name = "New name", location = Location(2.0, 2.0))
-
-    val pin = pins(quests, venue).single()
-
-    assertEquals("New name", pin.venueName)
-    assertEquals(Location(2.0, 2.0), pin.location)
-  }
-
-  @Test
-  fun aVenueNotPlacedYetIsDrawnWhereItsFeaturedQuestIs() {
-    val quests =
-        listOf(
-            testQuest(id = "old", venueId = "cafe", location = Location(1.0, 1.0), createdAt = 1),
-            testQuest(id = "new", venueId = "cafe", location = Location(3.0, 3.0), createdAt = 3),
-        )
+  fun aVenueNotPlacedYetGetsNoPin() {
+    val quests = listOf(testQuest(venueId = "cafe"), testQuest(id = "q2", venueId = "bar"))
     val venue = testVenue(id = "cafe", location = null)
 
-    assertEquals(Location(3.0, 3.0), pins(quests, venue).single().location)
+    assertEquals(listOf("bar"), pins(quests, venue).map { it.venueId })
   }
 
   @Test
-  fun anUnknownVenueIsDrawnFromItsFeaturedQuest() {
-    // As with Firestore quests until venues are in Firestore too
-    val quests =
-        listOf(
-            testQuest(
-                id = "old",
-                venueId = "cafe",
-                venueName = "Old",
-                location = Location(1.0, 1.0),
-                createdAt = 1,
-            ),
-            testQuest(
-                id = "new",
-                venueId = "cafe",
-                venueName = "New",
-                location = Location(3.0, 3.0),
-                createdAt = 3,
-            ),
-        )
+  fun anUnknownVenueGetsNoPin() {
+    // Its name and location come from its record only
+    val quests = listOf(testQuest(venueId = "cafe"), testQuest(id = "q2", venueId = "bar"))
 
-    val pin = pins(quests).single()
+    val pins = buildVenuePins(quests, mapOf("bar" to testVenue(id = "bar")), now)
 
-    assertEquals("New", pin.venueName)
-    assertEquals(Location(3.0, 3.0), pin.location)
+    assertEquals(listOf("bar"), pins.map { it.venueId })
   }
 
   @Test
@@ -260,10 +231,9 @@ class VenuePinsTest {
 
   @Test
   fun cardsShowTheVenuesInitialsUntilVenuesHaveImages() {
-    val quests = listOf(testQuest(venueId = "cafe", venueName = "Old name"))
+    val quests = listOf(testQuest(venueId = "cafe"))
     val venue = testVenue(id = "cafe", name = "Bar des Arches")
 
-    // From the name the card shows: the venue's own, not the quest's copy
     assertEquals(VenueAvatar.Initials("BA"), pins(quests, venue).single().avatar)
   }
 
@@ -276,13 +246,14 @@ class VenuePinsTest {
     val quests =
         listOf(
             testQuest(venueId = "cafe"),
-            testQuest(id = "q2", venueId = "bar", venueName = "Bar Nocturne"),
+            testQuest(id = "q2", venueId = "bar"),
         )
+    val bar = testVenue(id = "bar", name = "Bar Nocturne")
 
     val pins =
         buildVenuePins(
                 quests,
-                mapOf("cafe" to cafe),
+                mapOf("cafe" to cafe, "bar" to bar),
                 now,
                 iconOf = { venue ->
                   askedIcons += venue
@@ -295,8 +266,8 @@ class VenuePinsTest {
             )
             .associateBy { it.venueId }
 
-    assertEquals(setOf(cafe, null), askedIcons.toSet())
-    assertEquals(setOf(cafe to "Café Lumen", null to "Bar Nocturne"), askedAvatars.toSet())
+    assertEquals(setOf(cafe, bar), askedIcons.toSet())
+    assertEquals(setOf(cafe to "Café Lumen", bar to "Bar Nocturne"), askedAvatars.toSet())
     assertEquals(TestAvatar("cafe-icon"), pins.getValue("cafe").icon)
     assertEquals(VenueAvatar.QuestFlag, pins.getValue("bar").icon)
     assertEquals(TestAvatar("Bar Nocturne"), pins.getValue("bar").avatar)
@@ -312,11 +283,17 @@ class VenuePinsTest {
     val here = Location(46.5197, 6.6323)
     val quests =
         listOf(
-            testQuest(venueId = "cafe", location = Location(46.5220, 6.6330)),
-            testQuest(id = "q2", venueId = "geneva", location = Location(46.2044, 6.1432)),
+            testQuest(venueId = "cafe"),
+            testQuest(id = "q2", venueId = "geneva"),
+        )
+    val venues =
+        withRecords(
+            quests,
+            testVenue(id = "cafe", location = Location(46.5220, 6.6330)),
+            testVenue(id = "geneva", location = Location(46.2044, 6.1432)),
         )
 
-    val pins = buildVenuePins(quests, emptyMap(), now, from = here).associateBy { it.venueId }
+    val pins = buildVenuePins(quests, venues, now, from = here).associateBy { it.venueId }
 
     assertEquals(
         here.distanceTo(Location(46.5220, 6.6330)),
@@ -327,33 +304,10 @@ class VenuePinsTest {
   }
 
   @Test
-  fun theDistanceIsToWhereThePinStands() {
-    // The venue's own place when known, as for the pin itself
-    val here = Location(46.5197, 6.6323)
-    val quests = listOf(testQuest(venueId = "cafe", location = Location(1.0, 1.0)))
-    val venue = testVenue(id = "cafe", location = Location(46.5220, 6.6330))
-
-    val pin = buildVenuePins(quests, mapOf("cafe" to venue), now, from = here).single()
-
-    assertEquals(here.distanceTo(Location(46.5220, 6.6330)), pin.distanceMeters!!, 1e-6)
-  }
-
-  @Test
-  fun theAreaIsTheVenuesRadiusWhenKnown() {
+  fun theAreaIsTheVenuesRadius() {
     val quests = listOf(testQuest(venueId = "cafe").copy(radiusMeters = 80))
     val venue = testVenue(id = "cafe").copy(radiusMeters = 120)
 
     assertEquals(120, pins(quests, venue).single().areaRadiusMeters)
-  }
-
-  @Test
-  fun anUnknownVenuesAreaIsItsFeaturedQuestsRadius() {
-    val quests =
-        listOf(
-            testQuest(id = "old", venueId = "cafe", createdAt = 1).copy(radiusMeters = 40),
-            testQuest(id = "new", venueId = "cafe", createdAt = 2).copy(radiusMeters = 150),
-        )
-
-    assertEquals(150, pins(quests).single().areaRadiusMeters)
   }
 }

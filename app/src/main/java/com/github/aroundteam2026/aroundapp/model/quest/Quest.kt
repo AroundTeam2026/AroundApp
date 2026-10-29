@@ -1,8 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.quest
 
-import com.github.aroundteam2026.aroundapp.model.common.Location
-
 /**
  * A quest offered by a venue, which explorers complete by visiting it and submitting proof.
  *
@@ -10,9 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  * sets for them are overwritten.
  *
  * @property venueId Id of the owning venue, equal to the venue owner's uid.
- * @property venueName Copied from the venue at creation, so the map needs a single query.
- * @property location Copied from the venue at creation; where the quest takes place.
- * @property radiusMeters Distance from [location] within which a visit counts, between
+ * @property radiusMeters Distance from the venue's location within which a visit counts, between
  *   [QuestLimits.MIN_RADIUS_METERS] and [QuestLimits.MAX_RADIUS_METERS].
  * @property title Short name shown on the map, at most [QuestLimits.TITLE_MAX_LENGTH] characters.
  * @property description What the quest is about, at most [QuestLimits.DESCRIPTION_MAX_LENGTH]
@@ -32,8 +28,6 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 data class Quest(
     val id: String,
     val venueId: String,
-    val venueName: String,
-    val location: Location,
     val radiusMeters: Int,
     val title: String,
     val description: String,

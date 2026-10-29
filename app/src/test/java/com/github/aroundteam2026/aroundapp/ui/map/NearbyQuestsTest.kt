@@ -25,7 +25,13 @@ class NearbyQuestsTest {
   private val now = 1_800_000_000_000L
   private val here = Location(46.5197, 6.6323)
 
-  /** A quest at [meters] due north of [here], so its distance is known exactly. */
+  /** The venues [questAt] placed, by id; the first quest of a venue places it. */
+  private val placed = mutableMapOf<String, Venue>()
+
+  /**
+   * A quest whose venue, named [venueName], is [meters] due north of [here], so its distance is
+   * known exactly. Only the first quest of a venue places it: later ones keep its name and place.
+   */
   private fun questAt(
       meters: Double,
       id: String = "q-$meters",
@@ -34,27 +40,30 @@ class NearbyQuestsTest {
       createdAt: Long = 1_000L,
       reward: Reward? = Reward.Other("Free coffee"),
       status: QuestStatus = QuestStatus.ACTIVE,
-  ) =
-      testQuest(
-          id = id,
-          venueId = venueId,
-          venueName = venueName,
-          location = north(meters),
-          reward = reward,
-          status = status,
-          createdAt = createdAt,
-      )
+  ): Quest {
+    placed.getOrPut(venueId) { testVenue(id = venueId, name = venueName, location = north(meters)) }
+    return testQuest(
+        id = id,
+        venueId = venueId,
+        reward = reward,
+        status = status,
+        createdAt = createdAt,
+    )
+  }
 
   private fun north(meters: Double) =
       Location(here.lat + Math.toDegrees(meters / EARTH_RADIUS_METERS), here.lng)
 
-  /** The list for [quests], with names sorted as in English unless [locale] says otherwise. */
+  /**
+   * The list for [quests], with the venues [questAt] placed, replaced by [venues] where they share
+   * an id, and names sorted as in English unless [locale] says otherwise.
+   */
   private fun nearby(
       quests: List<Quest>,
       venues: List<Venue> = emptyList(),
       from: Location? = here,
       locale: Locale = Locale.ENGLISH,
-  ) = nearbyQuests(quests, venues.associateBy { it.id }, now, from, locale)
+  ) = nearbyQuests(quests, placed + venues.associateBy { it.id }, now, from, locale)
 
   private fun List<NearbyQuest>.ids() = map { it.questId }
 
@@ -64,14 +73,14 @@ class NearbyQuestsTest {
         testQuest(
             id = "fox",
             venueId = "lumen",
-            venueName = "Café Lumen",
-            location = north(300.0),
             title = "Find the hidden fox",
             reward = Reward.Other("Free coffee"),
             minPartySize = 3,
         )
 
-    val row = nearby(listOf(quest)).single()
+    val venue = testVenue(id = "lumen", name = "Café Lumen", location = north(300.0))
+
+    val row = nearby(listOf(quest), listOf(venue)).single()
 
     assertEquals("lumen", row.venueId)
     assertEquals("Café Lumen", row.venueName)
@@ -96,14 +105,15 @@ class NearbyQuestsTest {
     val asked = mutableListOf<Pair<Venue?, String>>()
     val quests =
         listOf(
-            questAt(100.0, id = "coffee", venueId = "cafe", venueName = "Old name"),
+            questAt(100.0, id = "coffee", venueId = "cafe"),
             questAt(200.0, id = "cocktail", venueId = "bar", venueName = "Bar Nocturne"),
         )
+    val venues = placed + mapOf("cafe" to cafe)
 
     val rows =
         nearbyQuests(
                 quests,
-                mapOf("cafe" to cafe),
+                venues,
                 now,
                 here,
                 avatarOf = { venue, name ->
@@ -113,26 +123,9 @@ class NearbyQuestsTest {
             )
             .associateBy { it.questId }
 
-    assertEquals(setOf(cafe to "Café Lumen", null to "Bar Nocturne"), asked.toSet())
+    assertEquals(setOf(cafe to "Café Lumen", venues["bar"] to "Bar Nocturne"), asked.toSet())
     assertEquals(TestAvatar("Café Lumen"), rows.getValue("coffee").avatar)
     assertEquals(TestAvatar("Bar Nocturne"), rows.getValue("cocktail").avatar)
-  }
-
-  @Test
-  fun everyQuestOfAVenueGetsTheSameAvatar() {
-    // Without the record, each quest's copy of the name may differ; the featured one's wins
-    val quests =
-        listOf(
-            questAt(300.0, id = "new", venueId = "bar", venueName = "Bar Nocturne", createdAt = 2),
-            questAt(300.0, id = "old", venueId = "bar", venueName = "Nocturne", createdAt = 1),
-        )
-
-    val rows = nearby(quests)
-
-    assertEquals(
-        listOf(VenueAvatar.Initials("BN"), VenueAvatar.Initials("BN")),
-        rows.map { it.avatar },
-    )
   }
 
   @Test
@@ -212,15 +205,12 @@ class NearbyQuestsTest {
   }
 
   @Test
-  fun theVenuesRecordWinsOverWhatTheQuestCopied() {
-    // Quests copy their venue's name and location at creation; the venue may have changed since
-    val quest = questAt(100.0, venueId = "lumen", venueName = "Old name")
-    val venue = testVenue(id = "lumen", name = "Café Lumen", location = north(1_200.0))
+  fun aVenueWithoutItsRecordHasNoRows() {
+    // A quest is listed under its venue's name and distance, so it can't be without them
+    val quest = testQuest(id = "fox", venueId = "unknown")
 
-    val row = nearby(listOf(quest), listOf(venue)).single()
-
-    assertEquals("Café Lumen", row.venueName)
-    assertEquals(1_200.0, row.distanceMeters!!, 0.01)
+    assertEquals(emptyList<String>(), nearby(listOf(quest)).ids())
+    assertEquals(emptyList<String>(), nearby(listOf(quest), from = null).ids())
   }
 
   @Test
@@ -232,38 +222,20 @@ class NearbyQuestsTest {
   }
 
   @Test
-  fun aVenueNotPlacedYetIsMeasuredWhereItsQuestSays() {
+  fun aVenueNotPlacedYetHasNoRows() {
     val quest = questAt(700.0, venueId = "lumen")
     val unplaced = testVenue(id = "lumen", name = "Café Lumen", location = null)
 
-    val row = nearby(listOf(quest), listOf(unplaced)).single()
-
-    assertEquals("Café Lumen", row.venueName)
-    assertEquals(700.0, row.distanceMeters!!, 0.01)
+    assertEquals(emptyList<String>(), nearby(listOf(quest), listOf(unplaced)).ids())
   }
 
   @Test
-  fun withoutItsRecordAVenueIsListedAsItsPinShowsIt() {
-    // The venue moved and was renamed between its two quests, and its record isn't known
-    val newer =
-        questAt(
-            100.0,
-            id = "newer",
-            venueId = "lumen",
-            venueName = "Café Lumen",
-            createdAt = 2_000L,
-        )
-    val older =
-        questAt(
-            NEARBY_RADIUS_METERS + 500,
-            id = "older",
-            venueId = "lumen",
-            venueName = "Lumen",
-            createdAt = 1_000L,
-        )
+  fun aVenueIsListedAsItsPinShowsIt() {
+    val newer = questAt(100.0, id = "newer", venueId = "lumen", createdAt = 2_000L)
+    val older = questAt(100.0, id = "older", venueId = "lumen", createdAt = 1_000L)
 
     val rows = nearby(listOf(newer, older))
-    val pin = buildVenuePins(listOf(newer, older), emptyMap(), now, from = here).single()
+    val pin = buildVenuePins(listOf(newer, older), placed, now, from = here).single()
 
     assertEquals(listOf("newer", "older"), rows.ids())
     rows.forEach { row ->
@@ -277,7 +249,7 @@ class NearbyQuestsTest {
     val quest = questAt(0.0, venueId = "lumen")
     val elsewhere = north(250.0)
 
-    val row = nearbyQuests(listOf(quest), emptyMap(), now, from = elsewhere).single()
+    val row = nearbyQuests(listOf(quest), placed, now, from = elsewhere).single()
 
     assertEquals(here.distanceTo(elsewhere), row.distanceMeters!!, 0.01)
   }
@@ -293,10 +265,14 @@ class NearbyQuestsTest {
   @Test
   fun withoutAPositionEveryValidQuestIsListed() {
     // Nothing to measure a radius from: the list holds whatever quests the repository gives
-    val geneva = testQuest(id = "geneva", venueId = "atelier", location = Location(46.2044, 6.1432))
+    val geneva = testQuest(id = "geneva", venueId = "atelier")
+    val atelier = testVenue(id = "atelier", location = Location(46.2044, 6.1432))
     val draft = questAt(100.0, status = QuestStatus.DRAFT)
 
-    assertEquals(listOf("geneva"), nearby(listOf(geneva, draft), from = null).ids())
+    assertEquals(
+        listOf("geneva"),
+        nearby(listOf(geneva, draft), listOf(atelier), from = null).ids(),
+    )
   }
 
   @Test
@@ -352,6 +328,7 @@ class NearbyQuestsTest {
   fun withoutAPositionTheVenuesRecordedNameIsSortedBy() {
     val renamed = questAt(100.0, id = "renamed", venueId = "lumen", venueName = "Zz old name")
     val other = questAt(200.0, id = "other", venueName = "Bar Nocturne")
+    // The venue renamed itself since
     val venue = testVenue(id = "lumen", name = "Atelier Lumen")
 
     assertEquals(

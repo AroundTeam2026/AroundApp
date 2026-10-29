@@ -130,8 +130,6 @@ object MapDemoData {
       Quest(
           id = id,
           venueId = venue.id,
-          venueName = venue.name,
-          location = venue.location!!,
           radiusMeters = venue.radiusMeters,
           title = title,
           description = "A demo quest at ${venue.name}.",

@@ -27,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
@@ -51,15 +52,20 @@ class MapScreenNearbyTest {
   private val quests =
       MutableStateFlow(
           listOf(
-              testQuest(id = "cafe-1", venueId = "cafe", venueName = "Café Lumen"),
-              testQuest(id = "bar-1", venueId = "bar", venueName = "Bar Nocturne"),
+              testQuest(id = "cafe-1", venueId = "cafe"),
+              testQuest(id = "bar-1", venueId = "bar"),
           )
       )
   private val viewModel =
       MapViewModel(
           FakeLocationRepository(Location(46.5220, 6.6330)),
           ScriptedQuestRepository.of(quests),
-          FakeVenueRepository(),
+          FakeVenueRepository(
+              listOf(
+                  testVenue(id = "cafe", name = "Café Lumen"),
+                  testVenue(id = "bar", name = "Bar Nocturne"),
+              )
+          ),
       )
 
   /** Shows the map; unless [locationOn], the explorer refuses the location permission. */

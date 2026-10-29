@@ -109,7 +109,6 @@ class VenueJourneyTest : TestCase() {
         val quest = QuestRepositoryProvider.repository.observeQuestsByVenue(uid).first().single()
         assertEquals(questTitle, quest.title)
         assertEquals(QuestStatus.ACTIVE, quest.status)
-        assertEquals(venue.location, quest.location)
       }
     }
   }

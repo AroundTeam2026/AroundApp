@@ -2,7 +2,6 @@
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorClient
@@ -13,7 +12,6 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
 import java.util.Date
 import kotlinx.coroutines.CoroutineStart
@@ -112,7 +110,9 @@ class QuestRepositoryFirestoreTest {
     // so the reads go to the server, after it has saved every write.
     db.waitForPendingWrites().await()
     val full = db.collection(QUESTS).document(fullId).get(Source.SERVER).await()
-    assertTrue(full.get("location") is GeoPoint)
+    // The venue's name and location are read from the venue, never copied onto the quest
+    assertFalse("venueName must not be stored", full.contains("venueName"))
+    assertFalse("location must not be stored", full.contains("location"))
     assertTrue(full.get("createdAt") is Timestamp)
     assertTrue(full.get("updatedAt") is Timestamp)
     assertEquals("DRAFT", full.get("status"))
@@ -259,7 +259,8 @@ class QuestRepositoryFirestoreTest {
   @Test
   fun createQuest_returnsFailureWhenTheWriteCannotBeIssued() = withTimeoutBlocking {
     // an exception thrown while building the write.
-    val result1 = repository.createQuest(quest().copy(location = Location(200.0, 0.0)))
+    val beyondYear9999 = Reward.Other("A sticker", expiresAt = Long.MAX_VALUE)
+    val result1 = repository.createQuest(quest().copy(reward = beyondYear9999))
     assertTrue(result1.isFailure)
     //  a synchronous Firestore exception occurs.
     val terminated = emulatorClient(TERMINATED_APP)
@@ -374,8 +375,6 @@ class QuestRepositoryFirestoreTest {
       Quest(
           id = "",
           venueId = venueId,
-          venueName = "Le Café",
-          location = Location(46.5191, -6.5668),
           radiusMeters = 120,
           title = "Find the mural",
           description = "A mural hides behind the bar.",
@@ -404,8 +403,6 @@ class QuestRepositoryFirestoreTest {
       Quest(
           id = id,
           venueId = venueId,
-          venueName = "Cafe",
-          location = Location(46.52, 6.57),
           radiusMeters = 50,
           title = title,
           description = "Description",

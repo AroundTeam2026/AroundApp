@@ -271,6 +271,5 @@ class VenueEntryNavigationTest {
     val saved = runBlocking { quests.observeQuestsByVenue(venue.id).first().single() }
     assertEquals("Find the mural", saved.title)
     assertEquals(venue.id, saved.venueId)
-    assertEquals(venue.location, saved.location)
   }
 }

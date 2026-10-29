@@ -2,11 +2,9 @@
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import android.util.Log
-import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Query
 import java.util.Date
 import kotlinx.coroutines.channels.awaitClose
@@ -17,11 +15,11 @@ import kotlinx.coroutines.tasks.await
 /**
  * [QuestRepository] backed by the Firestore `quests` collection.
  *
- * Firestore types stay inside this class. [Location] is stored as a `GeoPoint`, epoch-millisecond
- * times as `Timestamp`s, enums as their names and [Reward] as a nested map whose `type` field names
- * its subtype. Null fields are omitted, and the quest id is the document id rather than a stored
- * field. Documents that cannot be mapped back to a [Quest], including those whose reward cannot be
- * read, are logged and skipped: the `observe*` flows leave them out and [getQuest] returns null.
+ * Firestore types stay inside this class. Epoch-millisecond times are stored as `Timestamp`s, enums
+ * as their names and [Reward] as a nested map whose `type` field names its subtype. Null fields are
+ * omitted, and the quest id is the document id rather than a stored field. Documents that cannot be
+ * mapped back to a [Quest], including those whose reward cannot be read, are logged and skipped:
+ * the `observe*` flows leave them out and [getQuest] returns null.
  *
  * @param db Firestore client to read from and write to.
  * @param now Clock used for `createdAt` and `updatedAt`, in epoch milliseconds.
@@ -80,8 +78,6 @@ class QuestRepositoryFirestore(
   /** The document fields for this quest, with [time] as both creation and update time. */
   private fun Quest.toFirestore(time: Timestamp): Map<String, Any> = buildMap {
     put(VENUE_ID, venueId)
-    put(VENUE_NAME, venueName)
-    put(LOCATION, GeoPoint(location.lat, location.lng))
     put(RADIUS_METERS, radiusMeters)
     put(TITLE, title)
     put(DESCRIPTION, description)
@@ -120,12 +116,9 @@ class QuestRepositoryFirestore(
   private fun DocumentSnapshot.toQuest(): Quest? {
     if (!exists()) return null
     return try {
-      val location = required(LOCATION) { getGeoPoint(it) }
       Quest(
           id = id,
           venueId = required(VENUE_ID) { getString(it) },
-          venueName = required(VENUE_NAME) { getString(it) },
-          location = Location(location.latitude, location.longitude),
           radiusMeters = required(RADIUS_METERS) { getLong(it) }.toInt(),
           title = required(TITLE) { getString(it) },
           description = required(DESCRIPTION) { getString(it) },
@@ -179,8 +172,6 @@ class QuestRepositoryFirestore(
     const val QUESTS = "quests"
 
     const val VENUE_ID = "venueId"
-    const val VENUE_NAME = "venueName"
-    const val LOCATION = "location"
     const val RADIUS_METERS = "radiusMeters"
     const val TITLE = "title"
     const val DESCRIPTION = "description"

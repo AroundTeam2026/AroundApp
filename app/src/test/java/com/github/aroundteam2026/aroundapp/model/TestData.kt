@@ -13,8 +13,6 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 fun testQuest(
     id: String = "quest",
     venueId: String = "venue",
-    venueName: String = "Café Lumen",
-    location: Location = Location(46.5220, 6.6330),
     title: String = "Order the secret menu",
     reward: Reward? = Reward.FreeItem("Coffee", specifics = null),
     minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
@@ -25,8 +23,6 @@ fun testQuest(
     Quest(
         id = id,
         venueId = venueId,
-        venueName = venueName,
-        location = location,
         radiusMeters = 50,
         title = title,
         description = "Description",
