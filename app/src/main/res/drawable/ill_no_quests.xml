@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The flag on a teal disc from Figma's "My quests (empty)" screen. Its colours are the theme's
+     Tertiary (disc), Secondary and Sage (dots) and Cream (flag and outline). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="136dp"
+    android:height="136dp"
+    android:viewportWidth="136"
+    android:viewportHeight="136">
+    <path
+        android:fillColor="#FF5EA89D"
+        android:pathData="M68,0a68,68 0,1 0,0 136a68,68 0,1 0,0 -136z" />
+    <path
+        android:pathData="M52.83,87.5V50.67H76.67L72.33,59.33L76.67,68H52.83"
+        android:strokeColor="#FFFDFFE8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3.47" />
+    <path
+        android:fillColor="#FF62BAAD"
+        android:pathData="M117,15.5a9.5,9.5 0,1 0,0 19a9.5,9.5 0,1 0,0 -19z"
+        android:strokeColor="#FFFDFFE8"
+        android:strokeWidth="3" />
+    <path
+        android:fillColor="#FF3E8C80"
+        android:pathData="M18,104a6,6 0,1 0,0 12a6,6 0,1 0,0 -12z" />
+</vector>

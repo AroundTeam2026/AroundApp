@@ -33,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
+import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -94,6 +95,7 @@ class VenueEntryTest {
             viewModelFactory {
               initializer { CreateQuestViewModel(auth, venues, quests).also { createQuest = it } }
             },
+        venueQuestsFactory = venueQuestsFactoryOnFakes(),
     )
   }
 

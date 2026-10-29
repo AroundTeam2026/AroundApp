@@ -18,14 +18,20 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
  * @param navController the venue's NavHost, between the home and the screens above it.
  * @param onSignOut signs the venue out, from the Profile tab.
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
+ * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  */
 fun NavGraphBuilder.venueDestinations(
     navController: NavHostController,
     onSignOut: () -> Unit,
     createQuestFactory: ViewModelProvider.Factory,
+    venueQuestsFactory: ViewModelProvider.Factory,
 ) {
   composable(Routes.VENUE_HOME) {
-    VenueHome(onCreateQuest = navController::navigateToCreateQuest, onSignOut = onSignOut)
+    VenueHome(
+        onCreateQuest = navController::navigateToCreateQuest,
+        onSignOut = onSignOut,
+        venueQuestsFactory = venueQuestsFactory,
+    )
   }
   // By route: a second tap on X during the form's exit fade must not also pop the home
   createQuestDestination(

@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -79,7 +80,9 @@ class VenueJourneyTest : TestCase() {
     }
     step("Create a quest from the venue's home") {
       composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_TAB).performClick()
-      composeTestRule.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
+      // A new venue has no quests yet, so the empty state's button opens the form
+      waitFor(hasTestTag(C.Tag.VENUE_QUESTS_CREATE_FIRST))
+      composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_CREATE_FIRST).performClick()
       waitFor(hasTestTag(C.Tag.CREATE_QUEST_SCREEN))
       listOf(
               C.Tag.CREATE_QUEST_TITLE to questTitle,
@@ -95,6 +98,7 @@ class VenueJourneyTest : TestCase() {
       // Saving closes the form, back to the Quests tab it was opened from
       composeTestRule.waitUntil(TIMEOUT_MS) { !exists(hasTestTag(C.Tag.CREATE_QUEST_SCREEN)) }
       composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_SCREEN).assertIsDisplayed()
+      waitFor(hasTestTag(C.Tag.VENUE_QUEST_TITLE) and hasText(questTitle))
     }
     step("Firestore holds the venue's role, its venue and the quest") {
       runBlocking {

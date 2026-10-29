@@ -27,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
+import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 
 /**
  * Where a signed-in venue user enters the app: role routing's `venueScreen`, which it fills with
@@ -41,6 +42,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
  * @param navController the venue's NavHost controller; tests pass their own to read it.
  * @param areaStep draws the area step; [defaultVenueAreaStep] unless replaced, e.g. by tests.
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
+ * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  */
 @Composable
 fun VenueEntry(
@@ -53,6 +55,7 @@ fun VenueEntry(
     navController: NavHostController = rememberNavController(),
     areaStep: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
+    venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
 ) {
   when (val state = viewModel.uiState.collectAsStateWithLifecycle().value) {
     VenueEntryUiState.Loading ->
@@ -69,6 +72,7 @@ fun VenueEntry(
           venueRepository,
           locationScreen = areaStep,
           createQuestFactory = createQuestFactory,
+          venueQuestsFactory = venueQuestsFactory,
           start = state.start,
           navController = navController,
       )

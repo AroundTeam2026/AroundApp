@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
@@ -27,7 +28,11 @@ class VenueHomeTest {
   @Before
   fun launch() {
     composeTestRule.setContent {
-      VenueHome(onCreateQuest = { questsCreated++ }, onSignOut = { signOuts++ })
+      VenueHome(
+          onCreateQuest = { questsCreated++ },
+          onSignOut = { signOuts++ },
+          venueQuestsFactory = venueQuestsFactoryOnFakes(),
+      )
     }
   }
 
@@ -70,7 +75,6 @@ class VenueHomeTest {
     select(VenueTab.QUESTS)
 
     composeTestRule.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_STUB).assertIsDisplayed()
   }
 
   // VenueDestinationsTest checks that the venue's NavHost opens the form
