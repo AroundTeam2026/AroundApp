@@ -80,14 +80,16 @@ Every type may also have `expiresAt` (timestamp?): when the reward stops being v
 
 | Field | Type | Notes |
 |---|---|---|
-| `reservationId` | string | |
-| `questId` | string | |
+| `reservationId` | string | The quest is the reservation's, so it isn't stored here. |
 | `venueId` | string | Id of the venue that owns the quest. |
 | `explorerUid` | string | |
-| `proofUrl` | string | Cloud Storage URL. |
+| `photoUrl` | string? | Cloud Storage URL of the photo, for a `PHOTO` quest. |
+| `textAnswer` | string? | The written answer, for a `TEXT` quest. |
 | `status` | `PENDING`, `APPROVED` or `REJECTED` | |
 | `rejectReason` | string? | Required when `status` is `REJECTED`; must be absent otherwise. Enforced in `Completion`. |
 | `submittedAt` | timestamp | |
+
+Exactly one of `photoUrl` and `textAnswer` is present, and it isn't blank (enforced by `Proof`). Which one must match the quest's `proofType`; the rules will check that.
 
 Model only for now: there is no completions repository yet.
 
