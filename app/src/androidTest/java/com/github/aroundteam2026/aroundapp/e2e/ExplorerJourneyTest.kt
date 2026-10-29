@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -60,7 +61,8 @@ private val HERE = Location(46.5191, 6.5668)
 /**
  * An explorer's first visit, through the app as it ships on the Auth and Firestore emulators: they
  * create an account, find a venue's quest saved in Firestore among the map's nearby quests, view
- * that venue's page and accept the quest there.
+ * that venue's page and accept the quest there, then see it waiting for the venue on the Quests
+ * tab.
  */
 @RunWith(AndroidJUnit4::class)
 class ExplorerJourneyTest : TestCase() {
@@ -170,6 +172,20 @@ class ExplorerJourneyTest : TestCase() {
       assertEquals(questId, reservation.questId)
       assertEquals(venueId, reservation.venueId)
       assertEquals(ReservationStatus.PENDING, reservation.status)
+    }
+    step("The Quests tab lists the quest, waiting for the venue") {
+      composeTestRule.onNodeWithTag(C.Tag.QUESTS_TAB).performClick()
+      waitFor(hasTestTag(C.Tag.OVERVIEW_ROW_TITLE) and hasText(questTitle))
+      val waiting =
+          InstrumentationRegistry.getInstrumentation()
+              .targetContext
+              .getString(R.string.overview_status_waiting)
+      composeTestRule
+          .onNode(
+              hasText(waiting) and hasAnyAncestor(hasTestTag(C.Tag.OVERVIEW_ROW_STATUS)),
+              useUnmergedTree = true,
+          )
+          .assertIsDisplayed()
     }
   }
 
