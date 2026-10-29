@@ -95,19 +95,7 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
             auth.signOut()
             Result.failure(AuthError.EmailAlreadyInUse)
           }
-          else -> {
-            val accepted =
-                synchronized(sessionLock) {
-                  if (sessionEpoch == startingEpoch) {
-                    _currentUserId.value = uid
-                    true
-                  } else {
-                    auth.signOut()
-                    false
-                  }
-                }
-            if (accepted) Result.success(uid) else Result.failure(AuthError.InvalidCredentials)
-          }
+          else -> publishGoogleSignup(uid, startingEpoch)
         }
       } catch (e: CancellationException) {
         throw e
@@ -122,6 +110,18 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
       }
     }
   }
+
+  /** Publishes only if no sign-out happened while Firebase was resolving the credential. */
+  private fun publishGoogleSignup(uid: String, startingEpoch: Long): Result<String> =
+      synchronized(sessionLock) {
+        if (sessionEpoch == startingEpoch) {
+          _currentUserId.value = uid
+          Result.success(uid)
+        } else {
+          auth.signOut()
+          Result.failure(AuthError.InvalidCredentials)
+        }
+      }
 
   override fun signOut() {
     synchronized(sessionLock) {
