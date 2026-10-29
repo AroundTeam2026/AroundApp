@@ -251,7 +251,10 @@ class PartyRepositoryFirestoreTest {
       withTimeoutBlocking {
         explorer.join(reservationId, explorerUid).getOrThrow()
         friend.join(reservationId, friendUid).getOrThrow()
-        friend.withdraw(reservationId, friendUid).getOrThrow()
+        // A later clock, since the rules refuse a withdrawal that leaves updatedAt unchanged
+        PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
+            .withdraw(reservationId, friendUid)
+            .getOrThrow()
         signInNewUser(OUTSIDER_APP, Role.EXPLORER)
         val outsiderDb = emulatorClient(OUTSIDER_APP)
         try {
