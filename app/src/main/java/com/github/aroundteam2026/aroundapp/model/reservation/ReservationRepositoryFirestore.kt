@@ -190,7 +190,8 @@ class ReservationRepositoryFirestore(
 
   /**
    * The document fields for a new reservation. The status is always [ReservationStatus.PENDING],
-   * which is also the only status the rules let an explorer create.
+   * which is also the only status the rules let an explorer create, and its party has one joined
+   * member, the creator, whose membership is in the same batch.
    */
   private fun Reservation.toFirestore(createdAt: Timestamp): Map<String, Any> =
       mapOf(
@@ -200,6 +201,7 @@ class ReservationRepositoryFirestore(
           STATUS to ReservationStatus.PENDING.name,
           CREATED_AT to createdAt,
           EXPLORER_NAME to explorerName,
+          PartyUserFirestore.JOINED_COUNT to 1,
       )
 
   /** Maps this document to a [Reservation], or returns null if it is missing or malformed. */
@@ -232,7 +234,7 @@ class ReservationRepositoryFirestore(
     /** Long enough for the server to answer on a slow connection, short for a waiting explorer. */
     const val CONFIRM_TIMEOUT_MS = 5_000L
 
-    const val RESERVATIONS = "reservations"
+    const val RESERVATIONS = PartyUserFirestore.RESERVATIONS
 
     const val QUEST_ID = "questId"
     const val VENUE_ID = "venueId"

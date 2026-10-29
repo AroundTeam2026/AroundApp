@@ -168,6 +168,7 @@ class ReservationRepositoryFirestoreTest {
             "status",
             "createdAt",
             "explorerName",
+            "joinedCount",
         ),
         document.data!!.keys,
     )
@@ -175,6 +176,7 @@ class ReservationRepositoryFirestoreTest {
     assertTrue(document.get("createdAt") is Timestamp)
     assertEquals("PENDING", document.get("status"))
     assertEquals(EXPLORER_NAME, document.get("explorerName"))
+    assertEquals(1L, document.get("joinedCount"))
   }
 
   /**
