@@ -2,6 +2,9 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
+import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -20,12 +23,17 @@ import org.junit.Test
  * test.
  */
 class FakeReservationRepositoryTest {
+  private lateinit var party: FakePartyRepository
   private lateinit var repository: FakeReservationRepository
 
-  /** Gives every test a fresh, empty repository whose clock always returns [FIXED_NOW]. */
+  /**
+   * Gives every test a fresh, empty repository whose clock always returns [FIXED_NOW], with its
+   * parties in [party], so tests can read the memberships.
+   */
   @Before
   fun setUp() {
-    repository = FakeReservationRepository(now = { FIXED_NOW })
+    party = FakePartyRepository(now = { FIXED_NOW })
+    repository = FakeReservationRepository(now = { FIXED_NOW }, party = party)
   }
 
   /**
@@ -53,7 +61,7 @@ class FakeReservationRepositoryTest {
   @Test
   fun createReservation_assignsAnIdAndTheCreationTime() =
       runBlocking<Unit> {
-        val id = repository.createReservation(reservation()).getOrThrow()
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
 
         val stored = repository.observeForVenue("v1").first().single()
         assertEquals(id, stored.id)
@@ -61,9 +69,20 @@ class FakeReservationRepositoryTest {
       }
 
   @Test
+  fun createReservation_makesTheCreatorAJoinedMember() =
+      runBlocking<Unit> {
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
+
+        assertEquals(
+            listOf(PartyMember(id, "u1", PartyMemberStatus.JOINED, FIXED_NOW, FIXED_NOW)),
+            party.observeMembers(id).first(),
+        )
+      }
+
+  @Test
   fun createReservation_keepsTheExplorerName() =
       runBlocking<Unit> {
-        repository.createReservation(reservation()).getOrThrow()
+        repository.createReservation(reservation(), "u1").getOrThrow()
 
         assertEquals("Ada", repository.observeForVenue("v1").first().single().explorerName)
       }
@@ -74,7 +93,8 @@ class FakeReservationRepositoryTest {
         val id =
             repository
                 .createReservation(
-                    reservation(id = "caller", status = ReservationStatus.APPROVED, createdAt = 1L)
+                    reservation(id = "caller", status = ReservationStatus.APPROVED, createdAt = 1L),
+                    "u1",
                 )
                 .getOrThrow()
 
@@ -88,8 +108,8 @@ class FakeReservationRepositoryTest {
   @Test
   fun createReservation_generatesADifferentIdEachTime() =
       runBlocking<Unit> {
-        val first = repository.createReservation(reservation()).getOrThrow()
-        val second = repository.createReservation(reservation()).getOrThrow()
+        val first = repository.createReservation(reservation(), "u1").getOrThrow()
+        val second = repository.createReservation(reservation(), "u1").getOrThrow()
 
         assertNotEquals(first, second)
         assertEquals(2, repository.observeForVenue("v1").first().size)
@@ -101,15 +121,26 @@ class FakeReservationRepositoryTest {
         val failure = IllegalStateException("offline")
         repository.forcedFailure = failure
 
-        assertEquals(failure, repository.createReservation(reservation()).exceptionOrNull())
+        assertEquals(failure, repository.createReservation(reservation(), "u1").exceptionOrNull())
+        assertTrue(repository.observeForVenue("v1").first().isEmpty())
+        assertTrue(party.observeMembers("reservation-1").first().isEmpty())
+      }
+
+  @Test
+  fun createReservation_whenJoiningFails_returnsItAndStoresNoReservation() =
+      runBlocking<Unit> {
+        val failure = IllegalStateException("offline")
+        party.forcedFailure = failure
+
+        assertEquals(failure, repository.createReservation(reservation(), "u1").exceptionOrNull())
         assertTrue(repository.observeForVenue("v1").first().isEmpty())
       }
 
   @Test
   fun observeForVenue_returnsOnlyThatVenuesReservations() =
       runBlocking<Unit> {
-        val mine = repository.createReservation(reservation(venueId = "v1")).getOrThrow()
-        repository.createReservation(reservation(venueId = "v2")).getOrThrow()
+        val mine = repository.createReservation(reservation(venueId = "v1"), "u1").getOrThrow()
+        repository.createReservation(reservation(venueId = "v2"), "u1").getOrThrow()
 
         assertEquals(listOf(mine), repository.observeForVenue("v1").first().map { it.id })
       }
@@ -118,12 +149,14 @@ class FakeReservationRepositoryTest {
   fun observeForExplorer_returnsReservationsWhosePartyIncludesTheUid() =
       runBlocking<Unit> {
         val solo =
-            repository.createReservation(reservation(explorerUids = listOf("u1"))).getOrThrow()
+            repository
+                .createReservation(reservation(explorerUids = listOf("u1")), "u1")
+                .getOrThrow()
         val party =
             repository
-                .createReservation(reservation(explorerUids = listOf("u2", "u1")))
+                .createReservation(reservation(explorerUids = listOf("u2", "u1")), "u2")
                 .getOrThrow()
-        repository.createReservation(reservation(explorerUids = listOf("u2"))).getOrThrow()
+        repository.createReservation(reservation(explorerUids = listOf("u2")), "u2").getOrThrow()
 
         assertEquals(listOf(solo, party), repository.observeForExplorer("u1").first().map { it.id })
       }
@@ -136,7 +169,7 @@ class FakeReservationRepositoryTest {
               repository.observeForVenue("v1").take(2).toList()
             }
 
-        repository.createReservation(reservation()).getOrThrow()
+        repository.createReservation(reservation(), "u1").getOrThrow()
 
         val sizes = withTimeout(TIMEOUT_MS) { emissions.await() }.map { it.size }
         assertEquals(listOf(0, 1), sizes)
@@ -147,7 +180,7 @@ class FakeReservationRepositoryTest {
       runBlocking<Unit> {
         val id =
             repository
-                .createReservation(reservation(explorerUids = listOf("u1", "u2")))
+                .createReservation(reservation(explorerUids = listOf("u1", "u2")), "u1")
                 .getOrThrow()
         val before = repository.observeForVenue("v1").first().single()
 
@@ -160,7 +193,7 @@ class FakeReservationRepositoryTest {
   @Test
   fun updateStatus_allowsEachStepOfALifecycle() =
       runBlocking<Unit> {
-        val id = repository.createReservation(reservation()).getOrThrow()
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
 
         repository.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
         repository.updateStatus(id, ReservationStatus.CANCELLED).getOrThrow()
@@ -174,7 +207,7 @@ class FakeReservationRepositoryTest {
   @Test
   fun updateStatus_forbiddenTransition_failsAndKeepsTheStatus() =
       runBlocking<Unit> {
-        val id = repository.createReservation(reservation()).getOrThrow()
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
         repository.updateStatus(id, ReservationStatus.REJECTED).getOrThrow()
 
         val result = repository.updateStatus(id, ReservationStatus.APPROVED)
@@ -197,7 +230,7 @@ class FakeReservationRepositoryTest {
   @Test
   fun updateStatus_whenFailureIsForced_returnsItAndChangesNothing() =
       runBlocking<Unit> {
-        val id = repository.createReservation(reservation()).getOrThrow()
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
         val failure = IllegalStateException("offline")
         repository.forcedFailure = failure
 

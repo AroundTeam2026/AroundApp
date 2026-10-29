@@ -2,27 +2,31 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import kotlinx.coroutines.flow.Flow
 
 /** Reads and writes [Reservation]s. ViewModels depend on this interface only. */
 interface ReservationRepository {
   /**
-   * Stores a new reservation. The repository, not the caller, sets `id`, `createdAt` and `status`:
-   * it generates a fresh id, sets the creation time, and starts the reservation as
-   * [ReservationStatus.PENDING]. The values of those three fields in [reservation] are ignored.
+   * Stores a new reservation and makes [creatorUid] the first [PartyMemberStatus.JOINED] member of
+   * its party, in one atomic write: either both are stored or neither is. The repository, not the
+   * caller, sets `id`, `createdAt` and `status`: it generates a fresh id, sets the creation time,
+   * and starts the reservation as [ReservationStatus.PENDING]. The values of those three fields in
+   * [reservation] are ignored.
    *
    * Waits for the backend to confirm the write, for a bounded time. The security rules only let an
-   * explorer reserve for a party they belong to, for an active quest, so the Firestore
-   * implementation's server can refuse the write; a refusal that arrives in time is returned as a
-   * failure and nothing is stored. When no answer arrives in time, e.g. while offline, the write
-   * stays queued, is sent once the device is back online, and this returns success: a refusal after
-   * that is not reported here.
+   * explorer reserve as themselves, for a party they belong to, for an active quest, so the
+   * Firestore implementation's server can refuse the write; a refusal that arrives in time is
+   * returned as a failure and nothing is stored. When no answer arrives in time, e.g. while
+   * offline, the write stays queued, is sent once the device is back online, and this returns
+   * success: a refusal after that is not reported here.
    *
    * @param reservation the reservation to store; its `id`, `createdAt` and `status` are ignored.
+   * @param creatorUid uid of the explorer making the reservation, who joins its party.
    * @return the new reservation's id, or a failure if the write could not be issued or the backend
    *   refused it in time.
    */
-  suspend fun createReservation(reservation: Reservation): Result<String>
+  suspend fun createReservation(reservation: Reservation, creatorUid: String): Result<String>
 
   /**
    * Observes the reservations made for one venue's quests. Emits the current list on collection,

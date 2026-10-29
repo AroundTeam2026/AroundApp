@@ -40,7 +40,7 @@ class OverviewViewModelTest {
 
   /** The creation time the fake gives the next reservation; tests move it to order them. */
   private var now = START
-  private val reservations = FakeReservationRepository { now }
+  private val reservations = FakeReservationRepository({ now })
   private val listener = BreakableReservations(reservations)
 
   private val venues =
@@ -86,7 +86,8 @@ class OverviewViewModelTest {
       reservations
           .createReservation(
               newPendingReservation(questId, venueId, EXPLORER, TEST_EXPLORER_NAME, slotStart)
-                  .copy(explorerUids = party)
+                  .copy(explorerUids = party),
+              EXPLORER,
           )
           .getOrThrow()
 

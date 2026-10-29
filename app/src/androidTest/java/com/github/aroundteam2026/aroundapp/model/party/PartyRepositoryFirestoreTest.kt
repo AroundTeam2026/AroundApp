@@ -40,9 +40,9 @@ import org.junit.runner.RunWith
  * Tests [PartyRepositoryFirestore] on the Auth and Firestore emulators, so firestore.rules apply.
  *
  * Three users take part, each on their own client from [emulatorClient]: the explorer who made the
- * reservation, a friend who joins it, and the venue that owns it. Each test signs in fresh users
- * and has the explorer reserve a fresh active quest of the venue, so tests never see each other's
- * memberships. Each test's KDoc names the production bug it catches.
+ * reservation, and so is its first member, a friend who joins it, and the venue that owns it. Each
+ * test signs in fresh users and has the explorer reserve a fresh active quest of the venue, so
+ * tests never see each other's memberships. Each test's KDoc names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class PartyRepositoryFirestoreTest {
@@ -53,7 +53,7 @@ class PartyRepositoryFirestoreTest {
   private lateinit var friendDb: FirebaseFirestore
   private lateinit var venueDb: FirebaseFirestore
 
-  /** Each user's repository; the explorer's and the friend's join at [JOINED_AT]. */
+  /** Each user's repository; the explorer's and the friend's join and withdraw at [JOINED_AT]. */
   private lateinit var explorer: PartyRepositoryFirestore
   private lateinit var friend: PartyRepositoryFirestore
   private lateinit var venue: PartyRepositoryFirestore
@@ -62,7 +62,7 @@ class PartyRepositoryFirestoreTest {
   private lateinit var friendUid: String
   private lateinit var venueId: String
 
-  /** The explorer's pending reservation, created by [setUp], with no membership yet. */
+  /** The explorer's pending reservation, created by [setUp], with only their membership. */
   private lateinit var reservationId: String
 
   @Before
@@ -99,32 +99,35 @@ class PartyRepositoryFirestoreTest {
    */
   @Test
   fun join_storesAJoinedMembershipUnderTheComposedId() = withTimeoutBlocking {
-    explorer.join(reservationId, explorerUid).getOrThrow()
+    friend.join(reservationId, friendUid).getOrThrow()
 
     val document =
-        explorerDb
+        friendDb
             .collection(PARTY_USER)
-            .document("${reservationId}_$explorerUid")
+            .document("${reservationId}_$friendUid")
             .get(Source.SERVER)
             .await()
     assertTrue(document.get("joinedAt") is Timestamp)
     assertTrue(document.get("updatedAt") is Timestamp)
     assertEquals(
-        listOf(
-            PartyMember(reservationId, explorerUid, PartyMemberStatus.JOINED, JOINED_AT, JOINED_AT)
-        ),
-        venue.observeMembers(reservationId).first { it.isNotEmpty() },
+        PartyMember(reservationId, friendUid, PartyMemberStatus.JOINED, JOINED_AT, JOINED_AT),
+        venue
+            .observeMembers(reservationId)
+            .first { members -> members.any { it.uid == friendUid } }
+            .single { it.uid == friendUid },
     )
   }
 
   /** Bug: joining twice is reported as a success, or resets the first join's time. */
   @Test
   fun join_twice_returnsPermissionDeniedAndKeepsTheFirstJoin() = withTimeoutBlocking {
-    explorer.join(reservationId, explorerUid).getOrThrow()
+    friend.join(reservationId, friendUid).getOrThrow()
 
-    val later = PartyRepositoryFirestore(explorerDb) { WITHDRAWN_AT }
-    assertPermissionDenied(later.join(reservationId, explorerUid))
-    assertEquals(JOINED_AT, venue.observeMembers(reservationId).first().single().joinedAt)
+    val later = PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
+    assertPermissionDenied(later.join(reservationId, friendUid))
+    val members =
+        venue.observeMembers(reservationId).first { list -> list.any { it.uid == friendUid } }
+    assertEquals(JOINED_AT, members.single { it.uid == friendUid }.joinedAt)
   }
 
   /** Bug: an explorer joins a party the venue has already answered. */
@@ -144,18 +147,22 @@ class PartyRepositoryFirestoreTest {
   @Test
   fun join_whileOffline_succeedsAfterTheTimeoutAndIsSentOnceBackOnline() = withTimeoutBlocking {
     val repository =
-        PartyRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) { JOINED_AT }
-    explorerDb.disableNetwork().await()
+        PartyRepositoryFirestore(friendDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) { JOINED_AT }
+    friendDb.disableNetwork().await()
     try {
-      repository.join(reservationId, explorerUid).getOrThrow()
+      repository.join(reservationId, friendUid).getOrThrow()
     } finally {
-      explorerDb.enableNetwork().await()
+      friendDb.enableNetwork().await()
     }
-    explorerDb.waitForPendingWrites().await()
+    friendDb.waitForPendingWrites().await()
 
     assertEquals(
-        listOf(explorerUid),
-        venue.observeMembers(reservationId).first { it.isNotEmpty() }.map { it.uid },
+        setOf(explorerUid, friendUid),
+        venue
+            .observeMembers(reservationId)
+            .first { members -> members.any { it.uid == friendUid } }
+            .map { it.uid }
+            .toSet(),
     )
   }
 
@@ -165,31 +172,21 @@ class PartyRepositoryFirestoreTest {
    */
   @Test
   fun withdraw_keepsTheMembershipRecordsWhenAndHappensOnce() = withTimeoutBlocking {
-    explorer.join(reservationId, explorerUid).getOrThrow()
+    friend.join(reservationId, friendUid).getOrThrow()
 
-    PartyRepositoryFirestore(explorerDb) { WITHDRAWN_AT }
-        .withdraw(reservationId, explorerUid)
+    PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
+        .withdraw(reservationId, friendUid)
         .getOrThrow()
 
-    val member =
-        venue.observeMembers(reservationId).first { members ->
-          members.any { it.status == PartyMemberStatus.WITHDRAWN }
+    val members =
+        venue.observeMembers(reservationId).first { list ->
+          list.any { it.status == PartyMemberStatus.WITHDRAWN }
         }
     assertEquals(
-        listOf(
-            PartyMember(
-                reservationId,
-                explorerUid,
-                PartyMemberStatus.WITHDRAWN,
-                JOINED_AT,
-                WITHDRAWN_AT,
-            )
-        ),
-        member,
+        PartyMember(reservationId, friendUid, PartyMemberStatus.WITHDRAWN, JOINED_AT, WITHDRAWN_AT),
+        members.single { it.uid == friendUid },
     )
-    assertTrue(
-        explorer.withdraw(reservationId, explorerUid).exceptionOrNull() is IllegalStateException
-    )
+    assertTrue(friend.withdraw(reservationId, friendUid).exceptionOrNull() is IllegalStateException)
   }
 
   /**
@@ -204,14 +201,15 @@ class PartyRepositoryFirestoreTest {
   /** Bug: withdraw changes a document that cannot be mapped to a PartyMember. */
   @Test
   fun withdraw_aMalformedMembership_failsWithNoSuchElement() = withTimeoutBlocking {
-    // No status or times: the rules refuse it, so it goes past them
+    // No status or times: the rules refuse it, so it goes past them. The friend has no membership
+    // yet: the helper merges into an existing document, which would keep the explorer's fields.
     writeBypassingRules(
-        "$PARTY_USER/${reservationId}_$explorerUid",
-        mapOf("reservationId" to reservationId, "uid" to explorerUid),
+        "$PARTY_USER/${reservationId}_$friendUid",
+        mapOf("reservationId" to reservationId, "uid" to friendUid),
     )
 
     assertTrue(
-        explorer.withdraw(reservationId, explorerUid).exceptionOrNull() is NoSuchElementException
+        friend.withdraw(reservationId, friendUid).exceptionOrNull() is NoSuchElementException
     )
   }
 
@@ -221,7 +219,6 @@ class PartyRepositoryFirestoreTest {
    */
   @Test
   fun observeMembers_byAMember_emitsAFriendJoiningAfterSubscribing() = withTimeoutBlocking {
-    explorer.join(reservationId, explorerUid).getOrThrow()
     val emissions = Channel<List<PartyMember>>(Channel.UNLIMITED)
     val collector =
         launch(start = CoroutineStart.UNDISPATCHED) {
@@ -249,7 +246,6 @@ class PartyRepositoryFirestoreTest {
   @Test
   fun observeMembers_byAnOutsiderOrAWithdrawnMember_failsWithPermissionDenied() =
       withTimeoutBlocking {
-        explorer.join(reservationId, explorerUid).getOrThrow()
         friend.join(reservationId, friendUid).getOrThrow()
         // A later clock, since the rules refuse a withdrawal that leaves updatedAt unchanged
         PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
@@ -274,20 +270,14 @@ class PartyRepositoryFirestoreTest {
         "$PARTY_USER/${reservationId}_malformed",
         mapOf("reservationId" to reservationId, "uid" to "malformed", "status" to "GONE"),
     )
-    explorer.join(reservationId, explorerUid).getOrThrow()
 
     val members = venue.observeMembers(reservationId).first { it.isNotEmpty() }
 
     assertEquals(listOf(explorerUid), members.map { it.uid })
   }
 
-  /**
-   * Has the venue create an active quest and the explorer reserve it, then waits until the server
-   * has both, since the rules read them.
-   *
-   * @return the reservation's id.
-   */
-  private suspend fun createPendingReservation(): String {
+  /** Has the venue create an active quest and waits until the server has it; returns its id. */
+  private suspend fun createActiveQuest(): String {
     val quest =
         Quest(
             id = "",
@@ -304,9 +294,22 @@ class PartyRepositoryFirestoreTest {
         )
     val questId = QuestRepositoryFirestore(venueDb).createQuest(quest).getOrThrow()
     venueDb.waitForPendingWrites().await()
+    return questId
+  }
+
+  /**
+   * Has the venue create an active quest and the explorer reserve it, which makes them its first
+   * member, then waits until the server has both, since the rules read them.
+   *
+   * @return the reservation's id.
+   */
+  private suspend fun createPendingReservation(): String {
     val reservation =
-        newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START)
-    val id = ReservationRepositoryFirestore(explorerDb).createReservation(reservation).getOrThrow()
+        newPendingReservation(createActiveQuest(), venueId, explorerUid, EXPLORER_NAME, SLOT_START)
+    val id =
+        ReservationRepositoryFirestore(explorerDb)
+            .createReservation(reservation, explorerUid)
+            .getOrThrow()
     explorerDb.waitForPendingWrites().await()
     return id
   }
