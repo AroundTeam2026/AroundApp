@@ -32,12 +32,13 @@ class ReservationStatusTest {
     }
   }
 
-  /** Checks every status, so a new one has to be listed here as active or not. */
+  /** Lists every status, so a new one has to be added here as active or not. */
   @Test
   fun isActive_isTrueForPendingAndApprovedOnly() {
-    val active = setOf(PENDING, APPROVED)
-    for (status in ReservationStatus.entries) {
-      assertEquals("$status", status in active, status.isActive)
+    val expected = mapOf(PENDING to true, APPROVED to true, REJECTED to false, CANCELLED to false)
+    assertEquals(ReservationStatus.entries.toSet(), expected.keys)
+    for ((status, active) in expected) {
+      assertEquals("$status", active, status.isActive)
     }
   }
 

@@ -77,6 +77,8 @@ class ExplorerJourneyTest : TestCase() {
   private lateinit var venueId: String
   /** The seeded quest's id, which Firestore assigns. */
   private lateinit var questId: String
+  /** The id of the reservation the explorer makes, which Firestore assigns. */
+  private lateinit var reservationId: String
 
   /**
    * Puts the device at [HERE] and saves a venue and its active quest there, as a fresh venue
@@ -172,10 +174,13 @@ class ExplorerJourneyTest : TestCase() {
       assertEquals(questId, reservation.questId)
       assertEquals(venueId, reservation.venueId)
       assertEquals(ReservationStatus.PENDING, reservation.status)
+      reservationId = reservation.id
     }
     step("The Quests tab lists the quest, waiting for the venue") {
       composeTestRule.onNodeWithTag(C.Tag.QUESTS_TAB).performClick()
-      waitFor(hasTestTag(C.Tag.OVERVIEW_ROW_TITLE) and hasText(questTitle))
+      // Only this reservation's card, whatever else the tab lists
+      val inItsCard = hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId"))
+      waitFor(hasTestTag(C.Tag.OVERVIEW_ROW_TITLE) and hasText(questTitle) and inItsCard)
       val waiting =
           InstrumentationRegistry.getInstrumentation()
               .targetContext
@@ -184,7 +189,8 @@ class ExplorerJourneyTest : TestCase() {
           .onNode(
               // The card shows its status in capitals
               hasText(waiting, ignoreCase = true) and
-                  hasAnyAncestor(hasTestTag(C.Tag.OVERVIEW_ROW_STATUS)),
+                  hasAnyAncestor(hasTestTag(C.Tag.OVERVIEW_ROW_STATUS)) and
+                  inItsCard,
               useUnmergedTree = true,
           )
           .assertIsDisplayed()

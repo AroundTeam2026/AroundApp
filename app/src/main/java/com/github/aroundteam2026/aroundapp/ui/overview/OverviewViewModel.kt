@@ -169,8 +169,8 @@ class OverviewViewModel(
 }
 
 /**
- * The pending and approved reservations among [reservations], soonest slot first, then the newest,
- * ties going to the smallest id, so the order never depends on the repository's.
+ * The [ReservationStatus.isActive] reservations among [reservations], soonest slot first, then the
+ * newest, ties going to the smallest id, so the order never depends on the repository's.
  */
 internal fun activeReservations(reservations: List<Reservation>): List<Reservation> =
     reservations

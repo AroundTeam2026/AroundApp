@@ -321,8 +321,8 @@ internal fun venuePageQuests(
 
 /**
  * The size of the party the explorer has for each quest of the venue [venueId] they accepted, keyed
- * by quest id. Only pending and approved reservations count; of several for one quest, the biggest
- * party counts.
+ * by quest id. Only [ReservationStatus.isActive] reservations count; of several for one quest, the
+ * biggest party counts.
  */
 internal fun acceptedPartiesOf(reservations: List<Reservation>, venueId: String): Map<String, Int> =
     reservations
