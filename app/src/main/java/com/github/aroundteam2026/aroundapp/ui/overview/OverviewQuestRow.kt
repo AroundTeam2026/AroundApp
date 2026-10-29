@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
@@ -118,7 +119,8 @@ fun OverviewQuestRow(
         )
         QuestChips(
             row.reward,
-            minPartySize = 1,
+            // The party size has its own line, so the chips leave it out
+            minPartySize = QuestLimits.MIN_PARTY_SIZE,
             distanceMeters = null,
             venueQuestChipStyle(),
             Modifier.padding(top = REWARD_TOP),
