@@ -203,13 +203,24 @@ class ReservationRepositoryFirestoreTest {
         assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
       }
 
+  /** Bug: a reservation for a quest that doesn't exist is reported as created. */
+  @Test
+  fun createReservation_forAMissingQuest_returnsPermissionDenied() = withTimeoutBlocking {
+    val result = explorerRepository.createReservation(reservation().copy(questId = "missing"))
+
+    assertPermissionDenied(result)
+  }
+
   /**
-   * Bug: a reservation for a quest that is no longer active is reported as created. The rules
-   * refuse it, which is what happens when the venue deactivates a quest while an explorer accepts.
+   * Bug: a reservation for a quest the venue has just archived is reported as created. This is the
+   * case of the venue deactivating the quest while an explorer is accepting it: the rules only let
+   * an explorer reserve an active quest.
    */
   @Test
-  fun createReservation_forAQuestThatIsNotActive_returnsPermissionDenied() = withTimeoutBlocking {
-    val result = explorerRepository.createReservation(reservation().copy(questId = "missing"))
+  fun createReservation_forAQuestTheVenueArchived_returnsPermissionDenied() = withTimeoutBlocking {
+    venueDb.collection(QUESTS).document(questId).update("status", "ARCHIVED").await()
+
+    val result = explorerRepository.createReservation(reservation())
 
     assertPermissionDenied(result)
   }
@@ -511,6 +522,9 @@ class ReservationRepositoryFirestoreTest {
      * The Firestore collection the repository stores reservations in; some tests use it directly.
      */
     const val RESERVATIONS = "reservations"
+
+    /** The Firestore collection of quests, which a test changes directly as the venue. */
+    const val QUESTS = "quests"
 
     /** The app of the explorer that [setUp] signs in. */
     const val EXPLORER_APP = "reservation-test-explorer"
