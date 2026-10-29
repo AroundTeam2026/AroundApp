@@ -344,6 +344,25 @@ class FirestoreRulesTest {
             "a slotStart that is not a timestamp" to valid + ("slotStart" to 1_800_000_000_000L),
             "a party that is not a list" to valid + ("explorerUids" to explorer.uid),
             "an unknown field" to valid + ("leaderUid" to explorer.uid),
+            "no explorerName" to valid - "explorerName",
+            "an explorerName that is not a string" to valid + ("explorerName" to 42),
+        ),
+    )
+  }
+
+  @Test
+  fun reservationCarriesItsCreatorsOwnDisplayName() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val explorer = newUser(Role.EXPLORER)
+    val valid = reservation(quest, venue, listOf(explorer))
+
+    assertOnlyValidWriteSucceeds(
+        newReservation(),
+        valid,
+        mapOf(
+            "another name than the profile's" to valid + ("explorerName" to "Someone else"),
+            "an empty name for a named profile" to valid + ("explorerName" to ""),
         ),
     )
   }
@@ -538,6 +557,7 @@ class FirestoreRulesTest {
           "slotStart" to Timestamp.now(),
           "status" to status,
           "createdAt" to Timestamp.now(),
+          "explorerName" to DISPLAY_NAME,
       )
 
   /** A time [minutes] before now, by this device's clock. */

@@ -19,7 +19,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [ReservationRepository] backed by the Firestore `reservations` collection.
  *
  * Firestore types stay inside this class. Epoch-millisecond times are stored as `Timestamp`s and
- * the status as its enum name. The reservation id is the document id rather than a stored field.
+ * the status as its enum name. A document without `explorerName`, written before it was stored, is
+ * read with an empty one. The reservation id is the document id rather than a stored field.
  * Documents that cannot be mapped back to a [Reservation] are logged and skipped: the `observe*`
  * flows leave them out, and [updateStatus] treats them as missing.
  *
@@ -135,6 +136,7 @@ class ReservationRepositoryFirestore(
           SLOT_START to Timestamp(Date(slotStart)),
           STATUS to ReservationStatus.PENDING.name,
           CREATED_AT to createdAt,
+          EXPLORER_NAME to explorerName,
       )
 
   /** Maps this document to a [Reservation], or returns null if it is missing or malformed. */
@@ -150,6 +152,8 @@ class ReservationRepositoryFirestore(
           slotStart = required(SLOT_START) { getTimestamp(it) }.toDate().time,
           status = ReservationStatus.valueOf(required(STATUS) { getString(it) }),
           createdAt = required(CREATED_AT) { getTimestamp(it) }.toDate().time,
+          // Reservations made before the name was stored have none: show them, unnamed
+          explorerName = getString(EXPLORER_NAME) ?: "",
       )
     } catch (e: Exception) {
       Log.w(TAG, "Skipping malformed reservation document $id", e)
@@ -175,5 +179,6 @@ class ReservationRepositoryFirestore(
     const val SLOT_START = "slotStart"
     const val STATUS = "status"
     const val CREATED_AT = "createdAt"
+    const val EXPLORER_NAME = "explorerName"
   }
 }

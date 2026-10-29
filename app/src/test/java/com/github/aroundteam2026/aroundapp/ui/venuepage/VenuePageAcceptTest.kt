@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -9,7 +10,11 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
@@ -50,6 +55,8 @@ class VenuePageAcceptTest {
       )
 
   private var reservationRepository: ReservationRepository = reservations
+  private val users = ScriptedUserRepository(testUsers(EXPLORER))
+  private var userRepository: UserRepository = users
 
   private val viewModel by lazy {
     VenuePageViewModel(
@@ -57,6 +64,7 @@ class VenuePageAcceptTest {
         FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
         ScriptedQuestRepository(activeQuestsByVenue = { flowOf(quests) }),
         reservationRepository,
+        userRepository,
         EXPLORER,
         clock,
     )
@@ -83,7 +91,8 @@ class VenuePageAcceptTest {
   private suspend fun storeFor(questId: String, party: List<String> = listOf(EXPLORER)) =
       fake
           .createReservation(
-              newPendingReservation(questId, VENUE_ID, EXPLORER, START).copy(explorerUids = party)
+              newPendingReservation(questId, VENUE_ID, EXPLORER, NAME, START)
+                  .copy(explorerUids = party)
           )
           .getOrThrow()
 
@@ -101,6 +110,44 @@ class VenuePageAcceptTest {
     assertEquals(listOf(EXPLORER), reservation.explorerUids)
     assertEquals(START + 5_000, reservation.slotStart)
     assertEquals(ReservationStatus.PENDING, reservation.status)
+  }
+
+  @Test
+  fun acceptNamesTheReservationAsTheExplorersProfile() = test {
+    openAndPick("a")
+
+    viewModel.accept()
+    runCurrent()
+
+    assertEquals(TEST_EXPLORER_NAME, stored().single().explorerName)
+  }
+
+  @Test
+  fun aProfileThatCantBeReadFailsWithoutReservingAndRetrySucceeds() = test {
+    openAndPick("a")
+    users.nextGetFailure = IOException("offline")
+
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+    assertEquals(0, reservations.calls)
+
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    assertEquals(TEST_EXPLORER_NAME, stored().single().explorerName)
+  }
+
+  @Test
+  fun anExplorerWithoutAProfileCannotReserve() = test {
+    userRepository = FakeUserRepository()
+    openAndPick("a")
+
+    viewModel.accept()
+    runCurrent()
+
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+    assertEquals(0, reservations.calls)
   }
 
   @Test
@@ -255,7 +302,7 @@ class VenuePageAcceptTest {
 
   @Test
   fun aReservationAtAnotherVenueDoesNotAcceptThisVenuesQuest() = test {
-    fake.createReservation(newPendingReservation("a", "other-venue", EXPLORER, START))
+    fake.createReservation(newPendingReservation("a", "other-venue", EXPLORER, NAME, START))
 
     openAndPick("a")
 
@@ -452,7 +499,8 @@ class VenuePageAcceptTest {
     runCurrent()
 
     // The listener emits again, still without the new reservation
-    server.list.value = listOf(newPendingReservation("b", VENUE_ID, EXPLORER, START).copy(id = "x"))
+    server.list.value =
+        listOf(newPendingReservation("b", VENUE_ID, EXPLORER, NAME, START).copy(id = "x"))
     runCurrent()
 
     assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
@@ -486,7 +534,8 @@ class VenuePageAcceptTest {
     assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
 
     server.broken = true
-    server.list.value = listOf(newPendingReservation("b", VENUE_ID, EXPLORER, START).copy(id = "x"))
+    server.list.value =
+        listOf(newPendingReservation("b", VENUE_ID, EXPLORER, NAME, START).copy(id = "x"))
     runCurrent()
 
     assertEquals(AcceptStatus.NONE, state.acceptStatus)
@@ -495,7 +544,7 @@ class VenuePageAcceptTest {
 
   @Test
   fun aListenerThatFailsLaterKeepsWhatItShowed() = test {
-    val accepted = newPendingReservation("a", VENUE_ID, EXPLORER, START).copy(id = "r")
+    val accepted = newPendingReservation("a", VENUE_ID, EXPLORER, NAME, START).copy(id = "r")
     reservationRepository = FailingListenerRepository(fake, shownFirst = listOf(accepted))
     openAndPick("a")
 
@@ -506,6 +555,7 @@ class VenuePageAcceptTest {
   private companion object {
     const val VENUE_ID = "cafe"
     const val EXPLORER = "explorer"
+    const val NAME = TEST_EXPLORER_NAME
     const val START = 1_800_000_000_000L
   }
 }

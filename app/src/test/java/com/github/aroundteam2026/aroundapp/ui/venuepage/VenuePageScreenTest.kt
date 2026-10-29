@@ -31,6 +31,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -362,6 +363,7 @@ class VenuePageScreenTest {
             FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumen"))),
             ScriptedQuestRepository(activeQuestsByVenue = activeQuestsByVenue),
             reservations,
+            testUsers("explorer"),
             "explorer",
         )
     compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }

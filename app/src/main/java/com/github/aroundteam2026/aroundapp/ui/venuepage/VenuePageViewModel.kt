@@ -18,11 +18,14 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -43,13 +46,15 @@ import kotlinx.coroutines.launch
  * reservations of the explorer [explorerUid], and keeps up as they change and as rewards expire, by
  * [clock]. If listening to the venue or its quests fails, the page shows [VenuePageStatus.FAILED]
  * until [onRetry]. If listening to the reservations fails, the page stays and accepting is
- * unavailable ([VenuePageUiState.acceptAvailable]) until the page is opened again.
+ * unavailable ([VenuePageUiState.acceptAvailable]) until the page is opened again. Accepting names
+ * the explorer by the display name in their profile, read from [userRepository].
  */
 class VenuePageViewModel(
     private val venueId: String,
     private val venueRepository: VenueRepository,
     private val questRepository: QuestRepository,
     private val reservationRepository: ReservationRepository,
+    private val userRepository: UserRepository,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
@@ -106,12 +111,13 @@ class VenuePageViewModel(
 
   /**
    * Called when the explorer accepts the picked quest: books it as a pending reservation of a party
-   * of just themself, for a slot starting now. Does nothing when no quest is picked, when accepting
-   * is unavailable, or when that quest is already accepted or being accepted, so a double tap books
-   * once; other quests can still be accepted meanwhile. The quest shows as accepted only once the
-   * backend has answered, never while the write waits for it. A failure keeps the quest picked and
-   * shows [AcceptStatus.FAILED], and so does the server refusing the write later, after the quest
-   * showed as accepted; calling this again retries.
+   * of just themself, named as in their profile, for a slot starting now. Does nothing when no
+   * quest is picked, when accepting is unavailable, or when that quest is already accepted or being
+   * accepted, so a double tap books once; other quests can still be accepted meanwhile. The quest
+   * shows as accepted only once the backend has answered, never while the write waits for it. A
+   * failure keeps the quest picked and shows [AcceptStatus.FAILED], and so does the server refusing
+   * the write later, after the quest showed as accepted, or the explorer's profile not being
+   * readable; calling this again retries.
    */
   fun accept() {
     val current = mutableUiState.value
@@ -132,9 +138,15 @@ class VenuePageViewModel(
     refusing -= id
     viewModelScope.launch {
       val result =
-          reservationRepository.createReservation(
-              newPendingReservation(id, venueId, explorerUid, clock())
-          )
+          explorerName()
+              .fold(
+                  onSuccess = { name ->
+                    reservationRepository.createReservation(
+                        newPendingReservation(id, venueId, explorerUid, name, clock())
+                    )
+                  },
+                  onFailure = { Result.failure(it) },
+              )
       unconfirmed -= id
       result
           .onSuccess { reservationId ->
@@ -154,6 +166,22 @@ class VenuePageViewModel(
           }
     }
   }
+
+  /**
+   * The display name in the explorer's profile, which the venue sees on their reservation, or a
+   * failure if the profile is missing or can't be read.
+   */
+  private suspend fun explorerName(): Result<String> =
+      try {
+        val profile =
+            userRepository.getUser(explorerUid)
+                ?: throw NoSuchElementException("No profile for $explorerUid")
+        Result.success(profile.displayName)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
 
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
   fun onRetry() {
@@ -268,6 +296,7 @@ class VenuePageViewModel(
                 VenueRepositoryProvider.repository,
                 QuestRepositoryProvider.repository,
                 ReservationRepositoryProvider.repository,
+                UserRepositoryProvider.repository,
                 explorerUid,
             )
           }
