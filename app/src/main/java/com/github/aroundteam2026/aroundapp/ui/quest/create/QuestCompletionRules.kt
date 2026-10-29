@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.annotation.DrawableRes
@@ -135,9 +136,9 @@ private fun ProofOptions(selected: ProofType, onSelect: (ProofType) -> Unit) {
 
 /** The icon, title, hint and test tag of one proof card. */
 private data class ProofCopy(
-    @DrawableRes val icon: Int,
-    @StringRes val title: Int,
-    @StringRes val hint: Int,
+    @param:DrawableRes val icon: Int,
+    @param:StringRes val title: Int,
+    @param:StringRes val hint: Int,
     val tag: String,
 )
 
