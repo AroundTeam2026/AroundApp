@@ -55,14 +55,11 @@ service cloud.firestore {
     }
 
     function isValidQuest(data) {
-      return data.keys().hasAll(['venueId', 'venueName', 'location', 'radiusMeters', 'title',
-              'description', 'requirements', 'proofType', 'minPartySize', 'status', 'createdAt',
-              'updatedAt'])
-          && data.keys().hasOnly(['venueId', 'venueName', 'location', 'radiusMeters', 'title',
-              'description', 'requirements', 'proofType', 'minPartySize', 'exactPartySize',
-              'reward', 'status', 'createdAt', 'updatedAt'])
-          && data.venueName is string
-          && data.location is latlng
+      return data.keys().hasAll(['venueId', 'radiusMeters', 'title', 'description',
+              'requirements', 'proofType', 'minPartySize', 'status', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['venueId', 'radiusMeters', 'title', 'description',
+              'requirements', 'proofType', 'minPartySize', 'exactPartySize', 'reward', 'status',
+              'createdAt', 'updatedAt'])
           && isRadius(data.radiusMeters)
           && isText(data.title, 60)
           && isText(data.description, 500)

@@ -49,28 +49,23 @@ class MapViewModelNearbyTest {
   private val museumLocation = Location(46.5150, 6.6200)
   private val genevaLocation = Location(46.2044, 6.1432)
 
-  private val cafeQuest =
-      testQuest(id = "cafe-1", venueId = "cafe", venueName = "Café Lumen", location = cafeLocation)
-  private val barQuest =
-      testQuest(id = "bar-1", venueId = "bar", venueName = "Bar Nocturne", location = barLocation)
-  private val genevaQuest =
-      testQuest(
-          id = "geneva-1",
-          venueId = "geneva",
-          venueName = "Atelier Genève",
-          location = genevaLocation,
-      )
-  private val museumQuest =
-      testQuest(
-          id = "museum-1",
-          venueId = "museum",
-          venueName = "Musée",
-          location = museumLocation,
+  private val cafeQuest = testQuest(id = "cafe-1", venueId = "cafe")
+  private val barQuest = testQuest(id = "bar-1", venueId = "bar")
+  private val genevaQuest = testQuest(id = "geneva-1", venueId = "geneva")
+  private val museumQuest = testQuest(id = "museum-1", venueId = "museum")
+
+  private val cafe = testVenue(id = "cafe", name = "Café Lumen", location = cafeLocation)
+  private val venues =
+      listOf(
+          cafe,
+          testVenue(id = "bar", name = "Bar Nocturne", location = barLocation),
+          testVenue(id = "geneva", name = "Atelier Genève", location = genevaLocation),
+          testVenue(id = "museum", name = "Musée", location = museumLocation),
       )
 
   private val quests = MutableStateFlow(listOf(cafeQuest, barQuest, genevaQuest))
   private var questRepository = ScriptedQuestRepository.of(quests)
-  private var venueRepository: VenueRepository = FakeVenueRepository()
+  private var venueRepository: VenueRepository = FakeVenueRepository(venues)
   private val locationRepository = FakeLocationRepository(here)
 
   private val viewModel by lazy {
@@ -150,7 +145,7 @@ class MapViewModelNearbyTest {
 
     quests.value += museumQuest
     runCurrent()
-    quests.value += testQuest(id = "cafe-2", venueId = "cafe", location = cafeLocation)
+    quests.value += testQuest(id = "cafe-2", venueId = "cafe")
     runCurrent()
 
     assertEquals(listOf("cafe-1", "cafe-2", "bar-1", "museum-1"), nearbyIds)
@@ -182,11 +177,11 @@ class MapViewModelNearbyTest {
 
   @Test
   fun aVenueThatMovesFurtherAwayMovesDownTheList() = test {
-    val venues = FakeVenueRepository(listOf(testVenue(id = "cafe", location = cafeLocation)))
-    venueRepository = venues
+    val moving = FakeVenueRepository(venues)
+    venueRepository = moving
     located()
 
-    venues.setArea("cafe", museumLocation.copy(lat = museumLocation.lat - 0.002), 50, null)
+    moving.setArea("cafe", museumLocation.copy(lat = museumLocation.lat - 0.002), 50, null)
     runCurrent()
 
     assertEquals(listOf("bar-1", "cafe-1"), nearbyIds)
@@ -194,11 +189,11 @@ class MapViewModelNearbyTest {
 
   @Test
   fun aVenueThatMovesOutOfTheRadiusTakesItsQuestsWithIt() = test {
-    val venues = FakeVenueRepository(listOf(testVenue(id = "cafe", location = cafeLocation)))
-    venueRepository = venues
+    val moving = FakeVenueRepository(venues)
+    venueRepository = moving
     located()
 
-    venues.setArea("cafe", genevaLocation, 50, null)
+    moving.setArea("cafe", genevaLocation, 50, null)
     runCurrent()
 
     assertEquals(listOf("bar-1"), nearbyIds)
@@ -206,14 +201,10 @@ class MapViewModelNearbyTest {
 
   @Test
   fun aRenamedVenueIsListedUnderItsNewName() = test {
-    val venues =
-        FakeVenueRepository(
-            listOf(testVenue(id = "cafe", name = "Alpage", location = cafeLocation))
-        )
-    venueRepository = venues
+    venueRepository = FakeVenueRepository(listOf(cafe.copy(name = "Alpage")) + venues.drop(1))
     started()
 
-    // As "Café Lumen", which its quest copied, it would come last
+    // As "Café Lumen" it would come last
     assertEquals(listOf("cafe-1", "geneva-1", "bar-1"), nearbyIds)
     assertEquals("Alpage", nearby.first().venueName)
   }
@@ -260,7 +251,7 @@ class MapViewModelNearbyTest {
   }
 
   @Test
-  fun failingVenuesStillListTheQuests() = test {
+  fun failingVenuesEmptyTheList() = test {
     venueRepository =
         object : VenueRepository by FakeVenueRepository() {
           override fun observeVenues(venueIds: Set<String>) =
@@ -269,7 +260,8 @@ class MapViewModelNearbyTest {
 
     located()
 
-    assertEquals(listOf("cafe-1", "bar-1"), nearbyIds)
+    // Without its venue, a quest has no name or location to be listed under
+    assertEquals(emptyList<NearbyQuest>(), nearby)
   }
 
   private companion object {

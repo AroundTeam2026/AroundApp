@@ -36,14 +36,13 @@ class MapDemoDataTest {
   }
 
   @Test
-  fun everyQuestCopiesItsVenuesNameAndLocation() {
-    // As the real quests do, so the map can draw them without the venues
+  fun everyQuestBelongsToAPlacedVenue() {
+    // The map takes a quest's name and location from its venue, so it can't draw one without it
     val byId = venues.associateBy { it.id }
     quests.forEach { quest ->
       val venue = byId[quest.venueId]
       assertTrue("${quest.id} names an unknown venue", venue != null)
-      assertEquals(quest.id, venue!!.name, quest.venueName)
-      assertEquals(quest.id, venue.location, quest.location)
+      assertTrue("${quest.id}'s venue has no location", venue!!.location != null)
     }
   }
 

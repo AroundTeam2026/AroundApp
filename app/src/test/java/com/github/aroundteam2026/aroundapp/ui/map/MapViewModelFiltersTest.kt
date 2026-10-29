@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,21 +39,18 @@ class MapViewModelFiltersTest {
       testQuest(
           id = "cafe-1",
           venueId = "cafe",
-          location = Location(46.5220, 6.6330),
           reward = discount,
       )
   private val bar =
       testQuest(
           id = "bar-1",
           venueId = "bar",
-          location = Location(46.5235, 6.6365),
           reward = Reward.Other("Free entry"),
       )
   private val museum =
       testQuest(
           id = "museum-1",
           venueId = "museum",
-          location = Location(46.5150, 6.6200),
           reward = null,
       )
   private val quests = MutableStateFlow(listOf(cafe, bar, museum))
@@ -62,7 +60,15 @@ class MapViewModelFiltersTest {
     MapViewModel(
         FakeLocationRepository(here),
         ScriptedQuestRepository.of(quests),
-        FakeVenueRepository(),
+        FakeVenueRepository(
+            listOf(
+                testVenue(id = "cafe", location = Location(46.5220, 6.6330)),
+                testVenue(id = "bar", location = Location(46.5235, 6.6365)),
+                testVenue(id = "museum", location = Location(46.5150, 6.6200)),
+                testVenue(id = "bakery", location = Location(46.5205, 6.6325)),
+                testVenue(id = "pub", location = Location(46.5210, 6.6340)),
+            )
+        ),
         clock = { 1_000L },
     )
   }
@@ -113,10 +119,9 @@ class MapViewModelFiltersTest {
             testQuest(
                 id = "bakery-1",
                 venueId = "bakery",
-                location = Location(46.5205, 6.6325),
                 reward = discount,
             ) +
-            testQuest(id = "pub-1", venueId = "pub", location = Location(46.5210, 6.6340))
+            testQuest(id = "pub-1", venueId = "pub")
     runCurrent()
 
     assertEquals(listOf("bakery-1", "cafe-1"), listed)

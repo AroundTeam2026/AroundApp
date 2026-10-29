@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
@@ -71,8 +70,6 @@ class AroundAppVenuePageDeviceTest {
           Quest(
               id = "",
               venueId = uid,
-              venueName = venue.name,
-              location = Location(46.5191, 6.5668),
               radiusMeters = QuestLimits.DEFAULT_RADIUS_METERS,
               title = "Quest $uid",
               description = "Find the hidden fox",
