@@ -63,7 +63,7 @@ fun OverviewScreen(
     modifier: Modifier = Modifier,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  OverviewContent(state, onOpenVenue, viewModel::retry, modifier)
+  OverviewContent(state, onOpenVenue, viewModel::retry, viewModel::cancel, modifier)
 }
 
 /**
@@ -73,6 +73,8 @@ fun OverviewScreen(
  *
  * @param onOpenVenue Opens the page of the venue with this id, when its card is tapped.
  * @param onRetry Called when the explorer taps "Try again" after a failure.
+ * @param onCancel Cancels the reservation with this id, once the explorer has confirmed on its
+ *   card.
  * @param clock Tells which day is today, and the time zone the slots are written in.
  */
 @Composable
@@ -80,6 +82,7 @@ fun OverviewContent(
     state: OverviewUiState,
     onOpenVenue: (venueId: String) -> Unit,
     onRetry: () -> Unit,
+    onCancel: (reservationId: String) -> Unit,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
 ) {
@@ -91,7 +94,8 @@ fun OverviewContent(
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.OVERVIEW_LOADING)) }
       OverviewStatus.FAILED -> Centered { Failed(onRetry) }
       OverviewStatus.LOADED ->
-          if (state.rows.isEmpty()) Centered { Empty() } else Rows(state.rows, onOpenVenue, clock)
+          if (state.rows.isEmpty()) Centered { Empty() }
+          else Rows(state, onOpenVenue, onCancel, clock)
     }
   }
 }
@@ -124,9 +128,14 @@ private fun Title(state: OverviewUiState) {
   }
 }
 
-/** The accepted quests, one card each, in the order of [rows]. */
+/** The accepted quests of [state], one card each, in the order of its rows. */
 @Composable
-private fun Rows(rows: List<OverviewRow>, onOpenVenue: (venueId: String) -> Unit, clock: Clock) {
+private fun Rows(
+    state: OverviewUiState,
+    onOpenVenue: (venueId: String) -> Unit,
+    onCancel: (reservationId: String) -> Unit,
+    clock: Clock,
+) {
   LazyColumn(
       Modifier.fillMaxSize().testTag(C.Tag.OVERVIEW_LIST),
       contentPadding =
@@ -138,8 +147,14 @@ private fun Rows(rows: List<OverviewRow>, onOpenVenue: (venueId: String) -> Unit
           ),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
   ) {
-    items(rows, key = { it.reservationId }) { row ->
-      OverviewQuestRow(row, onClick = { onOpenVenue(row.venueId) }, clock = clock)
+    items(state.rows, key = { it.reservationId }) { row ->
+      OverviewQuestRow(
+          row,
+          onClick = { onOpenVenue(row.venueId) },
+          clock = clock,
+          cancelStatus = state.cancelStatusOf(row.reservationId),
+          onCancel = { onCancel(row.reservationId) },
+      )
     }
   }
 }
@@ -243,6 +258,7 @@ private fun OverviewPreview() {
         ),
         onOpenVenue = {},
         onRetry = {},
+        onCancel = {},
     )
   }
 }

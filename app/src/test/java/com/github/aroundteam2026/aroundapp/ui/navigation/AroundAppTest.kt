@@ -172,6 +172,7 @@ class AroundAppTest {
                 OverviewUiState(OverviewStatus.LOADED, listOf(overviewRow())),
                 onOpenVenue,
                 onRetry = {},
+                onCancel = {},
             )
           },
       )

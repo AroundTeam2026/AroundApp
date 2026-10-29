@@ -2,7 +2,10 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -38,6 +41,7 @@ class OverviewScreenTest {
 
   private val opened = mutableListOf<String>()
   private var retries = 0
+  private val cancelled = mutableListOf<String>()
 
   private fun show(state: OverviewUiState) {
     compose.setContent {
@@ -46,6 +50,7 @@ class OverviewScreenTest {
             state,
             onOpenVenue = { opened += it },
             onRetry = { retries++ },
+            onCancel = { cancelled += it },
             clock = CLOCK,
         )
       }
@@ -107,6 +112,48 @@ class OverviewScreenTest {
   }
 
   @Test
+  fun confirmingACancelCancelsThatCardsReservation() {
+    show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
+
+    cancelButtonOf("reservation-2").performClick()
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+
+    assertEquals(listOf("reservation-2"), cancelled)
+    assertEquals(emptyList<String>(), opened)
+  }
+
+  @Test
+  fun aCardBeingCancelledHasItsButtonDisabled() {
+    show(loaded(row(), row(id = "reservation-2")).copy(cancellingIds = setOf("reservation-2")))
+
+    cancelButtonOf("reservation-2").assertIsNotEnabled()
+    cancelButtonOf(ID).assertIsEnabled()
+  }
+
+  @Test
+  fun cancellingOnTheScreenCancelsTheReservationAndItsCardLeaves() {
+    val reservations = FakeReservationRepository()
+    runBlocking {
+      reservations.createReservation(
+          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT)
+      )
+    }
+    val viewModel =
+        OverviewViewModel(
+            "explorer",
+            reservations,
+            FakeQuestRepository(initialQuests = listOf(testQuest(id = "fox", venueId = CAFE))),
+            FakeVenueRepository(listOf(testVenue(id = CAFE))),
+        )
+    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
+
+    compose.onNode(hasTestTag(C.Tag.OVERVIEW_ROW_CANCEL), useUnmergedTree = true).performClick()
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+
+    compose.onNodeWithTag(C.Tag.OVERVIEW_EMPTY).assertIsDisplayed()
+  }
+
+  @Test
   fun theScreenShowsWhatItsViewModelLoads() {
     val reservations = FakeReservationRepository()
     runBlocking {
@@ -128,6 +175,14 @@ class OverviewScreenTest {
         .onNode(hasTestTag(C.Tag.OVERVIEW_ROW_TITLE), useUnmergedTree = true)
         .assertTextEquals(testQuest(id = "fox").title)
   }
+
+  /** The cancel button is a clickable of its own, so the card's merged node leaves it out. */
+  private fun cancelButtonOf(reservationId: String) =
+      compose.onNode(
+          hasTestTag(C.Tag.OVERVIEW_ROW_CANCEL) and
+              hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
+          useUnmergedTree = true,
+      )
 
   private fun row(
       id: String = ID,
