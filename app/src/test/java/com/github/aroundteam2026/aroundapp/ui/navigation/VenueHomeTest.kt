@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -32,6 +33,7 @@ class VenueHomeTest {
           onCreateQuest = { questsCreated++ },
           onSignOut = { signOuts++ },
           venueQuestsFactory = venueQuestsFactoryOnFakes(),
+          dashboardFactory = venueDashboardFactoryOnFakes(),
       )
     }
   }
@@ -59,7 +61,7 @@ class VenueHomeTest {
   @Test
   fun opensOnTheDashboard() {
     assertShowing(VenueTab.DASHBOARD)
-    composeTestRule.onNodeWithTag(C.Tag.DASHBOARD_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.DASHBOARD_EMPTY).assertIsDisplayed()
   }
 
   @Test

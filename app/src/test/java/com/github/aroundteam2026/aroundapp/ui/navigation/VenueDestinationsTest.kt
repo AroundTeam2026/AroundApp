@@ -19,6 +19,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 import org.junit.Assert.assertEquals
@@ -53,6 +54,7 @@ class VenueDestinationsTest {
             createQuestFactory = viewModelFactory { initializer { form } },
             venueQuestsFactory =
                 viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
+            dashboardFactory = venueDashboardFactoryOnFakes(VENUE_ID),
         )
       }
     }

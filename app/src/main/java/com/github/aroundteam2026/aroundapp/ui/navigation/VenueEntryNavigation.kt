@@ -43,8 +43,9 @@ val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
  * them.
  *
  * The location slot isolates Maps in navigation tests. [venueDestinations] owns the home and quest
- * routes; [createQuestFactory] and [venueQuestsFactory] supply an isolated form and quest list in
- * tests. [VenueEntry] chooses [start] from the venue's saved state.
+ * routes; [createQuestFactory], [venueQuestsFactory] and [dashboardFactory] supply an isolated
+ * form, quest list and dashboard in tests. [VenueEntry] chooses [start] from the venue's saved
+ * state.
  *
  * @param start where the graph opens: business setup, its area, or the home of a venue already set
  *   up. A venue resuming on its area starts at business setup with the area opened above it.
@@ -57,6 +58,7 @@ fun VenueEntryNavigation(
     locationScreen: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     venueQuestsFactory: ViewModelProvider.Factory,
+    dashboardFactory: ViewModelProvider.Factory,
     start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -85,7 +87,13 @@ fun VenueEntryNavigation(
           onBack,
       )
     }
-    venueDestinations(navController, profile::signOut, createQuestFactory, venueQuestsFactory)
+    venueDestinations(
+        navController,
+        profile::signOut,
+        createQuestFactory,
+        venueQuestsFactory,
+        dashboardFactory,
+    )
   }
   if (start is VenueEntryStart.Area) ResumeOnArea(start.venueId, navController)
 }
