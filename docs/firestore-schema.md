@@ -8,7 +8,7 @@ This doc describes what the code on `main` does. A change to a collection update
 - Domain models use our own `Location(lat: Double, lng: Double)`, never `GeoPoint` or `LatLng`. In Firestore a location is stored as a `GeoPoint`; the conversion happens inside the Firestore repository implementations.
 - Times are `Long` epoch milliseconds in the Kotlin models and `Timestamp` in Firestore (`createdAt`, `updatedAt`, `slotStart`, `submittedAt`, `reward.expiresAt`). The conversion happens inside the Firestore implementations.
 - Enum values are stored as their upper-case names (`EXPLORER`, `PENDING`, ...).
-- A document's id is not stored as a field. For `users` it is the uid and for `venues` the owner's uid; for the other collections it is a Firestore auto id.
+- A document's id is not stored as a field. For `users` it is the uid, for `venues` the owner's uid and for `party_user` `{reservationId}_{uid}`, whose parts are also stored as fields so queries can filter on them; for the other collections it is a Firestore auto id.
 - Fields marked `?` are optional: they are omitted when null.
 
 ## Collections
@@ -77,6 +77,20 @@ Every type may also have `expiresAt` (timestamp?): when the reward stops being v
 | `createdAt` | timestamp | Set by the repository. |
 | `explorerName` | string | Display name of the explorer who made the reservation, copied from their `users` profile on creation so the venue sees who reserved (the venue can't read profiles). Must equal that profile's `displayName` (enforced by the rules). Not updated on a rename. Reservations made before this field existed lack it; the app reads them with an empty name. |
 
+### `party_user/{reservationId}_{uid}`
+
+One membership per explorer and reservation. The id is built from both, so the rules find a membership with one read and an explorer can't join a party twice. Memberships are never deleted, so a withdrawal stays recorded.
+
+| Field | Type | Notes |
+|---|---|---|
+| `reservationId` | string | |
+| `uid` | string | The explorer. |
+| `status` | `JOINED` or `WITHDRAWN` | Set to `JOINED` by the repository on creation. |
+| `joinedAt` | timestamp | Set by the repository. |
+| `updatedAt` | timestamp | Set by the repository on creation and on withdrawal. |
+
+Reservations still list their party in `explorerUids`: #295 moves them onto these memberships.
+
 ### `completions/{id}`
 
 | Field | Type | Notes |
@@ -96,13 +110,15 @@ Model only for now: there is no completions repository yet.
 
 ## Allowed status transitions
 
-Encoded in `canTransition(from, to)`, which has one overload per status enum. The rules enforce the reservation transitions too.
+Encoded in `canTransition(from, to)`, which has one overload per status enum. The rules enforce the reservation and party member transitions too.
 
 | Entity | From | To |
 |---|---|---|
 | Reservation | `PENDING` | `APPROVED`, `REJECTED`, `CANCELLED` |
 | Reservation | `APPROVED` | `CANCELLED` |
 | Reservation | `REJECTED`, `CANCELLED` | none |
+| Party member | `JOINED` | `WITHDRAWN` |
+| Party member | `WITHDRAWN` | none |
 | Completion | `PENDING` | `APPROVED`, `REJECTED` |
 | Completion | `APPROVED`, `REJECTED` | none |
 
@@ -118,6 +134,7 @@ Every create and update must match its collection's table above: only the listed
 | `venues` | Any signed-in user | Only the owner (document id is their uid), whose `users` document has role `VENUE`. |
 | `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
 | `reservations` | The venue and the listed explorers | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one that lists them and carries their profile's `displayName` as `explorerName`, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards only `status` changes, along an allowed transition: the venue makes any of them, and a listed explorer can only cancel. No delete. |
+| `party_user` | The member, the party's other `JOINED` members and the reservation's venue | An explorer, whose `users` document has role `EXPLORER`, creates their own `JOINED` membership, under the id `{reservationId}_{uid}`, for a `PENDING` reservation. Afterwards only the member changes it, from `JOINED` to `WITHDRAWN`, along with `updatedAt`. No delete. |
 | `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
 
 ## Decided changes
@@ -125,7 +142,7 @@ Every create and update must match its collection's table above: only the listed
 Decided in #259, from the review of #25 and from R2 (#274). The tables above describe `main`; a change still in progress updates them when it lands.
 
 - **Copied venue fields in `quests`: adopted, done in #279 (F4a and F4b).** `venueName` and `location` go stale once a venue can rename itself or move its area, and dropping them later would mean migrating every stored quest. Readers take them from `venues/{venueId}` with `observeVenues`, one `in` query per 30 venues, as the overview (#269) does, and the rules reject the copies. The quests already stored on `around-67942` keep them until #283 removes them.
-- **Party membership: adopted, in #281.** `explorerUids` loses who withdrew from a party. One membership document per explorer and reservation (`party_user`) keeps that history. #281 replaces `explorerUids` this sprint and moves its readers (the venue page, the overview, `observeForExplorer` and the read rule) onto the memberships.
+- **Party membership: adopted, in #281; the collection is added in #294.** `explorerUids` loses who withdrew from a party. One membership document per explorer and reservation (`party_user`) keeps that history. #281 replaces `explorerUids` this sprint and moves its readers (the venue page, the overview, `observeForExplorer` and the read rule) onto the memberships.
 - **Ids copied into `completions`: only `questId` is dropped, done in #272 (F5).** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules will check them against the reservation and its memberships on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields.
 - **Text proof: adopted, done in #272 (F5).** `proofUrl` couldn't tell a typed answer from an uploaded photo, so a completion holds `photoUrl` for a `PHOTO` quest or `textAnswer` for a `TEXT` quest, never both.
 - **The explorer's name copied into `reservations`: kept, in #274 (R2).** A user can read only their own `users/{uid}`, so the venue has no other way to show who reserved. The copy is the name at booking time, which is what the venue needs for a short-lived reservation.

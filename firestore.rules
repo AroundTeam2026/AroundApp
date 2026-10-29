@@ -153,6 +153,28 @@ service cloud.firestore {
           || (from == 'APPROVED' && to == 'CANCELLED');
     }
 
+    function isValidPartyMember(data) {
+      return data.keys().hasAll(['reservationId', 'uid', 'status', 'joinedAt', 'updatedAt'])
+          && data.keys().hasOnly(['reservationId', 'uid', 'status', 'joinedAt', 'updatedAt'])
+          && data.reservationId is string
+          && data.uid is string
+          && data.status in ['JOINED', 'WITHDRAWN']
+          && data.joinedAt is timestamp
+          && data.updatedAt is timestamp;
+    }
+
+    function reservation(reservationId) {
+      return /databases/$(database)/documents/reservations/$(reservationId);
+    }
+
+    // The signed-in user is a joined member of the party of [reservationId]. Costs one document
+    // read: the membership's id is built from the reservation and the user.
+    function isJoinedMember(reservationId) {
+      let membership =
+          /databases/$(database)/documents/party_user/$(reservationId + '_' + request.auth.uid);
+      return exists(membership) && get(membership).data.status == 'JOINED';
+    }
+
     // Only the owner reads their profile.
     // The role is write-once: it can be chosen while null, then never changed.
     match /users/{uid} {
@@ -208,6 +230,33 @@ service cloud.firestore {
           && (request.auth.uid == resource.data.venueId
               || (request.auth.uid in resource.data.explorerUids
                   && request.resource.data.status == 'CANCELLED'));
+    }
+
+    // One membership per explorer and reservation, under the id `{reservationId}_{uid}`. An
+    // explorer account joins a pending reservation as themselves; getAfter also sees a reservation
+    // created in the same batch. Afterwards the member can only withdraw, which also moves
+    // updatedAt, and never join again. The member, the party's other joined members and the
+    // reservation's venue read it. Memberships are never deleted, so a withdrawal stays recorded.
+    match /party_user/{memberId} {
+      allow read: if signedIn()
+          && (request.auth.uid == resource.data.uid
+              || isJoinedMember(resource.data.reservationId)
+              || request.auth.uid == get(reservation(resource.data.reservationId)).data.venueId);
+      allow create: if signedIn()
+          && hasRole('EXPLORER')
+          && isValidPartyMember(request.resource.data)
+          && request.resource.data.uid == request.auth.uid
+          && memberId == request.resource.data.reservationId + '_' + request.auth.uid
+          && request.resource.data.status == 'JOINED'
+          && getAfter(reservation(request.resource.data.reservationId)).data.status == 'PENDING';
+      allow update: if isUser(resource.data.uid)
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'updatedAt'])
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasAll(['status', 'updatedAt'])
+          && resource.data.status == 'JOINED'
+          && request.resource.data.status == 'WITHDRAWN'
+          && request.resource.data.updatedAt is timestamp;
     }
 
     // completions: no rules yet, so all access is denied until completions get a repository.
