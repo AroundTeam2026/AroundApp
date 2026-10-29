@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -148,6 +149,82 @@ class OverviewQuestRowTest {
     part(C.Tag.OVERVIEW_ROW_SLOT)
         .assert(hasText("Today · 8:00", substring = true) and hasText("AM", substring = true))
   }
+
+  @Test
+  fun withoutOnCancelTheCardHasNoCancelButton() {
+    show(row())
+
+    cancelButton().assertDoesNotExist()
+  }
+
+  @Test
+  fun cancellingAsksFirstThenCancelsWithoutOpeningTheVenue() {
+    showCancellable()
+
+    cancelButton().assert(hasText("Cancel reservation")).performClick()
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertIsDisplayed()
+    compose
+        .onNode(hasText("Café Lumen will see it cancelled", substring = true))
+        .assertIsDisplayed()
+    assertEquals(0, cancels)
+
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+
+    assertEquals(1, cancels)
+    assertEquals(0, clicks)
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+  }
+
+  @Test
+  fun keepingTheReservationClosesTheDialogWithoutCancelling() {
+    showCancellable()
+    cancelButton().performClick()
+
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_KEEP).performClick()
+
+    assertEquals(0, cancels)
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+  }
+
+  @Test
+  fun whileCancellingTheButtonIsDisabledAndSaysSo() {
+    showCancellable(CancelStatus.CANCELLING)
+
+    cancelButton().assertIsNotEnabled().assert(hasText("Cancelling…"))
+    part(C.Tag.OVERVIEW_ROW_CANCEL_FAILED).assertDoesNotExist()
+  }
+
+  @Test
+  fun afterAFailureTheCardSaysSoAndTryAgainCancelsAtOnce() {
+    showCancellable(CancelStatus.FAILED)
+    part(C.Tag.OVERVIEW_ROW_CANCEL_FAILED).assertTextEquals("Couldn't cancel this reservation.")
+
+    cancelButton().assert(hasText("Try again")).performClick()
+
+    // The explorer confirmed the cancel that failed, so the retry doesn't ask again
+    assertEquals(1, cancels)
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+  }
+
+  private var cancels = 0
+
+  /** Shows the card with its cancel button, cancelling as [status] says. */
+  private fun showCancellable(status: CancelStatus = CancelStatus.NONE) {
+    compose.setContent {
+      AroundAppTheme {
+        OverviewQuestRow(
+            row(),
+            onClick = { clicks++ },
+            clock = CLOCK,
+            cancelStatus = status,
+            onCancel = { cancels++ },
+        )
+      }
+    }
+  }
+
+  /** The cancel button is a clickable of its own, so the card's merged node leaves it out. */
+  private fun cancelButton() = compose.onNodeWithTag(C.Tag.OVERVIEW_ROW_CANCEL)
 
   private fun row(
       status: OverviewRowStatus = OverviewRowStatus.WAITING,

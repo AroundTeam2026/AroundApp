@@ -18,7 +18,25 @@ data class OverviewUiState(
     val rows: List<OverviewRow> = emptyList(),
     val cancellingIds: Set<String> = emptySet(),
     val failedCancelIds: Set<String> = emptySet(),
-)
+) {
+  /** How cancelling the reservation [reservationId] stands, for its card. */
+  fun cancelStatusOf(reservationId: String): CancelStatus =
+      when (reservationId) {
+        in cancellingIds -> CancelStatus.CANCELLING
+        in failedCancelIds -> CancelStatus.FAILED
+        else -> CancelStatus.NONE
+      }
+}
+
+/** How cancelling a row's reservation stands. */
+enum class CancelStatus {
+  /** Not cancelled, and not being cancelled. */
+  NONE,
+  /** The cancel is being written. */
+  CANCELLING,
+  /** The last try failed; cancelling again retries. */
+  FAILED,
+}
 
 /**
  * One accepted quest in the overview: the reservation, with its quest and venue.
