@@ -15,11 +15,11 @@ interface ReservationRepository {
    * [reservation] are ignored.
    *
    * Waits for the backend to confirm the write, for a bounded time. The security rules only let an
-   * explorer reserve as themselves, for a party they belong to, for an active quest, so the
-   * Firestore implementation's server can refuse the write; a refusal that arrives in time is
-   * returned as a failure and nothing is stored. When no answer arrives in time, e.g. while
-   * offline, the write stays queued, is sent once the device is back online, and this returns
-   * success: a refusal after that is not reported here.
+   * explorer reserve as themselves, for an active quest, so the Firestore implementation's server
+   * can refuse the write; a refusal that arrives in time is returned as a failure and nothing is
+   * stored. When no answer arrives in time, e.g. while offline, the write stays queued, is sent
+   * once the device is back online, and this returns success: a refusal after that is not reported
+   * here.
    *
    * @param reservation the reservation to store; its `id`, `createdAt` and `status` are ignored.
    * @param creatorUid uid of the explorer making the reservation, who joins its party.
@@ -40,11 +40,12 @@ interface ReservationRepository {
   fun observeForVenue(venueId: String): Flow<List<Reservation>>
 
   /**
-   * Observes the reservations an explorer is part of. Emits on collection and on every change.
+   * Observes the reservations an explorer is part of. Emits on collection and on every change,
+   * including when the explorer joins or withdraws from a party.
    *
    * @param uid uid of the explorer.
-   * @return every reservation whose party includes [uid], whatever its status, in unspecified
-   *   order.
+   * @return every reservation whose party [uid] joined and didn't withdraw from, whatever its
+   *   status, in unspecified order.
    * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
    *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
    */
@@ -53,9 +54,9 @@ interface ReservationRepository {
   /**
    * Moves a reservation to [status], changing nothing else.
    *
-   * The security rules let the venue that owns the reservation make any change, and an explorer of
-   * the party only cancel it (E21). The Firestore implementation therefore fails when an explorer
-   * asks for any other status, even though the fake allows it.
+   * The security rules let the venue that owns the reservation make any change, and a joined member
+   * of the party only cancel it (E21). The Firestore implementation therefore fails when an
+   * explorer asks for any other status, even though the fake allows it.
    *
    * @param id id of the reservation.
    * @param status the new status; the change must be allowed by [canTransition].

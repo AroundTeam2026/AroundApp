@@ -292,7 +292,7 @@ class PartyRepositoryFirestoreTest {
       id =
           ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS)
               .createReservation(
-                  newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START),
+                  newPendingReservation(questId, venueId, EXPLORER_NAME, SLOT_START),
                   explorerUid,
               )
               .getOrThrow()
@@ -347,8 +347,7 @@ class PartyRepositoryFirestoreTest {
    * @return the reservation's id.
    */
   private suspend fun createPendingReservation(): String {
-    val reservation =
-        newPendingReservation(createActiveQuest(), venueId, explorerUid, EXPLORER_NAME, SLOT_START)
+    val reservation = newPendingReservation(createActiveQuest(), venueId, EXPLORER_NAME, SLOT_START)
     val id =
         ReservationRepositoryFirestore(explorerDb)
             .createReservation(reservation, explorerUid)

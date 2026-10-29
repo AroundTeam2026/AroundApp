@@ -107,19 +107,14 @@ service cloud.firestore {
           && isText(reward.description, 200);
     }
 
-    // A party has at most 10 explorers, each listed once. Rules can't loop over a list, so the
-    // entries aren't type-checked: the app skips a reservation with a non-string uid as malformed,
-    // which only hides the writer's own reservation.
+    // The party isn't stored on the reservation: it is the reservation's memberships in party_user.
     function isValidReservation(data) {
-      return data.keys().hasAll(['questId', 'venueId', 'explorerUids', 'slotStart', 'status',
-              'createdAt', 'explorerName'])
-          && data.keys().hasOnly(['questId', 'venueId', 'explorerUids', 'slotStart', 'status',
-              'createdAt', 'explorerName'])
+      return data.keys().hasAll(['questId', 'venueId', 'slotStart', 'status', 'createdAt',
+              'explorerName'])
+          && data.keys().hasOnly(['questId', 'venueId', 'slotStart', 'status', 'createdAt',
+              'explorerName'])
           && data.questId is string
           && data.venueId is string
-          && data.explorerUids is list
-          && data.explorerUids.size() <= 10
-          && data.explorerUids.toSet().size() == data.explorerUids.size()
           && data.slotStart is timestamp
           && data.createdAt is timestamp
           && data.explorerName is string;
@@ -219,18 +214,21 @@ service cloud.firestore {
       allow delete: if isUser(resource.data.venueId) && hasRole('VENUE');
     }
 
-    // An explorer account creates a pending reservation that lists them, in one batch with their own
-    // joined membership, that carries their profile's display name and doesn't start in the past,
-    // for an active quest of the venue it names. Afterwards only the status changes, along an allowed transition: the venue answers it, and an
-    // explorer of the party can cancel it.
+    // An explorer account creates a pending reservation, in one batch with their own joined
+    // membership, that carries their profile's display name and doesn't start in the past, for an
+    // active quest of the venue it names. Afterwards only the status changes, along an allowed
+    // transition: the venue answers it, and a joined member of the party can cancel it. The venue
+    // and the party's joined members read it. Anyone signed in may find that an id has no
+    // reservation: the app listens to a reservation it just created, offline maybe, before the
+    // server has it.
     match /reservations/{reservationId} {
       allow read: if signedIn()
-          && (request.auth.uid == resource.data.venueId
-              || request.auth.uid in resource.data.explorerUids);
+          && (resource == null
+              || request.auth.uid == resource.data.venueId
+              || isJoinedMember(reservationId));
       allow create: if signedIn()
           && hasRole('EXPLORER')
           && isValidReservation(request.resource.data)
-          && request.auth.uid in request.resource.data.explorerUids
           && willBeJoinedMember(reservationId)
           && isOwnDisplayName(request.resource.data.explorerName)
           && request.resource.data.status == 'PENDING'
@@ -240,8 +238,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
           && isReservationTransition(resource.data.status, request.resource.data.status)
           && (request.auth.uid == resource.data.venueId
-              || (request.auth.uid in resource.data.explorerUids
-                  && request.resource.data.status == 'CANCELLED'));
+              || (isJoinedMember(reservationId) && request.resource.data.status == 'CANCELLED'));
     }
 
     // One membership per explorer and reservation, under the id `{reservationId}_{uid}`. An
