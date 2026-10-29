@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- How long ago the explorer asked, e.g. "Requested 12 min. ago" -->
+    <string name="dashboard_requested">Requested %1$s</string>
+    <string name="dashboard_requested_just_now">Requested just now</string>
+    <string name="dashboard_unknown_quest">Quest no longer available</string>
+    <string name="dashboard_unknown_explorer">An explorer</string>
+    <string name="dashboard_leader">Leader</string>
+    <string name="dashboard_party_solo">Solo visit · Party of 1</string>
+    <plurals name="dashboard_party_size">
+        <item quantity="one">Party of %d</item>
+        <item quantity="other">Party of %d</item>
+    </plurals>
+    <!-- On the avatar after the leader's: the rest of the party, e.g. "+2" -->
+    <string name="dashboard_more_explorers">+%d</string>
+    <string name="dashboard_decline">Decline</string>
+    <string name="dashboard_approve">Approve</string>
+    <string name="dashboard_approved">Approved</string>
+</resources>
