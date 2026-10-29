@@ -573,6 +573,31 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun onlyThisVenuesAcceptedPartiesAreListenedTo() = test {
+    val elsewhere =
+        fake
+            .createReservation(
+                newPendingReservation("a", "other-venue", EXPLORER, NAME, START),
+                EXPLORER,
+            )
+            .getOrThrow()
+    val here = storeFor("a")
+    val listened = mutableSetOf<String>()
+    partyRepository =
+        object : PartyRepository by party {
+          override fun observeMembers(reservationId: String): Flow<List<PartyMember>> {
+            listened += reservationId
+            return if (reservationId == elsewhere) flow { throw IOException("denied") }
+            else party.observeMembers(reservationId)
+          }
+        }
+    openAndPick("b")
+
+    assertEquals(setOf(here), listened)
+    assertTrue(state.acceptAvailable)
+  }
+
+  @Test
   fun aListenerThatFailsWhileAcceptingStopsShowingAccepting() = test {
     val server =
         ScriptedReservationRepository()

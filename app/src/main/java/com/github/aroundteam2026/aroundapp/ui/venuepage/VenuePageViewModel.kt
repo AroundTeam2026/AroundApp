@@ -78,7 +78,10 @@ class VenuePageViewModel(
 
   private class Write(val questId: String, var shown: Boolean = false)
 
-  /** The explorer's [reservations] and the number of joined members of each, by reservation id. */
+  /**
+   * The explorer's [reservations] and the number of joined members of the pending and approved ones
+   * at this venue, by reservation id.
+   */
   private data class Booked(val reservations: List<Reservation>, val partySizes: Map<String, Int>)
 
   /**
@@ -219,9 +222,10 @@ class VenuePageViewModel(
               reservationRepository
                   .observeForExplorer(explorerUid)
                   .flatMapLatest { reservations ->
-                    partyRepository.observeJoinedCounts(reservations.map { it.id }).map {
-                      Booked(reservations, it)
-                    }
+                    // Only the parties acceptedPartiesOf counts, so an old reservation elsewhere
+                    // can't make accepting unavailable here
+                    val ids = reservations.filter { it.acceptsAQuestOf(venueId) }.map { it.id }
+                    partyRepository.observeJoinedCounts(ids).map { Booked(reservations, it) }
                   }
                   .map<Booked, Booked?> { it }
                   .catch {
@@ -348,12 +352,16 @@ internal fun acceptedPartiesOf(
     venueId: String,
 ): Map<String, Int> =
     reservations
-        .filter {
-          it.venueId == venueId &&
-              (it.status == ReservationStatus.PENDING || it.status == ReservationStatus.APPROVED)
-        }
+        .filter { it.acceptsAQuestOf(venueId) }
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxOf { partySizes[it.id] ?: 1 } }
+
+/**
+ * This reservation is a pending or approved one at the venue [venueId], so its quest is accepted.
+ */
+private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
+    this.venueId == venueId &&
+        (status == ReservationStatus.PENDING || status == ReservationStatus.APPROVED)
 
 /**
  * This page showing [venue], its valid [quests] and the parties of the [accepted] ones, or "not
