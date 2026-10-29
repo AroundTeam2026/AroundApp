@@ -4,18 +4,25 @@ package com.github.aroundteam2026.aroundapp.e2e
 import android.content.Context
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryFirestore
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryFirestore
@@ -33,10 +40,12 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import com.kaspersky.kaspresso.testcases.api.testcase.TestCase
 import java.util.UUID
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -50,8 +59,8 @@ private val HERE = Location(46.5191, 6.5668)
 
 /**
  * An explorer's first visit, through the app as it ships on the Auth and Firestore emulators: they
- * create an account, find a venue's quest saved in Firestore among the map's nearby quests and view
- * that venue's page.
+ * create an account, find a venue's quest saved in Firestore among the map's nearby quests, view
+ * that venue's page and accept the quest there.
  */
 @RunWith(AndroidJUnit4::class)
 class ExplorerJourneyTest : TestCase() {
@@ -61,6 +70,11 @@ class ExplorerJourneyTest : TestCase() {
   private val id = UUID.randomUUID()
   private val venueName = "Journey venue $id"
   private val questTitle = "Journey quest $id"
+
+  /** The seeded venue's id, its owner's uid. */
+  private lateinit var venueId: String
+  /** The seeded quest's id, which Firestore assigns. */
+  private lateinit var questId: String
 
   /**
    * Puts the device at [HERE] and saves a venue and its active quest there, as a fresh venue
@@ -81,28 +95,30 @@ class ExplorerJourneyTest : TestCase() {
               .await()
               .user!!
               .uid
+      venueId = uid
       // The rules let only an account with the VENUE role write a venue and its quests
       UserRepositoryFirestore(db).createUser(User(uid, "Test", Role.VENUE, 0L)).getOrThrow()
       VenueRepositoryFirestore(db)
           .createVenue(Venue(uid, venueName, HERE, DEFAULT_RADIUS_METERS, null, createdAt = 0L))
           .getOrThrow()
-      QuestRepositoryFirestore(db)
-          .createQuest(
-              Quest(
-                  id = "",
-                  venueId = uid,
-                  radiusMeters = QuestLimits.DEFAULT_RADIUS_METERS,
-                  title = questTitle,
-                  description = "Find the hidden fox",
-                  requirements = "A photo of the fox",
-                  proofType = ProofType.PHOTO,
-                  reward = null,
-                  status = QuestStatus.ACTIVE,
-                  createdAt = 0L,
-                  updatedAt = 0L,
+      questId =
+          QuestRepositoryFirestore(db)
+              .createQuest(
+                  Quest(
+                      id = "",
+                      venueId = uid,
+                      radiusMeters = QuestLimits.DEFAULT_RADIUS_METERS,
+                      title = questTitle,
+                      description = "Find the hidden fox",
+                      requirements = "A photo of the fox",
+                      proofType = ProofType.PHOTO,
+                      reward = null,
+                      status = QuestStatus.ACTIVE,
+                      createdAt = 0L,
+                      updatedAt = 0L,
+                  )
               )
-          )
-          .getOrThrow()
+              .getOrThrow()
       // createQuest doesn't wait for the server, which is where the app reads the quest from
       db.waitForPendingWrites().await()
       auth.signOut()
@@ -114,19 +130,64 @@ class ExplorerJourneyTest : TestCase() {
   @Test
   fun aNewExplorerFindsTheSeededQuestAndOpensItsVenuesPage() = run {
     step("Register a new explorer") { composeTestRule.createAccount() }
-    step("Find the quest in the map's nearby list") {
-      composeTestRule.onNodeWithTag(C.Tag.MAP_TAB).performClick()
-      composeTestRule.onNodeWithTag(C.Tag.NEARBY_BUTTON).performClick()
-      // "View quest" opens the venue of the page shown, so the seeded quest must be the one shown
-      val nearbyQuest = hasTestTag(C.Tag.NEARBY_QUEST_TITLE) and hasText(questTitle)
-      waitFor(nearbyQuest)
-      composeTestRule.onNode(nearbyQuest, useUnmergedTree = true).assertIsDisplayed()
+    step("Find the quest in the map's nearby list") { findTheQuestNearby() }
+    step("View the venue's page, which lists the quest") { viewTheVenuesPage() }
+  }
+
+  @Test
+  fun anExplorerAcceptsTheSeededQuestOnItsVenuesPage() = run {
+    step("Register a new explorer and open the venue's page") {
+      composeTestRule.createAccount()
+      findTheQuestNearby()
+      viewTheVenuesPage()
     }
-    step("View the venue's page, which lists the quest") {
-      composeTestRule.onNodeWithTag(C.Tag.NEARBY_VIEW).performClick()
-      waitFor(hasTestTag(C.Tag.VENUE_PAGE_NAME) and hasText(venueName))
-      waitFor(hasTestTag(C.Tag.VENUE_QUEST_ROW_TITLE) and hasText(questTitle))
+    step("Pick the quest and accept it") {
+      val row = hasTestTag(C.Tag.VENUE_QUEST_ROW) and hasText(questTitle)
+      composeTestRule.onNode(row).performClick().assertIsSelected()
+      composeTestRule.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertIsEnabled().performClick()
     }
+    step("The bar says the venue has yet to approve") {
+      val accepted =
+          InstrumentationRegistry.getInstrumentation()
+              .targetContext
+              .getString(R.string.accept_quest_accepted)
+      waitFor(hasTestTag(C.Tag.ACCEPT_QUEST_BUTTON) and hasAnyDescendant(hasText(accepted)))
+      composeTestRule.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertIsNotEnabled()
+    }
+    step("The server keeps one pending reservation for the quest") {
+      val explorerUid = Firebase.auth.currentUser!!.uid
+      val reservations = runBlocking {
+        withTimeout(SETUP_TIMEOUT_MS) {
+          // The app writes without waiting for the server; a write the rules refuse is rolled
+          // back, so it never shows up below and the test times out
+          Firebase.firestore.waitForPendingWrites().await()
+          ReservationRepositoryFirestore(Firebase.firestore).observeForExplorer(explorerUid).first {
+            it.isNotEmpty()
+          }
+        }
+      }
+      val reservation = reservations.single()
+      assertEquals(questId, reservation.questId)
+      assertEquals(venueId, reservation.venueId)
+      assertEquals(ReservationStatus.PENDING, reservation.status)
+    }
+  }
+
+  /** Opens the map's nearby quests and waits for the seeded quest to be the one shown. */
+  private fun findTheQuestNearby() {
+    composeTestRule.onNodeWithTag(C.Tag.MAP_TAB).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.NEARBY_BUTTON).performClick()
+    // "View quest" opens the venue of the page shown, so the seeded quest must be the one shown
+    val nearbyQuest = hasTestTag(C.Tag.NEARBY_QUEST_TITLE) and hasText(questTitle)
+    waitFor(nearbyQuest)
+    composeTestRule.onNode(nearbyQuest, useUnmergedTree = true).assertIsDisplayed()
+  }
+
+  /** Opens the shown quest's venue page and waits for it to list the seeded quest. */
+  private fun viewTheVenuesPage() {
+    composeTestRule.onNodeWithTag(C.Tag.NEARBY_VIEW).performClick()
+    waitFor(hasTestTag(C.Tag.VENUE_PAGE_NAME) and hasText(venueName))
+    waitFor(hasTestTag(C.Tag.VENUE_QUEST_ROW_TITLE) and hasText(questTitle))
   }
 
   /** Waits for a node matching [matcher], including one inside a clickable row's merged node. */
