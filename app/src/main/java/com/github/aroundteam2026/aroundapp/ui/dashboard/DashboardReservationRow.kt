@@ -18,13 +18,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +48,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import java.time.Clock
+import kotlinx.coroutines.delay
 
 /**
  * One reservation on the venue dashboard, as the Figma component `Reservation row`: the quest's
@@ -59,7 +60,8 @@ import java.time.Clock
  * @param reservation The reservation to draw.
  * @param onDecline Declines it; only a pending reservation offers it.
  * @param onApprove Approves it; only a pending reservation offers it.
- * @param clock Tells how long ago it was requested.
+ * @param clock Tells how long ago it was requested; read again each time the minute shown changes,
+ *   so a dashboard left open keeps up.
  */
 @Composable
 internal fun DashboardReservationRow(
@@ -70,10 +72,11 @@ internal fun DashboardReservationRow(
     clock: Clock = Clock.systemDefaultZone(),
 ) {
   val colors = MaterialTheme.colorScheme
+  val now = rememberNow(reservation.requestedAt, clock)
   Column(
       modifier
           .fillMaxWidth()
-          .clip(ROW_SHAPE)
+          .clip(MaterialTheme.shapes.large)
           .background(colors.surface)
           .padding(AroundSpacing.Large)
           .testTag("${C.Tag.DASHBOARD_ROW}_${reservation.reservationId}"),
@@ -89,7 +92,7 @@ internal fun DashboardReservationRow(
           overflow = TextOverflow.Ellipsis,
       )
       Text(
-          requestedText(reservation.requestedAt, clock.millis()),
+          requestedText(reservation.requestedAt, now),
           Modifier.testTag(C.Tag.DASHBOARD_ROW_REQUESTED),
           color = colors.onSurfaceVariant,
           style = AroundTextStyles.Small,
@@ -119,6 +122,21 @@ internal fun DashboardReservationRow(
     }
   }
 }
+
+/**
+ * The [clock]'s time, read again when the minute since [requestedAt] changes, so "Requested … ago"
+ * moves on while the row stays on screen instead of keeping the time it was first drawn at.
+ */
+@Composable
+private fun rememberNow(requestedAt: Long, clock: Clock): Long =
+    produceState(clock.millis(), requestedAt, clock) {
+          while (true) {
+            val elapsed = (value - requestedAt).coerceAtLeast(0)
+            delay(DateUtils.MINUTE_IN_MILLIS - elapsed % DateUtils.MINUTE_IN_MILLIS)
+            value = clock.millis()
+          }
+        }
+        .value
 
 /**
  * "Requested 12 min. ago", in the phone's language; "Requested just now" under a minute, rather
@@ -158,7 +176,7 @@ private fun Party(reservation: DashboardReservation) {
     Avatars(reservation.explorerName, others)
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
       Row(
-          horizontalArrangement = Arrangement.spacedBy(LEADER_GAP),
+          horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
           verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(
@@ -200,7 +218,7 @@ private fun Avatars(leaderName: String?, others: Int) {
   val colors = MaterialTheme.colorScheme
   Box(Modifier.clearAndSetSemantics {}) {
     Avatar(
-        leaderName?.let(::initialsOf) ?: "?",
+        leaderName?.let(::initialsOf) ?: stringResource(R.string.dashboard_unknown_initials),
         background = colors.primary,
         content = colors.onPrimary,
         modifier = Modifier.zIndex(1f),
@@ -309,12 +327,10 @@ private fun RowScope.RowButton(
 }
 
 private const val TITLE_MAX_LINES = 2
-private val ROW_SHAPE = RoundedCornerShape(20.dp)
 private val TEXT_GAP = 2.dp
 private val AVATAR_SIZE = 32.dp
 private val AVATAR_RING = 2.5.dp
 private val AVATAR_OVERLAP = 8.dp
-private val LEADER_GAP = 6.dp
 private val LEADER_START = 6.dp
 private val LEADER_END = 7.dp
 private val LEADER_VERTICAL = 2.dp

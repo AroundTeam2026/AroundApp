@@ -6,6 +6,8 @@
     <string name="dashboard_requested_just_now">Requested just now</string>
     <string name="dashboard_unknown_quest">Quest no longer available</string>
     <string name="dashboard_unknown_explorer">An explorer</string>
+    <!-- On the leader's avatar when their name isn't known -->
+    <string name="dashboard_unknown_initials">?</string>
     <string name="dashboard_leader">Leader</string>
     <string name="dashboard_party_solo">Solo visit · Party of 1</string>
     <plurals name="dashboard_party_size">

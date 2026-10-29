@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.Context
+import android.text.format.DateUtils
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -17,7 +18,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,20 +32,22 @@ class DashboardReservationRowTest {
   private var approvals = 0
   private var declines = 0
 
-  private fun show(reservation: DashboardReservation) {
+  private fun show(reservation: DashboardReservation, clock: Clock = CLOCK) {
     compose.setContent {
       AroundAppTheme {
         DashboardReservationRow(
             reservation,
             onDecline = { declines++ },
             onApprove = { approvals++ },
-            clock = CLOCK,
+            clock = clock,
         )
       }
     }
   }
 
-  private fun string(id: Int) = ApplicationProvider.getApplicationContext<Context>().getString(id)
+  private val context: Context = ApplicationProvider.getApplicationContext()
+
+  private fun string(id: Int, vararg args: Any) = context.getString(id, *args)
 
   private fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true)
 
@@ -58,10 +60,16 @@ class DashboardReservationRowTest {
 
     compose.onNodeWithTag("${C.Tag.DASHBOARD_ROW}_a").assertIsDisplayed()
     assertEquals("Find the hidden fox", node(C.Tag.DASHBOARD_ROW_TITLE).text())
-    assertTrue(node(C.Tag.DASHBOARD_ROW_REQUESTED).text().startsWith("Requested "))
+    assertEquals(
+        string(R.string.dashboard_requested, TWELVE_MIN_AGO),
+        node(C.Tag.DASHBOARD_ROW_REQUESTED).text(),
+    )
     assertEquals("Yusuf S.", node(C.Tag.DASHBOARD_ROW_EXPLORER).text())
     node(C.Tag.DASHBOARD_ROW_LEADER).assertExists()
-    assertEquals("Party of 3", node(C.Tag.DASHBOARD_ROW_PARTY).text())
+    assertEquals(
+        context.resources.getQuantityString(R.plurals.dashboard_party_size, 3, 3),
+        node(C.Tag.DASHBOARD_ROW_PARTY).text(),
+    )
     node(C.Tag.DASHBOARD_ROW_DECLINE).assertIsDisplayed()
     node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsDisplayed()
     node(C.Tag.DASHBOARD_ROW_APPROVED).assertDoesNotExist()
@@ -109,7 +117,7 @@ class DashboardReservationRowTest {
 
   @Test
   fun aRequestUnderAMinuteOldIsJustNow() {
-    show(pending().copy(requestedAt = NOW - 30_000))
+    show(pending().copy(requestedAt = NOW - JUST_NOW_AGE_MS))
 
     assertEquals(
         string(R.string.dashboard_requested_just_now),
@@ -117,10 +125,41 @@ class DashboardReservationRowTest {
     )
   }
 
+  @Test
+  fun theRequestedTimeMovesOnWhileTheRowIsShown() {
+    val clock = MovingClock(NOW)
+    show(pending().copy(requestedAt = NOW - JUST_NOW_AGE_MS), clock)
+
+    clock.now = NOW + DateUtils.MINUTE_IN_MILLIS
+    compose.mainClock.advanceTimeBy(DateUtils.MINUTE_IN_MILLIS)
+
+    assertEquals(
+        string(R.string.dashboard_requested, ONE_MIN_AGO),
+        node(C.Tag.DASHBOARD_ROW_REQUESTED).text(),
+    )
+  }
+
+  /** A clock the test moves on by hand, like the phone's while the dashboard stays open. */
+  private class MovingClock(var now: Long) : Clock() {
+    override fun getZone(): ZoneId = ZONE
+
+    override fun withZone(zone: ZoneId): Clock = this
+
+    override fun instant(): Instant = Instant.ofEpochMilli(now)
+  }
+
   private companion object {
     val ZONE: ZoneId = ZoneId.of("Europe/Zurich")
     val NOW: Long = LocalDateTime.of(2026, 10, 28, 14, 0).atZone(ZONE).toInstant().toEpochMilli()
     val CLOCK: Clock = Clock.fixed(Instant.ofEpochMilli(NOW), ZONE)
+
+    /** Under a minute, so the row says "just now". */
+    const val JUST_NOW_AGE_MS = 30_000L
+    const val REQUEST_AGE_MS = 12 * DateUtils.MINUTE_IN_MILLIS
+
+    // Android's English relative times, which the row puts after "Requested"
+    const val TWELVE_MIN_AGO = "12 min. ago"
+    const val ONE_MIN_AGO = "1 min. ago"
 
     fun pending(partySize: Int = 2) =
         DashboardReservation(
@@ -128,7 +167,7 @@ class DashboardReservationRowTest {
             questTitle = "Find the hidden fox",
             explorerName = "Yusuf S.",
             partySize = partySize,
-            requestedAt = NOW - 12 * 60_000,
+            requestedAt = NOW - REQUEST_AGE_MS,
             approved = false,
         )
   }
