@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- A card of the Quests tab: one quest the explorer accepted -->
+    <!-- Where a reservation stands with its venue -->
+    <string name="overview_status_waiting">Waiting for the venue</string>
+    <string name="overview_status_approved">Approved</string>
+    <!-- A reservation's slot: the day, e.g. "Today" or "Sun 2 Nov", then the time -->
+    <string name="overview_slot">%1$s · %2$s</string>
+    <string name="overview_slot_today">Today</string>
+    <!-- The venue's name, then its address -->
+    <string name="overview_venue_address">%1$s · %2$s</string>
+    <plurals name="overview_party_size">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item>
+    </plurals>
+    <!-- What tapping a card does, read by screen readers; the argument is the venue's name -->
+    <string name="overview_open_venue">Open %1$s</string>
+</resources>
