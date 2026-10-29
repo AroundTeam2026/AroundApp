@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
@@ -109,7 +110,9 @@ class OverviewScreenTest {
   fun theScreenShowsWhatItsViewModelLoads() {
     val reservations = FakeReservationRepository()
     runBlocking {
-      reservations.createReservation(newPendingReservation("fox", CAFE, "explorer", SLOT))
+      reservations.createReservation(
+          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT)
+      )
     }
     val viewModel =
         OverviewViewModel(
