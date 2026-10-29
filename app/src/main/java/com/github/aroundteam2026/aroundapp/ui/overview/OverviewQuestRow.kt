@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -50,7 +51,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 /**
  * One accepted quest in the overview, as the Figma card `Overview/Quest card` (after the active
@@ -186,7 +186,13 @@ private fun Slot(slotStart: Long, clock: Clock) {
                   locale,
               )
               .format(slot)
-  val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).format(slot)
+  val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
+  val time =
+      DateTimeFormatter.ofPattern(
+              DateFormat.getBestDateTimePattern(locale, if (is24Hour) HOURS_24 else HOURS_12),
+              locale,
+          )
+          .format(slot)
   Row(
       Modifier.background(colors.background, AroundPillShape)
           .padding(horizontal = AroundSpacing.CompactGap, vertical = SLOT_VERTICAL_PADDING),
@@ -235,6 +241,9 @@ private fun OneLine(text: String, tag: String, style: TextStyle, color: Color) {
 
 /** The weekday, day and month, in the order of the device's language. */
 private const val DAY_SKELETON = "EEEdMMM"
+/** Hours and minutes on the 24-hour clock, or the 12-hour one with AM/PM, as the phone is set. */
+private const val HOURS_24 = "Hm"
+private const val HOURS_12 = "hm"
 private const val TITLE_MAX_LINES = 2
 private val CARD_SHAPE = RoundedCornerShape(28.dp)
 private val CARD_ELEVATION = 10.dp

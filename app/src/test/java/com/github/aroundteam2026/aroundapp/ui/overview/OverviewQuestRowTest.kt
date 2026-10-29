@@ -22,7 +22,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -30,6 +29,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSettings
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "en-w413dp-h917dp-mdpi")
@@ -60,12 +60,13 @@ class OverviewQuestRowTest {
 
   @Test
   fun aWaitingCardShowsItsQuestVenueSlotAndParty() {
+    ShadowSettings.set24HourTimeFormat(true)
     show(row())
 
     part(C.Tag.OVERVIEW_ROW_TITLE).assertTextEquals("Find the hidden fox")
     part(C.Tag.OVERVIEW_ROW_VENUE).assertTextEquals("Café Lumen · Rue du Pont 1")
     part(C.Tag.QUEST_CHIP_REWARD).assertTextEquals("Free Coffee")
-    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("Today · ${time(SLOT)}")
+    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("Today · 08:00")
     part(C.Tag.OVERVIEW_ROW_PARTY).assertTextEquals("1 person")
     status("WAITING FOR THE VENUE").assertIsDisplayed()
     status("APPROVED").assertDoesNotExist()
@@ -83,16 +84,17 @@ class OverviewQuestRowTest {
   @Test
   fun aSlotOnAnotherDayShowsItsWeekdayAndDate() {
     val later = SLOT + 2 * DAY
+    ShadowSettings.set24HourTimeFormat(true)
     show(row(slotStart = later))
 
-    // In English, e.g. "Sun, Jan 17 · 8:00 AM"
+    // In English, e.g. "Sun, Jan 17 · 08:00"
     val day =
         DateTimeFormatter.ofPattern(
                 DateFormat.getBestDateTimePattern(Locale.ENGLISH, "EEEdMMM"),
                 Locale.ENGLISH,
             )
             .format(Instant.ofEpochMilli(later).atZone(UTC))
-    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("$day · ${time(later)}")
+    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("$day · 08:00")
   }
 
   // The app passes no clock, so the card reads the device's: a quest booked now is today
@@ -137,6 +139,16 @@ class OverviewQuestRowTest {
         )
   }
 
+  // The phone's 12-hour setting adds AM or PM; checked in parts, as the space before it varies
+  @Test
+  fun onThe12HourClockTheSlotSaysAmOrPm() {
+    ShadowSettings.set24HourTimeFormat(false)
+    show(row())
+
+    part(C.Tag.OVERVIEW_ROW_SLOT)
+        .assert(hasText("Today · 8:00", substring = true) and hasText("AM", substring = true))
+  }
+
   private fun row(
       status: OverviewRowStatus = OverviewRowStatus.WAITING,
       partySize: Int = 1,
@@ -166,11 +178,5 @@ class OverviewQuestRowTest {
     val UTC: ZoneOffset = ZoneOffset.UTC
     /** Two hours after [SLOT], the same day. */
     val CLOCK: Clock = Clock.fixed(Instant.ofEpochMilli(SLOT + 2 * 3_600_000L), UTC)
-
-    /** The time of [millis] in English, e.g. "8:00 AM", whichever space the JDK puts before AM. */
-    fun time(millis: Long): String =
-        DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-            .withLocale(Locale.ENGLISH)
-            .format(Instant.ofEpochMilli(millis).atZone(UTC))
   }
 }
