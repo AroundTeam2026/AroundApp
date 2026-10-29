@@ -451,6 +451,103 @@ class FirestoreRulesTest {
     assertSucceeds(approved.update("status", "CANCELLED"))
   }
 
+  // ---- party_user ----
+
+  @Test
+  fun explorerJoinsAPendingReservationOnlyAsThemselvesUnderTheirMembershipId() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val pending = pendingReservationOf(explorer, venue)
+    val approved = pendingReservationOf(explorer, venue)
+    signInAs(venue)
+    assertSucceeds(approved.update("status", "APPROVED"))
+    val friend = newUser(Role.EXPLORER)
+
+    assertDenied(
+        partyUser("${pending.id}-${friend.uid}").set(member(pending.id, friend)),
+        "a wrong membership id",
+    )
+    assertDenied(membership(pending.id, explorer).set(member(pending.id, explorer)), "another uid")
+    assertDenied(membership(approved.id, friend).set(member(approved.id, friend)), "not pending")
+    assertDenied(membership("missing", friend).set(member("missing", friend)), "no reservation")
+    assertSucceeds(membership(pending.id, friend).set(member(pending.id, friend)))
+
+    val otherVenue = newUser(Role.VENUE)
+    assertDenied(
+        membership(pending.id, otherVenue).set(member(pending.id, otherVenue)),
+        "a venue account",
+    )
+  }
+
+  @Test
+  fun partyMemberMustFollowTheSchema() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue)
+    val valid = member(reservation.id, explorer)
+
+    assertOnlyValidWriteSucceeds(
+        membership(reservation.id, explorer),
+        valid,
+        mapOf(
+            "a withdrawn membership" to valid + ("status" to "WITHDRAWN"),
+            "an unknown status" to valid + ("status" to "INVITED"),
+            "no joinedAt" to valid - "joinedAt",
+            "an updatedAt that is not a timestamp" to valid + ("updatedAt" to "now"),
+            "an unknown field" to valid + ("role" to "LEADER"),
+        ),
+    )
+  }
+
+  @Test
+  fun onlyTheMemberWithdrawsAndNeverJoinsAgain() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue)
+    val membership = membership(reservation.id, explorer)
+    assertSucceeds(membership.set(member(reservation.id, explorer)))
+    val withdrawal = mapOf("status" to "WITHDRAWN", "updatedAt" to Timestamp.now())
+
+    signInAs(venue)
+    assertDenied(membership.update(withdrawal), "the venue withdrawing the explorer")
+    signInAs(explorer)
+    assertDenied(
+        membership.update(withdrawal + ("joinedAt" to Timestamp.now())),
+        "a withdrawal that moves joinedAt",
+    )
+    assertSucceeds(membership.update(withdrawal))
+    assertDenied(membership.update("status", "JOINED"), "WITHDRAWN -> JOINED")
+    assertDenied(membership.set(member(reservation.id, explorer)), "joining again")
+    assertDenied(membership.delete(), "a delete")
+  }
+
+  @Test
+  fun membershipIsReadableByTheMemberTheirJoinedPartyAndTheVenueOnly() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue)
+    assertSucceeds(membership(reservation.id, explorer).set(member(reservation.id, explorer)))
+    val friend = newUser(Role.EXPLORER)
+    val friendsMembership = membership(reservation.id, friend)
+    assertSucceeds(friendsMembership.set(member(reservation.id, friend)))
+    val outsider = newUser(Role.EXPLORER)
+
+    signInAs(explorer)
+    assertSucceeds(friendsMembership.get(Source.SERVER))
+    signInAs(venue)
+    assertSucceeds(friendsMembership.get(Source.SERVER))
+    signInAs(outsider)
+    assertDenied(friendsMembership.get(Source.SERVER), "an outsider")
+
+    signInAs(explorer)
+    assertSucceeds(
+        membership(reservation.id, explorer)
+            .update(mapOf("status" to "WITHDRAWN", "updatedAt" to Timestamp.now()))
+    )
+    assertSucceeds(membership(reservation.id, explorer).get(Source.SERVER))
+    assertDenied(friendsMembership.get(Source.SERVER), "a withdrawn member")
+  }
+
   // ---- completions ----
 
   @Test
@@ -558,6 +655,33 @@ class FirestoreRulesTest {
           "status" to status,
           "createdAt" to Timestamp.now(),
           "explorerName" to DISPLAY_NAME,
+      )
+
+  /**
+   * Has [explorer] reserve a new active quest of [venue], for a party of just them, and returns the
+   * reservation. Leaves [explorer] signed in.
+   */
+  private fun pendingReservationOf(explorer: TestUser, venue: TestUser): DocumentReference {
+    val quest = questOf(venue)
+    signInAs(explorer)
+    val reservation = newReservation()
+    assertSucceeds(reservation.set(reservation(quest, venue, listOf(explorer))))
+    return reservation
+  }
+
+  private fun partyUser(id: String) = db.collection("party_user").document(id)
+
+  private fun membership(reservationId: String, user: TestUser) =
+      partyUser("${reservationId}_${user.uid}")
+
+  /** A joined membership of [user] in the party of [reservationId]. */
+  private fun member(reservationId: String, user: TestUser) =
+      mapOf(
+          "reservationId" to reservationId,
+          "uid" to user.uid,
+          "status" to "JOINED",
+          "joinedAt" to Timestamp.now(),
+          "updatedAt" to Timestamp.now(),
       )
 
   /** A time [minutes] before now, by this device's clock. */
