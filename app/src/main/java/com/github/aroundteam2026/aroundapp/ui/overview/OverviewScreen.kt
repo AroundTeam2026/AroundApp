@@ -34,10 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
-import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundHeader
-import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -231,34 +229,10 @@ private fun Message(text: Int) {
 private val ILLUSTRATION_SIZE = 136.dp
 private val ILLUSTRATION_ICON_SIZE = 48.dp
 
+// The screen around the cards; each card has its own preview in OverviewQuestRow.kt
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun OverviewPreview() {
-  AroundAppTheme {
-    OverviewContent(
-        OverviewUiState(
-            status = OverviewStatus.LOADED,
-            rows =
-                listOf(
-                    OverviewRow(
-                        reservationId = "reservation-1",
-                        questId = "fox",
-                        venueId = "cafe",
-                        questTitle = "Find the hidden fox",
-                        reward = Reward.FreeItem("croissant", specifics = null),
-                        venueName = "Café Lumière",
-                        address = "Rue de Bourg 12",
-                        avatar = VenueAvatar.Initials("CL"),
-                        slotStart = System.currentTimeMillis(),
-                        partySize = 3,
-                        status = OverviewRowStatus.APPROVED,
-                    )
-                ),
-        ),
-        onOpenVenue = {},
-        onRetry = {},
-        onCancel = {},
-    )
-  }
+  AroundAppTheme { OverviewContent(OverviewUiState(OverviewStatus.LOADED), {}, {}, {}) }
 }
