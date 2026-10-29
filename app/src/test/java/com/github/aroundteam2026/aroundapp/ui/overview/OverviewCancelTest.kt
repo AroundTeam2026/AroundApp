@@ -228,6 +228,15 @@ class OverviewCancelTest {
     assertEquals(0, reservations.updates)
   }
 
+  @Test
+  fun eachRowsCancelStatusFollowsTheMarks() {
+    val marked = OverviewUiState(cancellingIds = setOf("a"), failedCancelIds = setOf("b"))
+
+    assertEquals(CancelStatus.CANCELLING, marked.cancelStatusOf("a"))
+    assertEquals(CancelStatus.FAILED, marked.cancelStatusOf("b"))
+    assertEquals(CancelStatus.NONE, marked.cancelStatusOf("c"))
+  }
+
   private companion object {
     const val EXPLORER = "explorer"
     const val CAFE = "cafe"

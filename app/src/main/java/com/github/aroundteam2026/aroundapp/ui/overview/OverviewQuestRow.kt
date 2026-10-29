@@ -14,10 +14,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,11 +64,13 @@ import java.time.format.DateTimeFormatter
  * One accepted quest in the overview, as the Figma card `Overview/Quest card` (after the active
  * quest card of F3): where the reservation stands and its slot, then the venue's avatar, the
  * quest's title, the venue's name and address, the party size and the reward chip. Tapping it opens
- * the venue's page.
+ * the venue's page. With [onCancel], it ends with a button to cancel the reservation.
  *
  * @param row The accepted quest to draw.
  * @param onClick Opens the venue's page.
  * @param clock Tells which day is today, and the time zone the slot is written in.
+ * @param cancelStatus How cancelling this reservation stands, which the cancel button shows.
+ * @param onCancel Cancels the reservation, or null to draw no cancel button.
  */
 @Composable
 fun OverviewQuestRow(
@@ -69,6 +78,8 @@ fun OverviewQuestRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
+    cancelStatus: CancelStatus = CancelStatus.NONE,
+    onCancel: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
   Column(
@@ -133,6 +144,78 @@ fun OverviewQuestRow(
           tint = colors.onSurfaceVariant,
       )
     }
+    if (onCancel != null) CancelAction(cancelStatus, row.venueName, onCancel)
+  }
+}
+
+/**
+ * The card's cancel button, under its content: "Cancel reservation", which asks first since a
+ * cancelled reservation can't be undone; "Cancelling…", disabled, while the cancel is written; or
+ * after a failure an error and "Try again", which retries at once.
+ */
+@Composable
+private fun CancelAction(status: CancelStatus, venueName: String, onCancel: () -> Unit) {
+  val colors = MaterialTheme.colorScheme
+  var asking by rememberSaveable { mutableStateOf(false) }
+  Column(
+      Modifier.fillMaxWidth(),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall),
+      horizontalAlignment = Alignment.End,
+  ) {
+    if (status == CancelStatus.FAILED) {
+      Text(
+          stringResource(R.string.overview_cancel_failed),
+          Modifier.testTag(C.Tag.OVERVIEW_ROW_CANCEL_FAILED),
+          color = colors.error,
+          style = AroundTextStyles.Caption,
+      )
+    }
+    TextButton(
+        // The explorer already confirmed the cancel that failed
+        onClick = { if (status == CancelStatus.FAILED) onCancel() else asking = true },
+        enabled = status != CancelStatus.CANCELLING,
+        colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
+        modifier = Modifier.testTag(C.Tag.OVERVIEW_ROW_CANCEL),
+    ) {
+      Text(
+          stringResource(
+              when (status) {
+                CancelStatus.NONE -> R.string.overview_cancel
+                CancelStatus.CANCELLING -> R.string.overview_cancelling
+                CancelStatus.FAILED -> R.string.overview_cancel_retry
+              }
+          ),
+          style = AroundTextStyles.Button,
+      )
+    }
+  }
+  if (asking) {
+    AlertDialog(
+        onDismissRequest = { asking = false },
+        confirmButton = {
+          TextButton(
+              onClick = {
+                asking = false
+                onCancel()
+              },
+              colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
+              modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_CONFIRM),
+          ) {
+            Text(stringResource(R.string.overview_cancel_confirm))
+          }
+        },
+        dismissButton = {
+          TextButton(
+              onClick = { asking = false },
+              modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_KEEP),
+          ) {
+            Text(stringResource(R.string.overview_cancel_keep))
+          }
+        },
+        title = { Text(stringResource(R.string.overview_cancel_title)) },
+        text = { Text(stringResource(R.string.overview_cancel_text, venueName)) },
+        modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_DIALOG),
+    )
   }
 }
 
@@ -284,6 +367,7 @@ private fun OverviewQuestRowPreview() {
               status = OverviewRowStatus.APPROVED,
           ),
           onClick = {},
+          onCancel = {},
       )
     }
   }

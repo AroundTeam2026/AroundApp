@@ -10,6 +10,16 @@
     <string name="overview_slot_today">Today</string>
     <!-- The venue's name, then its address -->
     <string name="overview_venue_address">%1$s · %2$s</string>
+    <!-- Cancelling the reservation from its card -->
+    <string name="overview_cancel">Cancel reservation</string>
+    <string name="overview_cancelling">Cancelling…</string>
+    <string name="overview_cancel_retry">Try again</string>
+    <string name="overview_cancel_failed">Couldn\'t cancel this reservation.</string>
+    <!-- Asked before cancelling, which can't be undone; the argument is the venue's name -->
+    <string name="overview_cancel_title">Cancel this reservation?</string>
+    <string name="overview_cancel_text">%1$s will see it cancelled. To go after all, accept the quest again.</string>
+    <string name="overview_cancel_confirm">Cancel reservation</string>
+    <string name="overview_cancel_keep">Keep it</string>
     <plurals name="overview_party_size">
         <item quantity="one">%1$d person</item>
         <item quantity="other">%1$d people</item>
