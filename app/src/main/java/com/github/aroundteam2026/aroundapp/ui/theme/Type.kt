@@ -54,6 +54,7 @@ object AroundTextStyles {
   val SheetTitle = heading(24, 26)
   val OverlayTitle = heading(22, tracking = 0.0)
   val AvatarLarge = heading(20, tracking = 0.0)
+  val CardHeading = heading(20, tracking = 0.0)
   val AvatarSmall = heading(13, tracking = 0.0)
   val Tagline = body(17)
   val BodyLarge = body(16, 24)
@@ -74,6 +75,7 @@ object AroundTextStyles {
   val FieldLabel = body(14, weight = FontWeight.SemiBold)
   val Helper = body(13, weight = FontWeight.SemiBold)
   val Badge = body(12, weight = FontWeight.SemiBold)
+  val Label = body(11, weight = FontWeight.SemiBold)
   val Chip = body(14, weight = FontWeight.Medium)
   val FilterChip = body(13, weight = FontWeight.Medium)
   val MapLabel =

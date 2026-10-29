@@ -13,42 +13,50 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * [ReservationRepository] backed by the Firestore `reservations` collection.
  *
  * Firestore types stay inside this class. Epoch-millisecond times are stored as `Timestamp`s and
- * the status as its enum name. The reservation id is the document id rather than a stored field.
+ * the status as its enum name. A document without `explorerName`, written before it was stored, is
+ * read with an empty one. The reservation id is the document id rather than a stored field.
  * Documents that cannot be mapped back to a [Reservation] are logged and skipped: the `observe*`
  * flows leave them out, and [updateStatus] treats them as missing.
  *
  * The security rules decide who may do what: an explorer may only create a pending reservation that
  * lists them, and only the venue may change a reservation's status, along an allowed transition. A
- * creation the rules refuse is only logged, like a refused quest; a refused [updateStatus] comes
- * back as a failure.
+ * creation the rules refuse within [confirmTimeoutMs] comes back as a failure, and one they refuse
+ * later is only logged; a refused [updateStatus] comes back as a failure.
  *
  * @param db Firestore client to read from and write to.
+ * @param confirmTimeoutMs How long [createReservation] waits for the server to confirm a write, in
+ *   milliseconds, before it returns success with the write still queued.
  * @param now Clock used for `createdAt`, in epoch milliseconds.
  */
 class ReservationRepositoryFirestore(
     private val db: FirebaseFirestore,
+    private val confirmTimeoutMs: Long = CONFIRM_TIMEOUT_MS,
     private val now: () -> Long = System::currentTimeMillis,
 ) : ReservationRepository {
   private val reservations
     get() = db.collection(RESERVATIONS)
 
   /**
-   * Issues the write without waiting for the server, so it also succeeds offline; Firestore sends
-   * it once the device is back online. A later server rejection, e.g. because the signed-in user is
-   * not in `explorerUids`, is only logged. Exceptions thrown while issuing the write (e.g. on a
-   * terminated client) are returned as a failure.
+   * Issues the write and waits up to [confirmTimeoutMs] for the server's answer. A refusal in that
+   * time, e.g. because the signed-in user is not in `explorerUids`, is returned as the Firestore
+   * exception (`PERMISSION_DENIED`), and Firestore drops its local copy. Without an answer in time,
+   * e.g. while offline, it returns success: Firestore sends the write once the device is back
+   * online, and a refusal then is only logged. Exceptions thrown while issuing the write (e.g. on a
+   * terminated client) are returned as a failure too.
    */
   override suspend fun createReservation(reservation: Reservation): Result<String> =
       try {
         val document = reservations.document()
-        document.set(reservation.toFirestore(Timestamp(Date(now())))).addOnFailureListener {
-          Log.w(TAG, "Write of reservation ${document.id} was rejected", it)
-        }
+        val write = document.set(reservation.toFirestore(Timestamp(Date(now()))))
+        write.addOnFailureListener { Log.w(TAG, "Write of reservation ${document.id} failed", it) }
+        // Null when the server hasn't answered in time; a refusal throws
+        withTimeoutOrNull(confirmTimeoutMs) { write.await() }
         Result.success(document.id)
       } catch (e: CancellationException) {
         throw e
@@ -128,6 +136,7 @@ class ReservationRepositoryFirestore(
           SLOT_START to Timestamp(Date(slotStart)),
           STATUS to ReservationStatus.PENDING.name,
           CREATED_AT to createdAt,
+          EXPLORER_NAME to explorerName,
       )
 
   /** Maps this document to a [Reservation], or returns null if it is missing or malformed. */
@@ -143,6 +152,8 @@ class ReservationRepositoryFirestore(
           slotStart = required(SLOT_START) { getTimestamp(it) }.toDate().time,
           status = ReservationStatus.valueOf(required(STATUS) { getString(it) }),
           createdAt = required(CREATED_AT) { getTimestamp(it) }.toDate().time,
+          // Reservations made before the name was stored have none: show them, unnamed
+          explorerName = getString(EXPLORER_NAME) ?: "",
       )
     } catch (e: Exception) {
       Log.w(TAG, "Skipping malformed reservation document $id", e)
@@ -156,6 +167,10 @@ class ReservationRepositoryFirestore(
 
   private companion object {
     const val TAG = "ReservationRepositoryFirestore"
+
+    /** Long enough for the server to answer on a slow connection, short for a waiting explorer. */
+    const val CONFIRM_TIMEOUT_MS = 5_000L
+
     const val RESERVATIONS = "reservations"
 
     const val QUEST_ID = "questId"
@@ -164,5 +179,6 @@ class ReservationRepositoryFirestore(
     const val SLOT_START = "slotStart"
     const val STATUS = "status"
     const val CREATED_AT = "createdAt"
+    const val EXPLORER_NAME = "explorerName"
   }
 }

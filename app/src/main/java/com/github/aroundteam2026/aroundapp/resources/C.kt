@@ -187,6 +187,13 @@ object C {
     const val CREATE_QUEST_PARTY_EXACTLY = "create_quest_party_exactly"
     const val DASHBOARD_STUB = "dashboard_stub"
     const val OVERVIEW_STUB = "overview_stub"
+    /** Followed by `_` and the reservation's id, e.g. `overview_row_reservation-1`. */
+    const val OVERVIEW_ROW = "overview_row"
+    const val OVERVIEW_ROW_TITLE = "overview_row_title"
+    const val OVERVIEW_ROW_VENUE = "overview_row_venue"
+    const val OVERVIEW_ROW_SLOT = "overview_row_slot"
+    const val OVERVIEW_ROW_PARTY = "overview_row_party"
+    const val OVERVIEW_ROW_STATUS = "overview_row_status"
     const val CREATE_QUEST_REWARD_NONE = "create_quest_reward_none"
     const val CREATE_QUEST_REWARD_DISCOUNT = "create_quest_reward_discount"
     const val CREATE_QUEST_REWARD_AMOUNT = "create_quest_reward_amount"

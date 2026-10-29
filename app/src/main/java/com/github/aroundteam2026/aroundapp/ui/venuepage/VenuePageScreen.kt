@@ -256,7 +256,9 @@ private fun Header(state: VenuePageUiState) {
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    state.avatar?.let { QuestAvatar(it, avatarStyle(), Modifier.testTag(C.Tag.VENUE_PAGE_AVATAR)) }
+    state.avatar?.let {
+      QuestAvatar(it, venueAvatarStyle(), Modifier.testTag(C.Tag.VENUE_PAGE_AVATAR))
+    }
     Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall)) {
       Text(
           state.venueName,
@@ -287,9 +289,12 @@ private fun Header(state: VenuePageUiState) {
   }
 }
 
-/** The header's avatar, on the same colours as the map's cards. */
+/**
+ * A venue's avatar as its page's header shows it, on the same colours as the map's cards. The
+ * overview's rows use it too, at their own size.
+ */
 @Composable
-private fun avatarStyle(): QuestAvatarStyle {
+internal fun venueAvatarStyle(): QuestAvatarStyle {
   val colors = MaterialTheme.colorScheme
   return QuestAvatarStyle(
       size = AVATAR_SIZE,

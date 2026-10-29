@@ -359,6 +359,40 @@ class AuthViewModelTest {
       }
 
   @Test
+  fun googleSignupRecordsTheChosenRoleBeforeAuthenticating() =
+      runTest(dispatcher) {
+        val pending = FakePendingRoleStore()
+        val setup = ProfileSetup(repo, FakeUserRepository(), pending)
+        val observed =
+            object : AuthRepository by repo {
+              override suspend fun signInWithGoogle(idToken: String): Result<String> {
+                assertEquals(Role.VENUE, pending.pending?.role)
+                assertNull(pending.pending?.uid)
+                return repo.signInWithGoogle(idToken)
+              }
+            }
+        val form = AuthViewModel(observed, setup)
+        assertTrue(form.beginGoogleSignIn(Role.VENUE))
+        form.onGoogleCredential(GoogleCredentialResult.Token("token"))
+        advanceUntilIdle()
+        assertNotNull(repo.currentUserId.value)
+        assertEquals(Role.VENUE, pending.pending?.role)
+      }
+
+  @Test
+  fun googleSignupDoesNotAuthenticateWhenTheRoleCannotBeSaved() =
+      runTest(dispatcher) {
+        val pending = FakePendingRoleStore().apply { failSave = true }
+        val form = AuthViewModel(repo, ProfileSetup(repo, FakeUserRepository(), pending))
+        assertTrue(form.beginGoogleSignIn(Role.VENUE))
+        form.onGoogleCredential(GoogleCredentialResult.Token("token"))
+        advanceUntilIdle()
+        assertNull(repo.currentUserId.value)
+        assertEquals(AuthFormError.ACCOUNT_SETUP, form.uiState.value.error)
+        assertFalse(form.uiState.value.isLoading)
+      }
+
+  @Test
   fun googleCredentialOutcomesReleaseTheFormWithoutChangingFields() =
       runTest(dispatcher) {
         fill("ada@around.test", PASSWORD)

@@ -126,6 +126,7 @@ class ReservationRepositoryFirestoreTest {
             slotStart = SLOT_START,
             status = ReservationStatus.PENDING,
             createdAt = FIXED_NOW,
+            explorerName = EXPLORER_NAME,
         ),
         stored,
     )
@@ -138,7 +139,7 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun createReservation_forAnAcceptedQuest_isAcceptedByTheRules() = withTimeoutBlocking {
-    val accepted = newPendingReservation(questId, venueId, explorerUid, SLOT_START)
+    val accepted = newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START)
 
     val id = createAndSync(accepted)
 
@@ -160,13 +161,44 @@ class ReservationRepositoryFirestoreTest {
     val document = venueDb.collection(RESERVATIONS).document(id).get(Source.SERVER).await()
 
     assertEquals(
-        setOf("questId", "venueId", "explorerUids", "slotStart", "status", "createdAt"),
+        setOf(
+            "questId",
+            "venueId",
+            "explorerUids",
+            "slotStart",
+            "status",
+            "createdAt",
+            "explorerName",
+        ),
         document.data!!.keys,
     )
     assertTrue(document.get("slotStart") is Timestamp)
     assertTrue(document.get("createdAt") is Timestamp)
     assertEquals("PENDING", document.get("status"))
     assertEquals(listOf(explorerUid, FRIEND_UID), document.get("explorerUids"))
+    assertEquals(EXPLORER_NAME, document.get("explorerName"))
+  }
+
+  /**
+   * Bug: a reservation stored before `explorerName` existed is treated as malformed, so it vanishes
+   * from the venue's list instead of showing without a name.
+   */
+  @Test
+  fun observe_readsAReservationWithoutAnExplorerNameAsUnnamed() = withTimeoutBlocking {
+    val id = explorerDb.collection(RESERVATIONS).document().id
+    writeBypassingRules(
+        "$RESERVATIONS/$id",
+        mapOf(
+            "questId" to questId,
+            "venueId" to venueId,
+            "explorerUids" to listOf(explorerUid),
+            "slotStart" to Timestamp(1_800_000_000L, 0),
+            "status" to "PENDING",
+            "createdAt" to Timestamp(1_700_000_000L, 0),
+        ),
+    )
+
+    assertEquals("", fetchAsVenue(id).explorerName)
   }
 
   /**
@@ -190,36 +222,75 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: a reservation the rules refuse is stored anyway, or createReservation reports the refusal
-   * as a failure although, like createQuest, it must not wait for the server. The rules only let an
-   * explorer reserve for a party they belong to.
+   * Bug: a reservation the rules refuse is reported as created, so the explorer sees it accepted
+   * until it silently vanishes, or it is stored anyway. The rules only let an explorer reserve for
+   * a party they belong to.
    */
   @Test
-  fun createReservation_whenTheSignedInUserIsNotInTheParty_succeedsButTheServerRejectsTheWrite() =
+  fun createReservation_whenTheSignedInUserIsNotInTheParty_returnsPermissionDenied() =
       withTimeoutBlocking {
-        val id = createAndSync(reservation(party = listOf(FRIEND_UID)))
+        val result = explorerRepository.createReservation(reservation(party = listOf(FRIEND_UID)))
 
-        val stored = venueRepository.observeForVenue(venueId).first()
-
-        assertTrue(stored.none { it.id == id })
+        assertPermissionDenied(result)
+        assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
       }
 
+  /** Bug: a reservation for a quest that doesn't exist is reported as created. */
+  @Test
+  fun createReservation_forAMissingQuest_returnsPermissionDenied() = withTimeoutBlocking {
+    val result = explorerRepository.createReservation(reservation().copy(questId = "missing"))
+
+    assertPermissionDenied(result)
+  }
+
   /**
-   * Bug: createReservation waits for the server, so it hangs or fails while the device is offline.
+   * Bug: a reservation for a quest the venue has just archived is reported as created. This is the
+   * case of the venue deactivating the quest while an explorer is accepting it: the rules only let
+   * an explorer reserve an active quest.
    */
   @Test
-  fun createReservation_whileOffline_succeedsAndIsSentOnceBackOnline() = withTimeoutBlocking {
-    explorerDb.disableNetwork().await()
-    val id: String
-    try {
-      id = explorerRepository.createReservation(reservation()).getOrThrow()
-    } finally {
-      explorerDb.enableNetwork().await()
-    }
-    explorerDb.waitForPendingWrites().await()
+  fun createReservation_forAQuestTheVenueArchived_returnsPermissionDenied() = withTimeoutBlocking {
+    venueDb.collection(QUESTS).document(questId).update("status", "ARCHIVED").await()
 
-    assertEquals(id, fetchAsVenue(id).id)
+    val result = explorerRepository.createReservation(reservation())
+
+    assertPermissionDenied(result)
   }
+
+  /**
+   * Bug: createReservation returns before the server has the reservation, so a success says nothing
+   * about whether the write was accepted.
+   */
+  @Test
+  fun createReservation_returnsOnceTheServerHasTheReservation() = withTimeoutBlocking {
+    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+
+    // No waitForPendingWrites: the server must already have it
+    assertTrue(venueDb.collection(RESERVATIONS).document(id).get(Source.SERVER).await().exists())
+  }
+
+  /**
+   * Bug: createReservation waits for the server without a limit, so it hangs while the device is
+   * offline, or fails instead of leaving the write queued until the device is back online.
+   */
+  @Test
+  fun createReservation_whileOffline_succeedsAfterTheTimeoutAndIsSentOnceBackOnline() =
+      withTimeoutBlocking {
+        val repository =
+            ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) {
+              FIXED_NOW
+            }
+        explorerDb.disableNetwork().await()
+        val id: String
+        try {
+          id = repository.createReservation(reservation()).getOrThrow()
+        } finally {
+          explorerDb.enableNetwork().await()
+        }
+        explorerDb.waitForPendingWrites().await()
+
+        assertEquals(id, fetchAsVenue(id).id)
+      }
 
   /** Bug: an exception escapes createReservation instead of becoming a failure. */
   @Test
@@ -411,6 +482,7 @@ class ReservationRepositoryFirestoreTest {
           slotStart = SLOT_START,
           status = ReservationStatus.PENDING,
           createdAt = 1L,
+          explorerName = EXPLORER_NAME,
       )
 
   /**
@@ -484,6 +556,9 @@ class ReservationRepositoryFirestoreTest {
      */
     const val RESERVATIONS = "reservations"
 
+    /** The Firestore collection of quests, which a test changes directly as the venue. */
+    const val QUESTS = "quests"
+
     /** The app of the explorer that [setUp] signs in. */
     const val EXPLORER_APP = "reservation-test-explorer"
 
@@ -493,11 +568,17 @@ class ReservationRepositoryFirestoreTest {
     /** The app whose client a test terminates on purpose, to make the write fail. */
     const val TERMINATED_APP = "reservation-test-terminated"
 
+    /** The display name signInNewUser gives every profile; the rules require it on reservations. */
+    const val EXPLORER_NAME = "Test"
+
     /** A party member who never signs in; only the explorer's own uid matters to the rules. */
     const val FRIEND_UID = "friend-uid"
 
     /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
     const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
+
+    /** A confirmation timeout far below [TIMEOUT_MS], so the offline test outlasts it quickly. */
+    const val SHORT_TIMEOUT_MS = 500L
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
