@@ -186,6 +186,16 @@ object C {
     const val CREATE_QUEST_PARTY_AT_LEAST = "create_quest_party_at_least"
     const val CREATE_QUEST_PARTY_EXACTLY = "create_quest_party_exactly"
     const val DASHBOARD_STUB = "dashboard_stub"
+    /** Followed by `_` and the reservation's id, e.g. `dashboard_row_reservation-1`. */
+    const val DASHBOARD_ROW = "dashboard_row"
+    const val DASHBOARD_ROW_TITLE = "dashboard_row_title"
+    const val DASHBOARD_ROW_REQUESTED = "dashboard_row_requested"
+    const val DASHBOARD_ROW_EXPLORER = "dashboard_row_explorer"
+    const val DASHBOARD_ROW_LEADER = "dashboard_row_leader"
+    const val DASHBOARD_ROW_PARTY = "dashboard_row_party"
+    const val DASHBOARD_ROW_APPROVED = "dashboard_row_approved"
+    const val DASHBOARD_ROW_DECLINE = "dashboard_row_decline"
+    const val DASHBOARD_ROW_APPROVE = "dashboard_row_approve"
     const val OVERVIEW_STUB = "overview_stub"
     /** Followed by `_` and the reservation's id, e.g. `overview_row_reservation-1`. */
     const val OVERVIEW_ROW = "overview_row"
