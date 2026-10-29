@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
@@ -47,13 +48,16 @@ class VenuePageViewModelTest {
   private var questRepository = ScriptedQuestRepository(activeQuestsByVenue = { quests })
   private var venueRepository: VenueRepository = venues
 
+  private val party = FakePartyRepository()
+
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE_ID,
         venueRepository,
         questRepository,
-        FakeReservationRepository(),
+        FakeReservationRepository(party = party),
         testUsers("explorer"),
+        party,
         "explorer",
         clock,
     )

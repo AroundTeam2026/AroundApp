@@ -3,6 +3,9 @@ package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -40,7 +43,8 @@ class OverviewViewModelTest {
 
   /** The creation time the fake gives the next reservation; tests move it to order them. */
   private var now = START
-  private val reservations = FakeReservationRepository({ now })
+  private val party = FakePartyRepository { now }
+  private val reservations = FakeReservationRepository({ now }, party)
   private val listener = BreakableReservations(reservations)
 
   private val venues =
@@ -65,7 +69,9 @@ class OverviewViewModelTest {
     return quests[id]
   }
 
-  private val viewModel by lazy { OverviewViewModel(EXPLORER, listener, questRepository, venues) }
+  private val viewModel by lazy {
+    OverviewViewModel(EXPLORER, listener, questRepository, venues, party)
+  }
 
   private val state
     get() = viewModel.uiState.value
@@ -76,20 +82,26 @@ class OverviewViewModelTest {
 
   private fun test(body: suspend TestScope.() -> Unit) = runTest(dispatcher) { body() }
 
-  /** Books [questId] at [venueId] for [party], with its slot at [slotStart]; returns its id. */
+  /**
+   * Books [questId] at [venueId] as the explorer, with its slot at [slotStart], and has [friends]
+   * join its party; returns its id.
+   */
   private suspend fun book(
       questId: String,
       venueId: String = CAFE,
       slotStart: Long = START,
-      party: List<String> = listOf(EXPLORER),
-  ): String =
-      reservations
-          .createReservation(
-              newPendingReservation(questId, venueId, EXPLORER, TEST_EXPLORER_NAME, slotStart)
-                  .copy(explorerUids = party),
-              EXPLORER,
-          )
-          .getOrThrow()
+      friends: List<String> = emptyList(),
+  ): String {
+    val id =
+        reservations
+            .createReservation(
+                newPendingReservation(questId, venueId, EXPLORER, TEST_EXPLORER_NAME, slotStart),
+                EXPLORER,
+            )
+            .getOrThrow()
+    friends.forEach { party.join(id, it).getOrThrow() }
+    return id
+  }
 
   private suspend fun answer(id: String, status: ReservationStatus) {
     reservations.updateStatus(id, status).getOrThrow()
@@ -144,12 +156,37 @@ class OverviewViewModelTest {
   }
 
   @Test
-  fun thePartySizeCountsEveryExplorer() = test {
-    book("fox", party = listOf(EXPLORER, "friend", "cousin"))
+  fun thePartySizeCountsEveryJoinedExplorer() = test {
+    book("fox", friends = listOf("friend", "cousin"))
     viewModel
     runCurrent()
 
     assertEquals(3, state.rows.single().partySize)
+  }
+
+  @Test
+  fun aFriendWhoWithdrawsLeavesThePartySize() = test {
+    val id = book("fox", friends = listOf("friend", "cousin"))
+    viewModel
+    runCurrent()
+
+    party.withdraw(id, "cousin").getOrThrow()
+    runCurrent()
+
+    assertEquals(2, state.rows.single().partySize)
+  }
+
+  /** The party sizes are always all known; if one were missing, the explorer still counts. */
+  @Test
+  fun aPartyWithNoKnownSizeCountsJustTheExplorer() {
+    val reservation =
+        newPendingReservation("fox", CAFE, EXPLORER, TEST_EXPLORER_NAME, START)
+            .copy(id = "reservation-1")
+    val quest = testQuest(id = "fox", venueId = CAFE)
+
+    val rows = overviewRows(listOf(reservation to quest), listOf(testVenue(id = CAFE)), emptyMap())
+
+    assertEquals(1, rows.single().partySize)
   }
 
   @Test
@@ -302,7 +339,22 @@ class OverviewViewModelTest {
             throw IOException("denied")
           }
         }
-    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, broken)
+    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, broken, party)
+    runCurrent()
+
+    assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
+  }
+
+  @Test
+  fun aFailingPartyListenerShowsFailed() = test {
+    book("fox")
+    val broken =
+        object : PartyRepository by party {
+          override fun observeMembers(reservationId: String): Flow<List<PartyMember>> = flow {
+            throw IOException("denied")
+          }
+        }
+    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, broken)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)

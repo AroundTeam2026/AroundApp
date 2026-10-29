@@ -577,6 +577,21 @@ class FirestoreRulesTest {
     assertDenied(friendsMembership.get(Source.SERVER), "a withdrawn member")
   }
 
+  /**
+   * The app listens to the party of a reservation as soon as it creates it, maybe before the server
+   * has it, so the party of a missing reservation, which is empty, must be readable.
+   */
+  @Test
+  fun theEmptyPartyOfAMissingReservationIsReadable() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue)
+    newUser(Role.EXPLORER) // Signing up leaves this outsider signed in
+
+    assertEquals(0, assertSucceeds(partyOf(newReservation().id).get(Source.SERVER)).size())
+    assertDenied(partyOf(reservation.id).get(Source.SERVER), "another reservation's party")
+  }
+
   // ---- completions ----
 
   @Test
@@ -719,6 +734,10 @@ class FirestoreRulesTest {
 
   private fun membership(reservationId: String, user: TestUser) =
       partyUser("${reservationId}_${user.uid}")
+
+  /** The memberships of the party of [reservationId], as the app queries them. */
+  private fun partyOf(reservationId: String) =
+      db.collection("party_user").whereEqualTo("reservationId", reservationId)
 
   /** The fields a member changes to withdraw. */
   private fun withdrawal() = mapOf("status" to "WITHDRAWN", "updatedAt" to Timestamp.now())

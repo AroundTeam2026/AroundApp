@@ -89,7 +89,7 @@ One membership per explorer and reservation. The id is built from both, so the r
 | `joinedAt` | timestamp | Set by the repository. |
 | `updatedAt` | timestamp | Set by the repository on creation and on withdrawal. |
 
-The repository creates a reservation in one batch with its creator's `JOINED` membership. Reservations still list their party in `explorerUids`: #295 moves its readers onto these memberships.
+The repository creates a reservation in one batch with its creator's `JOINED` membership. The size of a party is the number of its `JOINED` members (`observeJoinedCounts`). Reservations still list their party in `explorerUids`: #295 moves `observeForExplorer` and the rules onto these memberships.
 
 ### `completions/{id}`
 
@@ -134,7 +134,7 @@ Every create and update must match its collection's table above: only the listed
 | `venues` | Any signed-in user | Only the owner (document id is their uid), whose `users` document has role `VENUE`. |
 | `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
 | `reservations` | The venue and the listed explorers | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one that lists them, in the same batch as their own `JOINED` membership, and carries their profile's `displayName` as `explorerName`, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards only `status` changes, along an allowed transition: the venue makes any of them, and a listed explorer can only cancel. No delete. |
-| `party_user` | The member, the party's other `JOINED` members and the reservation's venue | An explorer, whose `users` document has role `EXPLORER`, creates their own `JOINED` membership, under the id `{reservationId}_{uid}`, for a `PENDING` reservation. Afterwards only the member changes it, from `JOINED` to `WITHDRAWN`, along with `updatedAt`. No delete. |
+| `party_user` | The member, the party's other `JOINED` members and the reservation's venue. Anyone signed in may list the party of a reservation that doesn't exist, which is empty, since the app listens to one it just created before the server has it. | An explorer, whose `users` document has role `EXPLORER`, creates their own `JOINED` membership, under the id `{reservationId}_{uid}`, for a `PENDING` reservation. Afterwards only the member changes it, from `JOINED` to `WITHDRAWN`, along with `updatedAt`. No delete. |
 | `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
 
 ## Decided changes

@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -35,15 +39,16 @@ import kotlinx.coroutines.launch
  * Holds the overview of the quests the explorer [explorerUid] accepted, for the Quests tab.
  *
  * It listens to the explorer's reservations and keeps the pending and approved ones, each with its
- * quest, read once, and its venue, which it listens to. Rows follow the reservations and the venues
- * as they change. If anything fails, including the reservations' listener after sign-out, the
- * overview shows [OverviewStatus.FAILED] until [retry].
+ * quest, read once, and its venue and party, which it listens to. Rows follow the reservations, the
+ * venues and the parties as they change. If anything fails, including the reservations' listener
+ * after sign-out, the overview shows [OverviewStatus.FAILED] until [retry].
  */
 class OverviewViewModel(
     private val explorerUid: String,
     private val reservationRepository: ReservationRepository,
     private val questRepository: QuestRepository,
     private val venueRepository: VenueRepository,
+    private val partyRepository: PartyRepository,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(OverviewUiState())
   /** What the overview shows now; the screen observes it. */
@@ -63,9 +68,9 @@ class OverviewViewModel(
   }
 
   /**
-   * Listens to the explorer's reservations and their venues until the ViewModel is cleared or
-   * listening fails. A reservation's quest doesn't change, so each quest is read once per
-   * listening, and a missing one is remembered as missing.
+   * Listens to the explorer's reservations, their venues and their parties until the ViewModel is
+   * cleared or listening fails. A reservation's quest doesn't change, so each quest is read once
+   * per listening, and a missing one is remembered as missing.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen() {
@@ -83,9 +88,13 @@ class OverviewViewModel(
             }
           }
           .flatMapLatest { booked ->
-            venueRepository
-                .observeVenues(booked.map { (reservation, _) -> reservation.venueId }.toSet())
-                .map { venues -> overviewRows(booked, venues) }
+            val reservations = booked.map { (reservation, _) -> reservation }
+            combine(
+                venueRepository.observeVenues(reservations.map { it.venueId }.toSet()),
+                partyRepository.observeJoinedCounts(reservations.map { it.id }),
+            ) { venues, partySizes ->
+              overviewRows(booked, venues, partySizes)
+            }
           }
           .catch {
             Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
@@ -115,6 +124,7 @@ class OverviewViewModel(
             ReservationRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
             VenueRepositoryProvider.repository,
+            PartyRepositoryProvider.repository,
         )
       }
     }
@@ -137,20 +147,25 @@ internal fun activeReservations(reservations: List<Reservation>): List<Reservati
         )
 
 /**
- * The rows for the [booked] reservations and their quests, in their order. A reservation whose
- * venue isn't among [venues], because it no longer exists, has no row.
+ * The rows for the [booked] reservations and their quests, in their order, with the number of
+ * joined members of each party from [partySizes], keyed by reservation id. A reservation whose
+ * venue isn't among [venues], because it no longer exists, has no row. A party missing from
+ * [partySizes] counts as just the explorer, who is in every party they see here.
  */
 internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,
     venues: List<Venue>,
+    partySizes: Map<String, Int>,
 ): List<OverviewRow> {
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
-    venuesById[reservation.venueId]?.let { venue -> overviewRow(reservation, quest, venue) }
+    venuesById[reservation.venueId]?.let { venue ->
+      overviewRow(reservation, quest, venue, partySizes[reservation.id] ?: 1)
+    }
   }
 }
 
-private fun overviewRow(reservation: Reservation, quest: Quest, venue: Venue) =
+private fun overviewRow(reservation: Reservation, quest: Quest, venue: Venue, partySize: Int) =
     OverviewRow(
         reservationId = reservation.id,
         questId = quest.id,
@@ -161,7 +176,7 @@ private fun overviewRow(reservation: Reservation, quest: Quest, venue: Venue) =
         address = venue.address,
         avatar = INITIALS_AVATAR(venue, venue.name),
         slotStart = reservation.slotStart,
-        partySize = reservation.explorerUids.size,
+        partySize = partySize,
         status =
             if (reservation.status == ReservationStatus.APPROVED) OverviewRowStatus.APPROVED
             else OverviewRowStatus.WAITING,

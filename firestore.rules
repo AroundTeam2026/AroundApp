@@ -249,10 +249,13 @@ service cloud.firestore {
     // created in the same batch. Afterwards the member can only withdraw, which also moves
     // updatedAt, and never join again. The member, the party's other joined members and the
     // reservation's venue read it. Memberships are never deleted, so a withdrawal stays recorded.
+    // A reservation that doesn't exist has no memberships, and anyone signed in may list them: the
+    // app listens to the party of a reservation it just created before the server has it.
     match /party_user/{memberId} {
       allow read: if signedIn()
           && (request.auth.uid == resource.data.uid
               || isJoinedMember(resource.data.reservationId)
+              || !exists(reservation(resource.data.reservationId))
               || request.auth.uid == get(reservation(resource.data.reservationId)).data.venueId);
       allow create: if signedIn()
           && hasRole('EXPLORER')

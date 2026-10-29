@@ -26,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -323,9 +324,11 @@ class VenuePageScreenTest {
 
   @Test
   fun acceptingThePickedQuestBooksItThroughTheViewModel() {
-    val reservations = FakeReservationRepository()
+    val party = FakePartyRepository()
+    val reservations = FakeReservationRepository(party = party)
     showScreen(
         activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) },
+        party = party,
         reservations = reservations,
     )
     compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
@@ -355,7 +358,8 @@ class VenuePageScreenTest {
 
   private fun showScreen(
       activeQuestsByVenue: (String) -> Flow<List<Quest>>,
-      reservations: FakeReservationRepository = FakeReservationRepository(),
+      party: FakePartyRepository = FakePartyRepository(),
+      reservations: FakeReservationRepository = FakeReservationRepository(party = party),
   ) {
     val viewModel =
         VenuePageViewModel(
@@ -364,6 +368,7 @@ class VenuePageScreenTest {
             ScriptedQuestRepository(activeQuestsByVenue = activeQuestsByVenue),
             reservations,
             testUsers("explorer"),
+            party,
             "explorer",
         )
     compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }

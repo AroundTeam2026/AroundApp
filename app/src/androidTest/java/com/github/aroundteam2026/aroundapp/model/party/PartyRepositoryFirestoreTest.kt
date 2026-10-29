@@ -21,6 +21,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -274,6 +275,48 @@ class PartyRepositoryFirestoreTest {
     val members = venue.observeMembers(reservationId).first { it.isNotEmpty() }
 
     assertEquals(listOf(explorerUid), members.map { it.uid })
+  }
+
+  /**
+   * Bug: the rules refuse to list the party of a reservation the server doesn't have yet, so a
+   * listener attached right after creating one offline fails, and the party never shows.
+   */
+  @Test
+  fun observeMembers_ofAReservationCreatedOffline_followsItOnceOnline() = withTimeoutBlocking {
+    val questId = createActiveQuest()
+    explorerDb.disableNetwork().await()
+    val id: String
+    val emissions = Channel<List<PartyMember>>(Channel.UNLIMITED)
+    val collector: Job
+    try {
+      id =
+          ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS)
+              .createReservation(
+                  newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START),
+                  explorerUid,
+              )
+              .getOrThrow()
+      collector =
+          launch(start = CoroutineStart.UNDISPATCHED) {
+            explorer.observeMembers(id).collect(emissions::send)
+          }
+      // The local copy of the creator's membership, before the server has it
+      assertEquals(listOf(explorerUid), emissions.receive().map { it.uid })
+    } finally {
+      explorerDb.enableNetwork().await()
+    }
+    try {
+      explorerDb.waitForPendingWrites().await()
+
+      friend.join(id, friendUid).getOrThrow()
+
+      // A listener the server refused has ended, so this loop fails the test on TIMEOUT_MS
+      do {
+        val latest = emissions.receive()
+      } while (latest.none { it.uid == friendUid })
+    } finally {
+      collector.cancel()
+    }
   }
 
   /** Has the venue create an active quest and waits until the server has it; returns its id. */

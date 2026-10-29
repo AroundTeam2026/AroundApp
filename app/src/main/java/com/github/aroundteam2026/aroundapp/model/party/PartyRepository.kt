@@ -2,6 +2,9 @@
 package com.github.aroundteam2026.aroundapp.model.party
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 /** Reads and writes [PartyMember]s. ViewModels depend on this interface only. */
 interface PartyRepository {
@@ -37,4 +40,28 @@ interface PartyRepository {
    *   scope.
    */
   fun observeMembers(reservationId: String): Flow<List<PartyMember>>
+}
+
+/**
+ * Observes how many explorers are [PartyMemberStatus.JOINED] in the party of each reservation of
+ * [reservationIds]. Emits once every party has been read, then again whenever one changes.
+ *
+ * @return the number of joined members, keyed by reservation id, with every id of [reservationIds];
+ *   an empty map at once when there are none.
+ * @throws Exception from the flow if the listener of any party fails, as [observeMembers] does.
+ */
+fun PartyRepository.observeJoinedCounts(
+    reservationIds: Collection<String>
+): Flow<Map<String, Int>> {
+  val ids = reservationIds.distinct()
+  if (ids.isEmpty()) return flowOf(emptyMap())
+  return combine(
+      ids.map { id ->
+        observeMembers(id).map { members ->
+          id to members.count { it.status == PartyMemberStatus.JOINED }
+        }
+      }
+  ) {
+    it.toMap()
+  }
 }
