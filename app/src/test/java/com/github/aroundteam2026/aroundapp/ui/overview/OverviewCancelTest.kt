@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
+import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -55,7 +56,11 @@ class OverviewCancelTest {
 
   /** Books [questId] for the explorer; returns the reservation's id. */
   private suspend fun book(questId: String): String =
-      fake.createReservation(newPendingReservation(questId, CAFE, EXPLORER, START)).getOrThrow()
+      fake
+          .createReservation(
+              newPendingReservation(questId, CAFE, EXPLORER, TEST_EXPLORER_NAME, START)
+          )
+          .getOrThrow()
 
   /** Books a quest and opens the overview on it; returns the reservation's id. */
   private suspend fun TestScope.bookAndOpen(): String {
@@ -189,6 +194,21 @@ class OverviewCancelTest {
 
     fake.forcedFailure = null
     fake.updateStatus(id, ReservationStatus.REJECTED) // the venue answers meanwhile
+    runCurrent()
+
+    assertEquals(OverviewUiState(status = OverviewStatus.LOADED), state)
+  }
+
+  @Test
+  fun aCancelThatFailsAfterItsRowLeftMarksNothing() = test {
+    val id = bookAndOpen()
+    val gate = CompletableDeferred<Unit>().also { reservations.gate = it }
+    viewModel.cancel(id)
+    runCurrent()
+
+    fake.updateStatus(id, ReservationStatus.REJECTED) // the venue answers first
+    runCurrent()
+    gate.complete(Unit) // so the cancel fails: a rejected reservation can't be cancelled
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.LOADED), state)

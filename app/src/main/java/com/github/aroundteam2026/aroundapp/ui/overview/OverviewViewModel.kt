@@ -60,7 +60,7 @@ class OverviewViewModel(
    * Called when the explorer cancels the reservation [reservationId]. Does nothing unless it is one
    * of the rows, or while it is being cancelled, so a double tap cancels once. The row shows as
    * cancelling until the listener drops it. A failure, such as being offline, keeps the row and
-   * marks it failed; calling this again retries.
+   * marks it failed, unless the row left meanwhile; calling this again retries.
    */
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
@@ -80,9 +80,12 @@ class OverviewViewModel(
       reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED).onFailure {
         Log.w(TAG, "Cancelling reservation $reservationId failed", it)
         mutableUiState.update { state ->
+          // A row that left meanwhile, e.g. rejected by the venue, has nothing to mark
+          val shown = state.rows.any { row -> row.reservationId == reservationId }
           state.copy(
               cancellingIds = state.cancellingIds - reservationId,
-              failedCancelIds = state.failedCancelIds + reservationId,
+              failedCancelIds =
+                  if (shown) state.failedCancelIds + reservationId else state.failedCancelIds,
           )
         }
       }
