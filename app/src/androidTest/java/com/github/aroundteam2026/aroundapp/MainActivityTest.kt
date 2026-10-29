@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.e2e.E2eRule
 import com.github.aroundteam2026.aroundapp.e2e.createAccount
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.screen.MainScreen
+import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
 import com.kaspersky.kaspresso.testcases.api.testcase.TestCase
 import io.github.kakaocup.compose.node.element.ComposeScreen
@@ -71,7 +72,7 @@ class MainActivityTest : TestCase() {
     composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
-    composeTestRule.waitUntil(10_000) {
+    composeTestRule.waitUntil(SETUP_TIMEOUT_MS) {
       composeTestRule.onAllNodes(hasTestTag(C.Tag.NAV_BAR)).fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()

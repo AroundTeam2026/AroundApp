@@ -4,15 +4,23 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
+import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
+import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -27,21 +35,33 @@ class VenueDestinationsTest {
 
   private var signOuts = 0
   private lateinit var navController: NavHostController
+  private val auth = FakeAuthRepository(VENUE_ID)
+  /** Shared by the form and the Quests tab, so a saved quest reaches the list. */
+  private val quests = FakeQuestRepository()
+  private val form =
+      CreateQuestViewModel(auth, FakeVenueRepository(listOf(testVenue(id = VENUE_ID))), quests)
 
-  /** A venue NavHost that opens on the home, with the form on fakes. */
+  /** A venue NavHost that opens on the home of a placed venue without quests, on fakes. */
   @Before
   fun launch() {
     composeTestRule.setContent {
       navController = rememberNavController()
       NavHost(navController, startDestination = Routes.VENUE_HOME) {
-        venueDestinations(navController, { signOuts++ }, createQuestFactoryOnFakes())
+        venueDestinations(
+            navController,
+            { signOuts++ },
+            createQuestFactory = viewModelFactory { initializer { form } },
+            venueQuestsFactory =
+                viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
+        )
       }
     }
   }
 
+  // The venue has no quests yet, so the empty state's button opens the form
   private fun openTheForm() {
     composeTestRule.onNodeWithTag(VenueTab.QUESTS.tabTag).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_CREATE_FIRST).performClick()
     composeTestRule.waitForIdle()
   }
 
@@ -116,6 +136,20 @@ class VenueDestinationsTest {
   }
 
   @Test
+  fun aSavedQuestIsListedOnTheQuestsTab() {
+    openTheForm()
+    composeTestRule.runOnIdle {
+      form.updateTitle(QUEST_TITLE)
+      form.updateDescription(QUEST_TITLE)
+      form.updateRequirements(QUEST_TITLE)
+    }
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
+
+    assertBackOnTheQuestsTab()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_TITLE).assertTextEquals(QUEST_TITLE)
+  }
+
+  @Test
   fun theProfileTabSignsTheVenueOut() {
     composeTestRule.onNodeWithTag(VenueTab.PROFILE.tabTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
@@ -125,5 +159,7 @@ class VenueDestinationsTest {
 
   private companion object {
     const val DOUBLE_TAP_GAP_MS = 100L
+    const val VENUE_ID = "venue-1"
+    const val QUEST_TITLE = "Find the fox"
   }
 }

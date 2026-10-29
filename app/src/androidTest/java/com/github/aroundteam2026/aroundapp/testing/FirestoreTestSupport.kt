@@ -24,7 +24,10 @@ import org.json.JSONObject
 /** Bounds a test body, so a missing emission fails the test instead of hanging it. */
 const val TIMEOUT_MS = 10_000L
 
-/** Bounds setUp and tearDown; the first connection to the emulator can be slow on CI. */
+/**
+ * Bounds setup work: setUp, tearDown, and signing up or in through the app. The first connection to
+ * the emulators can be slow on CI.
+ */
 const val SETUP_TIMEOUT_MS = 15_000L
 
 /** The password of every user [signInNewUser] creates; only the Auth emulator ever sees it. */

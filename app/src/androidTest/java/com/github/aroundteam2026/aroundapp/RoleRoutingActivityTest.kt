@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -33,7 +34,7 @@ class RoleRoutingActivityTest {
     get() = e2e.composeTestRule
 
   private fun awaitTag(tag: String) {
-    compose.waitUntil(15_000) {
+    compose.waitUntil(SETUP_TIMEOUT_MS) {
       compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
     }
     compose.onNodeWithTag(tag).assertIsDisplayed()
@@ -46,7 +47,7 @@ class RoleRoutingActivityTest {
           .signUpWithEmail("routing-${UUID.randomUUID()}@around.test", "123456")
           .getOrThrow()
     }
-    compose.waitUntil(15_000) {
+    compose.waitUntil(SETUP_TIMEOUT_MS) {
       compose.onAllNodes(hasTestTag(C.Tag.AUTH_EMAIL)).fetchSemanticsNodes().isEmpty() &&
           compose.onAllNodes(hasTestTag(C.Tag.AUTH_SUBMIT)).fetchSemanticsNodes().isNotEmpty()
     }
