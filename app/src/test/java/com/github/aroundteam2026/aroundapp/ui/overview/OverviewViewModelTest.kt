@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
+import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -84,7 +85,7 @@ class OverviewViewModelTest {
   ): String =
       reservations
           .createReservation(
-              newPendingReservation(questId, venueId, EXPLORER, slotStart)
+              newPendingReservation(questId, venueId, EXPLORER, TEST_EXPLORER_NAME, slotStart)
                   .copy(explorerUids = party)
           )
           .getOrThrow()
@@ -222,7 +223,7 @@ class OverviewViewModelTest {
 
   @Test
   fun aTieOnTheSlotAndCreationGoesToTheSmallestId() {
-    val tied = newPendingReservation("fox", CAFE, EXPLORER, START)
+    val tied = newPendingReservation("fox", CAFE, EXPLORER, TEST_EXPLORER_NAME, START)
     val first = tied.copy(id = "reservation-1")
     val second = tied.copy(id = "reservation-2")
 

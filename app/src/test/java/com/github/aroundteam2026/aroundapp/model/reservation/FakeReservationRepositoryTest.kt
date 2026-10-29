@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
@@ -46,6 +47,7 @@ class FakeReservationRepositoryTest {
           slotStart = 5_000L,
           status = status,
           createdAt = createdAt,
+          explorerName = "Ada",
       )
 
   @Test
@@ -56,6 +58,14 @@ class FakeReservationRepositoryTest {
         val stored = repository.observeForVenue("v1").first().single()
         assertEquals(id, stored.id)
         assertEquals(FIXED_NOW, stored.createdAt)
+      }
+
+  @Test
+  fun createReservation_keepsTheExplorerName() =
+      runBlocking<Unit> {
+        repository.createReservation(reservation()).getOrThrow()
+
+        assertEquals("Ada", repository.observeForVenue("v1").first().single().explorerName)
       }
 
   @Test

@@ -111,17 +111,25 @@ service cloud.firestore {
     // entries aren't type-checked: the app skips a reservation with a non-string uid as malformed,
     // which only hides the writer's own reservation.
     function isValidReservation(data) {
-      return data.keys().hasAll(
-              ['questId', 'venueId', 'explorerUids', 'slotStart', 'status', 'createdAt'])
-          && data.keys().hasOnly(
-              ['questId', 'venueId', 'explorerUids', 'slotStart', 'status', 'createdAt'])
+      return data.keys().hasAll(['questId', 'venueId', 'explorerUids', 'slotStart', 'status',
+              'createdAt', 'explorerName'])
+          && data.keys().hasOnly(['questId', 'venueId', 'explorerUids', 'slotStart', 'status',
+              'createdAt', 'explorerName'])
           && data.questId is string
           && data.venueId is string
           && data.explorerUids is list
           && data.explorerUids.size() <= 10
           && data.explorerUids.toSet().size() == data.explorerUids.size()
           && data.slotStart is timestamp
-          && data.createdAt is timestamp;
+          && data.createdAt is timestamp
+          && data.explorerName is string;
+    }
+
+    // [name] is the display name in the signed-in user's profile, so nobody reserves under another
+    // name. Reads the same profile as hasRole, which rules count as one document read.
+    function isOwnDisplayName(name) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+          == name;
     }
 
     // [time] is now or later. The app sets a new reservation's slotStart from the phone's clock,
@@ -178,9 +186,10 @@ service cloud.firestore {
       allow delete: if isUser(resource.data.venueId) && hasRole('VENUE');
     }
 
-    // An explorer account creates a pending reservation that lists them and doesn't start in the
-    // past, for an active quest of the venue it names. Afterwards only the status changes, along an
-    // allowed transition: the venue answers it, and an explorer of the party can cancel it.
+    // An explorer account creates a pending reservation that lists them, carries their profile's
+    // display name and doesn't start in the past, for an active quest of the venue it names.
+    // Afterwards only the status changes, along an allowed transition: the venue answers it, and an
+    // explorer of the party can cancel it.
     match /reservations/{reservationId} {
       allow read: if signedIn()
           && (request.auth.uid == resource.data.venueId
@@ -189,6 +198,7 @@ service cloud.firestore {
           && hasRole('EXPLORER')
           && isValidReservation(request.resource.data)
           && request.auth.uid in request.resource.data.explorerUids
+          && isOwnDisplayName(request.resource.data.explorerName)
           && request.resource.data.status == 'PENDING'
           && isNotInThePast(request.resource.data.slotStart)
           && isForActiveQuestOfItsVenue(request.resource.data);

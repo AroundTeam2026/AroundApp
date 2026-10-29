@@ -126,6 +126,7 @@ class ReservationRepositoryFirestoreTest {
             slotStart = SLOT_START,
             status = ReservationStatus.PENDING,
             createdAt = FIXED_NOW,
+            explorerName = EXPLORER_NAME,
         ),
         stored,
     )
@@ -138,7 +139,7 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun createReservation_forAnAcceptedQuest_isAcceptedByTheRules() = withTimeoutBlocking {
-    val accepted = newPendingReservation(questId, venueId, explorerUid, SLOT_START)
+    val accepted = newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START)
 
     val id = createAndSync(accepted)
 
@@ -160,13 +161,44 @@ class ReservationRepositoryFirestoreTest {
     val document = venueDb.collection(RESERVATIONS).document(id).get(Source.SERVER).await()
 
     assertEquals(
-        setOf("questId", "venueId", "explorerUids", "slotStart", "status", "createdAt"),
+        setOf(
+            "questId",
+            "venueId",
+            "explorerUids",
+            "slotStart",
+            "status",
+            "createdAt",
+            "explorerName",
+        ),
         document.data!!.keys,
     )
     assertTrue(document.get("slotStart") is Timestamp)
     assertTrue(document.get("createdAt") is Timestamp)
     assertEquals("PENDING", document.get("status"))
     assertEquals(listOf(explorerUid, FRIEND_UID), document.get("explorerUids"))
+    assertEquals(EXPLORER_NAME, document.get("explorerName"))
+  }
+
+  /**
+   * Bug: a reservation stored before `explorerName` existed is treated as malformed, so it vanishes
+   * from the venue's list instead of showing without a name.
+   */
+  @Test
+  fun observe_readsAReservationWithoutAnExplorerNameAsUnnamed() = withTimeoutBlocking {
+    val id = explorerDb.collection(RESERVATIONS).document().id
+    writeBypassingRules(
+        "$RESERVATIONS/$id",
+        mapOf(
+            "questId" to questId,
+            "venueId" to venueId,
+            "explorerUids" to listOf(explorerUid),
+            "slotStart" to Timestamp(1_800_000_000L, 0),
+            "status" to "PENDING",
+            "createdAt" to Timestamp(1_700_000_000L, 0),
+        ),
+    )
+
+    assertEquals("", fetchAsVenue(id).explorerName)
   }
 
   /**
@@ -450,6 +482,7 @@ class ReservationRepositoryFirestoreTest {
           slotStart = SLOT_START,
           status = ReservationStatus.PENDING,
           createdAt = 1L,
+          explorerName = EXPLORER_NAME,
       )
 
   /**
@@ -534,6 +567,9 @@ class ReservationRepositoryFirestoreTest {
 
     /** The app whose client a test terminates on purpose, to make the write fail. */
     const val TERMINATED_APP = "reservation-test-terminated"
+
+    /** The display name signInNewUser gives every profile; the rules require it on reservations. */
+    const val EXPLORER_NAME = "Test"
 
     /** A party member who never signs in; only the explorer's own uid matters to the rules. */
     const val FRIEND_UID = "friend-uid"

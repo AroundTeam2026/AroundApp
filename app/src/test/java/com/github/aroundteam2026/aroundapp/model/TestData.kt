@@ -7,7 +7,11 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.Role
+import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import kotlinx.coroutines.runBlocking
 
 /** Builds a valid, active quest; tests override only the fields they care about. */
 fun testQuest(
@@ -55,3 +59,12 @@ fun testVenue(
         createdAt = 1_000L,
         featuredQuestId = featuredQuestId,
     )
+
+/** Display name of the explorer profile [testUsers] holds by default. */
+const val TEST_EXPLORER_NAME = "Ada"
+
+/** A user repository holding only the explorer profile of [uid], named [displayName]. */
+fun testUsers(uid: String, displayName: String = TEST_EXPLORER_NAME): FakeUserRepository =
+    FakeUserRepository().apply {
+      runBlocking { createUser(User(uid, displayName, Role.EXPLORER, createdAt = 0L)) }
+    }
