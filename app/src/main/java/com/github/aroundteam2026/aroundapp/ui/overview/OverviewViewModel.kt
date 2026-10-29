@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -37,7 +38,7 @@ import kotlinx.coroutines.launch
  * It listens to the explorer's reservations and keeps the pending and approved ones, each with its
  * quest, read once, and its venue, which it listens to. Rows follow the reservations and the venues
  * as they change. If anything fails, including the reservations' listener after sign-out, the
- * overview shows [OverviewStatus.FAILED] until [retry].
+ * overview shows [OverviewStatus.FAILED] until [retry]. The explorer can [cancel] a reservation.
  */
 class OverviewViewModel(
     private val explorerUid: String,
@@ -53,6 +54,39 @@ class OverviewViewModel(
 
   init {
     listen()
+  }
+
+  /**
+   * Called when the explorer cancels the reservation [reservationId]. Does nothing unless it is one
+   * of the rows, or while it is being cancelled, so a double tap cancels once. The row shows as
+   * cancelling until the listener drops it. A failure, such as being offline, keeps the row and
+   * marks it failed; calling this again retries.
+   */
+  fun cancel(reservationId: String) {
+    val current = mutableUiState.value
+    if (
+        reservationId in current.cancellingIds ||
+            current.rows.none { it.reservationId == reservationId }
+    ) {
+      return
+    }
+    mutableUiState.update {
+      it.copy(
+          cancellingIds = it.cancellingIds + reservationId,
+          failedCancelIds = it.failedCancelIds - reservationId,
+      )
+    }
+    viewModelScope.launch {
+      reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED).onFailure {
+        Log.w(TAG, "Cancelling reservation $reservationId failed", it)
+        mutableUiState.update { state ->
+          state.copy(
+              cancellingIds = state.cancellingIds - reservationId,
+              failedCancelIds = state.failedCancelIds + reservationId,
+          )
+        }
+      }
+    }
   }
 
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
@@ -92,7 +126,16 @@ class OverviewViewModel(
             mutableUiState.value = OverviewUiState(status = OverviewStatus.FAILED)
           }
           .collect { rows ->
-            mutableUiState.value = OverviewUiState(status = OverviewStatus.LOADED, rows = rows)
+            // A reservation that left the rows, e.g. once cancelled, is no longer cancelling
+            val ids = rows.map { it.reservationId }.toSet()
+            mutableUiState.update {
+              it.copy(
+                  status = OverviewStatus.LOADED,
+                  rows = rows,
+                  cancellingIds = it.cancellingIds intersect ids,
+                  failedCancelIds = it.failedCancelIds intersect ids,
+              )
+            }
           }
     }
   }
