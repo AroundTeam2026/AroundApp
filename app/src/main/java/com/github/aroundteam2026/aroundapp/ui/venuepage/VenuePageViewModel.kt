@@ -67,6 +67,24 @@ class VenuePageViewModel(
 
   private class Write(val questId: String, var shown: Boolean = false)
 
+  /**
+   * The quests whose reservation this page is creating and the backend hasn't answered yet.
+   * Firestore lists such a write at once, before the server accepts or refuses it, so it doesn't
+   * count as accepted until [ReservationRepository.createReservation] returns: the page shows
+   * "accepting" instead of "accepted" followed by a failure.
+   */
+  private val unconfirmed = mutableSetOf<String>()
+
+  /**
+   * The quests whose reservation the backend just refused. Firestore may list the refused write
+   * before or after the refusal arrives, so the quest doesn't count as accepted until the
+   * reservations no longer list anything for it.
+   */
+  private val refusing = mutableSetOf<String>()
+
+  /** What the page last heard from its listeners, so it can be shown again; null when failed. */
+  private var latest: Triple<Venue?, List<VenuePageQuest>, List<Reservation>?>? = null
+
   init {
     listen()
   }
@@ -90,9 +108,10 @@ class VenuePageViewModel(
    * Called when the explorer accepts the picked quest: books it as a pending reservation of a party
    * of just themself, for a slot starting now. Does nothing when no quest is picked, when accepting
    * is unavailable, or when that quest is already accepted or being accepted, so a double tap books
-   * once; other quests can still be accepted meanwhile. A failure keeps the quest picked and shows
-   * [AcceptStatus.FAILED], and so does the server refusing the write later, after the quest showed
-   * as accepted; calling this again retries.
+   * once; other quests can still be accepted meanwhile. The quest shows as accepted only once the
+   * backend has answered, never while the write waits for it. A failure keeps the quest picked and
+   * shows [AcceptStatus.FAILED], and so does the server refusing the write later, after the quest
+   * showed as accepted; calling this again retries.
    */
   fun accept() {
     val current = mutableUiState.value
@@ -109,13 +128,23 @@ class VenuePageViewModel(
           failedQuestIds = it.failedQuestIds - id,
       )
     }
+    unconfirmed += id
+    refusing -= id
     viewModelScope.launch {
-      // On success the page stays "accepting" until the reservation shows up in the listener
-      reservationRepository
-          .createReservation(newPendingReservation(id, venueId, explorerUid, clock()))
-          .onSuccess { reservationId -> written[reservationId] = Write(id) }
+      val result =
+          reservationRepository.createReservation(
+              newPendingReservation(id, venueId, explorerUid, clock())
+          )
+      unconfirmed -= id
+      result
+          .onSuccess { reservationId ->
+            // The page stays "accepting" until the reservation shows up in the listener
+            written[reservationId] = Write(id)
+            show()
+          }
           .onFailure {
             Log.w(TAG, "Accepting quest $id failed", it)
+            refusing += id
             mutableUiState.update { state ->
               state.copy(
                   acceptingQuestIds = state.acceptingQuestIds - id,
@@ -131,6 +160,8 @@ class VenuePageViewModel(
     if (mutableUiState.value.status != VenuePageStatus.FAILED) return
     mutableUiState.value = VenuePageUiState()
     written.clear()
+    refusing.clear()
+    latest = null
     listen()
   }
 
@@ -169,14 +200,31 @@ class VenuePageViewModel(
           }
           .catch {
             Log.w(TAG, "Listening to venue $venueId failed", it)
+            latest = null
             mutableUiState.value = VenuePageUiState(status = VenuePageStatus.FAILED)
           }
-          .collect { (venue, quests, reservations) ->
-            val accepted = reservations?.let { acceptedPartiesOf(it, venueId) }
-            val refused = reservations?.let(::refusedWrites).orEmpty()
-            mutableUiState.update { it.showing(venue, quests, accepted, refused) }
+          .collect { page ->
+            latest = page
+            // A refused write is over once Firestore no longer lists anything for its quest
+            page.third?.let { listed ->
+              refusing.retainAll { quest ->
+                listed.any { it.questId == quest && it.venueId == venueId }
+              }
+            }
+            show()
           }
     }
+  }
+
+  /**
+   * Shows what the listeners last sent. A quest whose reservation is [unconfirmed] or [refusing]
+   * doesn't count as accepted: it stays "accepting", or "failed", whatever Firestore lists.
+   */
+  private fun show() {
+    val (venue, quests, reservations) = latest ?: return
+    val accepted = reservations?.let { acceptedPartiesOf(it, venueId) - unconfirmed - refusing }
+    val refused = reservations?.let(::refusedWrites).orEmpty()
+    mutableUiState.update { it.showing(venue, quests, accepted, refused) }
   }
 
   /**
