@@ -3,15 +3,18 @@ package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import java.io.IOException
-import java.time.LocalDateTime
-import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,7 +23,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -37,9 +39,6 @@ import org.junit.Test
 class VenueDashboardViewModelTest {
   private val dispatcher = UnconfinedTestDispatcher()
 
-  /** The test's clock: [NOW] plus the virtual time the test has advanced. */
-  private val clock = { NOW + dispatcher.scheduler.currentTime }
-
   /** When the fake stores a reservation; tests move it to order requests. */
   private var createdAt = NOW
 
@@ -53,10 +52,13 @@ class VenueDashboardViewModelTest {
               listOf(
                   testQuest(id = "owl", venueId = VENUE_ID, title = "Find the owl"),
                   testQuest(id = "menu", venueId = VENUE_ID, title = "Order the secret menu"),
+                  testQuest(id = "old", venueId = VENUE_ID, status = QuestStatus.ARCHIVED),
               )
       )
+  private var venues: VenueRepository =
+      FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumière")))
 
-  private val viewModel by lazy { VenueDashboardViewModel(auth, reservations, quests, clock, ZONE) }
+  private val viewModel by lazy { VenueDashboardViewModel(auth, reservations, quests, venues) }
 
   private val state
     get() = viewModel.uiState.value
@@ -73,7 +75,7 @@ class VenueDashboardViewModelTest {
   }
 
   /**
-   * Stores a reservation of [questId] by [name], with a party of [partySize], for a slot at
+   * Stores a reservation of [questId] by [name], with a party of [partySize], with its slot at
    * [slotStart], requested at [requestedAt], and moves it to [status]. Returns its id.
    */
   private suspend fun reserve(
@@ -103,8 +105,7 @@ class VenueDashboardViewModelTest {
     assertEquals(VenueDashboardStatus.LOADED, state.status)
     assertTrue(state.isEmpty)
     assertEquals(0, state.pendingCount)
-    assertEquals(0, state.todayCount)
-    assertEquals(0, state.completionsCount)
+    assertEquals(2, state.activeQuestsCount)
   }
 
   @Test
@@ -114,6 +115,36 @@ class VenueDashboardViewModelTest {
 
     assertEquals(VenueDashboardStatus.LOADING, state.status)
     assertFalse(state.isEmpty)
+  }
+
+  @Test
+  fun theHeaderShowsTheVenue() = test {
+    watch()
+
+    assertEquals("Café Lumière", state.venueName)
+    assertEquals(VenueAvatar.Initials("CL"), state.avatar)
+  }
+
+  @Test
+  fun aVenueThatCantBeReadLeavesTheHeaderEmpty() = test {
+    venues = FakeVenueRepository()
+    watch()
+
+    assertEquals(VenueDashboardStatus.LOADED, state.status)
+    assertEquals("", state.venueName)
+    assertNull(state.avatar)
+  }
+
+  @Test
+  fun onlyActiveQuestsAreCounted() = test {
+    watch()
+
+    quests.createQuest(testQuest(venueId = VENUE_ID, status = QuestStatus.DRAFT)).getOrThrow()
+    quests.createQuest(testQuest(venueId = "other-venue")).getOrThrow()
+    assertEquals(2, state.activeQuestsCount)
+
+    quests.createQuest(testQuest(venueId = VENUE_ID)).getOrThrow()
+    assertEquals(3, state.activeQuestsCount)
   }
 
   @Test
@@ -128,25 +159,20 @@ class VenueDashboardViewModelTest {
   }
 
   @Test
-  fun approvedReservationsFromTodayOnAreUpcomingSoonestFirst() = test {
-    val tomorrow = reserve(status = ReservationStatus.APPROVED, slotStart = NOW + DAY)
-    val earlierToday = reserve(status = ReservationStatus.APPROVED, slotStart = START_OF_TODAY)
-    reserve(status = ReservationStatus.APPROVED, slotStart = START_OF_TODAY - 1)
+  fun everyApprovedReservationIsUpcomingOldestRequestFirstWhateverItsSlot() = test {
+    val newer = reserve(status = ReservationStatus.APPROVED, requestedAt = NOW - HOUR)
+    // Reservations have no visit time yet, so a slot in the past doesn't hide it
+    val older =
+        reserve(
+            status = ReservationStatus.APPROVED,
+            requestedAt = NOW - 2 * DAY,
+            slotStart = NOW - 2 * DAY,
+        )
     watch()
 
-    assertEquals(listOf(earlierToday, tomorrow), ids(state.upcoming))
+    assertEquals(listOf(older, newer), ids(state.upcoming))
+    assertTrue(state.upcoming.all { it.approved })
     assertTrue(state.needsAnswer.isEmpty())
-  }
-
-  @Test
-  fun todayCountsOnlyApprovedVisitsOfToday() = test {
-    reserve(status = ReservationStatus.APPROVED, slotStart = START_OF_TODAY)
-    reserve(status = ReservationStatus.APPROVED, slotStart = NOW + HOUR)
-    reserve(status = ReservationStatus.APPROVED, slotStart = START_OF_TODAY + DAY)
-    reserve(slotStart = NOW) // pending: not a visit yet
-    watch()
-
-    assertEquals(2, state.todayCount)
   }
 
   @Test
@@ -168,7 +194,7 @@ class VenueDashboardViewModelTest {
 
   @Test
   fun aRowShowsTheQuestTheExplorerAndTheParty() = test {
-    val id = reserve(questId = "menu", name = "Grace", partySize = 3, slotStart = NOW + HOUR)
+    val id = reserve(questId = "menu", name = "Grace", partySize = 3, requestedAt = NOW - HOUR)
     watch()
 
     assertEquals(
@@ -177,7 +203,7 @@ class VenueDashboardViewModelTest {
             questTitle = "Order the secret menu",
             explorerName = "Grace",
             partySize = 3,
-            slotStart = NOW + HOUR,
+            requestedAt = NOW - HOUR,
             approved = false,
         ),
         state.needsAnswer.single(),
@@ -206,7 +232,7 @@ class VenueDashboardViewModelTest {
 
   @Test
   fun approvingMovesTheReservationToUpcoming() = test {
-    val id = reserve(slotStart = NOW + HOUR)
+    val id = reserve()
     watch()
 
     viewModel.approve(id)
@@ -242,6 +268,24 @@ class VenueDashboardViewModelTest {
     runCurrent()
     assertTrue(state.savingIds.isEmpty())
     assertEquals(listOf(other), ids(state.needsAnswer))
+  }
+
+  @Test
+  fun anAnswerSavedButNotShownYetStaysSaving() = test {
+    val id = reserve()
+    reservations = SlowListenerRepository(fake)
+    watch()
+
+    viewModel.approve(id)
+    assertEquals(setOf(id), state.savingIds)
+    // A second tap before the listener shows the answer would fail: it saves nothing
+    viewModel.approve(id)
+    viewModel.decline(id)
+
+    fake.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+    assertTrue(state.savingIds.isEmpty())
+    assertEquals(listOf(id), ids(state.upcoming))
+    assertFalse(state.updateFailed)
   }
 
   @Test
@@ -303,39 +347,11 @@ class VenueDashboardViewModelTest {
     assertEquals(listOf(id), ids(state.needsAnswer))
   }
 
-  @Test
-  fun atMidnightTodaysVisitsLeaveUpcoming() = test {
-    reserve(status = ReservationStatus.APPROVED, slotStart = NOW + HOUR)
-    val tomorrow = reserve(status = ReservationStatus.APPROVED, slotStart = NOW + DAY)
-    watch()
-    assertEquals(2, state.upcoming.size)
-    assertEquals(1, state.todayCount)
-
-    advanceTimeBy(START_OF_TODAY + DAY - NOW + 1)
-
-    assertEquals(listOf(tomorrow), ids(state.upcoming))
-    assertEquals(1, state.todayCount)
-  }
-
-  @Test
-  fun dayBoundariesFollowTheTimeZone() {
-    assertEquals(START_OF_TODAY, startOfDay(NOW, ZONE))
-    assertEquals(START_OF_TODAY + DAY, nextStartOfDay(NOW, ZONE))
-    assertEquals(START_OF_TODAY, startOfDay(START_OF_TODAY, ZONE))
-  }
-
   private companion object {
     const val VENUE_ID = "cafe"
     const val HOUR = 3_600_000L
     const val DAY = 24 * HOUR
-
-    /** Zurich, which has no daylight saving change on the days the tests use. */
-    val ZONE: ZoneId = ZoneId.of("Europe/Zurich")
-
-    /** The test's "now": 14:00 on a Wednesday in Zurich. */
-    val NOW: Long = LocalDateTime.of(2026, 10, 28, 14, 0).atZone(ZONE).toInstant().toEpochMilli()
-
-    val START_OF_TODAY: Long = NOW - 14 * HOUR
+    const val NOW = 1_800_000_000_000L
   }
 }
 
@@ -358,6 +374,16 @@ private class GatedReservationRepository(private val inner: ReservationRepositor
     gate?.await()
     return inner.updateStatus(id, status)
   }
+}
+
+/**
+ * Delegates to [inner], but its saves succeed without changing it, as when the backend has the
+ * answer and the listener hasn't shown it yet; the test then changes [inner] itself.
+ */
+private class SlowListenerRepository(private val inner: ReservationRepository) :
+    ReservationRepository by inner {
+  override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> =
+      Result.success(Unit)
 }
 
 /** Delegates to [inner], but its venue listener fails the first time it is listened to. */

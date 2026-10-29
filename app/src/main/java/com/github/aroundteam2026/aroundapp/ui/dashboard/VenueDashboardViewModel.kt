@@ -12,14 +12,16 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
-import java.time.Instant
-import java.time.ZoneId
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
+import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,17 +32,17 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the dashboard of the signed-in venue: its reservations, split into those it has to answer
- * and the approved ones still ahead, with each reservation's quest title and explorer's name.
+ * Holds the dashboard of the signed-in venue: its name, its reservations, split into those it has
+ * to answer and the approved ones, with each reservation's quest title and explorer's name, and how
+ * many of its quests are active.
  *
- * It follows the signed-in venue, and keeps up as its reservations and quests change and as the day
- * changes, by [clock] in [zone]. It only listens while the dashboard is watched. If listening
- * fails, the dashboard shows [VenueDashboardStatus.FAILED] until [retry].
+ * It follows the signed-in venue, and keeps up as it, its reservations and its quests change. It
+ * only listens while the dashboard is watched. If listening fails, the dashboard shows
+ * [VenueDashboardStatus.FAILED] until [retry].
  *
  * [approve] and [decline] answer a pending reservation; a failure sets
  * [VenueDashboardUiState.updateFailed] until [clearUpdateError].
@@ -48,14 +50,13 @@ import kotlinx.coroutines.launch
 class VenueDashboardViewModel(
     authRepository: AuthRepository,
     private val reservationRepository: ReservationRepository,
-    questRepository: QuestRepository,
-    private val clock: () -> Long = System::currentTimeMillis,
-    private val zone: ZoneId = ZoneId.systemDefault(),
+    private val questRepository: QuestRepository,
+    private val venueRepository: VenueRepository,
 ) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listeners, even for the same venue. */
   private val retries = MutableStateFlow(0)
 
-  /** The answers being saved and whether the last one failed. */
+  /** The reservations answered and not failed yet, and whether the last answer failed. */
   private val answers = MutableStateFlow(Answers())
 
   private data class Answers(
@@ -69,12 +70,16 @@ class VenueDashboardViewModel(
       combine(
               combine(authRepository.currentUserId, retries) { venueId, _ -> venueId }
                   .flatMapLatest { venueId ->
-                    if (venueId == null) flowOf(VenueDashboardUiState())
-                    else listen(venueId, questRepository)
+                    if (venueId == null) flowOf(VenueDashboardUiState()) else listen(venueId)
                   },
               answers,
           ) { listened, answers ->
-            listened.copy(savingIds = answers.saving, updateFailed = answers.failed)
+            // An answer saved and shown by the listener has left the pending ones
+            val pending = listened.needsAnswer.mapTo(HashSet()) { it.reservationId }
+            listened.copy(
+                savingIds = answers.saving intersect pending,
+                updateFailed = answers.failed,
+            )
           }
           .stateIn(
               viewModelScope,
@@ -99,9 +104,10 @@ class VenueDashboardViewModel(
   }
 
   /**
-   * Moves the reservation [reservationId] to [status]. Does nothing while an answer to it is being
-   * saved, so a double tap saves once. A failure sets [VenueDashboardUiState.updateFailed]; on
-   * success, the listener shows the new status.
+   * Moves the reservation [reservationId] to [status]. Does nothing once it has been answered, so a
+   * double tap saves once. On success it stays saving until the listener shows it is no longer
+   * pending, so its buttons can't be tapped again in between, which would fail. A failure ends
+   * saving and sets [VenueDashboardUiState.updateFailed].
    */
   private fun answer(reservationId: String, status: ReservationStatus) {
     val before = answers.getAndUpdate { it.copy(saving = it.saving + reservationId) }
@@ -109,30 +115,24 @@ class VenueDashboardViewModel(
     viewModelScope.launch {
       reservationRepository.updateStatus(reservationId, status).onFailure {
         Log.w(TAG, "Answering reservation $reservationId with $status failed", it)
-        answers.update { answers -> answers.copy(failed = true) }
+        answers.update { answers ->
+          answers.copy(saving = answers.saving - reservationId, failed = true)
+        }
       }
-      answers.update { it.copy(saving = it.saving - reservationId) }
     }
   }
 
   /**
-   * The dashboard of the venue [venueId], from its reservations and quests, again at each midnight
-   * so a past day's reservations leave "Upcoming". A failing listener gives a failed dashboard.
+   * The dashboard of the venue [venueId], from the venue, its reservations and its quests. A
+   * failing listener gives a failed dashboard.
    */
-  @OptIn(ExperimentalCoroutinesApi::class)
-  private fun listen(venueId: String, quests: QuestRepository): Flow<VenueDashboardUiState> =
+  private fun listen(venueId: String): Flow<VenueDashboardUiState> =
       combine(
               reservationRepository.observeForVenue(venueId),
-              quests.observeQuestsByVenue(venueId),
-              ::Pair,
+              questRepository.observeQuestsByVenue(venueId),
+              venueRepository.observeVenue(venueId),
+              ::dashboardOf,
           )
-          .transformLatest { (reservations, venueQuests) ->
-            while (true) {
-              val now = clock()
-              emit(dashboardOf(reservations, venueQuests, now, zone))
-              delay(nextStartOfDay(now, zone) - now)
-            }
-          }
           // The repositories' flows throw if the backend stops a listener
           .catch {
             Log.w(TAG, "Listening to the dashboard of $venueId failed", it)
@@ -152,6 +152,7 @@ class VenueDashboardViewModel(
             AuthRepositoryProvider.repository,
             ReservationRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
+            VenueRepositoryProvider.repository,
         )
       }
     }
@@ -159,57 +160,34 @@ class VenueDashboardViewModel(
 }
 
 /**
- * The loaded dashboard for [reservations] at [now] in [zone], titled from [quests]. Pending
- * reservations need an answer, oldest request first. Approved ones with a slot from today on are
- * upcoming, soonest first. Ties go to the smallest id. Rejected and cancelled ones are left out.
+ * The loaded dashboard of [venue] for [reservations], titled from [quests], which also give the
+ * active quests count. A [venue] that can't be read leaves the header empty. Pending reservations
+ * need an answer and approved ones are upcoming, each oldest request first, ties going to the
+ * smallest id. Rejected and cancelled ones are left out.
  *
- * A pending reservation's slot can be in the past: accepting a quest doesn't pick a slot yet, so it
- * only dates the request. It still needs an answer.
+ * Reservations have no visit time yet, so nothing is sorted or filtered by their slot: a pending
+ * reservation's slot only dates the request, and an approved one keeps it.
  */
 internal fun dashboardOf(
     reservations: List<Reservation>,
     quests: List<Quest>,
-    now: Long,
-    zone: ZoneId,
+    venue: Venue?,
 ): VenueDashboardUiState {
   val titles = quests.associate { it.id to it.title }
-  val today = startOfDay(now, zone)
-  val tomorrow = nextStartOfDay(now, zone)
-  val approved = reservations.filter { it.status == ReservationStatus.APPROVED }
+  fun withStatus(status: ReservationStatus) =
+      reservations
+          .filter { it.status == status }
+          .sortedWith(compareBy<Reservation> { it.createdAt }.thenBy { it.id })
+          .map { it.toDashboardReservation(titles) }
   return VenueDashboardUiState(
       status = VenueDashboardStatus.LOADED,
-      needsAnswer =
-          reservations
-              .filter { it.status == ReservationStatus.PENDING }
-              .sortedWith(compareBy<Reservation> { it.createdAt }.thenBy { it.id })
-              .map { it.toDashboardReservation(titles) },
-      upcoming =
-          approved
-              .filter { it.slotStart >= today }
-              .sortedWith(compareBy<Reservation> { it.slotStart }.thenBy { it.id })
-              .map { it.toDashboardReservation(titles) },
-      todayCount = approved.count { it.slotStart in today until tomorrow },
+      venueName = venue?.name.orEmpty(),
+      avatar = venue?.let { INITIALS_AVATAR(it, it.name) },
+      needsAnswer = withStatus(ReservationStatus.PENDING),
+      upcoming = withStatus(ReservationStatus.APPROVED),
+      activeQuestsCount = quests.count { it.status == QuestStatus.ACTIVE },
   )
 }
-
-/** The first millisecond of the day [time] falls on, in [zone]. */
-internal fun startOfDay(time: Long, zone: ZoneId): Long =
-    Instant.ofEpochMilli(time)
-        .atZone(zone)
-        .toLocalDate()
-        .atStartOfDay(zone)
-        .toInstant()
-        .toEpochMilli()
-
-/** The first millisecond of the day after the one [time] falls on, in [zone]. */
-internal fun nextStartOfDay(time: Long, zone: ZoneId): Long =
-    Instant.ofEpochMilli(time)
-        .atZone(zone)
-        .toLocalDate()
-        .plusDays(1)
-        .atStartOfDay(zone)
-        .toInstant()
-        .toEpochMilli()
 
 private fun Reservation.toDashboardReservation(titles: Map<String, String>) =
     DashboardReservation(
@@ -217,6 +195,6 @@ private fun Reservation.toDashboardReservation(titles: Map<String, String>) =
         questTitle = titles[questId],
         explorerName = explorerName.ifBlank { null },
         partySize = explorerUids.size,
-        slotStart = slotStart,
+        requestedAt = createdAt,
         approved = status == ReservationStatus.APPROVED,
     )
