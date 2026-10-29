@@ -23,9 +23,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * The security rules decide who may do what: an explorer joins a pending reservation as themselves,
  * while it has fewer than [MAX_PARTY_SIZE] joined members, only the member withdraws, and the
- * member, the party's other joined members and the reservation's venue read. A withdrawn member can
- * still read their own membership, but not the party. Joining and withdrawing also move the
- * reservation's count of joined members, in the same write, which is how the rules cap the party.
+ * party's members, withdrawn ones too, and the reservation's venue read. Joining and withdrawing
+ * also move the reservation's count of joined members, in the same write, which is how the rules
+ * cap the party.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [join] waits for the server to confirm the write, in

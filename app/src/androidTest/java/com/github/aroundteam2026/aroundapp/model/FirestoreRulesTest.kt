@@ -555,7 +555,7 @@ class FirestoreRulesTest {
   }
 
   @Test
-  fun membershipIsReadableByTheMemberTheirJoinedPartyAndTheVenueOnly() {
+  fun membershipIsReadableByTheMemberTheirPartyAndTheVenueOnly() {
     val venue = newUser(Role.VENUE)
     val explorer = newUser(Role.EXPLORER)
     val reservation = pendingReservationOf(explorer, venue)
@@ -574,7 +574,21 @@ class FirestoreRulesTest {
     signInAs(explorer)
     assertSucceeds(withdraw(reservation.id, explorer))
     assertSucceeds(membership(reservation.id, explorer).get(Source.SERVER))
-    assertDenied(friendsMembership.get(Source.SERVER), "a withdrawn member")
+    assertSucceeds(friendsMembership.get(Source.SERVER))
+  }
+
+  /** A member who withdrew still sees who else was in the party. */
+  @Test
+  fun aWithdrawnMemberListsTheirParty() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue)
+    val friend = newUser(Role.EXPLORER)
+    assertSucceeds(join(reservation.id, friend))
+
+    signInAs(explorer)
+    assertSucceeds(withdraw(reservation.id, explorer))
+    assertEquals(2, assertSucceeds(partyOf(reservation.id).get(Source.SERVER)).size())
   }
 
   /** Rules can't count a party's memberships, so the reservation's joinedCount caps it. */

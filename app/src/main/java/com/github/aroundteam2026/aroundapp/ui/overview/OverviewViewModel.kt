@@ -160,6 +160,7 @@ internal fun overviewRows(
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
     venuesById[reservation.venueId]?.let { venue ->
+      // A safety net only: observeJoinedCounts gives the size of every party it is asked for
       overviewRow(reservation, quest, venue, partySizes[reservation.id] ?: 1)
     }
   }
