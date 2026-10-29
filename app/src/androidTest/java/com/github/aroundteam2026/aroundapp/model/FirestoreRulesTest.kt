@@ -555,7 +555,7 @@ class FirestoreRulesTest {
   }
 
   @Test
-  fun membershipIsReadableByTheMemberTheirJoinedPartyAndTheVenueOnly() {
+  fun membershipIsReadableByTheMemberTheirPartyAndTheVenueOnly() {
     val venue = newUser(Role.VENUE)
     val explorer = newUser(Role.EXPLORER)
     val reservation = pendingReservationOf(explorer, venue)
@@ -574,7 +574,24 @@ class FirestoreRulesTest {
     signInAs(explorer)
     assertSucceeds(membership(reservation.id, explorer).update(withdrawal()))
     assertSucceeds(membership(reservation.id, explorer).get(Source.SERVER))
-    assertDenied(friendsMembership.get(Source.SERVER), "a withdrawn member")
+    assertSucceeds(friendsMembership.get(Source.SERVER))
+  }
+
+  /**
+   * A creator who withdraws still lists the reservation through `explorerUids`, so the overview and
+   * the venue page still list its party.
+   */
+  @Test
+  fun aWithdrawnMemberListsTheirParty() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue)
+    val friend = newUser(Role.EXPLORER)
+    assertSucceeds(membership(reservation.id, friend).set(member(reservation.id, friend)))
+
+    signInAs(explorer)
+    assertSucceeds(membership(reservation.id, explorer).update(withdrawal()))
+    assertEquals(2, assertSucceeds(partyOf(reservation.id).get(Source.SERVER)).size())
   }
 
   /**

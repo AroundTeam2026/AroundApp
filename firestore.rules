@@ -173,10 +173,9 @@ service cloud.firestore {
       return /databases/$(database)/documents/party_user/$(reservationId + '_' + request.auth.uid);
     }
 
-    // The signed-in user is a joined member of the party of [reservationId].
-    function isJoinedMember(reservationId) {
-      return exists(ownMembership(reservationId))
-          && get(ownMembership(reservationId)).data.status == 'JOINED';
+    // The signed-in user has a membership in the party of [reservationId], joined or withdrawn.
+    function isMember(reservationId) {
+      return exists(ownMembership(reservationId));
     }
 
     // The signed-in user is a joined member of the party of [reservationId] once this write is
@@ -247,14 +246,15 @@ service cloud.firestore {
     // One membership per explorer and reservation, under the id `{reservationId}_{uid}`. An
     // explorer account joins a pending reservation as themselves; getAfter also sees a reservation
     // created in the same batch. Afterwards the member can only withdraw, which also moves
-    // updatedAt, and never join again. The member, the party's other joined members and the
-    // reservation's venue read it. Memberships are never deleted, so a withdrawal stays recorded.
+    // updatedAt, and never join again. The party's members, withdrawn ones too, and the
+    // reservation's venue read it: a withdrawn creator still sees the reservation, so they must
+    // still be able to list its party. Memberships are never deleted, so a withdrawal stays recorded.
     // A reservation that doesn't exist has no memberships, and anyone signed in may list them: the
     // app listens to the party of a reservation it just created before the server has it.
     match /party_user/{memberId} {
       allow read: if signedIn()
           && (request.auth.uid == resource.data.uid
-              || isJoinedMember(resource.data.reservationId)
+              || isMember(resource.data.reservationId)
               || !exists(reservation(resource.data.reservationId))
               || request.auth.uid == get(reservation(resource.data.reservationId)).data.venueId);
       allow create: if signedIn()

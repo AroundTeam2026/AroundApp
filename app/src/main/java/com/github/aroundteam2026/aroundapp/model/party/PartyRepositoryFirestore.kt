@@ -21,8 +21,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [observeMembers] leaves them out, and [withdraw] treats them as missing.
  *
  * The security rules decide who may do what: an explorer joins a pending reservation as themselves,
- * only the member withdraws, and the member, the party's other joined members and the reservation's
- * venue read. A withdrawn member can still read their own membership, but not the party.
+ * only the member withdraws, and the party's members, withdrawn ones too, and the reservation's
+ * venue read.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [join] waits for the server to confirm the write, in
