@@ -195,7 +195,8 @@ class SessionNavigationTest {
     installBackFallback()
     compose.setContent {
       AroundAppTheme {
-        // The app's own main screen, but with an overview that doesn't read Firestore
+        // A copy of SessionNavigation's default mainScreen, with an overview that doesn't read
+        // Firestore: keep the two in sync
         SessionNavigation(
             repo,
             mainScreen = { userId ->

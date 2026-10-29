@@ -25,8 +25,9 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
- * The bar with the Around wordmark at the top of the explorer's tab screens, as in the Figma
- * explorer home (F3): the panel colour, rounded at the bottom, over a soft shadow.
+ * The bar with the Around wordmark, as in the Figma explorer home (F3): the panel colour, rounded
+ * at the bottom, over a soft shadow. A tab screen that wants it draws it at its own top, as the
+ * overview does; the map runs edge to edge, so it isn't part of [BottomTabScaffold].
  */
 @Composable
 fun AroundHeader(modifier: Modifier = Modifier) {
