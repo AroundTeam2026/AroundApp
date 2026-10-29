@@ -139,6 +139,8 @@ Every create and update must match its collection's table above: only the listed
 | `party_user` | The member, the party's other `JOINED` members and the reservation's venue. Anyone signed in may list the party of a reservation that doesn't exist, which is empty, for the same reason. | An explorer, whose `users` document has role `EXPLORER`, creates their own `JOINED` membership, under the id `{reservationId}_{uid}`, for a `PENDING` reservation with fewer than 10 `JOINED` members, adding 1 to its `joinedCount` in the same batch. Afterwards only the member changes it, from `JOINED` to `WITHDRAWN`, along with `updatedAt`, taking 1 off `joinedCount` in the same batch. No delete. |
 | `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
 
+Joining a party needs only its reservation's id, and a `JOINED` membership lets the explorer read and cancel the reservation. So an explorer who learns the id of someone else's `PENDING` reservation can join that party and cancel it. Ids are random and only shown to the party and the venue, so this rests on them staying private. An invite check, e.g. when parties get companions, would close it.
+
 ## Decided changes
 
 Decided in #259, from the review of #25 and from R2 (#274). The tables above describe `main`; a change still in progress updates them when it lands.
