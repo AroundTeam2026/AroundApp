@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,10 +55,10 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import kotlinx.coroutines.launch
 
 /**
- * The form a venue fills in to create a quest. [onClose] leaves it without saving, but can't be
- * tapped once the quest is being saved, and [onCreated] gets the id of the quest once it is saved.
- * A failed save shows a snackbar once and keeps the form. A venue that couldn't be read can be read
- * again from the form.
+ * The form a venue fills in to create a quest. [onClose] leaves it without saving, but neither it
+ * nor Back can leave once the quest is being saved, and [onCreated] gets the id of the quest once
+ * it is saved. A failed save shows a snackbar once and keeps the form. A venue that couldn't be
+ * read can be read again from the form.
  */
 @Composable
 fun CreateQuestScreen(
@@ -85,6 +86,8 @@ fun CreateQuestScreen(
       SaveState.Saving -> Unit
     }
   }
+  // Leaving would cancel the save the venue is waiting on, though its write may still happen
+  BackHandler(enabled = state.saveState == SaveState.Saving) {}
   CreateQuestContent(
       state = state,
       onTitleChange = viewModel::updateTitle,

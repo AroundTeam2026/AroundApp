@@ -25,6 +25,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
@@ -72,6 +73,7 @@ class VenueEntryNavigationTest {
             },
             createQuestFactory = createQuestFactoryOnFakes(),
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
+            dashboardFactory = venueDashboardFactoryOnFakes(),
             start = start,
         )
       }
@@ -218,6 +220,7 @@ class VenueEntryNavigationTest {
                   venues,
                   createQuestFactory = createQuestFactoryOnFakes(),
                   venueQuestsFactory = venueQuestsFactoryOnFakes(),
+                  dashboardFactory = venueDashboardFactoryOnFakes(),
                   locationScreen = { uid, onSaved, _ ->
                     Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
                   },
@@ -257,6 +260,7 @@ class VenueEntryNavigationTest {
             },
             createQuestFactory = viewModelFactory { initializer { form } },
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
+            dashboardFactory = venueDashboardFactoryOnFakes(),
         )
       }
     }

@@ -17,6 +17,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -41,7 +43,8 @@ import kotlinx.coroutines.launch
  * It listens to the explorer's reservations and keeps the pending and approved ones, each with its
  * quest, read once, and its venue and party, which it listens to. Rows follow the reservations, the
  * venues and the parties as they change. If anything fails, including the reservations' listener
- * after sign-out, the overview shows [OverviewStatus.FAILED] until [retry].
+ * after sign-out, the overview shows [OverviewStatus.FAILED] until [retry]. The explorer can
+ * [cancel] a reservation.
  */
 class OverviewViewModel(
     private val explorerUid: String,
@@ -58,6 +61,42 @@ class OverviewViewModel(
 
   init {
     listen()
+  }
+
+  /**
+   * Called when the explorer cancels the reservation [reservationId]. Does nothing unless it is one
+   * of the rows, or while it is being cancelled, so a double tap cancels once. The row shows as
+   * cancelling until the listener drops it. A failure, such as being offline, keeps the row and
+   * marks it failed, unless the row left meanwhile; calling this again retries.
+   */
+  fun cancel(reservationId: String) {
+    val current = mutableUiState.value
+    if (
+        reservationId in current.cancellingIds ||
+            current.rows.none { it.reservationId == reservationId }
+    ) {
+      return
+    }
+    mutableUiState.update {
+      it.copy(
+          cancellingIds = it.cancellingIds + reservationId,
+          failedCancelIds = it.failedCancelIds - reservationId,
+      )
+    }
+    viewModelScope.launch {
+      reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED).onFailure {
+        Log.w(TAG, "Cancelling reservation $reservationId failed", it)
+        mutableUiState.update { state ->
+          // A row that left meanwhile, e.g. rejected by the venue, has nothing to mark
+          val shown = state.rows.any { row -> row.reservationId == reservationId }
+          state.copy(
+              cancellingIds = state.cancellingIds - reservationId,
+              failedCancelIds =
+                  if (shown) state.failedCancelIds + reservationId else state.failedCancelIds,
+          )
+        }
+      }
+    }
   }
 
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
@@ -101,7 +140,16 @@ class OverviewViewModel(
             mutableUiState.value = OverviewUiState(status = OverviewStatus.FAILED)
           }
           .collect { rows ->
-            mutableUiState.value = OverviewUiState(status = OverviewStatus.LOADED, rows = rows)
+            // A reservation that left the rows, e.g. once cancelled, is no longer cancelling
+            val ids = rows.map { it.reservationId }.toSet()
+            mutableUiState.update {
+              it.copy(
+                  status = OverviewStatus.LOADED,
+                  rows = rows,
+                  cancellingIds = it.cancellingIds intersect ids,
+                  failedCancelIds = it.failedCancelIds intersect ids,
+              )
+            }
           }
     }
   }
@@ -132,14 +180,12 @@ class OverviewViewModel(
 }
 
 /**
- * The pending and approved reservations among [reservations], soonest slot first, then the newest,
- * ties going to the smallest id, so the order never depends on the repository's.
+ * The [ReservationStatus.isActive] reservations among [reservations], soonest slot first, then the
+ * newest, ties going to the smallest id, so the order never depends on the repository's.
  */
 internal fun activeReservations(reservations: List<Reservation>): List<Reservation> =
     reservations
-        .filter {
-          it.status == ReservationStatus.PENDING || it.status == ReservationStatus.APPROVED
-        }
+        .filter { it.status.isActive }
         .sortedWith(
             compareBy<Reservation> { it.slotStart }
                 .thenByDescending { it.createdAt }

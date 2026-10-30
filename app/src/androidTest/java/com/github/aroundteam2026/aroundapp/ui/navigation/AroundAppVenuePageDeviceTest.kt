@@ -3,7 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -125,7 +125,13 @@ class AroundAppVenuePageDeviceTest {
   private fun openVenuePage() {
     composeTestRule.setContent {
       navController = rememberNavController()
-      AroundApp(explorerUid = explorerUid, onSignOut = {}, navController = navController)
+      // The app opens on the Quests tab; an empty overview keeps its listener off this test
+      AroundApp(
+          explorerUid = explorerUid,
+          onSignOut = {},
+          navController = navController,
+          overview = {},
+      )
     }
     composeTestRule.runOnUiThread { navController.navigateToVenuePage(venue.id) }
   }

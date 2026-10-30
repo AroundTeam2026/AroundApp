@@ -22,7 +22,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.StateRestorationTester
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -37,6 +37,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
+import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
@@ -191,7 +193,23 @@ class SessionNavigationTest {
     val repo = FakeAuthRepository()
     repo.addAccount("ada@around.test", "123456")
     installBackFallback()
-    compose.setContent { AroundAppTheme { SessionNavigation(repo) } }
+    compose.setContent {
+      AroundAppTheme {
+        // A copy of SessionNavigation's default mainScreen, with an overview that doesn't read
+        // Firestore: keep the two in sync
+        SessionNavigation(
+            repo,
+            mainScreen = { userId ->
+              val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(repo))
+              AroundApp(
+                  explorerUid = userId,
+                  onSignOut = profile::signOut,
+                  overview = { OverviewOnFakes(it) },
+              )
+            },
+        )
+      }
+    }
     submit()
     compose.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).assertIsDisplayed().performClick()

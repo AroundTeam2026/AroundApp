@@ -20,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
@@ -342,9 +343,10 @@ internal fun venuePageQuests(
 
 /**
  * The size of the party the explorer has for each quest of the venue [venueId] they accepted, keyed
- * by quest id: the number of joined members in [partySizes], keyed by reservation id. Only pending
- * and approved reservations count; of several for one quest, the biggest party counts. A party
- * missing from [partySizes] counts as just the explorer, who is in every party they see here.
+ * by quest id: the number of joined members in [partySizes], keyed by reservation id. Only
+ * [ReservationStatus.isActive] reservations count; of several for one quest, the biggest party
+ * counts. A party missing from [partySizes] counts as just the explorer, who is in every party they
+ * see here.
  */
 internal fun acceptedPartiesOf(
     reservations: List<Reservation>,
@@ -356,12 +358,9 @@ internal fun acceptedPartiesOf(
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxOf { partySizes[it.id] ?: 1 } }
 
-/**
- * This reservation is a pending or approved one at the venue [venueId], so its quest is accepted.
- */
+/** This reservation is an active one at the venue [venueId], so its quest is accepted. */
 private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
-    this.venueId == venueId &&
-        (status == ReservationStatus.PENDING || status == ReservationStatus.APPROVED)
+    this.venueId == venueId && status.isActive
 
 /**
  * This page showing [venue], its valid [quests] and the parties of the [accepted] ones, or "not

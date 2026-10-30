@@ -1,15 +1,17 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -32,6 +34,7 @@ class VenueHomeTest {
           onCreateQuest = { questsCreated++ },
           onSignOut = { signOuts++ },
           venueQuestsFactory = venueQuestsFactoryOnFakes(),
+          dashboardFactory = venueDashboardFactoryOnFakes(),
       )
     }
   }
@@ -59,7 +62,7 @@ class VenueHomeTest {
   @Test
   fun opensOnTheDashboard() {
     assertShowing(VenueTab.DASHBOARD)
-    composeTestRule.onNodeWithTag(C.Tag.DASHBOARD_STUB).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.DASHBOARD_EMPTY).assertIsDisplayed()
   }
 
   @Test

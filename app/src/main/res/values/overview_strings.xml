@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
-    <!-- A card of the Quests tab: one quest the explorer accepted -->
+    <!-- The Quests tab: the quests the explorer accepted -->
+    <string name="overview_title">My quests</string>
+    <plurals name="overview_count">
+        <item quantity="one">%1$d accepted</item>
+        <item quantity="other">%1$d accepted</item>
+    </plurals>
+    <string name="overview_failed">Couldn\'t load your quests. Check your connection and try again.</string>
+    <string name="overview_retry">Try again</string>
+    <string name="overview_empty_title">No quests yet</string>
+    <string name="overview_empty_body">Accept a quest on a venue\'s page and it shows up here.</string>
     <!-- Where a reservation stands with its venue -->
     <string name="overview_status_waiting">Waiting for the venue</string>
     <string name="overview_status_approved">Approved</string>
@@ -10,10 +19,20 @@
     <string name="overview_slot_today">Today</string>
     <!-- The venue's name, then its address -->
     <string name="overview_venue_address">%1$s · %2$s</string>
+    <!-- Cancelling the reservation from its card -->
+    <string name="overview_cancel">Cancel reservation</string>
+    <string name="overview_cancelling">Cancelling…</string>
+    <string name="overview_cancel_retry">Try again</string>
+    <string name="overview_cancel_failed">Couldn\'t cancel this reservation.</string>
+    <!-- Asked before cancelling, which can't be undone; the argument is the venue's name -->
+    <string name="overview_cancel_title">Cancel this reservation?</string>
+    <string name="overview_cancel_text">%1$s will see it cancelled. To go after all, accept the quest again.</string>
+    <string name="overview_cancel_confirm">Cancel reservation</string>
+    <string name="overview_cancel_keep">Keep it</string>
     <plurals name="overview_party_size">
         <item quantity="one">%1$d person</item>
         <item quantity="other">%1$d people</item>
     </plurals>
-    <!-- What tapping a card does, read by screen readers; the argument is the venue's name -->
+    <!-- What tapping a row does, read by screen readers; the argument is the venue's name -->
     <string name="overview_open_venue">Open %1$s</string>
 </resources>

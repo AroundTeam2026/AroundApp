@@ -76,6 +76,20 @@ enum class ReservationStatus {
 }
 
 /**
+ * Whether a reservation with this status still stands: waiting for the venue or accepted. Rejected
+ * and cancelled ones are over. Exhaustive, so a new status doesn't compile until it is decided
+ * here.
+ */
+val ReservationStatus.isActive: Boolean
+  get() =
+      when (this) {
+        ReservationStatus.PENDING,
+        ReservationStatus.APPROVED -> true
+        ReservationStatus.REJECTED,
+        ReservationStatus.CANCELLED -> false
+      }
+
+/**
  * Whether a reservation may change from [from] to [to].
  *
  * A pending reservation can be approved, rejected or cancelled; an approved one can only be
