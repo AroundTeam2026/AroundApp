@@ -137,7 +137,7 @@ class OverviewScreenTest {
     val reservations = FakeReservationRepository(party = party)
     runBlocking {
       reservations.createReservation(
-          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT),
+          newPendingReservation("fox", CAFE, TEST_EXPLORER_NAME, SLOT),
           "explorer",
       )
     }
@@ -163,7 +163,7 @@ class OverviewScreenTest {
     val reservations = FakeReservationRepository(party = party)
     runBlocking {
       reservations.createReservation(
-          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT),
+          newPendingReservation("fox", CAFE, TEST_EXPLORER_NAME, SLOT),
           "explorer",
       )
     }

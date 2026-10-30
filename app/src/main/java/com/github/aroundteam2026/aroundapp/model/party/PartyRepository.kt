@@ -12,11 +12,12 @@ interface PartyRepository {
    * Makes [uid] a [PartyMemberStatus.JOINED] member of the party of [reservationId]. The repository
    * sets `joinedAt` and `updatedAt`.
    *
-   * The security rules only let an explorer join as themselves, a pending reservation, once: the
-   * Firestore implementation fails when the server refuses.
+   * The security rules only let an explorer join as themselves, a pending reservation, once, while
+   * it has fewer than [MAX_PARTY_SIZE] joined members: the Firestore implementation fails when the
+   * server refuses.
    *
    * @return success, or a failure if [uid] already has a membership for this reservation, whatever
-   *   its status, or if the write failed.
+   *   its status, if the party is full, or if the write failed.
    */
   suspend fun join(reservationId: String, uid: String): Result<Unit>
 

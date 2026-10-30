@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
@@ -70,7 +71,7 @@ class ReservationRepositoryFirestoreTest {
   /** Repository used by the signed-in venue, which owns the reservations the tests create. */
   private lateinit var venueRepository: ReservationRepositoryFirestore
 
-  /** Uid of the explorer signed in by [setUp], a member of every party [reservation] builds. */
+  /** Uid of the explorer signed in by [setUp], who creates every reservation and so joins it. */
   private lateinit var explorerUid: String
 
   /** Uid of the venue signed in by [setUp], used as the venue id of every reservation. */
@@ -108,8 +109,8 @@ class ReservationRepositoryFirestoreTest {
       }
 
   /**
-   * Bug: a field is dropped or mis-mapped on write or read (e.g. slotStart and createdAt swapped, a
-   * party member lost, the status mapped to the wrong enum, the id not taken from the document id).
+   * Bug: a field is dropped or mis-mapped on write or read (e.g. slotStart and createdAt swapped,
+   * the status mapped to the wrong enum, the id not taken from the document id).
    */
   @Test
   fun createReservation_thenObserveForVenue_roundTripsEveryField() = withTimeoutBlocking {
@@ -122,7 +123,6 @@ class ReservationRepositoryFirestoreTest {
             id = id,
             questId = questId,
             venueId = venueId,
-            explorerUids = listOf(explorerUid, FRIEND_UID),
             slotStart = SLOT_START,
             status = ReservationStatus.PENDING,
             createdAt = FIXED_NOW,
@@ -139,7 +139,7 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun createReservation_forAnAcceptedQuest_isAcceptedByTheRules() = withTimeoutBlocking {
-    val accepted = newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START)
+    val accepted = newPendingReservation(questId, venueId, EXPLORER_NAME, SLOT_START)
 
     val id = createAndSync(accepted)
 
@@ -151,8 +151,8 @@ class ReservationRepositoryFirestoreTest {
 
   /**
    * Bug: the document does not follow the schema (a time stored as a Long, the status stored as an
-   * ordinal, the party stored as a map) or the id is also stored as a field. A round trip cannot
-   * see any of these.
+   * ordinal, the party still stored on the reservation) or the id is also stored as a field. A
+   * round trip cannot see any of these.
    */
   @Test
   fun createReservation_storesSchemaTypes() = withTimeoutBlocking {
@@ -164,24 +164,25 @@ class ReservationRepositoryFirestoreTest {
         setOf(
             "questId",
             "venueId",
-            "explorerUids",
             "slotStart",
             "status",
             "createdAt",
             "explorerName",
+            "joinedCount",
         ),
         document.data!!.keys,
     )
     assertTrue(document.get("slotStart") is Timestamp)
     assertTrue(document.get("createdAt") is Timestamp)
     assertEquals("PENDING", document.get("status"))
-    assertEquals(listOf(explorerUid, FRIEND_UID), document.get("explorerUids"))
     assertEquals(EXPLORER_NAME, document.get("explorerName"))
+    assertEquals(1L, document.get("joinedCount"))
   }
 
   /**
    * Bug: the creator's membership is not written, is written under another id than the rules look
-   * up, or with another time than the reservation's, so the party looks empty.
+   * up, or with another time than the reservation's, so the creator can't read their own
+   * reservation and the party looks empty.
    */
   @Test
   fun createReservation_makesTheCreatorAJoinedMemberAtTheCreationTime() = withTimeoutBlocking {
@@ -209,7 +210,6 @@ class ReservationRepositoryFirestoreTest {
         mapOf(
             "questId" to questId,
             "venueId" to venueId,
-            "explorerUids" to listOf(explorerUid),
             "slotStart" to Timestamp(1_800_000_000L, 0),
             "status" to "PENDING",
             "createdAt" to Timestamp(1_700_000_000L, 0),
@@ -241,25 +241,8 @@ class ReservationRepositoryFirestoreTest {
 
   /**
    * Bug: a reservation the rules refuse is reported as created, so the explorer sees it accepted
-   * until it silently vanishes, or it is stored anyway. The rules only let an explorer reserve for
-   * a party they belong to.
-   */
-  @Test
-  fun createReservation_whenTheSignedInUserIsNotInTheParty_returnsPermissionDenied() =
-      withTimeoutBlocking {
-        val result =
-            explorerRepository.createReservation(
-                reservation(party = listOf(FRIEND_UID)),
-                explorerUid,
-            )
-
-        assertPermissionDenied(result)
-        assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
-      }
-
-  /**
-   * Bug: a reservation is created with another explorer's membership, so anyone can sign a friend
-   * up. The rules only let an explorer reserve as themselves, joining the party.
+   * until it silently vanishes, or it is stored anyway. The rules only let an explorer reserve as
+   * themselves, joining the party.
    */
   @Test
   fun createReservation_forAnotherCreatorThanTheSignedInUser_returnsPermissionDenied() =
@@ -386,34 +369,133 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: observeForExplorer matches the party with equality instead of array-contains, so a
-   * reservation whose party has two members is missed.
+   * Bug: observeForExplorer only finds the reservations the explorer created, also finds those
+   * whose party they never joined, or keeps those they withdrew from.
    */
   @Test
-  fun observeForExplorer_returnsEveryReservationWhosePartyIncludesTheExplorer() =
+  fun observeForExplorer_returnsTheReservationsTheExplorerJoinedAndDidNotLeave() =
       withTimeoutBlocking {
-        val solo = createAndSync(reservation(party = listOf(explorerUid)))
-        val withFriend = createAndSync(reservation(party = listOf(FRIEND_UID, explorerUid)))
-        val expected = setOf(solo, withFriend)
+        val friendUid = signInNewUser(FRIEND_APP, Role.EXPLORER)
+        val friendDb = emulatorClient(FRIEND_APP)
+        try {
+          val friendRepository = ReservationRepositoryFirestore(friendDb) { FIXED_NOW }
+          val own = createAndSync()
+          val left = createAndSync()
+          val joined = friendRepository.createReservation(reservation(), friendUid).getOrThrow()
+          friendRepository.createReservation(reservation(), friendUid).getOrThrow()
+          val party = PartyRepositoryFirestore(explorerDb)
+          party.join(joined, explorerUid).getOrThrow()
+          party.withdraw(left, explorerUid).getOrThrow()
 
-        val reservations =
-            explorerRepository.observeForExplorer(explorerUid).first { list ->
-              list.map { it.id }.containsAll(expected)
-            }
+          val reservations =
+              explorerRepository.observeForExplorer(explorerUid).first { list ->
+                list.map { it.id }.toSet() == setOf(own, joined)
+              }
 
-        assertEquals(expected, reservations.map { it.id }.toSet())
+          assertEquals(setOf(own, joined), reservations.map { it.id }.toSet())
+        } finally {
+          friendDb.terminate().await()
+        }
       }
 
   /**
-   * Bug: observeForVenue or observeForExplorer lets a malformed document crash the listener or end
-   * the flow instead of skipping it.
+   * Bug: observeForExplorer reads the memberships or a reservation once instead of listening, so a
+   * withdrawal or the venue's answer never shows.
+   */
+  @Test
+  fun observeForExplorer_followsTheVenuesAnswerAndAWithdrawal() = withTimeoutBlocking {
+    val id = createAndSync()
+    val emissions = Channel<List<Reservation>>(Channel.UNLIMITED)
+    val collector =
+        launch(start = CoroutineStart.UNDISPATCHED) {
+          explorerRepository.observeForExplorer(explorerUid).collect(emissions::send)
+        }
+    try {
+      do {
+        val latest = emissions.receive()
+      } while (latest.none { it.id == id })
+
+      venueRepository.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+      do {
+        val latest = emissions.receive()
+      } while (latest.none { it.id == id && it.status == ReservationStatus.APPROVED })
+
+      PartyRepositoryFirestore(explorerDb).withdraw(id, explorerUid).getOrThrow()
+      do {
+        val latest = emissions.receive()
+      } while (latest.any { it.id == id })
+    } finally {
+      collector.cancel()
+    }
+  }
+
+  /**
+   * Bug: the rules refuse to read a reservation the server doesn't have yet, so the listener
+   * observeForExplorer attaches right after an offline creation fails and the reservation never
+   * follows the venue's answer.
+   */
+  @Test
+  fun observeForExplorer_ofAReservationCreatedOffline_followsItOnceOnline() = withTimeoutBlocking {
+    val repository =
+        ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) {
+          FIXED_NOW
+        }
+    val emissions = Channel<List<Reservation>>(Channel.UNLIMITED)
+    val collector =
+        launch(start = CoroutineStart.UNDISPATCHED) {
+          repository.observeForExplorer(explorerUid).collect(emissions::send)
+        }
+    try {
+      explorerDb.disableNetwork().await()
+      val id: String
+      try {
+        id = repository.createReservation(reservation(), explorerUid).getOrThrow()
+        // The local copy, listed before the server has it
+        do {
+          val latest = emissions.receive()
+        } while (latest.none { it.id == id })
+      } finally {
+        explorerDb.enableNetwork().await()
+      }
+      explorerDb.waitForPendingWrites().await()
+
+      venueRepository.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+
+      // A listener the server refused is left out, so this loop fails the test on TIMEOUT_MS
+      do {
+        val latest = emissions.receive()
+      } while (latest.none { it.id == id && it.status == ReservationStatus.APPROVED })
+    } finally {
+      collector.cancel()
+    }
+  }
+
+  /**
+   * Bug: observeForVenue or observeForExplorer lets a malformed reservation or membership crash the
+   * listener or end the flow instead of skipping it.
    */
   @Test
   fun observe_skipsMalformedDocuments() = withTimeoutBlocking {
     // No questId, slotStart or createdAt: the rules refuse it, so it goes past them
+    val malformedId = explorerDb.collection(RESERVATIONS).document().id
     writeBypassingRules(
-        "$RESERVATIONS/${explorerDb.collection(RESERVATIONS).document().id}",
-        mapOf("venueId" to venueId, "explorerUids" to listOf(explorerUid), "status" to "PENDING"),
+        "$RESERVATIONS/$malformedId",
+        mapOf("venueId" to venueId, "status" to "PENDING"),
+    )
+    writeBypassingRules(
+        "$PARTY_USER/${malformedId}_$explorerUid",
+        mapOf(
+            "reservationId" to malformedId,
+            "uid" to explorerUid,
+            "status" to "JOINED",
+            "joinedAt" to Timestamp.now(),
+            "updatedAt" to Timestamp.now(),
+        ),
+    )
+    // A membership without its times, of a reservation that doesn't exist
+    writeBypassingRules(
+        "$PARTY_USER/missing_$explorerUid",
+        mapOf("reservationId" to "missing", "uid" to explorerUid, "status" to "JOINED"),
     )
     val validId = createAndSync()
 
@@ -459,15 +541,15 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: updateStatus throws or hangs for an id with no document instead of returning a failure.
-   * The read rule cannot evaluate a missing document, so the server answers PERMISSION_DENIED
-   * rather than the transaction seeing a missing reservation.
+   * Bug: updateStatus throws, hangs or writes for an id with no document instead of returning a
+   * failure. The rules let anyone signed in find that an id has no reservation, so the transaction
+   * sees it missing.
    */
   @Test
-  fun updateStatus_forAnUnknownId_failsWithPermissionDenied() = withTimeoutBlocking {
+  fun updateStatus_forAnUnknownId_failsWithNoSuchElement() = withTimeoutBlocking {
     val result = venueRepository.updateStatus("unknown", ReservationStatus.APPROVED)
 
-    assertPermissionDenied(result)
+    assertTrue(result.exceptionOrNull() is NoSuchElementException)
   }
 
   /**
@@ -481,7 +563,7 @@ class ReservationRepositoryFirestoreTest {
     // read it because the venueId matches.
     writeBypassingRules(
         "$RESERVATIONS/$id",
-        mapOf("venueId" to venueId, "explorerUids" to listOf(explorerUid), "status" to "PENDING"),
+        mapOf("venueId" to venueId, "status" to "PENDING"),
     )
 
     val result = venueRepository.updateStatus(id, ReservationStatus.APPROVED)
@@ -491,7 +573,7 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: the KDoc and the rules disagree: an explorer of the party may cancel their reservation
+   * Bug: the KDoc and the rules disagree: a joined member of the party may cancel their reservation
    * (E21) but not answer it in the venue's place, and that refusal must come back as a failure that
    * leaves the reservation untouched.
    */
@@ -507,15 +589,14 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * A reservation by the explorer for the venue's quest. [party] must contain the explorer for the
-   * rules to accept it. `id`, `status` and `createdAt` are set by the repository and ignored.
+   * A reservation for the venue's quest. `id`, `status` and `createdAt` are set by the repository
+   * and ignored.
    */
-  private fun reservation(party: List<String> = listOf(explorerUid, FRIEND_UID)) =
+  private fun reservation() =
       Reservation(
           id = "",
           questId = questId,
           venueId = venueId,
-          explorerUids = party,
           slotStart = SLOT_START,
           status = ReservationStatus.PENDING,
           createdAt = 1L,
@@ -596,7 +677,7 @@ class ReservationRepositoryFirestoreTest {
     /** The Firestore collection of quests, which a test changes directly as the venue. */
     const val QUESTS = "quests"
 
-    /** The Firestore collection of memberships, which some tests read directly. */
+    /** The Firestore collection of memberships, which some tests read or write directly. */
     const val PARTY_USER = "party_user"
 
     /** The app of the explorer that [setUp] signs in. */
@@ -605,13 +686,16 @@ class ReservationRepositoryFirestoreTest {
     /** The app of the venue that [setUp] signs in. */
     const val VENUE_APP = "reservation-test-venue"
 
+    /** The app of a friend, another explorer, whom some tests sign in. */
+    const val FRIEND_APP = "reservation-test-friend"
+
     /** The app whose client a test terminates on purpose, to make the write fail. */
     const val TERMINATED_APP = "reservation-test-terminated"
 
     /** The display name signInNewUser gives every profile; the rules require it on reservations. */
     const val EXPLORER_NAME = "Test"
 
-    /** A party member who never signs in; only the explorer's own uid matters to the rules. */
+    /** An explorer who never signs in, whom the signed-in explorer can't reserve for. */
     const val FRIEND_UID = "friend-uid"
 
     /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */

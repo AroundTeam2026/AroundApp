@@ -99,10 +99,7 @@ class VenuePageAcceptTest {
   private suspend fun storeFor(questId: String, friends: List<String> = emptyList()): String {
     val id =
         fake
-            .createReservation(
-                newPendingReservation(questId, VENUE_ID, EXPLORER, NAME, START),
-                EXPLORER,
-            )
+            .createReservation(newPendingReservation(questId, VENUE_ID, NAME, START), EXPLORER)
             .getOrThrow()
     friends.forEach { party.join(id, it).getOrThrow() }
     return id
@@ -314,10 +311,7 @@ class VenuePageAcceptTest {
 
   @Test
   fun aReservationAtAnotherVenueDoesNotAcceptThisVenuesQuest() = test {
-    fake.createReservation(
-        newPendingReservation("a", "other-venue", EXPLORER, NAME, START),
-        EXPLORER,
-    )
+    fake.createReservation(newPendingReservation("a", "other-venue", NAME, START), EXPLORER)
 
     openAndPick("a")
 
@@ -380,10 +374,22 @@ class VenuePageAcceptTest {
     assertEquals(2, state.morePeopleNeeded)
   }
 
+  @Test
+  fun aQuestTheExplorerWithdrewFromIsNoLongerAccepted() = test {
+    val id = storeFor("a", friends = listOf("friend"))
+    openAndPick("a")
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+
+    party.withdraw(id, EXPLORER).getOrThrow()
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+  }
+
   /** The party sizes are always all known; if one were missing, the explorer still counts. */
   @Test
   fun aPartyWithNoKnownSizeCountsJustTheExplorer() {
-    val reservation = newPendingReservation("a", VENUE_ID, EXPLORER, NAME, START).copy(id = "r")
+    val reservation = newPendingReservation("a", VENUE_ID, NAME, START).copy(id = "r")
 
     assertEquals(mapOf("a" to 1), acceptedPartiesOf(listOf(reservation), emptyMap(), VENUE_ID))
   }
@@ -534,8 +540,7 @@ class VenuePageAcceptTest {
     runCurrent()
 
     // The listener emits again, still without the new reservation
-    server.list.value =
-        listOf(newPendingReservation("b", VENUE_ID, EXPLORER, NAME, START).copy(id = "x"))
+    server.list.value = listOf(newPendingReservation("b", VENUE_ID, NAME, START).copy(id = "x"))
     runCurrent()
 
     assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
@@ -577,7 +582,7 @@ class VenuePageAcceptTest {
     val elsewhere =
         fake
             .createReservation(
-                newPendingReservation("a", "other-venue", EXPLORER, NAME, START),
+                newPendingReservation("a", "other-venue", NAME, START),
                 EXPLORER,
             )
             .getOrThrow()
@@ -609,8 +614,7 @@ class VenuePageAcceptTest {
     assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
 
     server.broken = true
-    server.list.value =
-        listOf(newPendingReservation("b", VENUE_ID, EXPLORER, NAME, START).copy(id = "x"))
+    server.list.value = listOf(newPendingReservation("b", VENUE_ID, NAME, START).copy(id = "x"))
     runCurrent()
 
     assertEquals(AcceptStatus.NONE, state.acceptStatus)
@@ -619,7 +623,7 @@ class VenuePageAcceptTest {
 
   @Test
   fun aListenerThatFailsLaterKeepsWhatItShowed() = test {
-    val accepted = newPendingReservation("a", VENUE_ID, EXPLORER, NAME, START).copy(id = "r")
+    val accepted = newPendingReservation("a", VENUE_ID, NAME, START).copy(id = "r")
     reservationRepository = FailingListenerRepository(fake, shownFirst = listOf(accepted))
     openAndPick("a")
     assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)

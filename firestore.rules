@@ -107,22 +107,24 @@ service cloud.firestore {
           && isText(reward.description, 200);
     }
 
-    // A party has at most 10 explorers, each listed once. Rules can't loop over a list, so the
-    // entries aren't type-checked: the app skips a reservation with a non-string uid as malformed,
-    // which only hides the writer's own reservation.
+    // The party isn't stored on the reservation: it is the reservation's memberships in party_user.
+    // joinedCount counts its JOINED ones, since rules can't count documents, to cap the party.
     function isValidReservation(data) {
-      return data.keys().hasAll(['questId', 'venueId', 'explorerUids', 'slotStart', 'status',
-              'createdAt', 'explorerName'])
-          && data.keys().hasOnly(['questId', 'venueId', 'explorerUids', 'slotStart', 'status',
-              'createdAt', 'explorerName'])
+      return data.keys().hasAll(['questId', 'venueId', 'slotStart', 'status', 'createdAt',
+              'explorerName', 'joinedCount'])
+          && data.keys().hasOnly(['questId', 'venueId', 'slotStart', 'status', 'createdAt',
+              'explorerName', 'joinedCount'])
           && data.questId is string
           && data.venueId is string
-          && data.explorerUids is list
-          && data.explorerUids.size() <= 10
-          && data.explorerUids.toSet().size() == data.explorerUids.size()
           && data.slotStart is timestamp
           && data.createdAt is timestamp
-          && data.explorerName is string;
+          && data.explorerName is string
+          && data.joinedCount is int;
+    }
+
+    // The most explorers a party holds at once.
+    function maxPartySize() {
+      return 10;
     }
 
     // [name] is the display name in the signed-in user's profile, so nobody reserves under another
@@ -178,11 +180,41 @@ service cloud.firestore {
       return exists(ownMembership(reservationId));
     }
 
+    // The signed-in user is a joined member of the party of [reservationId].
+    function isJoinedMember(reservationId) {
+      return isMember(reservationId)
+          && get(ownMembership(reservationId)).data.status == 'JOINED';
+    }
+
     // The signed-in user is a joined member of the party of [reservationId] once this write is
     // applied, e.g. through a membership created in the same batch.
     function willBeJoinedMember(reservationId) {
       return existsAfter(ownMembership(reservationId))
           && getAfter(ownMembership(reservationId)).data.status == 'JOINED';
+    }
+
+    // This write moves the reservation's joinedCount by [delta] only, in one batch with the
+    // signed-in user's own membership joining (+1, while pending and not full) or withdrawing (-1).
+    function isJoinedCountChange(reservationId, delta) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedCount'])
+          && request.resource.data.joinedCount == resource.data.joinedCount + delta
+          && ((delta == 1
+                  && resource.data.status == 'PENDING'
+                  && request.resource.data.joinedCount <= maxPartySize()
+                  && !exists(ownMembership(reservationId))
+                  && willBeJoinedMember(reservationId))
+              || (delta == -1
+                  && isJoinedMember(reservationId)
+                  && getAfter(ownMembership(reservationId)).data.status == 'WITHDRAWN'));
+    }
+
+    // The joinedCount of [reservationId] moves by [delta] in this write. A reservation created in
+    // the same batch starts at 1, for its creator.
+    function movesJoinedCount(reservationId, delta) {
+      return exists(reservation(reservationId))
+          ? getAfter(reservation(reservationId)).data.joinedCount
+              == get(reservation(reservationId)).data.joinedCount + delta
+          : getAfter(reservation(reservationId)).data.joinedCount == 1;
     }
 
     // Only the owner reads their profile.
@@ -218,37 +250,45 @@ service cloud.firestore {
       allow delete: if isUser(resource.data.venueId) && hasRole('VENUE');
     }
 
-    // An explorer account creates a pending reservation that lists them, in one batch with their own
-    // joined membership, that carries their profile's display name and doesn't start in the past,
-    // for an active quest of the venue it names. Afterwards only the status changes, along an allowed transition: the venue answers it, and an
-    // explorer of the party can cancel it.
+    // An explorer account creates a pending reservation, in one batch with their own joined
+    // membership, that carries their profile's display name and doesn't start in the past, for an
+    // active quest of the venue it names, with a joinedCount of 1. Afterwards the status changes
+    // along an allowed transition: the venue answers it, and a joined member of the party can
+    // cancel it. joinedCount only moves with a membership joining or withdrawing in the same batch.
+    // The venue and the party's joined members read it. Anyone signed in may find that an id has no
+    // reservation: the app listens to a reservation it just created, offline maybe, before the
+    // server has it.
     match /reservations/{reservationId} {
       allow read: if signedIn()
-          && (request.auth.uid == resource.data.venueId
-              || request.auth.uid in resource.data.explorerUids);
+          && (resource == null
+              || request.auth.uid == resource.data.venueId
+              || isJoinedMember(reservationId));
       allow create: if signedIn()
           && hasRole('EXPLORER')
           && isValidReservation(request.resource.data)
-          && request.auth.uid in request.resource.data.explorerUids
           && willBeJoinedMember(reservationId)
           && isOwnDisplayName(request.resource.data.explorerName)
           && request.resource.data.status == 'PENDING'
+          && request.resource.data.joinedCount == 1
           && isNotInThePast(request.resource.data.slotStart)
           && isForActiveQuestOfItsVenue(request.resource.data);
       allow update: if signedIn()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-          && isReservationTransition(resource.data.status, request.resource.data.status)
-          && (request.auth.uid == resource.data.venueId
-              || (request.auth.uid in resource.data.explorerUids
-                  && request.resource.data.status == 'CANCELLED'));
+          && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                  && isReservationTransition(resource.data.status, request.resource.data.status)
+                  && (request.auth.uid == resource.data.venueId
+                      || (isJoinedMember(reservationId)
+                          && request.resource.data.status == 'CANCELLED')))
+              || isJoinedCountChange(reservationId, 1)
+              || isJoinedCountChange(reservationId, -1));
     }
 
     // One membership per explorer and reservation, under the id `{reservationId}_{uid}`. An
-    // explorer account joins a pending reservation as themselves; getAfter also sees a reservation
-    // created in the same batch. Afterwards the member can only withdraw, which also moves
-    // updatedAt, and never join again. The party's members, withdrawn ones too, and the
-    // reservation's venue read it: a withdrawn creator still sees the reservation, so they must
-    // still be able to list its party. Memberships are never deleted, so a withdrawal stays recorded.
+    // explorer account joins a pending reservation as themselves, in one batch that adds 1 to its
+    // joinedCount, which caps the party; getAfter also sees a reservation created in the same
+    // batch. Afterwards the member can only withdraw, which also moves updatedAt and takes 1 off
+    // joinedCount, and never join again. The party's members, withdrawn ones too, and the
+    // reservation's venue read it, so a member who withdrew still sees who else was in the party.
+    // Memberships are never deleted, so a withdrawal stays recorded.
     // A reservation that doesn't exist has no memberships, and anyone signed in may list them: the
     // app listens to the party of a reservation it just created before the server has it.
     match /party_user/{memberId} {
@@ -263,7 +303,8 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid
           && memberId == request.resource.data.reservationId + '_' + request.auth.uid
           && request.resource.data.status == 'JOINED'
-          && getAfter(reservation(request.resource.data.reservationId)).data.status == 'PENDING';
+          && getAfter(reservation(request.resource.data.reservationId)).data.status == 'PENDING'
+          && movesJoinedCount(request.resource.data.reservationId, 1);
       allow update: if isUser(resource.data.uid)
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['status', 'updatedAt'])
@@ -271,7 +312,8 @@ service cloud.firestore {
               .hasAll(['status', 'updatedAt'])
           && resource.data.status == 'JOINED'
           && request.resource.data.status == 'WITHDRAWN'
-          && request.resource.data.updatedAt is timestamp;
+          && request.resource.data.updatedAt is timestamp
+          && movesJoinedCount(resource.data.reservationId, -1);
     }
 
     // completions: no rules yet, so all access is denied until completions get a repository.

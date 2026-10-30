@@ -10,9 +10,9 @@ import kotlinx.coroutines.flow.update
 /**
  * In-memory [PartyRepository] for unit tests and for running the app without Firestore.
  *
- * Unlike the rules, it doesn't check that the reservation exists and is pending, or who joins.
- * [observeMembers] emits again only when its own result changes. Not thread-safe; use one instance
- * per test.
+ * Unlike the rules, it doesn't check that the reservation exists and is pending, or who joins. Like
+ * them, it refuses a join while the party has [MAX_PARTY_SIZE] joined members. [observeMembers]
+ * emits again only when its own result changes. Not thread-safe; use one instance per test.
  *
  * @param now Clock used for `joinedAt` and `updatedAt`, in epoch milliseconds.
  */
@@ -36,6 +36,13 @@ class FakePartyRepository(private val now: () -> Long = System::currentTimeMilli
       return Result.failure(
           IllegalStateException("$uid already has a membership in $reservationId")
       )
+    }
+    val joined =
+        members.value.values.count {
+          it.reservationId == reservationId && it.status == PartyMemberStatus.JOINED
+        }
+    if (joined >= MAX_PARTY_SIZE) {
+      return Result.failure(IllegalStateException("The party of $reservationId is full"))
     }
     val time = now()
     members.update {

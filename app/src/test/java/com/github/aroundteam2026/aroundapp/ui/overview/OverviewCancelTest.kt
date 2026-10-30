@@ -61,7 +61,7 @@ class OverviewCancelTest {
   private suspend fun book(questId: String): String =
       fake
           .createReservation(
-              newPendingReservation(questId, CAFE, EXPLORER, TEST_EXPLORER_NAME, START),
+              newPendingReservation(questId, CAFE, TEST_EXPLORER_NAME, START),
               EXPLORER,
           )
           .getOrThrow()

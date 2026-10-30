@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.model.party
 
 import android.util.Log
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Date
 import kotlin.coroutines.cancellation.CancellationException
@@ -21,8 +22,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [observeMembers] leaves them out, and [withdraw] treats them as missing.
  *
  * The security rules decide who may do what: an explorer joins a pending reservation as themselves,
- * only the member withdraws, and the party's members, withdrawn ones too, and the reservation's
- * venue read.
+ * while it has fewer than [MAX_PARTY_SIZE] joined members, only the member withdraws, and the
+ * party's members, withdrawn ones too, and the reservation's venue read. Joining and withdrawing
+ * also move the reservation's count of joined members, in the same write, which is how the rules
+ * cap the party.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [join] waits for the server to confirm the write, in
@@ -37,19 +40,33 @@ class PartyRepositoryFirestore(
   private val members
     get() = db.collection(PartyUserFirestore.COLLECTION)
 
+  private fun reservation(reservationId: String) =
+      db.collection(PartyUserFirestore.RESERVATIONS).document(reservationId)
+
   /**
-   * Issues the write and waits up to [confirmTimeoutMs] for the server's answer, like
+   * Writes the membership and adds 1 to the reservation's joined count in one batch, and waits up
+   * to [confirmTimeoutMs] for the server's answer, like
    * `ReservationRepositoryFirestore.createReservation`: a refusal in that time is returned as the
-   * Firestore exception (`PERMISSION_DENIED`), which is also what joining twice gives, since the
-   * second write is an update the rules refuse. Without an answer in time, e.g. while offline, it
-   * returns success and the write stays queued.
+   * Firestore exception (`PERMISSION_DENIED`), which is also what joining twice or a full party
+   * gives, since the second write is an update the rules refuse. Without an answer in time, e.g.
+   * while offline, it returns success and the write stays queued.
    */
   override suspend fun join(reservationId: String, uid: String): Result<Unit> =
       try {
         val id = partyMemberId(reservationId, uid)
         val time = Timestamp(Date(now()))
         val write =
-            members.document(id).set(PartyUserFirestore.joinedMembership(reservationId, uid, time))
+            db.batch()
+                .set(
+                    members.document(id),
+                    PartyUserFirestore.joinedMembership(reservationId, uid, time),
+                )
+                .update(
+                    reservation(reservationId),
+                    PartyUserFirestore.JOINED_COUNT,
+                    FieldValue.increment(1),
+                )
+                .commit()
         write.addOnFailureListener { Log.w(TAG, "Write of membership $id failed", it) }
         // Null when the server hasn't answered in time; a refusal throws
         withTimeoutOrNull(confirmTimeoutMs) { write.await() }
@@ -62,7 +79,8 @@ class PartyRepositoryFirestore(
 
   /**
    * Reads the membership and withdraws it in one transaction, so [canTransition] is checked against
-   * the stored status. Needs a connection: a transaction fails while the device is offline.
+   * the stored status, and takes 1 off the reservation's joined count in the same transaction.
+   * Needs a connection: a transaction fails while the device is offline.
    *
    * Fails with [NoSuchElementException] if the membership is malformed, with
    * [IllegalStateException] if it is already withdrawn, and with the Firestore exception if the
@@ -88,6 +106,11 @@ class PartyRepositoryFirestore(
                               PartyUserFirestore.STATUS to PartyMemberStatus.WITHDRAWN.name,
                               PartyUserFirestore.UPDATED_AT to Timestamp(Date(now())),
                           ),
+                      )
+                      transaction.update(
+                          reservation(reservationId),
+                          PartyUserFirestore.JOINED_COUNT,
+                          FieldValue.increment(-1),
                       )
                       null
                     }

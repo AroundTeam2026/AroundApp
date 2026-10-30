@@ -50,6 +50,22 @@ class FakePartyRepositoryTest {
         assertEquals(JOINED_AT, party().single().joinedAt)
       }
 
+  @Test
+  fun join_aFullParty_failsUntilAMemberWithdraws() =
+      runBlocking<Unit> {
+        repeat(MAX_PARTY_SIZE) { repository.join("r1", "u$it").getOrThrow() }
+        repository.join("r2", "late").getOrThrow()
+
+        assertTrue(repository.join("r1", "late").exceptionOrNull() is IllegalStateException)
+        assertEquals(MAX_PARTY_SIZE, party().size)
+        repository.withdraw("r1", "u0").getOrThrow()
+        repository.join("r1", "late").getOrThrow()
+        assertEquals(
+            MAX_PARTY_SIZE,
+            party().count { it.status == PartyMemberStatus.JOINED },
+        )
+      }
+
   /** A withdrawn explorer still has a membership, so they can't join that party again. */
   @Test
   fun join_afterWithdrawing_fails() =

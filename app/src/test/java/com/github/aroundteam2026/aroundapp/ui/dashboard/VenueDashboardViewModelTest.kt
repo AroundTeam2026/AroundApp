@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
@@ -42,7 +43,8 @@ class VenueDashboardViewModelTest {
   /** When the fake stores a reservation; tests move it to order requests. */
   private var createdAt = NOW
 
-  private val fake = FakeReservationRepository({ createdAt })
+  private val party = FakePartyRepository { createdAt }
+  private val fake = FakeReservationRepository({ createdAt }, party)
   private val gated = GatedReservationRepository(fake)
   private var reservations: ReservationRepository = gated
   private val auth = FakeAuthRepository(VENUE_ID)
@@ -58,7 +60,9 @@ class VenueDashboardViewModelTest {
   private var venues: VenueRepository =
       FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumière")))
 
-  private val viewModel by lazy { VenueDashboardViewModel(auth, reservations, quests, venues) }
+  private val viewModel by lazy {
+    VenueDashboardViewModel(auth, reservations, quests, venues, party)
+  }
 
   private val state
     get() = viewModel.uiState.value
@@ -88,10 +92,9 @@ class VenueDashboardViewModelTest {
       venueId: String = VENUE_ID,
   ): String {
     createdAt = requestedAt
-    val reservation =
-        newPendingReservation(questId, venueId, "explorer", name, slotStart)
-            .copy(explorerUids = listOf("explorer") + List(partySize - 1) { "friend-$it" })
+    val reservation = newPendingReservation(questId, venueId, name, slotStart)
     val id = fake.createReservation(reservation, "explorer").getOrThrow()
+    repeat(partySize - 1) { party.join(id, "friend-$it").getOrThrow() }
     if (status != ReservationStatus.PENDING) fake.updateStatus(id, status).getOrThrow()
     return id
   }
