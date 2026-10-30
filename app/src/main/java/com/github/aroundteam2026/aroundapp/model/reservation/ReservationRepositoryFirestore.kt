@@ -3,6 +3,8 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.util.Log
+import com.github.aroundteam2026.aroundapp.model.party.PartyUserFirestore
+import com.github.aroundteam2026.aroundapp.model.party.partyMemberId
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -25,9 +27,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * flows leave them out, and [updateStatus] treats them as missing.
  *
  * The security rules decide who may do what: an explorer may only create a pending reservation that
- * lists them, and only the venue may change a reservation's status, along an allowed transition. A
- * creation the rules refuse within [confirmTimeoutMs] comes back as a failure, and one they refuse
- * later is only logged; a refused [updateStatus] comes back as a failure.
+ * lists them, together with their own joined membership in `party_user`, and only the venue may
+ * change a reservation's status, along an allowed transition. A creation the rules refuse within
+ * [confirmTimeoutMs] comes back as a failure, and one they refuse later is only logged; a refused
+ * [updateStatus] comes back as a failure.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [createReservation] waits for the server to confirm a write, in
@@ -43,17 +46,31 @@ class ReservationRepositoryFirestore(
     get() = db.collection(RESERVATIONS)
 
   /**
-   * Issues the write and waits up to [confirmTimeoutMs] for the server's answer. A refusal in that
-   * time, e.g. because the signed-in user is not in `explorerUids`, is returned as the Firestore
-   * exception (`PERMISSION_DENIED`), and Firestore drops its local copy. Without an answer in time,
-   * e.g. while offline, it returns success: Firestore sends the write once the device is back
-   * online, and a refusal then is only logged. Exceptions thrown while issuing the write (e.g. on a
-   * terminated client) are returned as a failure too.
+   * Writes the reservation and [creatorUid]'s membership, under [partyMemberId], in one batch,
+   * which the server applies whole or not at all, and waits up to [confirmTimeoutMs] for its
+   * answer. Both share the creation time. A refusal in that time, e.g. because [creatorUid] is not
+   * the signed-in user, is returned as the Firestore exception (`PERMISSION_DENIED`), and Firestore
+   * drops its local copy of both. Without an answer in time, e.g. while offline, it returns
+   * success: Firestore sends the batch once the device is back online, and a refusal then is only
+   * logged. Exceptions thrown while issuing the write (e.g. on a terminated client) are returned as
+   * a failure too.
    */
-  override suspend fun createReservation(reservation: Reservation): Result<String> =
+  override suspend fun createReservation(
+      reservation: Reservation,
+      creatorUid: String,
+  ): Result<String> =
       try {
         val document = reservations.document()
-        val write = document.set(reservation.toFirestore(Timestamp(Date(now()))))
+        val time = Timestamp(Date(now()))
+        val write =
+            db.batch()
+                .set(document, reservation.toFirestore(time))
+                .set(
+                    db.collection(PartyUserFirestore.COLLECTION)
+                        .document(partyMemberId(document.id, creatorUid)),
+                    PartyUserFirestore.joinedMembership(document.id, creatorUid, time),
+                )
+                .commit()
         write.addOnFailureListener { Log.w(TAG, "Write of reservation ${document.id} failed", it) }
         // Null when the server hasn't answered in time; a refusal throws
         withTimeoutOrNull(confirmTimeoutMs) { write.await() }

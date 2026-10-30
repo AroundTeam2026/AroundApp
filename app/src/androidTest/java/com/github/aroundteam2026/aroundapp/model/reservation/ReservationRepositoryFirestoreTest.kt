@@ -180,6 +180,24 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: the creator's membership is not written, is written under another id than the rules look
+   * up, or with another time than the reservation's, so the party looks empty.
+   */
+  @Test
+  fun createReservation_makesTheCreatorAJoinedMemberAtTheCreationTime() = withTimeoutBlocking {
+    val id = createAndSync()
+
+    val membership =
+        venueDb.collection(PARTY_USER).document("${id}_$explorerUid").get(Source.SERVER).await()
+
+    assertEquals(id, membership.getString("reservationId"))
+    assertEquals(explorerUid, membership.getString("uid"))
+    assertEquals("JOINED", membership.getString("status"))
+    assertEquals(FIXED_NOW, membership.getTimestamp("joinedAt")!!.toDate().time)
+    assertEquals(FIXED_NOW, membership.getTimestamp("updatedAt")!!.toDate().time)
+  }
+
+  /**
    * Bug: a reservation stored before `explorerName` existed is treated as malformed, so it vanishes
    * from the venue's list instead of showing without a name.
    */
@@ -229,7 +247,24 @@ class ReservationRepositoryFirestoreTest {
   @Test
   fun createReservation_whenTheSignedInUserIsNotInTheParty_returnsPermissionDenied() =
       withTimeoutBlocking {
-        val result = explorerRepository.createReservation(reservation(party = listOf(FRIEND_UID)))
+        val result =
+            explorerRepository.createReservation(
+                reservation(party = listOf(FRIEND_UID)),
+                explorerUid,
+            )
+
+        assertPermissionDenied(result)
+        assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
+      }
+
+  /**
+   * Bug: a reservation is created with another explorer's membership, so anyone can sign a friend
+   * up. The rules only let an explorer reserve as themselves, joining the party.
+   */
+  @Test
+  fun createReservation_forAnotherCreatorThanTheSignedInUser_returnsPermissionDenied() =
+      withTimeoutBlocking {
+        val result = explorerRepository.createReservation(reservation(), FRIEND_UID)
 
         assertPermissionDenied(result)
         assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
@@ -238,7 +273,8 @@ class ReservationRepositoryFirestoreTest {
   /** Bug: a reservation for a quest that doesn't exist is reported as created. */
   @Test
   fun createReservation_forAMissingQuest_returnsPermissionDenied() = withTimeoutBlocking {
-    val result = explorerRepository.createReservation(reservation().copy(questId = "missing"))
+    val result =
+        explorerRepository.createReservation(reservation().copy(questId = "missing"), explorerUid)
 
     assertPermissionDenied(result)
   }
@@ -252,7 +288,7 @@ class ReservationRepositoryFirestoreTest {
   fun createReservation_forAQuestTheVenueArchived_returnsPermissionDenied() = withTimeoutBlocking {
     venueDb.collection(QUESTS).document(questId).update("status", "ARCHIVED").await()
 
-    val result = explorerRepository.createReservation(reservation())
+    val result = explorerRepository.createReservation(reservation(), explorerUid)
 
     assertPermissionDenied(result)
   }
@@ -263,7 +299,7 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun createReservation_returnsOnceTheServerHasTheReservation() = withTimeoutBlocking {
-    val id = explorerRepository.createReservation(reservation()).getOrThrow()
+    val id = explorerRepository.createReservation(reservation(), explorerUid).getOrThrow()
 
     // No waitForPendingWrites: the server must already have it
     assertTrue(venueDb.collection(RESERVATIONS).document(id).get(Source.SERVER).await().exists())
@@ -283,7 +319,7 @@ class ReservationRepositoryFirestoreTest {
         explorerDb.disableNetwork().await()
         val id: String
         try {
-          id = repository.createReservation(reservation()).getOrThrow()
+          id = repository.createReservation(reservation(), explorerUid).getOrThrow()
         } finally {
           explorerDb.enableNetwork().await()
         }
@@ -298,7 +334,8 @@ class ReservationRepositoryFirestoreTest {
     val terminated = emulatorClient(TERMINATED_APP)
     terminated.terminate().await()
 
-    val result = ReservationRepositoryFirestore(terminated).createReservation(reservation())
+    val result =
+        ReservationRepositoryFirestore(terminated).createReservation(reservation(), explorerUid)
 
     assertTrue(result.isFailure)
   }
@@ -517,7 +554,7 @@ class ReservationRepositoryFirestoreTest {
    * wait for the server. This also returns once the server has rejected the write.
    */
   private suspend fun createAndSync(reservation: Reservation = reservation()): String {
-    val id = explorerRepository.createReservation(reservation).getOrThrow()
+    val id = explorerRepository.createReservation(reservation, explorerUid).getOrThrow()
     explorerDb.waitForPendingWrites().await()
     return id
   }
@@ -558,6 +595,9 @@ class ReservationRepositoryFirestoreTest {
 
     /** The Firestore collection of quests, which a test changes directly as the venue. */
     const val QUESTS = "quests"
+
+    /** The Firestore collection of memberships, which some tests read directly. */
+    const val PARTY_USER = "party_user"
 
     /** The app of the explorer that [setUp] signs in. */
     const val EXPLORER_APP = "reservation-test-explorer"

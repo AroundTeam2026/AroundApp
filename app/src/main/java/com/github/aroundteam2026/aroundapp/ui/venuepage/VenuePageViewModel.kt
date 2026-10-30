@@ -143,7 +143,8 @@ class VenuePageViewModel(
               .fold(
                   onSuccess = { name ->
                     reservationRepository.createReservation(
-                        newPendingReservation(id, venueId, explorerUid, name, clock())
+                        newPendingReservation(id, venueId, explorerUid, name, clock()),
+                        explorerUid,
                     )
                   },
                   onFailure = { Result.failure(it) },

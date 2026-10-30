@@ -1,6 +1,9 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -14,16 +17,22 @@ import kotlinx.coroutines.flow.update
  * again only when its own result changes, not on every write. Ids are generated as `reservation-1`,
  * `reservation-2`, ... and are unique per instance. Not thread-safe; use one instance per test.
  *
+ * Parties live in [party], like `party_user` in Firestore: [createReservation] joins the creator
+ * there. Share [party] with the code under test to read the memberships.
+ *
  * @param now Clock used for `createdAt`, in epoch milliseconds. Pass a fixed value in tests to make
  *   timestamps predictable.
+ * @param party Where the parties of the reservations are kept.
  */
-class FakeReservationRepository(private val now: () -> Long = System::currentTimeMillis) :
-    ReservationRepository {
+class FakeReservationRepository(
+    private val now: () -> Long = System::currentTimeMillis,
+    private val party: PartyRepository = FakePartyRepository(now),
+) : ReservationRepository {
   /**
    * Simulates a backend error (e.g. no network or a rejected write) so callers' error paths can be
    * tested. While non-null, [createReservation] and [updateStatus] return
-   * `Result.failure(forcedFailure)` and change nothing. Set it back to null to make writes succeed
-   * again.
+   * `Result.failure(forcedFailure)` and change nothing, not even the party. Set it back to null to
+   * make writes succeed again.
    */
   var forcedFailure: Throwable? = null
 
@@ -34,15 +43,22 @@ class FakeReservationRepository(private val now: () -> Long = System::currentTim
   private var nextId = 1
 
   /**
-   * Stores a copy of [reservation] with a new id, [now] as its creation time and
-   * [ReservationStatus.PENDING] as its status, and returns that id. Returns [forcedFailure]
-   * instead, storing nothing, if it is set.
+   * Joins [creatorUid] to the party of a new id in [party], then stores a copy of [reservation]
+   * with that id, [now] as its creation time and [ReservationStatus.PENDING] as its status, and
+   * returns the id. Returns [forcedFailure] instead, storing nothing, if it is set, and the failure
+   * of [party] if joining fails, without storing the reservation.
    */
-  override suspend fun createReservation(reservation: Reservation): Result<String> {
+  override suspend fun createReservation(
+      reservation: Reservation,
+      creatorUid: String,
+  ): Result<String> {
     forcedFailure?.let {
       return Result.failure(it)
     }
     val id = "reservation-${nextId++}"
+    party.join(id, creatorUid).onFailure {
+      return Result.failure(it)
+    }
     val stored = reservation.copy(id = id, status = ReservationStatus.PENDING, createdAt = now())
     reservations.update { it + (id to stored) }
     return Result.success(id)

@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -46,7 +47,8 @@ class VenuePageAcceptTest {
   private val dispatcher = StandardTestDispatcher()
   private val clock = { START + dispatcher.scheduler.currentTime }
 
-  private val fake = FakeReservationRepository { START }
+  private val party = FakePartyRepository { START }
+  private val fake = FakeReservationRepository({ START }, party)
   private val reservations = GatedReservationRepository(fake)
   private val quests =
       listOf(
@@ -92,7 +94,8 @@ class VenuePageAcceptTest {
       fake
           .createReservation(
               newPendingReservation(questId, VENUE_ID, EXPLORER, NAME, START)
-                  .copy(explorerUids = party)
+                  .copy(explorerUids = party),
+              EXPLORER,
           )
           .getOrThrow()
 
@@ -108,6 +111,7 @@ class VenuePageAcceptTest {
     assertEquals("a", reservation.questId)
     assertEquals(VENUE_ID, reservation.venueId)
     assertEquals(listOf(EXPLORER), reservation.explorerUids)
+    assertEquals(listOf(EXPLORER), party.observeMembers(reservation.id).first().map { it.uid })
     assertEquals(START + 5_000, reservation.slotStart)
     assertEquals(ReservationStatus.PENDING, reservation.status)
   }
@@ -302,7 +306,10 @@ class VenuePageAcceptTest {
 
   @Test
   fun aReservationAtAnotherVenueDoesNotAcceptThisVenuesQuest() = test {
-    fake.createReservation(newPendingReservation("a", "other-venue", EXPLORER, NAME, START))
+    fake.createReservation(
+        newPendingReservation("a", "other-venue", EXPLORER, NAME, START),
+        EXPLORER,
+    )
 
     openAndPick("a")
 
@@ -569,11 +576,14 @@ private class GatedReservationRepository(private val inner: ReservationRepositor
   var calls = 0
     private set
 
-  override suspend fun createReservation(reservation: Reservation): Result<String> {
+  override suspend fun createReservation(
+      reservation: Reservation,
+      creatorUid: String,
+  ): Result<String> {
     val call = ++calls
     if (call == failOnCall) return Result.failure(IOException("offline"))
     gate?.await()
-    return inner.createReservation(reservation)
+    return inner.createReservation(reservation, creatorUid)
   }
 }
 
@@ -591,7 +601,10 @@ private class ScriptedReservationRepository : ReservationRepository by FakeReser
   var broken = false
   private var next = 1
 
-  override suspend fun createReservation(reservation: Reservation): Result<String> {
+  override suspend fun createReservation(
+      reservation: Reservation,
+      creatorUid: String,
+  ): Result<String> {
     val id = "server-${next++}"
     if (showsWrites) list.value += reservation.copy(id = id)
     answer?.await()?.onFailure {

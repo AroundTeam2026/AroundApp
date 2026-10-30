@@ -167,12 +167,23 @@ service cloud.firestore {
       return /databases/$(database)/documents/reservations/$(reservationId);
     }
 
-    // The signed-in user is a joined member of the party of [reservationId]. Costs one document
-    // read: the membership's id is built from the reservation and the user.
+    // The signed-in user's membership in the party of [reservationId]. Its id is built from the
+    // reservation and the user, so checking it costs one document read.
+    function ownMembership(reservationId) {
+      return /databases/$(database)/documents/party_user/$(reservationId + '_' + request.auth.uid);
+    }
+
+    // The signed-in user is a joined member of the party of [reservationId].
     function isJoinedMember(reservationId) {
-      let membership =
-          /databases/$(database)/documents/party_user/$(reservationId + '_' + request.auth.uid);
-      return exists(membership) && get(membership).data.status == 'JOINED';
+      return exists(ownMembership(reservationId))
+          && get(ownMembership(reservationId)).data.status == 'JOINED';
+    }
+
+    // The signed-in user is a joined member of the party of [reservationId] once this write is
+    // applied, e.g. through a membership created in the same batch.
+    function willBeJoinedMember(reservationId) {
+      return existsAfter(ownMembership(reservationId))
+          && getAfter(ownMembership(reservationId)).data.status == 'JOINED';
     }
 
     // Only the owner reads their profile.
@@ -208,9 +219,9 @@ service cloud.firestore {
       allow delete: if isUser(resource.data.venueId) && hasRole('VENUE');
     }
 
-    // An explorer account creates a pending reservation that lists them, carries their profile's
-    // display name and doesn't start in the past, for an active quest of the venue it names.
-    // Afterwards only the status changes, along an allowed transition: the venue answers it, and an
+    // An explorer account creates a pending reservation that lists them, in one batch with their own
+    // joined membership, that carries their profile's display name and doesn't start in the past,
+    // for an active quest of the venue it names. Afterwards only the status changes, along an allowed transition: the venue answers it, and an
     // explorer of the party can cancel it.
     match /reservations/{reservationId} {
       allow read: if signedIn()
@@ -220,6 +231,7 @@ service cloud.firestore {
           && hasRole('EXPLORER')
           && isValidReservation(request.resource.data)
           && request.auth.uid in request.resource.data.explorerUids
+          && willBeJoinedMember(reservationId)
           && isOwnDisplayName(request.resource.data.explorerName)
           && request.resource.data.status == 'PENDING'
           && isNotInThePast(request.resource.data.slotStart)
