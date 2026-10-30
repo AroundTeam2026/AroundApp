@@ -5,9 +5,11 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -28,7 +30,7 @@ class FakeReservationRepositoryTest {
 
   /**
    * Gives every test a fresh, empty repository whose clock always returns [FIXED_NOW], with its
-   * parties in [party], so tests can read the memberships.
+   * parties in [party], so tests can make other explorers join or withdraw.
    */
   @Before
   fun setUp() {
@@ -43,7 +45,6 @@ class FakeReservationRepositoryTest {
   private fun reservation(
       id: String = "",
       venueId: String = "v1",
-      explorerUids: List<String> = listOf("u1"),
       status: ReservationStatus = ReservationStatus.PENDING,
       createdAt: Long = 1_000L,
   ) =
@@ -51,7 +52,6 @@ class FakeReservationRepositoryTest {
           id = id,
           questId = "q1",
           venueId = venueId,
-          explorerUids = explorerUids,
           slotStart = 5_000L,
           status = status,
           createdAt = createdAt,
@@ -146,19 +146,45 @@ class FakeReservationRepositoryTest {
       }
 
   @Test
-  fun observeForExplorer_returnsReservationsWhosePartyIncludesTheUid() =
+  fun observeForExplorer_returnsTheReservationsTheUidJoined() =
       runBlocking<Unit> {
-        val solo =
-            repository
-                .createReservation(reservation(explorerUids = listOf("u1")), "u1")
-                .getOrThrow()
-        val party =
-            repository
-                .createReservation(reservation(explorerUids = listOf("u2", "u1")), "u2")
-                .getOrThrow()
-        repository.createReservation(reservation(explorerUids = listOf("u2")), "u2").getOrThrow()
+        val solo = repository.createReservation(reservation(), "u1").getOrThrow()
+        val friends = repository.createReservation(reservation(), "u2").getOrThrow()
+        party.join(friends, "u1").getOrThrow()
+        repository.createReservation(reservation(), "u2").getOrThrow()
 
-        assertEquals(listOf(solo, party), repository.observeForExplorer("u1").first().map { it.id })
+        assertEquals(
+            listOf(solo, friends),
+            repository.observeForExplorer("u1").first().map { it.id },
+        )
+      }
+
+  @Test
+  fun observeForExplorer_leavesOutAReservationTheUidWithdrewFrom() =
+      runBlocking<Unit> {
+        val id = repository.createReservation(reservation(), "u2").getOrThrow()
+        party.join(id, "u1").getOrThrow()
+
+        party.withdraw(id, "u1").getOrThrow()
+
+        assertTrue(repository.observeForExplorer("u1").first().isEmpty())
+        assertEquals(listOf(id), repository.observeForExplorer("u2").first().map { it.id })
+      }
+
+  @Test
+  fun observeForExplorer_emitsAgainWhenTheUidJoinsAParty() =
+      runBlocking<Unit> {
+        val id = repository.createReservation(reservation(), "u2").getOrThrow()
+        val subscribed = CompletableDeferred<Unit>()
+        val emissions = async {
+          repository.observeForExplorer("u1").onEach { subscribed.complete(Unit) }.take(2).toList()
+        }
+        withTimeout(TIMEOUT_MS) { subscribed.await() }
+
+        party.join(id, "u1").getOrThrow()
+
+        val ids = withTimeout(TIMEOUT_MS) { emissions.await() }.map { list -> list.map { it.id } }
+        assertEquals(listOf(emptyList(), listOf(id)), ids)
       }
 
   @Test
@@ -178,10 +204,7 @@ class FakeReservationRepositoryTest {
   @Test
   fun updateStatus_allowedTransition_changesOnlyTheStatus() =
       runBlocking<Unit> {
-        val id =
-            repository
-                .createReservation(reservation(explorerUids = listOf("u1", "u2")), "u1")
-                .getOrThrow()
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
         val before = repository.observeForVenue("v1").first().single()
 
         repository.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()

@@ -9,6 +9,10 @@ import com.google.firebase.firestore.DocumentSnapshot
  * How memberships are stored in the Firestore `party_user` collection. Shared by
  * [PartyRepositoryFirestore] and the reservation repository, which creates the creator's membership
  * in the same batch as the reservation, so both write and read the same document.
+ *
+ * Each reservation also stores its number of [PartyMemberStatus.JOINED] members in [JOINED_COUNT],
+ * since the rules can't count documents: every write that adds or withdraws a membership moves it
+ * in the same batch, and the rules cap it at [MAX_PARTY_SIZE].
  */
 internal object PartyUserFirestore {
   const val COLLECTION = "party_user"
@@ -18,6 +22,10 @@ internal object PartyUserFirestore {
   const val STATUS = "status"
   const val JOINED_AT = "joinedAt"
   const val UPDATED_AT = "updatedAt"
+
+  /** The collection of the reservations, which hold [JOINED_COUNT]. */
+  const val RESERVATIONS = "reservations"
+  const val JOINED_COUNT = "joinedCount"
 
   private const val TAG = "PartyUserFirestore"
 

@@ -19,6 +19,9 @@ data class PartyMember(
     val updatedAt: Long,
 )
 
+/** The most explorers a party holds at once: more can't join it while it has that many. */
+const val MAX_PARTY_SIZE = 10
+
 /** Whether an explorer is in a reservation's party. */
 enum class PartyMemberStatus {
   /** In the party. */

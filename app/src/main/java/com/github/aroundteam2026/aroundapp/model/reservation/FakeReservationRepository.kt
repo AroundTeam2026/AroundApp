@@ -3,10 +3,15 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
@@ -18,7 +23,8 @@ import kotlinx.coroutines.flow.update
  * `reservation-2`, ... and are unique per instance. Not thread-safe; use one instance per test.
  *
  * Parties live in [party], like `party_user` in Firestore: [createReservation] joins the creator
- * there. Share [party] with the code under test to read the memberships.
+ * there, and [observeForExplorer] follows the explorer's joined memberships in it. Share [party]
+ * with the code under test to make other explorers join or withdraw.
  *
  * @param now Clock used for `createdAt`, in epoch milliseconds. Pass a fixed value in tests to make
  *   timestamps predictable.
@@ -69,11 +75,29 @@ class FakeReservationRepository(
       reservations.map { all -> all.values.filter { it.venueId == venueId } }.distinctUntilChanged()
 
   /**
-   * Emits every stored reservation whose party includes [uid], and again when that list changes.
+   * Emits every stored reservation whose party in [party] [uid] joined and didn't withdraw from,
+   * and again when that list changes.
    */
+  @OptIn(ExperimentalCoroutinesApi::class)
   override fun observeForExplorer(uid: String): Flow<List<Reservation>> =
       reservations
-          .map { all -> all.values.filter { uid in it.explorerUids } }
+          .flatMapLatest { all ->
+            if (all.isEmpty()) {
+              flowOf(emptyList())
+            } else {
+              combine(
+                  all.values.map { reservation ->
+                    party.observeMembers(reservation.id).map { members ->
+                      reservation.takeIf {
+                        members.any { it.uid == uid && it.status == PartyMemberStatus.JOINED }
+                      }
+                    }
+                  }
+              ) {
+                it.filterNotNull()
+              }
+            }
+          }
           .distinctUntilChanged()
 
   /**

@@ -142,6 +142,31 @@ class PartyRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: joining or withdrawing doesn't move the reservation's joined count, so the rules refuse
+   * the write, or the cap counts members who left.
+   */
+  @Test
+  fun joinAndWithdraw_moveTheReservationsJoinedCount() = withTimeoutBlocking {
+    assertEquals(1L, joinedCount())
+    friend.join(reservationId, friendUid).getOrThrow()
+    assertEquals(2L, joinedCount())
+    // A later clock, or updatedAt doesn't change and the rules refuse the withdrawal
+    PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
+        .withdraw(reservationId, friendUid)
+        .getOrThrow()
+    assertEquals(1L, joinedCount())
+  }
+
+  /** Bug: an explorer joins a party that already has the most members the rules allow. */
+  @Test
+  fun join_aFullParty_returnsPermissionDenied() = withTimeoutBlocking {
+    // Filling the party for real takes MAX_PARTY_SIZE accounts; FirestoreRulesTest does that
+    writeBypassingRules("$RESERVATIONS/$reservationId", mapOf("joinedCount" to MAX_PARTY_SIZE))
+
+    assertPermissionDenied(friend.join(reservationId, friendUid))
+  }
+
+  /**
    * Bug: join waits for the server without a limit, so it hangs while the device is offline, or
    * fails instead of leaving the write queued until the device is back online.
    */
@@ -258,8 +283,8 @@ class PartyRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: the read rule refuses a member who withdrew, so a withdrawn creator, who still sees the
-   * reservation, can no longer list its party.
+   * Bug: the read rule refuses a member who withdrew, so they no longer see who else was in the
+   * party.
    */
   @Test
   fun observeMembers_byAWithdrawnMember_listsTheParty() = withTimeoutBlocking {
@@ -302,7 +327,7 @@ class PartyRepositoryFirestoreTest {
       id =
           ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS)
               .createReservation(
-                  newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START),
+                  newPendingReservation(questId, venueId, EXPLORER_NAME, SLOT_START),
                   explorerUid,
               )
               .getOrThrow()
@@ -357,8 +382,7 @@ class PartyRepositoryFirestoreTest {
    * @return the reservation's id.
    */
   private suspend fun createPendingReservation(): String {
-    val reservation =
-        newPendingReservation(createActiveQuest(), venueId, explorerUid, EXPLORER_NAME, SLOT_START)
+    val reservation = newPendingReservation(createActiveQuest(), venueId, EXPLORER_NAME, SLOT_START)
     val id =
         ReservationRepositoryFirestore(explorerDb)
             .createReservation(reservation, explorerUid)
@@ -366,6 +390,15 @@ class PartyRepositoryFirestoreTest {
     explorerDb.waitForPendingWrites().await()
     return id
   }
+
+  /** The reservation's joined count as the server stores it, read by the venue. */
+  private suspend fun joinedCount(): Long? =
+      venueDb
+          .collection(RESERVATIONS)
+          .document(reservationId)
+          .get(Source.SERVER)
+          .await()
+          .getLong("joinedCount")
 
   /** Asserts [result] is a failure caused by the security rules refusing the write. */
   private fun assertPermissionDenied(result: Result<*>) {
@@ -379,6 +412,7 @@ class PartyRepositoryFirestoreTest {
 
   private companion object {
     const val PARTY_USER = "party_user"
+    const val RESERVATIONS = "reservations"
 
     const val EXPLORER_APP = "party-test-explorer"
     const val FRIEND_APP = "party-test-friend"

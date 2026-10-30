@@ -9,10 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus.R
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Tests [canTransition] and [isActive] for reservations, and the construction rules of
- * [Reservation].
- */
+/** Tests [canTransition] and [isActive] for reservations. */
 class ReservationStatusTest {
   private val allowed =
       setOf(
@@ -40,18 +37,5 @@ class ReservationStatusTest {
     for ((status, active) in expected) {
       assertEquals("$status", active, status.isActive)
     }
-  }
-
-  /** A party always has someone in it, so an empty list of explorers is refused. */
-  @Test(expected = IllegalArgumentException::class)
-  fun reservation_withNoExplorers_isRejected() {
-    Reservation("r1", "q1", "v1", emptyList(), 0L, PENDING, 0L)
-  }
-
-  /** A reservation with at least one explorer is valid. */
-  @Test
-  fun reservation_withAnExplorer_isAccepted() {
-    val reservation = Reservation("r1", "q1", "v1", listOf("u1"), 0L, PENDING, 0L)
-    assertEquals(listOf("u1"), reservation.explorerUids)
   }
 }

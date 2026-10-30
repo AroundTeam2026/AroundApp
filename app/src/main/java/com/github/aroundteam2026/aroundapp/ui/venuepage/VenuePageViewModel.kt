@@ -155,7 +155,7 @@ class VenuePageViewModel(
               .fold(
                   onSuccess = { name ->
                     reservationRepository.createReservation(
-                        newPendingReservation(id, venueId, explorerUid, name, clock()),
+                        newPendingReservation(id, venueId, name, clock()),
                         explorerUid,
                     )
                   },

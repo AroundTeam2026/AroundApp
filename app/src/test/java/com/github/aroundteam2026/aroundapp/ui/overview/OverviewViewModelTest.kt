@@ -95,7 +95,7 @@ class OverviewViewModelTest {
     val id =
         reservations
             .createReservation(
-                newPendingReservation(questId, venueId, EXPLORER, TEST_EXPLORER_NAME, slotStart),
+                newPendingReservation(questId, venueId, TEST_EXPLORER_NAME, slotStart),
                 EXPLORER,
             )
             .getOrThrow()
@@ -176,12 +176,24 @@ class OverviewViewModelTest {
     assertEquals(2, state.rows.single().partySize)
   }
 
+  @Test
+  fun aReservationTheExplorerWithdrewFromLeavesTheList() = test {
+    val id = book("fox", friends = listOf("friend"))
+    book("cake")
+    viewModel
+    runCurrent()
+
+    party.withdraw(id, EXPLORER).getOrThrow()
+    runCurrent()
+
+    assertEquals(listOf("Taste the cake"), titles())
+  }
+
   /** The party sizes are always all known; if one were missing, the explorer still counts. */
   @Test
   fun aPartyWithNoKnownSizeCountsJustTheExplorer() {
     val reservation =
-        newPendingReservation("fox", CAFE, EXPLORER, TEST_EXPLORER_NAME, START)
-            .copy(id = "reservation-1")
+        newPendingReservation("fox", CAFE, TEST_EXPLORER_NAME, START).copy(id = "reservation-1")
     val quest = testQuest(id = "fox", venueId = CAFE)
 
     val rows = overviewRows(listOf(reservation to quest), listOf(testVenue(id = CAFE)), emptyMap())
@@ -261,7 +273,7 @@ class OverviewViewModelTest {
 
   @Test
   fun aTieOnTheSlotAndCreationGoesToTheSmallestId() {
-    val tied = newPendingReservation("fox", CAFE, EXPLORER, TEST_EXPLORER_NAME, START)
+    val tied = newPendingReservation("fox", CAFE, TEST_EXPLORER_NAME, START)
     val first = tied.copy(id = "reservation-1")
     val second = tied.copy(id = "reservation-2")
 
