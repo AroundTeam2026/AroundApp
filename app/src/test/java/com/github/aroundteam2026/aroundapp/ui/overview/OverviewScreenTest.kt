@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
@@ -132,10 +133,12 @@ class OverviewScreenTest {
 
   @Test
   fun cancellingOnTheScreenCancelsTheReservationAndItsCardLeaves() {
-    val reservations = FakeReservationRepository()
+    val party = FakePartyRepository()
+    val reservations = FakeReservationRepository(party = party)
     runBlocking {
       reservations.createReservation(
-          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT)
+          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT),
+          "explorer",
       )
     }
     val viewModel =
@@ -144,6 +147,7 @@ class OverviewScreenTest {
             reservations,
             FakeQuestRepository(initialQuests = listOf(testQuest(id = "fox", venueId = CAFE))),
             FakeVenueRepository(listOf(testVenue(id = CAFE))),
+            party,
         )
     compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
 
@@ -155,10 +159,12 @@ class OverviewScreenTest {
 
   @Test
   fun theScreenShowsWhatItsViewModelLoads() {
-    val reservations = FakeReservationRepository()
+    val party = FakePartyRepository()
+    val reservations = FakeReservationRepository(party = party)
     runBlocking {
       reservations.createReservation(
-          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT)
+          newPendingReservation("fox", CAFE, "explorer", TEST_EXPLORER_NAME, SLOT),
+          "explorer",
       )
     }
     val viewModel =
@@ -167,6 +173,7 @@ class OverviewScreenTest {
             reservations,
             FakeQuestRepository(initialQuests = listOf(testQuest(id = "fox", venueId = CAFE))),
             FakeVenueRepository(listOf(testVenue(id = CAFE))),
+            party,
         )
     compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
 

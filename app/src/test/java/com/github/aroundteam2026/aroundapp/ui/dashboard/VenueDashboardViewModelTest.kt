@@ -42,7 +42,7 @@ class VenueDashboardViewModelTest {
   /** When the fake stores a reservation; tests move it to order requests. */
   private var createdAt = NOW
 
-  private val fake = FakeReservationRepository { createdAt }
+  private val fake = FakeReservationRepository({ createdAt })
   private val gated = GatedReservationRepository(fake)
   private var reservations: ReservationRepository = gated
   private val auth = FakeAuthRepository(VENUE_ID)
@@ -91,7 +91,7 @@ class VenueDashboardViewModelTest {
     val reservation =
         newPendingReservation(questId, venueId, "explorer", name, slotStart)
             .copy(explorerUids = listOf("explorer") + List(partySize - 1) { "friend-$it" })
-    val id = fake.createReservation(reservation).getOrThrow()
+    val id = fake.createReservation(reservation, "explorer").getOrThrow()
     if (status != ReservationStatus.PENDING) fake.updateStatus(id, status).getOrThrow()
     return id
   }
