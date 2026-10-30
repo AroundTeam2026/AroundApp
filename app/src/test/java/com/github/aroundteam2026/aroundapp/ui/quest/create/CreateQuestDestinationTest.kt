@@ -1,11 +1,12 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.viewmodel.initializer
@@ -16,9 +17,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
+import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -32,13 +38,18 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class CreateQuestDestinationTest {
-  @get:Rule val compose = createComposeRule()
+  @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val quests = FakeQuestRepository()
+  /** The answer a save waits for, if set; otherwise saves go straight to [quests]. */
+  private var heldSave: CompletableDeferred<Result<String>>? = null
   private val viewModel =
       CreateQuestViewModel(
           FakeAuthRepository(VENUE_ID),
           FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
-          quests,
+          object : QuestRepository by quests {
+            override suspend fun createQuest(quest: Quest): Result<String> =
+                heldSave?.await() ?: quests.createQuest(quest)
+          },
       )
   private lateinit var navController: NavHostController
 
@@ -82,6 +93,20 @@ class CreateQuestDestinationTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
     compose.onNodeWithTag(START).assertIsDisplayed()
     assertEquals("Find the fox", runBlocking { quests.getQuest("quest-1") }?.title)
+  }
+
+  @Test
+  fun backLeavesTheFormOnlyOnceTheSaveEnds() {
+    val answer = CompletableDeferred<Result<String>>().also { heldSave = it }
+    fillValid()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
+
+    compose.pressBack()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertIsDisplayed()
+
+    answer.complete(Result.failure(IOException()))
+    compose.pressBack()
+    compose.onNodeWithTag(START).assertIsDisplayed()
   }
 
   private companion object {

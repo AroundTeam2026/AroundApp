@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The venue's name, then today's date, e.g. "Café Lumière · Sat 12 Oct" -->
+    <string name="dashboard_venue_and_date">%1$s · %2$s</string>
+    <string name="dashboard_stat_pending">Pending</string>
+    <string name="dashboard_stat_active_quests">Active quests</string>
+    <string name="dashboard_needs_answer">Needs your answer</string>
+    <string name="dashboard_upcoming">Upcoming</string>
+    <!-- How long ago the explorer asked, e.g. "Requested 12 min. ago" -->
+    <string name="dashboard_requested">Requested %1$s</string>
+    <string name="dashboard_requested_just_now">Requested just now</string>
+    <string name="dashboard_unknown_quest">Quest no longer available</string>
+    <string name="dashboard_unknown_explorer">An explorer</string>
+    <!-- On the leader's avatar when their name isn't known -->
+    <string name="dashboard_unknown_initials">?</string>
+    <string name="dashboard_leader">Leader</string>
+    <string name="dashboard_party_solo">Solo visit · Party of 1</string>
+    <plurals name="dashboard_party_size">
+        <item quantity="one">Party of %d</item>
+        <item quantity="other">Party of %d</item>
+    </plurals>
+    <!-- On the avatar after the leader's: the rest of the party, e.g. "+2" -->
+    <string name="dashboard_more_explorers">+%d</string>
+    <string name="dashboard_decline">Decline</string>
+    <string name="dashboard_approve">Approve</string>
+    <string name="dashboard_approved">Approved</string>
+    <string name="dashboard_show_all">Show all %d</string>
+    <string name="dashboard_empty_title">No reservations yet</string>
+    <string name="dashboard_empty_body">When explorers accept your quests, their requests show up here.</string>
+    <string name="dashboard_failed">Couldn\'t load your dashboard. Try again.</string>
+    <string name="dashboard_retry">Try again</string>
+</resources>
