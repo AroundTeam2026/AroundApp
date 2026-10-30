@@ -21,6 +21,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -240,28 +241,38 @@ class PartyRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: the read rule lets someone outside the party, or a member who withdrew, read it, instead
-   * of the flow ending with PERMISSION_DENIED as the KDoc promises.
+   * Bug: the read rule lets someone outside the party read it, instead of the flow ending with
+   * PERMISSION_DENIED as the KDoc promises.
    */
   @Test
-  fun observeMembers_byAnOutsiderOrAWithdrawnMember_failsWithPermissionDenied() =
-      withTimeoutBlocking {
-        friend.join(reservationId, friendUid).getOrThrow()
-        // A later clock, since the rules refuse a withdrawal that leaves updatedAt unchanged
-        PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
-            .withdraw(reservationId, friendUid)
-            .getOrThrow()
-        signInNewUser(OUTSIDER_APP, Role.EXPLORER)
-        val outsiderDb = emulatorClient(OUTSIDER_APP)
-        try {
-          val outsider = PartyRepositoryFirestore(outsiderDb)
+  fun observeMembers_byAnOutsider_failsWithPermissionDenied() = withTimeoutBlocking {
+    signInNewUser(OUTSIDER_APP, Role.EXPLORER)
+    val outsiderDb = emulatorClient(OUTSIDER_APP)
+    try {
+      val outsider = PartyRepositoryFirestore(outsiderDb)
 
-          assertPermissionDenied(runCatching { outsider.observeMembers(reservationId).first() })
-          assertPermissionDenied(runCatching { friend.observeMembers(reservationId).first() })
-        } finally {
-          outsiderDb.terminate().await()
-        }
-      }
+      assertPermissionDenied(runCatching { outsider.observeMembers(reservationId).first() })
+    } finally {
+      outsiderDb.terminate().await()
+    }
+  }
+
+  /**
+   * Bug: the read rule refuses a member who withdrew, so a withdrawn creator, who still sees the
+   * reservation, can no longer list its party.
+   */
+  @Test
+  fun observeMembers_byAWithdrawnMember_listsTheParty() = withTimeoutBlocking {
+    friend.join(reservationId, friendUid).getOrThrow()
+    // A later clock, since the rules refuse a withdrawal that leaves updatedAt unchanged
+    PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
+        .withdraw(reservationId, friendUid)
+        .getOrThrow()
+
+    val members = friend.observeMembers(reservationId).first { it.size == 2 }
+
+    assertEquals(setOf(explorerUid, friendUid), members.map { it.uid }.toSet())
+  }
 
   /** Bug: a malformed document crashes the listener or ends the flow instead of being skipped. */
   @Test
@@ -274,6 +285,48 @@ class PartyRepositoryFirestoreTest {
     val members = venue.observeMembers(reservationId).first { it.isNotEmpty() }
 
     assertEquals(listOf(explorerUid), members.map { it.uid })
+  }
+
+  /**
+   * Bug: the rules refuse to list the party of a reservation the server doesn't have yet, so a
+   * listener attached right after creating one offline fails, and the party never shows.
+   */
+  @Test
+  fun observeMembers_ofAReservationCreatedOffline_followsItOnceOnline() = withTimeoutBlocking {
+    val questId = createActiveQuest()
+    explorerDb.disableNetwork().await()
+    val id: String
+    val emissions = Channel<List<PartyMember>>(Channel.UNLIMITED)
+    val collector: Job
+    try {
+      id =
+          ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS)
+              .createReservation(
+                  newPendingReservation(questId, venueId, explorerUid, EXPLORER_NAME, SLOT_START),
+                  explorerUid,
+              )
+              .getOrThrow()
+      collector =
+          launch(start = CoroutineStart.UNDISPATCHED) {
+            explorer.observeMembers(id).collect(emissions::send)
+          }
+      // The local copy of the creator's membership, before the server has it
+      assertEquals(listOf(explorerUid), emissions.receive().map { it.uid })
+    } finally {
+      explorerDb.enableNetwork().await()
+    }
+    try {
+      explorerDb.waitForPendingWrites().await()
+
+      friend.join(id, friendUid).getOrThrow()
+
+      // A listener the server refused has ended, so this loop fails the test on TIMEOUT_MS
+      do {
+        val latest = emissions.receive()
+      } while (latest.none { it.uid == friendUid })
+    } finally {
+      collector.cancel()
+    }
   }
 
   /** Has the venue create an active quest and waits until the server has it; returns its id. */
