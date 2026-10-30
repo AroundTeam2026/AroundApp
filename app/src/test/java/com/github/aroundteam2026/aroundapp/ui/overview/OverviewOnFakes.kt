@@ -15,12 +15,13 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 @Composable
 fun OverviewOnFakes(onOpenVenue: (venueId: String) -> Unit) {
   val viewModel = remember {
+    val party = FakePartyRepository()
     OverviewViewModel(
         "explorer",
-        FakeReservationRepository(),
+        FakeReservationRepository(party = party),
         FakeQuestRepository(),
         FakeVenueRepository(),
-        FakePartyRepository(),
+        party,
     )
   }
   OverviewScreen(viewModel, onOpenVenue)
