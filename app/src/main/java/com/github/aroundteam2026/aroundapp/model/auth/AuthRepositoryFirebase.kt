@@ -12,10 +12,14 @@ import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.auth
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 /**
  * [AuthRepository] backed by Firebase Authentication.
@@ -24,13 +28,20 @@ import kotlinx.coroutines.tasks.await
  */
 class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : AuthRepository {
 
+  private val sessionLock = Any()
+  private var googleSignUpInFlight = false
+  private var sessionEpoch = 0L
   private val _currentUserId = MutableStateFlow(auth.currentUser?.uid)
   override val currentUserId: StateFlow<String?> = _currentUserId.asStateFlow()
 
   init {
     // Also catches changes made outside this class, such as an expired or deleted account.
     // The listener lives as long as the app, since AuthRepositoryProvider creates one instance.
-    auth.addAuthStateListener { _currentUserId.value = it.currentUser?.uid }
+    auth.addAuthStateListener {
+      synchronized(sessionLock) {
+        if (!googleSignUpInFlight) _currentUserId.value = it.currentUser?.uid
+      }
+    }
   }
 
   override suspend fun signUpWithEmail(email: String, password: String): Result<String> = authCall {
@@ -53,9 +64,71 @@ class AuthRepositoryFirebase(private val auth: FirebaseAuth = Firebase.auth) : A
     auth.signInWithCredential(credential).await().user?.uid
   }
 
+  override suspend fun signUpWithGoogle(idToken: String): Result<String> {
+    if (idToken.isBlank()) return Result.failure(AuthError.InvalidCredentials)
+    val startingEpoch =
+        synchronized(sessionLock) {
+          if (googleSignUpInFlight || auth.currentUser != null) {
+            return Result.failure(AuthError.InvalidCredentials)
+          }
+          googleSignUpInFlight = true
+          sessionEpoch
+        }
+    val caller = currentCoroutineContext()[Job]
+    // The Firebase task can still complete after its caller is cancelled. Wait for it, then either
+    // publish a new account or clear the tentative session before the auth listener is unblocked.
+    return withContext(NonCancellable) {
+      try {
+        val result =
+            auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
+        val uid = result.user?.uid
+        when {
+          caller?.isActive == false -> {
+            auth.signOut()
+            throw CancellationException("Google signup was cancelled")
+          }
+          uid == null -> {
+            auth.signOut()
+            Result.failure(AuthError.Unknown())
+          }
+          result.additionalUserInfo?.isNewUser != true -> {
+            auth.signOut()
+            Result.failure(AuthError.EmailAlreadyInUse)
+          }
+          else -> publishGoogleSignup(uid, startingEpoch)
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        auth.signOut()
+        Result.failure(e.toAuthError())
+      } finally {
+        synchronized(sessionLock) {
+          googleSignUpInFlight = false
+          _currentUserId.value = auth.currentUser?.uid
+        }
+      }
+    }
+  }
+
+  /** Publishes only if no sign-out happened while Firebase was resolving the credential. */
+  private fun publishGoogleSignup(uid: String, startingEpoch: Long): Result<String> =
+      synchronized(sessionLock) {
+        if (sessionEpoch == startingEpoch) {
+          _currentUserId.value = uid
+          Result.success(uid)
+        } else {
+          auth.signOut()
+          Result.failure(AuthError.InvalidCredentials)
+        }
+      }
+
   override fun signOut() {
-    auth.signOut()
-    _currentUserId.value = null
+    synchronized(sessionLock) {
+      sessionEpoch++
+      auth.signOut()
+      _currentUserId.value = null
+    }
   }
 
   /** Runs a Firebase call, updates [currentUserId] right away and maps failures to [AuthError]. */

@@ -365,10 +365,10 @@ class AuthViewModelTest {
         val setup = ProfileSetup(repo, FakeUserRepository(), pending)
         val observed =
             object : AuthRepository by repo {
-              override suspend fun signInWithGoogle(idToken: String): Result<String> {
+              override suspend fun signUpWithGoogle(idToken: String): Result<String> {
                 assertEquals(Role.VENUE, pending.pending?.role)
                 assertNull(pending.pending?.uid)
-                return repo.signInWithGoogle(idToken)
+                return repo.signUpWithGoogle(idToken)
               }
             }
         val form = AuthViewModel(observed, setup)

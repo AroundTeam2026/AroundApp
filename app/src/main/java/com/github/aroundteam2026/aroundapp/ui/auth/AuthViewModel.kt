@@ -192,7 +192,11 @@ class AuthViewModel(
                   else -> registration.choose(role)
                 }
               },
-              call = { repository.signInWithGoogle(result.idToken) },
+              call = {
+                if (role == null) repository.signInWithGoogle(result.idToken)
+                else repository.signUpWithGoogle(result.idToken)
+              },
+              onFailure = { if (role != null) registration?.discardChoice() },
           )
       GoogleCredentialResult.Cancelled -> _uiState.update { it.copy(isLoading = false) }
       GoogleCredentialResult.Unavailable -> fail(AuthFormError.GOOGLE_UNAVAILABLE)
@@ -248,6 +252,7 @@ class AuthViewModel(
 
   private fun authenticate(
       prepare: suspend () -> Result<Unit>,
+      onFailure: suspend () -> Unit = {},
       call: suspend () -> Result<String>,
   ) {
     viewModelScope.launch {
@@ -256,6 +261,7 @@ class AuthViewModel(
         return@launch
       }
       val result = call()
+      if (result.isFailure) onFailure()
       _uiState.update {
         if (result.isSuccess) AuthUiState()
         else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
