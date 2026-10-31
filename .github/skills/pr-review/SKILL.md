@@ -33,7 +33,7 @@ Go through each point before approving (or opening) a pull request.
 - [ ] Functions are short and do one thing
 
 ## Coverage
-- [ ] Line coverage of new code is at least 80% (course requirement; see the SonarCloud comment on the PR)
+- [ ] Line coverage of new code is at least 90% (see the SonarCloud comment on the PR); if not, the PR description justifies why
 
 ## Naming conventions
 - [ ] camelCase for functions and variables, PascalCase for classes and composables, UPPER_SNAKE_CASE for constants
