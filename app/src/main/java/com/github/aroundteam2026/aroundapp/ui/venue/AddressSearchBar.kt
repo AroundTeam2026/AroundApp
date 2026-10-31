@@ -119,21 +119,21 @@ object AddressSearchDefaults {
           ink = AroundColors.Ink,
           muted = AroundColors.InkMuted,
           line = AroundColors.Line,
-          avatar = Color(0xFF5EA89D),
+          avatar = AroundColors.Tertiary,
           onAvatar = AroundColors.Cream,
           highlight = AroundColors.Purple,
-          shadow = Color(0x266B5947),
+          shadow = AroundColors.AddressShadow,
       )
 
-  // The app has no dark colours yet. The dark mode's highlight is its accent text colour, the same
+  // The dark mode's highlight is its accent text colour, the same
   // as its ink, as in Figma
   private val DARK =
       LIGHT.copy(
-          surface = Color(0xFF383838),
-          ink = Color(0xFFFDFFE8),
-          muted = Color(0xFFB5B6A6),
-          line = Color(0xFF474547),
-          highlight = Color(0xFFFDFFE8),
+          surface = AroundColors.DarkSurface,
+          ink = AroundColors.Cream,
+          muted = AroundColors.DarkMuted,
+          line = AroundColors.DarkLine,
+          highlight = AroundColors.Cream,
       )
 
   /** The colours for dark mode when [darkTheme], else for light mode. */

@@ -50,6 +50,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -85,7 +86,12 @@ fun OverviewQuestRow(
   Column(
       modifier
           .fillMaxWidth()
-          .shadow(CARD_ELEVATION, CARD_SHAPE, ambientColor = CARD_SHADOW, spotColor = CARD_SHADOW)
+          .shadow(
+              CARD_ELEVATION,
+              CARD_SHAPE,
+              ambientColor = AroundColors.CardShadow,
+              spotColor = AroundColors.CardShadow,
+          )
           .clip(CARD_SHAPE)
           .background(colors.surface)
           .clickable(
@@ -332,8 +338,6 @@ private const val HOURS_12 = "hm"
 private const val TITLE_MAX_LINES = 2
 private val CARD_SHAPE = RoundedCornerShape(28.dp)
 private val CARD_ELEVATION = 10.dp
-// Figma's card shadow: black at 14 %, the same in light and dark mode
-private val CARD_SHADOW = Color(0x24000000)
 private val AVATAR_SIZE = 52.dp
 private val INFO_SPACING = 3.dp
 private val REWARD_TOP = 3.dp
