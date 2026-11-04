@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.location
 
 import android.annotation.SuppressLint
@@ -9,6 +10,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -24,8 +26,10 @@ class FusedLocationRepository(
 ) : LocationRepository {
   private val appContext: Context = context.applicationContext
 
-  // Lint can't see the permission check through LocationPermissions.isGranted
+  // Lint can't see the permission check through LocationPermissions.isGranted. The await that
+  // cancels the request with the caller is still marked experimental.
   @SuppressLint("MissingPermission")
+  @OptIn(ExperimentalCoroutinesApi::class)
   override suspend fun currentLocation(): Location? {
     if (!LocationPermissions.isGranted(appContext)) return null
     // Cancelling the caller cancels the request, so leaving the map stops the location hardware

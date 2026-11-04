@@ -3,6 +3,9 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -20,6 +23,7 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -46,7 +50,8 @@ class VenuePageAcceptTest {
   private val dispatcher = StandardTestDispatcher()
   private val clock = { START + dispatcher.scheduler.currentTime }
 
-  private val fake = FakeReservationRepository { START }
+  private val party = FakePartyRepository { START }
+  private val fake = FakeReservationRepository({ START }, party)
   private val reservations = GatedReservationRepository(fake)
   private val quests =
       listOf(
@@ -57,6 +62,7 @@ class VenuePageAcceptTest {
   private var reservationRepository: ReservationRepository = reservations
   private val users = ScriptedUserRepository(testUsers(EXPLORER))
   private var userRepository: UserRepository = users
+  private var partyRepository: PartyRepository = party
 
   private val viewModel by lazy {
     VenuePageViewModel(
@@ -65,6 +71,7 @@ class VenuePageAcceptTest {
         ScriptedQuestRepository(activeQuestsByVenue = { flowOf(quests) }),
         reservationRepository,
         userRepository,
+        partyRepository,
         EXPLORER,
         clock,
     )
@@ -88,13 +95,15 @@ class VenuePageAcceptTest {
 
   private suspend fun stored(): List<Reservation> = fake.observeForExplorer(EXPLORER).first()
 
-  private suspend fun storeFor(questId: String, party: List<String> = listOf(EXPLORER)) =
-      fake
-          .createReservation(
-              newPendingReservation(questId, VENUE_ID, EXPLORER, NAME, START)
-                  .copy(explorerUids = party)
-          )
-          .getOrThrow()
+  /** Stores the explorer's reservation of [questId], which [friends] join; returns its id. */
+  private suspend fun storeFor(questId: String, friends: List<String> = emptyList()): String {
+    val id =
+        fake
+            .createReservation(newPendingReservation(questId, VENUE_ID, NAME, START), EXPLORER)
+            .getOrThrow()
+    friends.forEach { party.join(id, it).getOrThrow() }
+    return id
+  }
 
   @Test
   fun acceptCreatesOnePendingReservationForThePickedQuest() = test {
@@ -107,7 +116,7 @@ class VenuePageAcceptTest {
     val reservation = stored().single()
     assertEquals("a", reservation.questId)
     assertEquals(VENUE_ID, reservation.venueId)
-    assertEquals(listOf(EXPLORER), reservation.explorerUids)
+    assertEquals(listOf(EXPLORER), party.observeMembers(reservation.id).first().map { it.uid })
     assertEquals(START + 5_000, reservation.slotStart)
     assertEquals(ReservationStatus.PENDING, reservation.status)
   }
@@ -302,7 +311,7 @@ class VenuePageAcceptTest {
 
   @Test
   fun aReservationAtAnotherVenueDoesNotAcceptThisVenuesQuest() = test {
-    fake.createReservation(newPendingReservation("a", "other-venue", EXPLORER, NAME, START))
+    fake.createReservation(newPendingReservation("a", "other-venue", NAME, START), EXPLORER)
 
     openAndPick("a")
 
@@ -344,13 +353,45 @@ class VenuePageAcceptTest {
 
   @Test
   fun theBiggerPartyOfAnAcceptedQuestLowersWhatItNeeds() = test {
-    storeFor("b", party = listOf(EXPLORER, "friend"))
+    storeFor("b", friends = listOf("friend"))
     openAndPick("b")
     assertEquals(1, state.morePeopleNeeded)
 
-    storeFor("a", party = listOf(EXPLORER, "friend", "other"))
+    storeFor("a", friends = listOf("friend", "other"))
     viewModel.onQuestSelected("a")
     assertEquals(0, state.morePeopleNeeded) // never below zero
+  }
+
+  @Test
+  fun aFriendWhoWithdrawsRaisesWhatTheQuestNeeds() = test {
+    val id = storeFor("b", friends = listOf("friend"))
+    openAndPick("b")
+    assertEquals(1, state.morePeopleNeeded)
+
+    party.withdraw(id, "friend").getOrThrow()
+    runCurrent()
+
+    assertEquals(2, state.morePeopleNeeded)
+  }
+
+  @Test
+  fun aQuestTheExplorerWithdrewFromIsNoLongerAccepted() = test {
+    val id = storeFor("a", friends = listOf("friend"))
+    openAndPick("a")
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+
+    party.withdraw(id, EXPLORER).getOrThrow()
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+  }
+
+  /** The party sizes are always all known; if one were missing, the explorer still counts. */
+  @Test
+  fun aPartyWithNoKnownSizeCountsJustTheExplorer() {
+    val reservation = newPendingReservation("a", VENUE_ID, NAME, START).copy(id = "r")
+
+    assertEquals(mapOf("a" to 1), acceptedPartiesOf(listOf(reservation), emptyMap(), VENUE_ID))
   }
 
   @Test
@@ -499,8 +540,7 @@ class VenuePageAcceptTest {
     runCurrent()
 
     // The listener emits again, still without the new reservation
-    server.list.value =
-        listOf(newPendingReservation("b", VENUE_ID, EXPLORER, NAME, START).copy(id = "x"))
+    server.list.value = listOf(newPendingReservation("b", VENUE_ID, NAME, START).copy(id = "x"))
     runCurrent()
 
     assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
@@ -523,6 +563,46 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun aFailingPartyListenerKeepsThePageAndStopsAccepting() = test {
+    storeFor("a")
+    partyRepository =
+        object : PartyRepository by party {
+          override fun observeMembers(reservationId: String): Flow<List<PartyMember>> = flow {
+            throw IOException("denied")
+          }
+        }
+    openAndPick("b")
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertFalse(state.acceptAvailable)
+  }
+
+  @Test
+  fun onlyThisVenuesAcceptedPartiesAreListenedTo() = test {
+    val elsewhere =
+        fake
+            .createReservation(
+                newPendingReservation("a", "other-venue", NAME, START),
+                EXPLORER,
+            )
+            .getOrThrow()
+    val here = storeFor("a")
+    val listened = mutableSetOf<String>()
+    partyRepository =
+        object : PartyRepository by party {
+          override fun observeMembers(reservationId: String): Flow<List<PartyMember>> {
+            listened += reservationId
+            return if (reservationId == elsewhere) flow { throw IOException("denied") }
+            else party.observeMembers(reservationId)
+          }
+        }
+    openAndPick("b")
+
+    assertEquals(setOf(here), listened)
+    assertTrue(state.acceptAvailable)
+  }
+
+  @Test
   fun aListenerThatFailsWhileAcceptingStopsShowingAccepting() = test {
     val server =
         ScriptedReservationRepository()
@@ -534,8 +614,7 @@ class VenuePageAcceptTest {
     assertEquals(AcceptStatus.ACCEPTING, state.acceptStatus)
 
     server.broken = true
-    server.list.value =
-        listOf(newPendingReservation("b", VENUE_ID, EXPLORER, NAME, START).copy(id = "x"))
+    server.list.value = listOf(newPendingReservation("b", VENUE_ID, NAME, START).copy(id = "x"))
     runCurrent()
 
     assertEquals(AcceptStatus.NONE, state.acceptStatus)
@@ -544,9 +623,12 @@ class VenuePageAcceptTest {
 
   @Test
   fun aListenerThatFailsLaterKeepsWhatItShowed() = test {
-    val accepted = newPendingReservation("a", VENUE_ID, EXPLORER, NAME, START).copy(id = "r")
+    val accepted = newPendingReservation("a", VENUE_ID, NAME, START).copy(id = "r")
     reservationRepository = FailingListenerRepository(fake, shownFirst = listOf(accepted))
     openAndPick("a")
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+
+    advanceTimeBy(FAILS_AFTER_MS + 1)
 
     assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
     assertFalse(state.acceptAvailable)
@@ -560,6 +642,9 @@ class VenuePageAcceptTest {
   }
 }
 
+/** How long a [FailingListenerRepository] listener shows its first list before it fails. */
+private const val FAILS_AFTER_MS = 1_000L
+
 /** Delegates to [inner], counting [createReservation] calls and holding them until [gate] ends. */
 private class GatedReservationRepository(private val inner: ReservationRepository) :
     ReservationRepository by inner {
@@ -569,11 +654,14 @@ private class GatedReservationRepository(private val inner: ReservationRepositor
   var calls = 0
     private set
 
-  override suspend fun createReservation(reservation: Reservation): Result<String> {
+  override suspend fun createReservation(
+      reservation: Reservation,
+      creatorUid: String,
+  ): Result<String> {
     val call = ++calls
     if (call == failOnCall) return Result.failure(IOException("offline"))
     gate?.await()
-    return inner.createReservation(reservation)
+    return inner.createReservation(reservation, creatorUid)
   }
 }
 
@@ -591,7 +679,10 @@ private class ScriptedReservationRepository : ReservationRepository by FakeReser
   var broken = false
   private var next = 1
 
-  override suspend fun createReservation(reservation: Reservation): Result<String> {
+  override suspend fun createReservation(
+      reservation: Reservation,
+      creatorUid: String,
+  ): Result<String> {
     val id = "server-${next++}"
     if (showsWrites) list.value += reservation.copy(id = id)
     answer?.await()?.onFailure {
@@ -605,13 +696,19 @@ private class ScriptedReservationRepository : ReservationRepository by FakeReser
   }
 }
 
-/** Delegates to [inner], but its explorer listener shows [shownFirst], if any, then fails. */
+/**
+ * Delegates to [inner], but its explorer listener shows [shownFirst], if any, then fails
+ * [FAILS_AFTER_MS] later, in virtual time.
+ */
 private class FailingListenerRepository(
     private val inner: ReservationRepository,
     private val shownFirst: List<Reservation>?,
 ) : ReservationRepository by inner {
   override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
-    shownFirst?.let { emit(it) }
+    shownFirst?.let {
+      emit(it)
+      delay(FAILS_AFTER_MS)
+    }
     throw IOException("denied")
   }
 }

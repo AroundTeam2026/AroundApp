@@ -37,6 +37,7 @@ import com.github.aroundteam2026.aroundapp.screen.RegistrationScreen
 import com.github.aroundteam2026.aroundapp.ui.navigation.AppDestination
 import com.github.aroundteam2026.aroundapp.ui.navigation.AppRoot
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
@@ -100,7 +101,14 @@ class RegistrationFlowTest {
                   },
               )
             },
-            explorerHome = { AroundApp(explorerUid = "explorer", onSignOut = {}) },
+            explorerHome = {
+              // The app's own overview would read Firestore
+              AroundApp(
+                  explorerUid = "explorer",
+                  onSignOut = {},
+                  overview = { OverviewOnFakes(it) },
+              )
+            },
             venueEntry = { Text("Venue entry") },
             profileError = { error("Unexpected profile failure") },
         )

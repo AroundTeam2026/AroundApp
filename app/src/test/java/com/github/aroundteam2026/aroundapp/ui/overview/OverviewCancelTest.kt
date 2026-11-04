@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -33,7 +34,8 @@ import org.junit.Test
 class OverviewCancelTest {
   private val dispatcher = StandardTestDispatcher()
 
-  private val fake = FakeReservationRepository { START }
+  private val party = FakePartyRepository { START }
+  private val fake = FakeReservationRepository({ START }, party)
   private val reservations = GatedStatusUpdates(fake)
 
   private val viewModel by lazy {
@@ -42,6 +44,7 @@ class OverviewCancelTest {
         reservations,
         ScriptedQuestRepository(quest = { id -> testQuest(id = id, venueId = CAFE) }),
         FakeVenueRepository(listOf(testVenue(id = CAFE))),
+        party,
     )
   }
 
@@ -58,7 +61,8 @@ class OverviewCancelTest {
   private suspend fun book(questId: String): String =
       fake
           .createReservation(
-              newPendingReservation(questId, CAFE, EXPLORER, TEST_EXPLORER_NAME, START)
+              newPendingReservation(questId, CAFE, TEST_EXPLORER_NAME, START),
+              EXPLORER,
           )
           .getOrThrow()
 

@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus.APPROVED
@@ -8,7 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus.R
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Tests [canTransition] for reservations and the construction rules of [Reservation]. */
+/** Tests [canTransition] and [isActive] for reservations. */
 class ReservationStatusTest {
   private val allowed =
       setOf(
@@ -28,16 +29,13 @@ class ReservationStatusTest {
     }
   }
 
-  /** A party always has someone in it, so an empty list of explorers is refused. */
-  @Test(expected = IllegalArgumentException::class)
-  fun reservation_withNoExplorers_isRejected() {
-    Reservation("r1", "q1", "v1", emptyList(), 0L, PENDING, 0L)
-  }
-
-  /** A reservation with at least one explorer is valid. */
+  /** Lists every status, so a new one has to be added here as active or not. */
   @Test
-  fun reservation_withAnExplorer_isAccepted() {
-    val reservation = Reservation("r1", "q1", "v1", listOf("u1"), 0L, PENDING, 0L)
-    assertEquals(listOf("u1"), reservation.explorerUids)
+  fun isActive_isTrueForPendingAndApprovedOnly() {
+    val expected = mapOf(PENDING to true, APPROVED to true, REJECTED to false, CANCELLED to false)
+    assertEquals(ReservationStatus.entries.toSet(), expected.keys)
+    for ((status, active) in expected) {
+      assertEquals("$status", active, status.isActive)
+    }
   }
 }

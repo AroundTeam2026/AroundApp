@@ -1,11 +1,12 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.viewmodel.initializer
@@ -19,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 import org.junit.Assert.assertEquals
@@ -53,6 +55,7 @@ class VenueDestinationsTest {
             createQuestFactory = viewModelFactory { initializer { form } },
             venueQuestsFactory =
                 viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
+            dashboardFactory = venueDashboardFactoryOnFakes(VENUE_ID),
         )
       }
     }

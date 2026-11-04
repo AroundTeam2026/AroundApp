@@ -58,6 +58,7 @@ compose-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifes
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
+firebase-storage = { module = "com.google.firebase:firebase-storage" }
 
 kaspresso = { group = "com.kaspersky.android-components", name = "kaspresso", version.ref = "kaspresso" }
 kaspresso-compose = { group = "com.kaspersky.android-components", name = "kaspresso-compose-support", version.ref = "kaspresso" }

@@ -26,6 +26,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 
@@ -43,6 +44,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
  * @param areaStep draws the area step; [defaultVenueAreaStep] unless replaced, e.g. by tests.
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
+ * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
  */
 @Composable
 fun VenueEntry(
@@ -56,6 +58,7 @@ fun VenueEntry(
     areaStep: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
+    dashboardFactory: ViewModelProvider.Factory = VenueDashboardViewModel.factory(),
 ) {
   when (val state = viewModel.uiState.collectAsStateWithLifecycle().value) {
     VenueEntryUiState.Loading ->
@@ -73,6 +76,7 @@ fun VenueEntry(
           locationScreen = areaStep,
           createQuestFactory = createQuestFactory,
           venueQuestsFactory = venueQuestsFactory,
+          dashboardFactory = dashboardFactory,
           start = state.start,
           navController = navController,
       )

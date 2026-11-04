@@ -10,6 +10,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
+import com.google.firebase.storage.FirebaseStorage
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
@@ -64,6 +65,20 @@ fun emulatorClient(appName: String): FirebaseFirestore =
           FirebaseFirestoreSettings.Builder()
               .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
               .build() // keep local cache in ram only
+    }
+
+/**
+ * Returns a Cloud Storage client of the [FirebaseApp] named [appName], on the Storage emulator's
+ * bucket for `demo-project`, so storage.rules read their Firestore documents from the same project
+ * as [emulatorClient] and [writeBypassingRules]. Start the emulators with `firebase emulators:start
+ * --only auth,firestore,storage --project demo-project`.
+ *
+ * A client can only be pointed at the emulator before its first use, so call this once per app
+ * name; tests that need it use fresh names.
+ */
+fun emulatorStorage(appName: String): FirebaseStorage =
+    FirebaseStorage.getInstance(emulatorApp(appName), "gs://$PROJECT_ID.appspot.com").apply {
+      useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.STORAGE_PORT)
     }
 
 /**

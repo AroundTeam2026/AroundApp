@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.testUsers
@@ -18,12 +19,14 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 fun VenuePageOnFakes(venueId: String, onBack: () -> Unit) {
   val viewModel =
       remember(venueId) {
+        val party = FakePartyRepository()
         VenuePageViewModel(
             venueId,
             FakeVenueRepository(listOf(testVenue(id = venueId))),
             FakeQuestRepository(),
-            FakeReservationRepository(),
+            FakeReservationRepository(party = party),
             testUsers("explorer"),
+            party,
             "explorer",
         )
       }

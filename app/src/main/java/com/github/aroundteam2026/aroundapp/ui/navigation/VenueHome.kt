@@ -3,8 +3,6 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -14,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsScreen
 
@@ -55,13 +54,15 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * The venue's home, where a signed-in venue lands: the selected tab's screen above a bottom bar of
  * Dashboard, Quests and Profile (see [BottomTabScaffold]).
  *
- * The dashboard is a "Coming soon" stub until its own task builds it. The Quests tab lists the
- * venue's quests (see [VenueQuestsScreen]); its "New quest" buttons call [onCreateQuest], so the
- * venue's NavHost opens the create-quest form full screen above the home (see [venueDestinations]).
+ * The Dashboard tab shows the venue's reservations (see [VenueDashboardScreen]). The Quests tab
+ * lists the venue's quests (see [VenueQuestsScreen]); its "New quest" buttons call [onCreateQuest],
+ * so the venue's NavHost opens the create-quest form full screen above the home (see
+ * [venueDestinations]).
  *
  * @param onCreateQuest opens the form where the venue creates a quest.
  * @param onSignOut signs the venue out, from the Profile tab.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
+ * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  */
 @Composable
@@ -69,9 +70,10 @@ fun VenueHome(
     onCreateQuest: () -> Unit,
     onSignOut: () -> Unit,
     venueQuestsFactory: ViewModelProvider.Factory,
+    dashboardFactory: ViewModelProvider.Factory,
     navController: NavHostController = rememberNavController(),
     screen: @Composable (VenueTab) -> Unit = {
-      VenueTabScreen(it, onCreateQuest, onSignOut, venueQuestsFactory)
+      VenueTabScreen(it, onCreateQuest, onSignOut, venueQuestsFactory, dashboardFactory)
     },
 ) {
   BottomTabScaffold(
@@ -91,13 +93,14 @@ private fun VenueTabScreen(
     onCreateQuest: () -> Unit,
     onSignOut: () -> Unit,
     venueQuestsFactory: ViewModelProvider.Factory,
+    dashboardFactory: ViewModelProvider.Factory,
 ) =
     when (tab) {
-      // The tab keeps its own tag, whatever the dashboard becomes
       VenueTab.DASHBOARD ->
-          Box(Modifier.fillMaxSize().testTag(tab.screenTag)) {
-            ComingSoonScreen(R.string.dashboard_title, C.Tag.DASHBOARD_STUB)
-          }
+          VenueDashboardScreen(
+              viewModel(factory = dashboardFactory),
+              Modifier.testTag(tab.screenTag),
+          )
       VenueTab.QUESTS ->
           VenueQuestsScreen(
               viewModel(factory = venueQuestsFactory),

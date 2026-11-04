@@ -8,7 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,6 +22,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.dashboardDestination
 import com.github.aroundteam2026.aroundapp.ui.dashboard.navigateToDashboard
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
@@ -52,6 +53,7 @@ class RoutesTest {
           onSignOut = {},
           navController = navController,
           venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+          overview = { OverviewOnFakes(it) },
       )
     }
     composeTestRule.waitForIdle()
