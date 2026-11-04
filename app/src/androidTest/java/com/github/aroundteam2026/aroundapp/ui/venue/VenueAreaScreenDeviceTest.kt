@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -66,6 +67,8 @@ class VenueAreaScreenDeviceTest {
           venues,
           object : LocationRepository {
             override suspend fun currentLocation() = here
+
+            override suspend fun currentPreciseLocation(): Location? = null
           },
           object : AddressSearchRepository {
             override suspend fun search(query: String, near: GeoBounds?) =

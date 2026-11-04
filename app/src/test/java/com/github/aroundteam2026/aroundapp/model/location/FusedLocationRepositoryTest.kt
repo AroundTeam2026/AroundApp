@@ -198,6 +198,23 @@ class FusedLocationRepositoryTest {
 
     assertNull(repository.currentPreciseLocation())
   }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  @Test
+  fun cancellingThePreciseCallerCancelsTheGpsRequest() = runTest {
+    grant(ACCESS_FINE_LOCATION)
+    val token = slot<CancellationToken>()
+    every { client.getCurrentLocation(any<CurrentLocationRequest>(), capture(token)) } returns
+        TaskCompletionSource<android.location.Location>().task
+
+    val call = launch { repository.currentPreciseLocation() }
+    runCurrent()
+    assertFalse(token.captured.isCancellationRequested)
+
+    call.cancel()
+    runCurrent()
+    assertTrue(token.captured.isCancellationRequested)
+  }
 }
 
 /** Whether the garbage collector frees this reference's object; collection can take a few tries. */

@@ -408,6 +408,70 @@ class CompletionViewModelTest {
   }
 
   @Test
+  fun reservationListenerFailureWhileLocatingUnlocksTheFormAfterRetry() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    listener.broken = true
+    book("photo") // A new reservation emission makes the active listener fail.
+    runCurrent()
+    assertEquals(CompletionFormStatus.FAILED, state.status)
+
+    gate.complete(Unit)
+    runCurrent()
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(0, completions.calls)
+
+    listener.broken = false
+    viewModel.onRetry()
+    runCurrent()
+    assertEquals(CompletionFormStatus.READY, state.status)
+    viewModel.submit()
+    runCurrent()
+    assertEquals(1, completions.calls)
+  }
+
+  @Test
+  fun completionSavedDuringAnUnavailableFixRemainsSaved() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    locations.preciseLocation = null
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    val id =
+        fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier")).getOrThrow()
+    runCurrent()
+    gate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Saved(id), state.saveState)
+    assertEquals(0, completions.calls)
+  }
+
+  @Test
+  fun completionSavedDuringASuccessfulFixIsNotSubmittedAgain() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    val id =
+        fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier")).getOrThrow()
+    runCurrent()
+    gate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Saved(id), state.saveState)
+    assertEquals(0, completions.calls)
+  }
+
+  @Test
   fun anOutOfRangePhotoIsNeverUploaded() = test {
     open("photo")
     viewModel.pickPhoto(PHOTO)
@@ -711,8 +775,10 @@ private class BreakableReservations(private val inner: ReservationRepository) :
 
   override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
     collections++
-    if (broken) throw IOException("offline")
-    emitAll(inner.observeForExplorer(uid))
+    inner.observeForExplorer(uid).collect {
+      if (broken) throw IOException("offline")
+      emit(it)
+    }
   }
 }
 

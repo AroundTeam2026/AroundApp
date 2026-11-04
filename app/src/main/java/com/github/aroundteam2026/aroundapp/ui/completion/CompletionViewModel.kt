@@ -104,11 +104,13 @@ class CompletionViewModel(
         return@launch
       }
       // Approval may be withdrawn while the device is finding its position.
-      if (
-          mutableUiState.value.status != CompletionFormStatus.READY ||
-              mutableUiState.value.saveState is SaveState.Saved
-      )
-          return@launch
+      if (mutableUiState.value.saveState is SaveState.Saved) return@launch
+      if (mutableUiState.value.status != CompletionFormStatus.READY) {
+        mutableUiState.update {
+          if (it.saveState is SaveState.Saved) it else it.copy(saveState = SaveState.Idle)
+        }
+        return@launch
+      }
       val proof = proofOf(form)
       val saveState =
           proof
