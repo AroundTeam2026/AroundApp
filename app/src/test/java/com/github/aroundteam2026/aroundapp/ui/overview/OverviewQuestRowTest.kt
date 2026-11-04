@@ -22,7 +22,10 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.util.Date
+import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -147,9 +150,18 @@ class OverviewQuestRowTest {
         )
   }
 
-  // On some Android versions, Traditional Chinese writes the 12-hour clock with a day period
-  // letter java.time can't read. Robolectric's patterns don't use it, so this only checks the
-  // language still shows its time.
+  // Android can pick pattern letters java.time can't read: on some Android versions the day period
+  // "B" of Traditional Chinese, here the "b" (AM, PM, noon or midnight) that even the test JDK's
+  // java.time rejects with "Unknown pattern letter: b". The slot's formats must still read them.
+  @Test
+  fun aSlotFormatReadsPatternLettersJavaTimeDoesNot() {
+    val time = slotFormat("hmb", Locale.ENGLISH, UTC).format(Date(SLOT))
+
+    // Checked in parts, as the space before AM varies
+    assertTrue(time, time.startsWith("8:00") && time.endsWith("AM"))
+  }
+
+  // Traditional Chinese on the 12-hour clock puts the day period before the time
   @Test
   @Config(qualifiers = "zh-rTW")
   fun inTraditionalChineseOnThe12HourClockTheSlotShowsItsTime() {

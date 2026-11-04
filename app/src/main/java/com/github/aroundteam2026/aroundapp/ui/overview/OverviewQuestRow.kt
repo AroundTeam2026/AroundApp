@@ -299,20 +299,22 @@ private fun Slot(slotStart: Long, clock: Clock) {
   }
 }
 
-/**
- * The day and time formats of a slot, for the phone's [locale] and clock setting, in [zone]. They
- * use Android's ICU formatter, which reads every pattern Android picks for a language; java.time
- * does not, e.g. the day period of Traditional Chinese on the 12-hour clock on some Android
- * versions.
- */
+/** The day and time formats of a slot, for the phone's [locale] and clock setting, in [zone]. */
 private class SlotFormats(locale: Locale, is24Hour: Boolean, zone: ZoneId) {
-  private val icuZone = IcuTimeZone.getTimeZone(TimeZone.getTimeZone(zone).id)
-  val day: IcuDateFormat = format(DAY_SKELETON, locale)
-  val time: IcuDateFormat = format(if (is24Hour) HOURS_24 else HOURS_12, locale)
-
-  private fun format(skeleton: String, locale: Locale) =
-      IcuDateFormat.getInstanceForSkeleton(skeleton, locale).also { it.timeZone = icuZone }
+  val day: IcuDateFormat = slotFormat(DAY_SKELETON, locale, zone)
+  val time: IcuDateFormat = slotFormat(if (is24Hour) HOURS_24 else HOURS_12, locale, zone)
 }
+
+/**
+ * The format Android picks for [skeleton] in [locale], writing times in [zone]. It uses Android's
+ * ICU formatter, which reads every pattern letter Android returns; java.time does not, e.g. the day
+ * period of Traditional Chinese on the 12-hour clock on some Android versions.
+ */
+internal fun slotFormat(skeleton: String, locale: Locale, zone: ZoneId): IcuDateFormat =
+    IcuDateFormat.getInstanceForSkeleton(skeleton, locale).also {
+      // Through java.util first, so that java.time's "Z" becomes ICU's "UTC"
+      it.timeZone = IcuTimeZone.getTimeZone(TimeZone.getTimeZone(zone).id)
+    }
 
 /** A muted line of [text] after a small [icon], cut off with an ellipsis. */
 @Composable
