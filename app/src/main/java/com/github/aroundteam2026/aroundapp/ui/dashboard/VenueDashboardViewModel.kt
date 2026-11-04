@@ -123,15 +123,26 @@ class VenueDashboardViewModel(
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen(venueId: String): Flow<VenueDashboardUiState> =
       combine(
-              reservationRepository.observeForVenue(venueId).flatMapLatest { reservations ->
-                // Only the shown reservations' parties are read
-                val ids = reservations.filter { it.status.isActive }.map { it.id }
-                partyRepository.observeJoinedCounts(ids).map { reservations to it }
-              },
+              combine(
+                      reservationRepository.observeForVenue(venueId),
+                      completionRepository.observeForVenue(venueId),
+                      ::Pair,
+                  )
+                  .flatMapLatest { (reservations, completions) ->
+                    // Only the shown reservations' and proofs' parties are read. A proof's
+                    // reservation may have been cancelled since, so it is read on its own
+                    val ids =
+                        reservations.filter { it.status.isActive }.map { it.id } +
+                            completions
+                                .filter { it.status == CompletionStatus.PENDING }
+                                .map { it.reservationId }
+                    partyRepository.observeJoinedCounts(ids).map {
+                      Triple(reservations, completions, it)
+                    }
+                  },
               questRepository.observeQuestsByVenue(venueId),
               venueRepository.observeVenue(venueId),
-              completionRepository.observeForVenue(venueId),
-          ) { (reservations, partySizes), quests, venue, completions ->
+          ) { (reservations, completions, partySizes), quests, venue ->
             dashboardOf(reservations, partySizes, quests, venue, completions)
           }
           // The repositories' flows throw if the backend stops a listener

@@ -406,7 +406,28 @@ class VenueDashboardViewModelTest {
         state.proofsToReview.first(),
     )
     assertEquals(ProofType.TEXT, state.proofsToReview.last().proofType)
-    assertFalse(state.isEmpty)
+  }
+
+  @Test
+  fun proofsSentAtTheSameTimeGoSmallestIdFirst() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED)
+    // Stored first, but its id ("<reservation>_zoe") is the larger one
+    val larger = sendProof(reservation, explorerUid = "zoe")
+    val smaller = sendProof(reservation, explorerUid = "amy")
+    watch()
+
+    assertTrue(smaller < larger)
+    assertEquals(listOf(smaller, larger), proofIds(state.proofsToReview))
+  }
+
+  @Test
+  fun aProofOfACancelledReservationKeepsItsPartySize() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED, partySize = 3)
+    sendProof(reservation)
+    fake.updateStatus(reservation, ReservationStatus.CANCELLED).getOrThrow()
+    watch()
+
+    assertEquals(3, state.proofsToReview.single().partySize)
   }
 
   @Test

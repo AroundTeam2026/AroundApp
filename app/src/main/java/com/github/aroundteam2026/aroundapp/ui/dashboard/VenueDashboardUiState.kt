@@ -43,15 +43,9 @@ data class VenueDashboardUiState(
   val pendingCount: Int
     get() = needsAnswer.size
 
-  /**
-   * Whether the dashboard is shown and has no reservation or proof to list: "No reservations yet".
-   */
+  /** Whether the dashboard is shown and has no reservation to list: "No reservations yet". */
   val isEmpty: Boolean
-    get() =
-        status == VenueDashboardStatus.LOADED &&
-            needsAnswer.isEmpty() &&
-            upcoming.isEmpty() &&
-            proofsToReview.isEmpty()
+    get() = status == VenueDashboardStatus.LOADED && needsAnswer.isEmpty() && upcoming.isEmpty()
 }
 
 /**
