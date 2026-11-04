@@ -110,7 +110,7 @@ One completion per explorer and reservation (`completionId`). The id is built fr
 
 Exactly one of `photoUrl` and `textAnswer` is present, and it isn't blank (enforced by `Proof`). Which one must match the quest's `proofType`, which the rules check.
 
-Read and written through `CompletionRepository`, with `FakeCompletionRepository` for unit tests. The Firestore implementation comes with #326.
+Read and written through `CompletionRepository`: `CompletionRepositoryFirestore` in the app, `FakeCompletionRepository` in unit tests.
 
 ## Allowed status transitions
 
