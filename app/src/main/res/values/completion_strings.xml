@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The proof photo picker, on the completion screen -->
+    <string name="proof_photo_title">Add a photo of your proof</string>
+    <!-- The argument is the venue's name -->
+    <string name="proof_photo_body">Take it here at %1$s, or pick one you just took.</string>
+    <string name="proof_photo_take">Take photo</string>
+    <string name="proof_photo_gallery">Choose from gallery</string>
+    <string name="proof_photo_retake">Retake</string>
+    <!-- Read by screen readers on the picked photo -->
+    <string name="proof_photo_description">Your proof photo</string>
+    <!-- After the explorer refused the camera permission -->
+    <string name="proof_photo_camera_refused_title">Around can\'t use the camera</string>
+    <string name="proof_photo_camera_refused_body">Allow the camera in your phone\'s settings to take a photo here, or pick one from your gallery.</string>
+    <string name="proof_photo_open_settings">Open settings</string>
+</resources>
