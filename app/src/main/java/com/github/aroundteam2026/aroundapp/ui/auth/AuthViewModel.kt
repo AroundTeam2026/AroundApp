@@ -258,25 +258,25 @@ class AuthViewModel(
       call: suspend () -> Result<String>,
   ) {
     viewModelScope.launch {
-      var result: Result<String>? = null
       var prepared = false
-      try {
-        if (prepare().isFailure) {
-          _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
-          return@launch
-        }
-        prepared = true
-        result = call()
-      } finally {
-        if (prepared && result?.isSuccess != true) {
-          // The caller may already be cancelled; the saved signup choice must still be removed.
-          withContext(NonCancellable) { onFailure() }
-        }
-      }
-      val completed = checkNotNull(result)
+      var succeeded = false
+      val result =
+          try {
+            if (prepare().isFailure) {
+              _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
+              return@launch
+            }
+            prepared = true
+            call().also { succeeded = it.isSuccess }
+          } finally {
+            if (prepared && !succeeded) {
+              // The caller may already be cancelled; the saved signup choice must still be removed.
+              withContext(NonCancellable) { onFailure() }
+            }
+          }
       _uiState.update {
-        if (completed.isSuccess) AuthUiState()
-        else it.copy(isLoading = false, error = completed.exceptionOrNull()?.let(::toFormError))
+        if (result.isSuccess) AuthUiState()
+        else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
       }
     }
   }
