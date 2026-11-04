@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import android.net.Uri
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -12,7 +13,7 @@ import org.junit.Test
 
 /**
  * Tests [FakeProofPhotoRepository] against the [ProofPhotoRepository] contract, one behaviour per
- * test. Photos are mocks: a unit test can't build a real [Uri], and the fake never reads one.
+ * test. Photos are mocks: a unit test can't build a real [Uri], so the fake is given their bytes.
  */
 class FakeProofPhotoRepositoryTest {
   private lateinit var repository: FakeProofPhotoRepository
@@ -58,10 +59,44 @@ class FakeProofPhotoRepositoryTest {
         assertTrue(repository.uploads.isEmpty())
       }
 
+  @Test
+  fun download_returnsTheBytesUploadedAtThatLocation() =
+      runBlocking<Unit> {
+        val first = mockk<Uri>()
+        val retake = mockk<Uri>()
+        repository =
+            FakeProofPhotoRepository(read = { if (it === retake) RETAKE_BYTES else FIRST_BYTES })
+        repository.upload(RESERVATION_ID, first).getOrThrow()
+        val retakeLocation = repository.upload(RESERVATION_ID, retake).getOrThrow()
+
+        assertArrayEquals(RETAKE_BYTES, repository.download(retakeLocation).getOrThrow())
+      }
+
+  @Test
+  fun download_whereNothingWasUploaded_fails() =
+      runBlocking<Unit> {
+        val result = repository.download(UNKNOWN_LOCATION)
+
+        assertTrue(result.exceptionOrNull() is NoSuchElementException)
+      }
+
+  @Test
+  fun download_whenFailureIsForced_returnsIt() =
+      runBlocking<Unit> {
+        val location = repository.upload(RESERVATION_ID, mockk()).getOrThrow()
+        val failure = IllegalStateException(OFFLINE)
+        repository.forcedFailure = failure
+
+        assertEquals(failure, repository.download(location).exceptionOrNull())
+      }
+
   private companion object {
     const val RESERVATION_ID = "r1"
     const val GS_SCHEME = "gs://"
     const val RESERVATION_PROOFS = "/proofs/$RESERVATION_ID/"
     const val OFFLINE = "offline"
+    const val UNKNOWN_LOCATION = "gs://fake-bucket/proofs/$RESERVATION_ID/missing"
+    val FIRST_BYTES = byteArrayOf(1)
+    val RETAKE_BYTES = byteArrayOf(2)
   }
 }

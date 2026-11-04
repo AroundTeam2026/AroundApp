@@ -4,7 +4,8 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import android.net.Uri
 
 /**
- * Uploads the photos explorers submit as [Proof.Photo]. ViewModels depend on this interface only.
+ * Uploads the photos explorers submit as [Proof.Photo], and downloads them for the venue that
+ * reviews them and the party that took them. ViewModels depend on this interface only.
  */
 interface ProofPhotoRepository {
   /**
@@ -27,4 +28,19 @@ interface ProofPhotoRepository {
    *   finish in time.
    */
   suspend fun upload(reservationId: String, photo: Uri): Result<String>
+
+  /**
+   * Downloads the proof photo stored at [location], so a screen can show it without reading Cloud
+   * Storage itself. A photo is under 5 MB, so it is returned whole. Waits for the download to
+   * finish, for a bounded time, and fails if it doesn't finish in time.
+   *
+   * The security rules only let the venue of the photo's reservation and the joined members of its
+   * party read it, so the Storage implementation can fail where the fake doesn't check.
+   *
+   * @param location the photo's `gs://` location, as returned by [upload] and stored in
+   *   [Proof.Photo].
+   * @return the photo's bytes, or a failure if there is no photo at [location]
+   *   ([NoSuchElementException]), if the read was refused, failed, or didn't finish in time.
+   */
+  suspend fun download(location: String): Result<ByteArray>
 }
