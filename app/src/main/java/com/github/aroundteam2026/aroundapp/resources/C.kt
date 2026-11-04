@@ -256,5 +256,6 @@ object C {
     const val PROOF_PHOTO_GALLERY = "proof_photo_gallery"
     const val PROOF_PHOTO_RETAKE = "proof_photo_retake"
     const val PROOF_PHOTO_OPEN_SETTINGS = "proof_photo_open_settings"
+    const val PROOF_PHOTO_ERROR = "proof_photo_error"
   }
 }

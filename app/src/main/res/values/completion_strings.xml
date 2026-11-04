@@ -14,4 +14,8 @@
     <string name="proof_photo_camera_refused_title">Around can\'t use the camera</string>
     <string name="proof_photo_camera_refused_body">Allow the camera in your phone\'s settings to take a photo here, or pick one from your gallery.</string>
     <string name="proof_photo_open_settings">Open settings</string>
+    <!-- When taking or using a photo fails -->
+    <string name="proof_photo_no_camera">No camera app found. Pick a photo from your gallery instead.</string>
+    <string name="proof_photo_unreadable">Couldn\'t use this photo. Try another one.</string>
+    <string name="proof_photo_too_big">This photo is too big to send. Try another one.</string>
 </resources>

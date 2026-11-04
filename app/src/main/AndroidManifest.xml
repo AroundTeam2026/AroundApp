@@ -6,7 +6,9 @@
     <!-- The location repository needs one of these. Both are requested; the user may grant only the coarse one. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- Proof photos: declared, so Android asks the explorer before the app opens the camera -->
+    <!-- Proof photos. TakePicture opens the camera app, which works without this permission; once
+         it is declared, Android only opens the camera after the explorer allows it, which gives
+         the ask-first and refused states #330 asks for. Don't remove it as unused. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Phones without a camera can still install the app and pick a proof from the gallery -->
     <uses-feature

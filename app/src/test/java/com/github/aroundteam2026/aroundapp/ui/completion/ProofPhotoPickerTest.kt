@@ -15,12 +15,15 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.TakePicture
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -32,6 +35,8 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -51,34 +56,44 @@ class ProofPhotoPickerTest {
 
   private val app = ApplicationProvider.getApplicationContext<Application>()
   // Plain files instead of FileProvider, which can't find the cache under Windows paths
-  private val photos = ProofPhotos(app, Dispatchers.Unconfined, share = { Uri.fromFile(it) })
+  private val photos = proofPhotos()
   private val picked = mutableListOf<Uri>()
   private var retakes = 0
 
+  private fun proofPhotos(limitBytes: Int = Int.MAX_VALUE) =
+      ProofPhotos(app, Dispatchers.Unconfined, limitBytes, share = { Uri.fromFile(it) })
+
   /** Shows the picker with [photo]; each photo it hands over becomes the picked one. */
-  private fun show(results: FakeActivityResults, photo: Uri? = null): FakeActivityResults {
-    compose.setContent {
-      var current by remember { mutableStateOf(photo) }
-      CompositionLocalProvider(LocalActivityResultRegistryOwner provides results) {
-        AroundAppTheme {
-          ProofPhotoPicker(
-              venueName = "Café Lumière",
-              photo = current,
-              onPhotoPicked = {
-                picked += it
-                current = it
-              },
-              onRetake = {
-                retakes++
-                current = null
-              },
-              photos = photos,
-          )
-        }
-      }
-    }
+  private fun show(
+      results: FakeActivityResults,
+      photo: Uri? = null,
+      photos: ProofPhotos = this.photos,
+  ): FakeActivityResults {
+    compose.setContent { Picker(results, photo, photos) }
     compose.waitForIdle()
     return results
+  }
+
+  @Composable
+  private fun Picker(results: FakeActivityResults, photo: Uri?, photos: ProofPhotos) {
+    var current by remember { mutableStateOf(photo) }
+    CompositionLocalProvider(LocalActivityResultRegistryOwner provides results) {
+      AroundAppTheme {
+        ProofPhotoPicker(
+            venueName = "Café Lumière",
+            photo = current,
+            onPhotoPicked = {
+              picked += it
+              current = it
+            },
+            onRetake = {
+              retakes++
+              current = null
+            },
+            photos = photos,
+        )
+      }
+    }
   }
 
   private fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true)
@@ -96,6 +111,13 @@ class ProofPhotoPickerTest {
     compose.waitForIdle()
   }
 
+  private fun FakeActivityResults.cameraFile() =
+      File((inputsOf<TakePicture>().single() as Uri).path!!)
+
+  private fun errorSays(text: String) {
+    node(C.Tag.PROOF_PHOTO_ERROR).assertIsDisplayed().assertTextEquals(text)
+  }
+
   @Test
   fun takingAPhotoAsksForTheCameraFirst() {
     val results = show(FakeActivityResults(permission = true, camera = photo()))
@@ -107,7 +129,7 @@ class ProofPhotoPickerTest {
   }
 
   @Test
-  fun aTakenPhotoIsPickedAndShown() {
+  fun aTakenPhotoIsShrunkPickedAndShownAndTheOriginalDeleted() {
     allowCamera()
     val results = show(FakeActivityResults(camera = photo()))
 
@@ -115,28 +137,49 @@ class ProofPhotoPickerTest {
 
     // An allowed camera opens without asking again
     assertTrue(results.inputsOf<RequestPermission>().isEmpty())
-    assertEquals(results.inputsOf<TakePicture>(), picked)
+    assertNotEquals(results.inputsOf<TakePicture>(), picked)
+    assertTrue(File(picked.single().path!!).exists())
+    assertFalse(results.cameraFile().exists())
     node(C.Tag.PROOF_PHOTO_IMAGE).assertIsDisplayed()
     node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
   }
 
   @Test
-  fun aCancelledCameraPicksNothing() {
+  fun aCancelledCameraPicksNothingAndLeavesNoFile() {
     allowCamera()
-    show(FakeActivityResults(camera = null))
+    val results = show(FakeActivityResults(camera = null))
 
     tap(C.Tag.PROOF_PHOTO_TAKE)
 
     assertTrue(picked.isEmpty())
+    assertFalse(results.cameraFile().exists())
     node(C.Tag.PROOF_PHOTO_TAKE).assertIsDisplayed()
   }
 
   @Test
-  fun withoutACameraAppNothingOpensAndTheGalleryStillWorks() {
+  fun aPhotoTakenWhileTheActivityWasRecreatedIsStillPicked() {
+    allowCamera()
+    val results = FakeActivityResults(camera = photo(), holdCamera = true)
+    val restoration = StateRestorationTester(compose)
+    restoration.setContent { Picker(results, photo = null, photos = photos) }
+    tap(C.Tag.PROOF_PHOTO_TAKE)
+
+    // The camera app is still open when the activity is recreated, then returns its photo
+    restoration.emulateSavedInstanceStateRestore()
+    results.finishCamera()
+    compose.waitForIdle()
+
+    assertEquals(1, picked.size)
+    node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
+  }
+
+  @Test
+  fun withoutACameraAppTheBoxSaysSoAndTheGalleryStillWorks() {
     allowCamera()
     show(FakeActivityResults(noCameraApp = true, gallery = testImage(app, 80, 60)))
 
     tap(C.Tag.PROOF_PHOTO_TAKE)
+    errorSays("No camera app found. Pick a photo from your gallery instead.")
     tap(C.Tag.PROOF_PHOTO_GALLERY)
 
     assertEquals(1, picked.size)
@@ -176,14 +219,27 @@ class ProofPhotoPickerTest {
   }
 
   @Test
-  fun theGalleryAsksForNoPermissionAndItsPhotoIsPicked() {
+  fun afterARefusedCameraTheGalleryStillPicksAPhoto() {
+    show(FakeActivityResults(permission = false, gallery = testImage(app, 80, 60)))
+    tap(C.Tag.PROOF_PHOTO_TAKE)
+
+    tap(C.Tag.PROOF_PHOTO_GALLERY)
+
+    assertEquals(1, picked.size)
+    node(C.Tag.PROOF_PHOTO_IMAGE).assertIsDisplayed()
+  }
+
+  @Test
+  fun theGalleryAsksForNoPermissionAndAShrunkCopyIsPicked() {
     val image = testImage(app, 80, 60)
     val results = show(FakeActivityResults(gallery = image))
 
     tap(C.Tag.PROOF_PHOTO_GALLERY)
 
     assertTrue(results.inputsOf<RequestPermission>().isEmpty())
-    assertEquals(listOf(image), picked)
+    assertNotEquals(image, picked.single())
+    // The gallery's photo is the explorer's: it stays where it was
+    assertTrue(File(image.path!!).exists())
     node(C.Tag.PROOF_PHOTO_IMAGE).assertIsDisplayed()
   }
 
@@ -198,12 +254,39 @@ class ProofPhotoPickerTest {
   }
 
   @Test
-  fun retakeClearsThePhotoBackToTheChoices() {
-    show(FakeActivityResults(), photo = testImage(app, 80, 60))
+  fun aPhotoThatCantBeReadSaysSoAndPicksNothing() {
+    val text = File(app.cacheDir, "not-a-photo.txt").apply { writeText("hello") }
+    show(FakeActivityResults(gallery = Uri.fromFile(text)))
+
+    tap(C.Tag.PROOF_PHOTO_GALLERY)
+
+    assertTrue(picked.isEmpty())
+    errorSays("Couldn't use this photo. Try another one.")
+  }
+
+  @Test
+  fun aPhotoStillTooBigOnceShrunkSaysSoAndPicksNothing() {
+    show(
+        FakeActivityResults(gallery = testImage(app, 80, 60)),
+        photos = proofPhotos(limitBytes = 1),
+    )
+
+    tap(C.Tag.PROOF_PHOTO_GALLERY)
+
+    assertTrue(picked.isEmpty())
+    errorSays("This photo is too big to send. Try another one.")
+  }
+
+  @Test
+  fun retakeClearsThePhotoAndDeletesItsCopy() {
+    show(FakeActivityResults(gallery = testImage(app, 80, 60)))
+    tap(C.Tag.PROOF_PHOTO_GALLERY)
+    val copy = File(picked.single().path!!)
 
     tap(C.Tag.PROOF_PHOTO_RETAKE)
 
     assertEquals(1, retakes)
+    assertFalse(copy.exists())
     node(C.Tag.PROOF_PHOTO_TAKE).assertIsDisplayed()
   }
 
@@ -234,20 +317,37 @@ class ProofPhotoPickerTest {
 /**
  * Answers the picker's requests in place of Android and the other apps, and records them: the
  * camera permission with [permission], the camera by writing [camera] into its file (or cancelling
- * when null, or failing when there is [noCameraApp]), and the gallery with [gallery].
+ * when null, or failing when there is [noCameraApp]), and the gallery with [gallery]. With
+ * [holdCamera], the camera stays open until [finishCamera].
  */
 internal class FakeActivityResults(
     private val permission: Boolean? = null,
     private val camera: Bitmap? = null,
     private val noCameraApp: Boolean = false,
     private val gallery: Uri? = null,
+    private val holdCamera: Boolean = false,
 ) : ActivityResultRegistryOwner {
   val launches = mutableListOf<Pair<ActivityResultContract<*, *>, Any?>>()
+  private var heldCamera: Pair<Int, Uri>? = null
 
   inline fun <reified T : ActivityResultContract<*, *>> inputsOf() =
       launches.filter { it.first is T }.map { it.second }
 
-  override val activityResultRegistry =
+  /** Writes [camera] into the held camera's file and returns it to the picker. */
+  fun finishCamera() {
+    val (requestCode, target) = checkNotNull(heldCamera) { "The camera isn't open" }
+    heldCamera = null
+    takePhoto(requestCode, target)
+  }
+
+  private fun takePhoto(requestCode: Int, target: Uri) {
+    camera?.let { photo ->
+      File(target.path!!).outputStream().use { photo.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+    }
+    activityResultRegistry.dispatchResult(requestCode, camera != null)
+  }
+
+  override val activityResultRegistry: ActivityResultRegistry =
       object : ActivityResultRegistry() {
         override fun <I, O> onLaunch(
             requestCode: Int,
@@ -260,14 +360,9 @@ internal class FakeActivityResults(
           }
           launches += contract to input
           when (contract) {
-            is TakePicture -> {
-              camera?.let { photo ->
-                File((input as Uri).path!!).outputStream().use {
-                  photo.compress(Bitmap.CompressFormat.JPEG, 90, it)
-                }
-              }
-              dispatchResult(requestCode, camera != null)
-            }
+            is TakePicture ->
+                if (holdCamera) heldCamera = requestCode to input as Uri
+                else takePhoto(requestCode, input as Uri)
             is RequestPermission -> permission?.let { dispatchResult(requestCode, it) }
             is PickVisualMedia -> dispatchResult(requestCode, gallery)
             else -> error("Unexpected request: $contract")

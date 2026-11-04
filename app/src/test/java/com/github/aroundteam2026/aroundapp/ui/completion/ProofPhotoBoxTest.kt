@@ -2,8 +2,13 @@
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -23,7 +28,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The three states of the proof photo box, as drawn, without the camera or the gallery. */
+/**
+ * The three states of the proof photo box, with its errors and while disabled, as drawn, without
+ * the camera or the gallery.
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "en-w413dp-h917dp-mdpi")
@@ -37,6 +45,8 @@ class ProofPhotoBoxTest {
       picked: Boolean = false,
       preview: ImageBitmap? = null,
       cameraRefused: Boolean = false,
+      error: ProofPhotoError? = null,
+      enabled: Boolean = true,
   ) {
     compose.setContent {
       AroundAppTheme {
@@ -49,6 +59,8 @@ class ProofPhotoBoxTest {
             onChooseFromGallery = { calls += "gallery" },
             onOpenSettings = { calls += "settings" },
             onRetake = { calls += "retake" },
+            error = error,
+            enabled = enabled,
         )
       }
     }
@@ -113,6 +125,50 @@ class ProofPhotoBoxTest {
 
     node(C.Tag.PROOF_PHOTO_IMAGE).assertDoesNotExist()
     node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
+  }
+
+  @Test
+  fun eachErrorIsSaidUnderTheButtons() {
+    var shown by mutableStateOf<ProofPhotoError?>(null)
+    compose.setContent {
+      AroundAppTheme { ProofPhotoBox(VENUE, false, null, false, {}, {}, {}, {}, error = shown) }
+    }
+
+    mapOf(
+            ProofPhotoError.NO_CAMERA to R.string.proof_photo_no_camera,
+            ProofPhotoError.UNREADABLE to R.string.proof_photo_unreadable,
+            ProofPhotoError.TOO_BIG to R.string.proof_photo_too_big,
+        )
+        .forEach { (error, message) ->
+          shown = error
+          node(C.Tag.PROOF_PHOTO_ERROR).assertTextEquals(app.getString(message))
+        }
+  }
+
+  @Test
+  fun withoutAnErrorNothingIsSaid() {
+    show()
+
+    node(C.Tag.PROOF_PHOTO_ERROR).assertDoesNotExist()
+  }
+
+  @Test
+  fun whileDisabledTheButtonsDoNothing() {
+    show(enabled = false)
+
+    node(C.Tag.PROOF_PHOTO_TAKE).assertIsNotEnabled().performClick()
+    node(C.Tag.PROOF_PHOTO_GALLERY).assertIsNotEnabled().performClick()
+
+    assertEquals(emptyList<String>(), calls)
+  }
+
+  @Test
+  fun whileDisabledRetakeDoesNothing() {
+    show(picked = true, enabled = false)
+
+    node(C.Tag.PROOF_PHOTO_RETAKE).performClick()
+
+    assertEquals(emptyList<String>(), calls)
   }
 
   private companion object {
