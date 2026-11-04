@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import androidx.activity.compose.BackHandler
@@ -48,6 +49,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -74,7 +76,7 @@ fun CreateQuestScreen(
   val currentOnCreated by rememberUpdatedState(onCreated)
   LaunchedEffect(state.saveState) {
     when (val save = state.saveState) {
-      is SaveState.Saved -> currentOnCreated(save.questId)
+      is SaveState.Saved -> currentOnCreated(save.id)
       SaveState.Failed -> {
         // Launched in the screen's scope, not in this effect: clearing the error changes the
         // effect's key, which would cancel a snackbar shown from inside it

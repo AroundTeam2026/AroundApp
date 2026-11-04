@@ -20,6 +20,7 @@ Go through each point before approving (or opening) a pull request.
 - [ ] Every behaviour in the acceptance criteria and KDoc is covered, including error paths and "nothing changes on failure"
 - [ ] Async and flow tests can't pass vacuously or hang: they subscribe before acting and use a timeout
 - [ ] Tests use fakes or emulators, not the real Firebase project
+- [ ] Instrumented tests reuse the shared setup in `androidTest/.../testing/` and add no seconds-long per-test setup (new Firebase clients, extra sign-ins, `terminate()` in `@After`); the CI's instrumented-tests step is not noticeably slower than on main
 
 ## Design
 - [ ] MVVM separation is respected (ViewModels never import Firebase)

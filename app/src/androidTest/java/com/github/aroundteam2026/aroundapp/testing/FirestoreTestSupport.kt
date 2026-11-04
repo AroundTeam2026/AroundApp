@@ -52,20 +52,32 @@ fun withTimeoutBlocking(block: suspend CoroutineScope.() -> Unit) = runBlocking 
  *
  * The app is on the `demo-project` id and never the default app, so a test cannot reach the real
  * project. [FirebaseEmulator.connect] only configures the default app, so this reuses its host and
- * ports instead. The client caches in memory only, so a fresh client reads from the server.
+ * ports instead. The client caches in memory only and drops documents no listener or write needs.
  *
- * A test uses one name per role it needs, such as a second user or a client it terminates on
- * purpose, and terminates every client it gets, so no listener or cached data leaks into the next
- * test.
+ * Every call for the same name returns the same client until someone terminates it, so its
+ * connection stays open from one test to the next: opening a new client and terminating it costs
+ * about a second, against tens of milliseconds for a write on an open one. A test uses one name per
+ * role it needs and signs a fresh user in on it with [signInNewUser], so tests never see each
+ * other's data. A test that terminates a client on purpose uses a name of its own; the next call
+ * for that name returns a new client.
  */
-fun emulatorClient(appName: String): FirebaseFirestore =
-    FirebaseFirestore.getInstance(emulatorApp(appName)).apply {
-      useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
-      firestoreSettings =
+fun emulatorClient(appName: String): FirebaseFirestore {
+  val db = FirebaseFirestore.getInstance(emulatorApp(appName))
+  synchronized(configuredClients) {
+    // A started client can't be configured again; after terminate(), getInstance returns a new one
+    if (configuredClients.add(db)) {
+      db.useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
+      db.firestoreSettings =
           FirebaseFirestoreSettings.Builder()
               .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
               .build() // keep local cache in ram only
     }
+  }
+  return db
+}
+
+/** Every client [emulatorClient] has configured, by identity. */
+private val configuredClients = mutableSetOf<FirebaseFirestore>()
 
 /**
  * Returns a Cloud Storage client of the [FirebaseApp] named [appName], on the Storage emulator's
@@ -82,9 +94,10 @@ fun emulatorStorage(appName: String): FirebaseStorage =
     }
 
 /**
- * Creates a fresh user on the Auth emulator and signs them in on the app named [appName], so that
- * app's Firestore client acts as them. With a [role], it also saves their `users/{uid}` profile
- * through the rules, as the app does; the rules only let venue accounts write venues and quests.
+ * Creates a fresh user on the Auth emulator and signs them in on the app named [appName], in place
+ * of whoever was signed in there, so that app's [emulatorClient] acts as them once this returns.
+ * With a [role], it also saves their `users/{uid}` profile through the rules, as the app does; the
+ * rules only let venue accounts write venues and quests.
  *
  * @return the new user's uid.
  */
@@ -92,17 +105,15 @@ suspend fun signInNewUser(appName: String, role: Role? = null): String {
   val email = "$appName-${UUID.randomUUID()}@around.test"
   val auth = FirebaseAuth.getInstance(emulatorApp(appName))
   val uid = auth.createUserWithEmailAndPassword(email, PASSWORD).await().user!!.uid
+  // Auth tells the app's Firestore client on the main thread, so a write issued before that is
+  // queued for the previous user and never sent
+  InstrumentationRegistry.getInstrumentation().waitForIdleSync()
   if (role != null) {
-    // Terminated afterwards, so the test's own emulatorClient call gets a fresh client to configure
-    val db = emulatorClient(appName)
-    try {
-      db.collection("users")
-          .document(uid)
-          .set(mapOf("displayName" to "Test", "role" to role.name, "createdAt" to Timestamp.now()))
-          .await()
-    } finally {
-      db.terminate().await()
-    }
+    emulatorClient(appName)
+        .collection("users")
+        .document(uid)
+        .set(mapOf("displayName" to "Test", "role" to role.name, "createdAt" to Timestamp.now()))
+        .await()
   }
   return uid
 }

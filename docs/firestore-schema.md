@@ -102,7 +102,7 @@ One completion per explorer and reservation (`completionId`). The id is built fr
 | `reservationId` | string | The quest is the reservation's, so it isn't stored here. |
 | `venueId` | string | Id of the venue that owns the quest. |
 | `explorerUid` | string | |
-| `photoUrl` | string? | Cloud Storage URL of the photo, under `proofs/{reservationId}/` (see [Cloud Storage](#cloud-storage)), for a `PHOTO` quest. At most 2000 characters. |
+| `photoUrl` | string? | The photo's Cloud Storage location (`gs://...`, not a download URL), under `proofs/{reservationId}/` (see [Cloud Storage](#cloud-storage)), for a `PHOTO` quest. At most 2000 characters. |
 | `textAnswer` | string? | The written answer, for a `TEXT` quest. At most 1000 characters. |
 | `status` | `PENDING`, `APPROVED` or `REJECTED` | |
 | `rejectReason` | string? | Required when `status` is `REJECTED`, not blank and at most 300 characters; must be absent otherwise. Enforced in `Completion` and by the rules. |
@@ -110,7 +110,7 @@ One completion per explorer and reservation (`completionId`). The id is built fr
 
 Exactly one of `photoUrl` and `textAnswer` is present, and it isn't blank (enforced by `Proof`). Which one must match the quest's `proofType`, which the rules check.
 
-Read and written through `CompletionRepository`, with `FakeCompletionRepository` for unit tests. The Firestore implementation comes with #326.
+Read and written through `CompletionRepository`: `CompletionRepositoryFirestore` in the app, `FakeCompletionRepository` in unit tests.
 
 ## Allowed status transitions
 
