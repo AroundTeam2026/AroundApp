@@ -100,7 +100,7 @@ The size of a party is the number of its `JOINED` members (`observeJoinedCounts`
 | `reservationId` | string | The quest is the reservation's, so it isn't stored here. |
 | `venueId` | string | Id of the venue that owns the quest. |
 | `explorerUid` | string | |
-| `photoUrl` | string? | Cloud Storage URL of the photo, for a `PHOTO` quest. |
+| `photoUrl` | string? | Cloud Storage URL of the photo, under `proofs/{reservationId}/` (see [Cloud Storage](#cloud-storage)), for a `PHOTO` quest. |
 | `textAnswer` | string? | The written answer, for a `TEXT` quest. |
 | `status` | `PENDING`, `APPROVED` or `REJECTED` | |
 | `rejectReason` | string? | Required when `status` is `REJECTED`; must be absent otherwise. Enforced in `Completion`. |
@@ -140,6 +140,16 @@ Every create and update must match its collection's table above: only the listed
 | `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
 
 Joining a party needs only its reservation's id, and a `JOINED` membership lets the explorer read and cancel the reservation. So an explorer who learns the id of someone else's `PENDING` reservation can join that party and cancel it. Ids are random and only shown to the party and the venue, so this rests on them staying private. An invite check, e.g. when parties get companions, would close it.
+
+## Cloud Storage
+
+From `storage.rules`. Anything not listed is denied, including listing, overwriting and deleting.
+
+| Path | Read | Write |
+|---|---|---|
+| `proofs/{reservationId}/{photoId}` | The reservation's party's `JOINED` members and its venue | A `JOINED` member of the reservation creates it while the reservation is `APPROVED`: an image (`image/*`) under 5 MB. Each photo gets a new `photoId`, so a retake never replaces an earlier one. |
+
+The rules read the reservation and the membership from Firestore, so a proof follows the same party as `reservations`. A completion's `photoUrl` points to its photo here.
 
 ## Decided changes
 

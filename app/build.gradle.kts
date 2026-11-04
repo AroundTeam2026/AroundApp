@@ -164,6 +164,9 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
+  // Proof photos (#328). Firebase only registers what the app's own manifest lists, so instrumented
+  // tests that use Storage, like the storage.rules tests, need it here too.
+  implementation(libs.firebase.storage)
   implementation(libs.compose.ui)
   implementation(libs.compose.ui.graphics)
   implementation(libs.compose.material3)

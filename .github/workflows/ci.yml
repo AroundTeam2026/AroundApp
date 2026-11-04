@@ -173,8 +173,8 @@ jobs:
         run: |
           export JAVA_HOME="$JAVA_HOME_21_X64"
           export PATH="$JAVA_HOME/bin:$PATH"
-          firebase emulators:start --only auth,firestore --project demo-project &
-          npx wait-on tcp:9099 tcp:8080
+          firebase emulators:start --only auth,firestore,storage --project demo-project &
+          npx wait-on tcp:9099 tcp:8080 tcp:9199
 
       # Run unit tests + lint
       - name: Run tests
