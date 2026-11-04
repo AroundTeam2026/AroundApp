@@ -4,6 +4,12 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import android.net.Uri
 
 /**
+ * A proof photo must be smaller than this many bytes, 5 MB, as `storage.rules` require.
+ * [ProofPhotoRepository.upload] checks it before uploading.
+ */
+const val PROOF_PHOTO_LIMIT_BYTES = 5 * 1024 * 1024
+
+/**
  * Uploads the photos explorers submit as [Proof.Photo], and downloads them for the venue that
  * reviews them and the party that took them. ViewModels depend on this interface only.
  */
@@ -19,10 +25,13 @@ interface ProofPhotoRepository {
    * Firestore write, an upload isn't kept for later while offline, so it fails if it doesn't finish
    * in time.
    *
+   * A photo of [PROOF_PHOTO_LIMIT_BYTES] or more fails with [IllegalArgumentException] before
+   * anything is uploaded, so it must be made smaller first.
+   *
    * The security rules only let a joined member of an approved reservation upload, and only an
-   * image under 5 MB, so the Storage implementation can fail where the fake doesn't check. Such a
-   * refusal fails the same way on every retry: e.g. a larger photo must be made smaller first, and
-   * a reservation cancelled after its approval never takes a proof again.
+   * image, so the Storage implementation can fail where the fake doesn't check. Such a refusal
+   * fails the same way on every retry: e.g. a reservation cancelled after its approval never takes
+   * a proof again.
    *
    * [photo] must still be readable when this is called: the photo picker only lets the app read
    * what it picked while the screen that picked it lives, so after the app was closed, or if the
@@ -31,15 +40,17 @@ interface ProofPhotoRepository {
    *
    * @param reservationId id of the approved reservation the photo proves.
    * @param photo the photo to upload, e.g. as returned by the photo picker or the camera.
-   * @return the photo's `gs://` location, or a failure if [photo] can't be read, or if the upload
-   *   was refused, failed, or didn't finish in time.
+   * @return the photo's `gs://` location, or a failure if [photo] is too large
+   *   ([IllegalArgumentException]) or can't be read, or if the upload was refused, failed, or
+   *   didn't finish in time.
    */
   suspend fun upload(reservationId: String, photo: Uri): Result<String>
 
   /**
    * Downloads the proof photo stored at [location], so a screen can show it without reading Cloud
-   * Storage itself. A photo is under 5 MB, so it is returned whole. Waits for the download to
-   * finish, for a bounded time, and fails if it doesn't finish in time.
+   * Storage itself. A photo is smaller than [PROOF_PHOTO_LIMIT_BYTES], so it is returned whole, in
+   * a new array on every call. Waits for the download to finish, for a bounded time, and fails if
+   * it doesn't finish in time.
    *
    * The security rules only let the venue of the photo's reservation and the joined members of its
    * party read it, so the Storage implementation can fail where the fake doesn't check.

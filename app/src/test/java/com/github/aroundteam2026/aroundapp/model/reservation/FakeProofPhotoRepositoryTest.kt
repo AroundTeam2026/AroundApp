@@ -60,6 +60,26 @@ class FakeProofPhotoRepositoryTest {
       }
 
   @Test
+  fun upload_photoAtTheSizeLimit_failsBeforeTheBackendAndRecordsNothing() =
+      runBlocking<Unit> {
+        repository = FakeProofPhotoRepository(read = { ByteArray(PROOF_PHOTO_LIMIT_BYTES) })
+        repository.forcedFailure = IllegalStateException(OFFLINE)
+
+        val result = repository.upload(RESERVATION_ID, mockk())
+
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        assertTrue(repository.uploads.isEmpty())
+      }
+
+  @Test
+  fun upload_photoJustUnderTheSizeLimit_succeeds() =
+      runBlocking<Unit> {
+        repository = FakeProofPhotoRepository(read = { ByteArray(PROOF_PHOTO_LIMIT_BYTES - 1) })
+
+        assertTrue(repository.upload(RESERVATION_ID, mockk()).isSuccess)
+      }
+
+  @Test
   fun download_returnsTheBytesUploadedAtThatLocation() =
       runBlocking<Unit> {
         val first = mockk<Uri>()
@@ -70,6 +90,18 @@ class FakeProofPhotoRepositoryTest {
         val retakeLocation = repository.upload(RESERVATION_ID, retake).getOrThrow()
 
         assertArrayEquals(RETAKE_BYTES, repository.download(retakeLocation).getOrThrow())
+      }
+
+  @Test
+  fun download_returnsANewCopyEachTime() =
+      runBlocking<Unit> {
+        val original = byteArrayOf(ORIGINAL_BYTE)
+        repository = FakeProofPhotoRepository(read = { original.copyOf() })
+        val location = repository.upload(RESERVATION_ID, mockk()).getOrThrow()
+
+        repository.download(location).getOrThrow()[0] = CHANGED_BYTE
+
+        assertArrayEquals(original, repository.download(location).getOrThrow())
       }
 
   @Test
@@ -107,6 +139,8 @@ class FakeProofPhotoRepositoryTest {
     const val OFFLINE = "offline"
     const val FOREIGN_LOCATION = "gs://other-bucket/proofs/$RESERVATION_ID/photo-1"
     const val UNKNOWN_LOCATION = "gs://fake-bucket/proofs/$RESERVATION_ID/missing"
+    const val ORIGINAL_BYTE: Byte = 1
+    const val CHANGED_BYTE: Byte = 2
     val FIRST_BYTES = byteArrayOf(1)
     val RETAKE_BYTES = byteArrayOf(2)
   }
