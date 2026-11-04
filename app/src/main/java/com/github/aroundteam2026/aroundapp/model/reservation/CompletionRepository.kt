@@ -57,8 +57,24 @@ interface CompletionRepository {
   fun observeForVenue(venueId: String): Flow<List<Completion>>
 
   /**
-   * Moves a completion to [CompletionStatus.APPROVED], changing nothing else. The security rules
-   * only let the venue that owns it do so, so the Firestore implementation fails for anyone else.
+   * Observes every completion of one reservation, so its party sees each other's submissions. Emits
+   * the current list on collection, then again whenever one is added or changes.
+   *
+   * The security rules only let a joined member of the party run this, so the Firestore
+   * implementation's flow fails for anyone else; a venue uses [observeForVenue] instead.
+   *
+   * @param reservationId id of the reservation whose completions to return.
+   * @return all of that reservation's completions, whatever their status, in unspecified order.
+   * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
+   *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
+   */
+  fun observeForReservation(reservationId: String): Flow<List<Completion>>
+
+  /**
+   * Moves a pending or rejected completion to [CompletionStatus.APPROVED], removing any reject
+   * reason and changing nothing else, so a venue can change its mind about a rejection. The
+   * security rules only let the venue that owns it do so, so the Firestore implementation fails for
+   * anyone else.
    *
    * @param id id of the completion.
    * @return success, or a failure if there is no completion with this id

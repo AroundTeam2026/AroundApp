@@ -77,6 +77,11 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     it.venueId == venueId
   }
 
+  /** Emits every stored completion of [reservationId], and again whenever that list changes. */
+  override fun observeForReservation(reservationId: String): Flow<List<Completion>> = observe {
+    it.reservationId == reservationId
+  }
+
   /**
    * Approves the completion with [id]. Fails, changing nothing, if there is no such completion, if
    * [canTransition] forbids the change, or if [forcedFailure] is set.

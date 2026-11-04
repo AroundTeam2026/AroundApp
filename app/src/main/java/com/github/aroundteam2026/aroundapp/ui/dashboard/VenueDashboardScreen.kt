@@ -22,11 +22,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,11 +59,13 @@ import com.github.aroundteam2026.aroundapp.ui.venuepage.venueAvatarStyle
 import java.time.Clock
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 /**
  * The venue's Dashboard tab, as the Figma frame `Venue dashboard`: a header with the venue and
  * today's date, the pending and active quests counts, then the reservations that need an answer and
- * the approved ones. Approve and Decline answer a pending reservation.
+ * the approved ones. Approve and Decline answer a pending reservation: its buttons are disabled
+ * while the answer is saved, and a failed answer shows a snackbar once.
  *
  * Figma's "Today" count is left out: reservations have no visit time yet (see
  * [VenueDashboardUiState]).
@@ -66,18 +73,32 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun VenueDashboardScreen(viewModel: VenueDashboardViewModel, modifier: Modifier = Modifier) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val snackbarHostState = remember { SnackbarHostState() }
+  val scope = rememberCoroutineScope()
+  val updateFailed = stringResource(R.string.dashboard_update_failed)
+  LaunchedEffect(state.updateFailed) {
+    if (state.updateFailed) {
+      // Launched in the screen's scope, not in this effect: clearing the error changes the
+      // effect's key, which would cancel a snackbar shown from inside it
+      scope.launch { snackbarHostState.showSnackbar(updateFailed) }
+      // Cleared at once, so the snackbar doesn't show again when the screen is recreated
+      viewModel.clearUpdateError()
+    }
+  }
   VenueDashboardContent(
       state,
       onApprove = viewModel::approve,
       onDecline = viewModel::decline,
       onRetry = viewModel::retry,
       modifier = modifier,
+      snackbarHostState = snackbarHostState,
   )
 }
 
 /**
  * Stateless dashboard showing [state]. [onApprove] and [onDecline] take a reservation's id;
- * [onRetry] listens again after a failure. [clock] dates the header and the rows.
+ * [onRetry] listens again after a failure. [snackbarHostState] shows a failed answer. [clock] dates
+ * the header and the rows.
  */
 @Composable
 internal fun VenueDashboardContent(
@@ -86,6 +107,7 @@ internal fun VenueDashboardContent(
     onDecline: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     clock: Clock = Clock.systemDefaultZone(),
 ) {
   Box(
@@ -104,6 +126,7 @@ internal fun VenueDashboardContent(
       VenueDashboardStatus.FAILED -> LoadFailed(onRetry)
       VenueDashboardStatus.LOADED -> Dashboard(state, onApprove, onDecline, clock)
     }
+    SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
   }
 }
 
@@ -130,7 +153,7 @@ private fun Dashboard(
       item { NoReservations() }
     } else {
       section(R.string.dashboard_needs_answer, state.needsAnswer.size, C.Tag.DASHBOARD_NEEDS_ANSWER)
-      reservations(pending, onApprove, onDecline, clock)
+      reservations(pending, state.savingIds, onApprove, onDecline, clock)
       if (pending.size < state.needsAnswer.size) {
         item {
           TextButton(
@@ -146,7 +169,7 @@ private fun Dashboard(
         }
       }
       section(R.string.dashboard_upcoming, state.upcoming.size, C.Tag.DASHBOARD_UPCOMING)
-      reservations(state.upcoming, onApprove, onDecline, clock)
+      reservations(state.upcoming, state.savingIds, onApprove, onDecline, clock)
     }
   }
 }
@@ -253,8 +276,10 @@ private fun LazyListScope.section(@StringRes title: Int, count: Int, tag: String
   }
 }
 
+/** The rows of [reservations]; those in [savingIds] have their buttons disabled. */
 private fun LazyListScope.reservations(
     reservations: List<DashboardReservation>,
+    savingIds: Set<String>,
     onApprove: (String) -> Unit,
     onDecline: (String) -> Unit,
     clock: Clock,
@@ -264,6 +289,7 @@ private fun LazyListScope.reservations(
         it,
         onDecline = { onDecline(it.reservationId) },
         onApprove = { onApprove(it.reservationId) },
+        saving = it.reservationId in savingIds,
         clock = clock,
     )
   }
