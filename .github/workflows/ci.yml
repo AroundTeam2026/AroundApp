@@ -15,17 +15,19 @@ on:
       - synchronize
       - reopened
 
-# A new push to a PR cancels that PR's older run, whose result no one will read. Runs on main all
-# finish, so every merge keeps its own result.
+# A new push to a PR cancels that PR's older run, whose result no one will read. Every push to main
+# gets a group of its own, so its run always finishes and every merge keeps its own result: in a
+# shared group, GitHub keeps one pending run and drops the older one.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The jobs run in parallel, each on its own runner, so a run takes as long as its slowest job
 # rather than the sum of its parts: `checks` formats, lints and unit-tests; each `instrumented`
 # job boots an emulator and runs one shard of the instrumented tests; `report` waits for them all,
 # merges their coverage and uploads it to SonarCloud. Every job starts from the same
-# .github/actions/setup-build.
+# .github/actions/setup-build. The report job is named CI: main's ruleset requires a check of that
+# name, the single job's, and the report is the one that is green only when every job is.
 jobs:
   checks:
     name: Format, lint and unit tests
@@ -253,20 +255,32 @@ jobs:
           path: app/build/outputs/androidTest-results/connected/
           retention-days: 7
 
-      # This shard's coverage, for the report job to merge with the other shards' and the unit tests'
+      # This shard's coverage, for the report job to merge with the other shards' and the unit
+      # tests'. A missing file is an error: the report would otherwise pass with less coverage and
+      # no sign of why.
       - name: Upload instrumented test coverage
         uses: actions/upload-artifact@v7
         with:
           name: instrumented-coverage-${{ matrix.shard }}
           path: app/build/outputs/code_coverage/debugAndroidTest/connected/
+          if-no-files-found: error
           retention-days: 1
 
   report:
-    name: Coverage and SonarCloud
+    name: CI
     needs: [checks, instrumented]
+    # Runs after a failure too, so the required check turns red instead of waiting for a report
+    # that never comes; a cancelled run has a newer one to report for it
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
 
     steps:
+      - name: Fail when a job this depends on failed
+        if: ${{ contains(needs.*.result, 'failure') }}
+        run: |
+          echo "::error::A job this report depends on failed; see the checks and instrumented jobs."
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
