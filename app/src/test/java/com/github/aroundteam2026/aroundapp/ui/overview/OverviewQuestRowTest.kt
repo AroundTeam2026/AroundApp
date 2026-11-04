@@ -22,9 +22,11 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -155,6 +157,8 @@ class OverviewQuestRowTest {
   // java.time rejects with "Unknown pattern letter: b". The slot's formats must still read them.
   @Test
   fun aSlotFormatReadsPatternLettersJavaTimeDoesNot() {
+    // The premise: if java.time ever learns "b", this test no longer proves anything
+    assertThrows(IllegalArgumentException::class.java) { DateTimeFormatter.ofPattern("h:mm b") }
     val time = slotFormat("hmb", Locale.ENGLISH, UTC).format(Date(SLOT))
 
     // Checked in parts, as the space before AM varies
