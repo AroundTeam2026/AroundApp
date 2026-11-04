@@ -14,6 +14,12 @@ on:
       - synchronize
       - reopened
 
+# A new push to a PR cancels that PR's older run, whose result no one will read. Runs on main all
+# finish, so every merge keeps its own result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ci:
     name: CI
@@ -111,9 +117,12 @@ jobs:
 
       # The runner's command-line tools (12.0) predate the pixel_9 profile, so avdmanager rejects it.
       # When the runner has none, android-emulator-runner installs the newer ones it bundles. That
-      # behaviour is the action's own, so both emulator steps pin its exact version.
+      # behaviour is the action's own, so both emulator steps pin its exact version. The runner sets
+      # ANDROID_HOME for shell steps only; writing it to GITHUB_ENV lets the system image cache read it.
       - name: Remove the runner's outdated Android command-line tools
-        run: rm -rf "$ANDROID_HOME/cmdline-tools"
+        run: |
+          rm -rf "$ANDROID_HOME/cmdline-tools"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
       # Cache the Emulator, if the cache does not hit, create the emulator
       - name: AVD cache
@@ -124,6 +133,15 @@ jobs:
             ~/.android/avd/*
             ~/.android/adb*
           key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores
+
+      # The AVD cache holds the AVD and its snapshot, not the system image it boots, which lives in the
+      # SDK. Without this cache, both emulator steps download the image again (about a minute); with
+      # it, their sdkmanager finds the image installed and skips it.
+      - name: System image cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.ANDROID_HOME }}/system-images/android-${{ env.AVD_API_LEVEL }}/${{ env.AVD_TARGET }}/x86_64
+          key: system-image-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-x86_64
 
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -221,6 +239,16 @@ jobs:
           else
             echo "none"
           fi
+
+      # Each instrumented test's duration and device log, kept after the emulator is gone: to find
+      # the slow tests, and to debug a failure without rerunning it.
+      - name: Upload instrumented test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: instrumented-test-results
+          path: app/build/outputs/androidTest-results/connected/
+          retention-days: 7
 
       # This step generates the coverage report which will be uploaded to sonar
       - name: Generate Coverage Report
