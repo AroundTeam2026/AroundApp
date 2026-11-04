@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -7,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import com.github.aroundteam2026.aroundapp.ui.SaveState
 import java.time.ZoneId
 import kotlin.math.ceil
 
@@ -53,21 +55,6 @@ internal fun validateQuestText(value: String, maxLength: Int): QuestTextError? {
 internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean): QuestTextError? {
   val error = validateQuestText(value, maxLength)
   return if (error == QuestTextError.BLANK && !touched) null else error
-}
-
-/** Where saving the quest stands. */
-sealed interface SaveState {
-  /** Not saved yet. */
-  data object Idle : SaveState
-
-  /** Being saved; the form can't be saved again meanwhile. */
-  data object Saving : SaveState
-
-  /** Saved as the quest [questId]. */
-  data class Saved(val questId: String) : SaveState
-
-  /** The last save failed; the form keeps its values and can be saved again. */
-  data object Failed : SaveState
 }
 
 /**

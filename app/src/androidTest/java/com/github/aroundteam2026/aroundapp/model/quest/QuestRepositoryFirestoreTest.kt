@@ -21,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -45,12 +44,12 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class QuestRepositoryFirestoreTest {
   /**
-   * Fails any test, including its setUp and tearDown, that runs longer than this instead of
-   * blocking CI forever, and reports where it was stuck.
+   * Fails any test, including its setUp, that runs longer than this instead of blocking CI forever,
+   * and reports where it was stuck.
    */
   @get:Rule val timeout: Timeout = Timeout.seconds(30)
 
-  /** The signed-in venue's client, created by [setUp] and terminated by [tearDown]. */
+  /** The signed-in venue's client, from [setUp]. */
   private lateinit var db: FirebaseFirestore
 
   /** The repository under test, on [db], with a clock that always returns [FIXED_NOW]. */
@@ -59,7 +58,7 @@ class QuestRepositoryFirestoreTest {
   /** Uid of the user signed in by [setUp], used as the venue id of the quests it creates. */
   private lateinit var venueId: String
 
-  /** Signs in a fresh venue user and connects a fresh client to the emulator. */
+  /** Signs in a fresh venue user on the emulator client of [MAIN_APP]. */
   @Before
   fun setUp() =
       runBlocking<Unit> {
@@ -67,10 +66,6 @@ class QuestRepositoryFirestoreTest {
         db = emulatorClient(MAIN_APP)
         repository = QuestRepositoryFirestore(db) { FIXED_NOW }
       }
-
-  /** Terminates the client [setUp] created, so no listener or cached data leaks between tests. */
-  @After
-  fun tearDown() = runBlocking<Unit> { withTimeout(SETUP_TIMEOUT_MS) { db.terminate().await() } }
 
   /**
    * Bug: a field is dropped or mis-mapped on write or read (e.g. lat/lng swapped, sign lost, reward

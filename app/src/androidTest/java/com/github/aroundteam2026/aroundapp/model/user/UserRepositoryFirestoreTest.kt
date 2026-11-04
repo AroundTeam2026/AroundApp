@@ -22,7 +22,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -45,8 +44,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class UserRepositoryFirestoreTest {
   /**
-   * Fails any test that runs longer than its setUp, body and tearDown timeouts added together, so
-   * one of those reports where the test was stuck before this rule cuts it off.
+   * Fails any test that runs longer than its setUp and body timeouts added together, so one of
+   * those reports where the test was stuck before this rule cuts it off.
    */
   @get:Rule val timeout: Timeout = Timeout.millis(RULE_TIMEOUT_MS)
 
@@ -63,10 +62,6 @@ class UserRepositoryFirestoreTest {
         db = emulatorClient(APP)
         repository = UserRepositoryFirestore(db)
       }
-
-  /** Terminates the client, so no listener or cached data leaks between tests. */
-  @After
-  fun tearDown() = runBlocking<Unit> { withTimeout(SETUP_TIMEOUT_MS) { db.terminate().await() } }
 
   /**
    * Bug: a field is dropped or mis-mapped on write or read (e.g. the role mapped to the wrong enum,
@@ -264,8 +259,8 @@ class UserRepositoryFirestoreTest {
 
     const val APP = "user-test"
 
-    /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
-    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
+    /** Bounds a whole test: setUp and the test body, plus a margin. */
+    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + 5_000L
 
     /** Creation time of every profile, in epoch ms; the non-zero ms catch precision loss. */
     const val CREATED_AT = 1_700_000_000_123L
