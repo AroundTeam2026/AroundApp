@@ -102,19 +102,19 @@ One completion per explorer and reservation (`completionId`). The id is built fr
 | `reservationId` | string | The quest is the reservation's, so it isn't stored here. |
 | `venueId` | string | Id of the venue that owns the quest. |
 | `explorerUid` | string | |
-| `photoUrl` | string? | Cloud Storage URL of the photo, under `proofs/{reservationId}/` (see [Cloud Storage](#cloud-storage)), for a `PHOTO` quest. |
-| `textAnswer` | string? | The written answer, for a `TEXT` quest. |
+| `photoUrl` | string? | Cloud Storage URL of the photo, under `proofs/{reservationId}/` (see [Cloud Storage](#cloud-storage)), for a `PHOTO` quest. At most 2000 characters. |
+| `textAnswer` | string? | The written answer, for a `TEXT` quest. At most 1000 characters. |
 | `status` | `PENDING`, `APPROVED` or `REJECTED` | |
-| `rejectReason` | string? | Required when `status` is `REJECTED`; must be absent otherwise. Enforced in `Completion`. |
+| `rejectReason` | string? | Required when `status` is `REJECTED`, not blank and at most 300 characters; must be absent otherwise. Enforced in `Completion` and by the rules. |
 | `submittedAt` | timestamp | |
 
-Exactly one of `photoUrl` and `textAnswer` is present, and it isn't blank (enforced by `Proof`). Which one must match the quest's `proofType`; the rules will check that.
+Exactly one of `photoUrl` and `textAnswer` is present, and it isn't blank (enforced by `Proof`). Which one must match the quest's `proofType`, which the rules check.
 
-Read and written through `CompletionRepository`, with `FakeCompletionRepository` for unit tests. The Firestore implementation and the rules come with #326.
+Read and written through `CompletionRepository`, with `FakeCompletionRepository` for unit tests. The Firestore implementation comes with #326.
 
 ## Allowed status transitions
 
-Encoded in `canTransition(from, to)`, which has one overload per status enum. The rules enforce the reservation and party member transitions too.
+Encoded in `canTransition(from, to)`, which has one overload per status enum. The rules enforce them too.
 
 | Entity | From | To |
 |---|---|---|
@@ -124,7 +124,8 @@ Encoded in `canTransition(from, to)`, which has one overload per status enum. Th
 | Party member | `JOINED` | `WITHDRAWN` |
 | Party member | `WITHDRAWN` | none |
 | Completion | `PENDING` | `APPROVED`, `REJECTED` |
-| Completion | `APPROVED`, `REJECTED` | none |
+| Completion | `REJECTED` | `APPROVED`, if the venue changes its mind |
+| Completion | `APPROVED` | none |
 
 ## Security rules summary (v2)
 
@@ -139,7 +140,7 @@ Every create and update must match its collection's table above: only the listed
 | `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
 | `reservations` | The venue and the party's `JOINED` members. Anyone signed in may read an id that has no reservation, since the app listens to one it just created before the server has it. | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one in the same batch as their own `JOINED` membership, carrying their profile's `displayName` as `explorerName`, with a `joinedCount` of 1, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards `status` changes along an allowed transition: the venue makes any of them, and a `JOINED` member can only cancel. `joinedCount` changes alone, by 1, in the same batch as the user's own membership joining or withdrawing. No delete. |
 | `party_user` | The party's members, `WITHDRAWN` ones too, so a member who withdrew still sees who else was in the party, and the reservation's venue. Anyone signed in may list the party of a reservation that doesn't exist, which is empty, for the same reason. | An explorer, whose `users` document has role `EXPLORER`, creates their own `JOINED` membership, under the id `{reservationId}_{uid}`, for a `PENDING` reservation with fewer than 10 `JOINED` members, adding 1 to its `joinedCount` in the same batch. Afterwards only the member changes it, from `JOINED` to `WITHDRAWN`, along with `updatedAt`, taking 1 off `joinedCount` in the same batch. No delete. |
-| `completions` | Nobody yet | Nobody yet: rules come with the completions repository. |
+| `completions` | The explorer who submitted it, the party's `JOINED` members and its venue. Anyone signed in may read an id that has no completion, so an answer to an unknown id can report it. | A `JOINED` member of an `APPROVED` reservation creates their own, `PENDING` and without a `rejectReason`, under the id `{reservationId}_{explorerUid}`, repeating the reservation's `venueId`, with the proof its quest's `proofType` asks for. There is no second submission, whatever the first one's status. Afterwards only the venue changes it: a `PENDING` one to `REJECTED`, changing only `status` and `rejectReason`, and a `PENDING` or `REJECTED` one to `APPROVED`, changing only `status` and removing any `rejectReason`. `APPROVED` is final. No delete. |
 
 Joining a party needs only its reservation's id, and a `JOINED` membership lets the explorer read and cancel the reservation. So an explorer who learns the id of someone else's `PENDING` reservation can join that party and cancel it. Ids are random and only shown to the party and the venue, so this rests on them staying private. An invite check, e.g. when parties get companions, would close it.
 
@@ -159,6 +160,6 @@ Decided in #259, from the review of #25 and from R2 (#274). The tables above des
 
 - **Copied venue fields in `quests`: adopted, done in #279 (F4a and F4b).** `venueName` and `location` go stale once a venue can rename itself or move its area, and dropping them later would mean migrating every stored quest. Readers take them from `venues/{venueId}` with `observeVenues`, one `in` query per 30 venues, as the overview (#269) does, and the rules reject the copies. The quests already stored on `around-67942` keep them until #283 removes them.
 - **Party membership: adopted, done in #281 (#294, #298, #295).** `explorerUids` loses who withdrew from a party. One membership document per explorer and reservation (`party_user`) keeps that history. Reservations no longer have `explorerUids`, and its readers (the venue page, the overview, `observeForExplorer` and the read and cancel rules) use the memberships. Reservations already stored on `around-67942` have no memberships, so only their venue can read them.
-- **Ids copied into `completions`: only `questId` is dropped, done in #272 (F5).** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules will check them against the reservation and its memberships on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields.
+- **Ids copied into `completions`: only `questId` is dropped, done in #272 (F5).** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules check them against the reservation and its memberships on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields.
 - **Text proof: adopted, done in #272 (F5).** `proofUrl` couldn't tell a typed answer from an uploaded photo, so a completion holds `photoUrl` for a `PHOTO` quest or `textAnswer` for a `TEXT` quest, never both.
 - **The explorer's name copied into `reservations`: kept, in #274 (R2).** A user can read only their own `users/{uid}`, so the venue has no other way to show who reserved. The copy is the name at booking time, which is what the venue needs for a short-lived reservation.

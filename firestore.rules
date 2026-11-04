@@ -30,6 +30,10 @@ service cloud.firestore {
       return !(field in data) || isText(data[field], maxLength);
     }
 
+    function isFilledText(value, maxLength) {
+      return isText(value, maxLength) && value.trim().size() > 0;
+    }
+
     function isRadius(value) {
       return value is int && value >= 20 && value <= 200;
     }
@@ -217,6 +221,52 @@ service cloud.firestore {
           : getAfter(reservation(reservationId)).data.joinedCount == 1;
     }
 
+    // A completion as the explorer submits it: pending and without a reject reason. Its proof is
+    // checked by isProofOfType.
+    function isValidCompletion(data) {
+      return data.keys().hasAll(['reservationId', 'venueId', 'explorerUid', 'status',
+              'submittedAt'])
+          && data.keys().hasOnly(['reservationId', 'venueId', 'explorerUid', 'photoUrl',
+              'textAnswer', 'status', 'submittedAt'])
+          && data.reservationId is string
+          && data.venueId is string
+          && data.explorerUid is string
+          && data.status == 'PENDING'
+          && data.submittedAt is timestamp;
+    }
+
+    // [data] holds one proof, not blank, of the proof type [type].
+    function isProofOfType(data, type) {
+      return (type == 'PHOTO'
+              && !('textAnswer' in data)
+              && isFilledText(data.get('photoUrl', ''), 2000))
+          || (type == 'TEXT'
+              && !('photoUrl' in data)
+              && isFilledText(data.get('textAnswer', ''), 1000));
+    }
+
+    // The completion [data] is for an approved reservation of the venue it names, with the proof
+    // its quest asks for. Costs two document reads.
+    function isProofOfApprovedReservation(data) {
+      let booked = get(reservation(data.reservationId)).data;
+      let quest = /databases/$(database)/documents/quests/$(booked.questId);
+      return booked.status == 'APPROVED'
+          && booked.venueId == data.venueId
+          && isProofOfType(data, get(quest).data.proofType);
+    }
+
+    // The venue's answer, changing nothing else: a pending completion becomes rejected with a
+    // reason, and a pending or rejected one becomes approved, without a reason.
+    function isCompletionAnswer(before, after) {
+      return after.diff(before).affectedKeys().hasOnly(['status', 'rejectReason'])
+          && ((before.status in ['PENDING', 'REJECTED']
+                  && after.status == 'APPROVED'
+                  && !('rejectReason' in after))
+              || (before.status == 'PENDING'
+                  && after.status == 'REJECTED'
+                  && isFilledText(after.rejectReason, 300)));
+    }
+
     // Only the owner reads their profile.
     // The role is write-once: it can be chosen while null, then never changed.
     match /users/{uid} {
@@ -316,6 +366,31 @@ service cloud.firestore {
           && movesJoinedCount(resource.data.reservationId, -1);
     }
 
-    // completions: no rules yet, so all access is denied until completions get a repository.
+    // One completion per explorer and reservation, under the id `{reservationId}_{explorerUid}`. A
+    // joined member of an approved reservation submits their own, pending, with the proof its quest
+    // asks for; only explorer accounts join parties, so that needs no role check. They can only
+    // create it, so a second submission is refused whatever the first one's status. Only the venue
+    // answers it, and can still approve what it rejected, but an approval is final. The explorer,
+    // the party's joined members and the venue read it. Anyone signed in may find that an id has no
+    // completion, which is how an answer to an unknown id reports it. Completions are never deleted.
+    match /completions/{completionId} {
+      allow get: if signedIn()
+          && (resource == null
+              || request.auth.uid == resource.data.explorerUid
+              || request.auth.uid == resource.data.venueId
+              || isJoinedMember(resource.data.reservationId));
+      allow list: if signedIn()
+          && (request.auth.uid == resource.data.explorerUid
+              || request.auth.uid == resource.data.venueId
+              || isJoinedMember(resource.data.reservationId));
+      allow create: if signedIn()
+          && isValidCompletion(request.resource.data)
+          && request.resource.data.explorerUid == request.auth.uid
+          && completionId == request.resource.data.reservationId + '_' + request.auth.uid
+          && isJoinedMember(request.resource.data.reservationId)
+          && isProofOfApprovedReservation(request.resource.data);
+      allow update: if isUser(resource.data.venueId)
+          && isCompletionAnswer(resource.data, request.resource.data);
+    }
   }
 }
