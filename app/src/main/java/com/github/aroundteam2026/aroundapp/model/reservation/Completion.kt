@@ -48,15 +48,17 @@ sealed interface Proof {
   /**
    * A photo taken at the venue.
    *
-   * @property url Cloud Storage URL of the uploaded photo.
-   * @throws IllegalArgumentException if [url] is blank.
+   * @property location The photo's Cloud Storage location (`gs://...`), as returned by
+   *   [ProofPhotoRepository.upload]. It is not a download URL, so an image loader can't open it:
+   *   read the photo with [ProofPhotoRepository.download].
+   * @throws IllegalArgumentException if [location] is blank.
    */
-  data class Photo(val url: String) : Proof {
+  data class Photo(val location: String) : Proof {
     override val type: ProofType
       get() = ProofType.PHOTO
 
     init {
-      require(url.isNotBlank()) { "A photo proof needs the photo's URL" }
+      require(location.isNotBlank()) { "A photo proof needs the photo's location" }
     }
   }
 

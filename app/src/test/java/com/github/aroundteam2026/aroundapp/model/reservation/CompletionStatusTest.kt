@@ -21,7 +21,7 @@ class CompletionStatusTest {
           reservationId = "r1",
           venueId = "v1",
           explorerUid = "u1",
-          proof = Proof.Photo("https://example.com/proof.jpg"),
+          proof = Proof.Photo(PHOTO_LOCATION),
           status = status,
           rejectReason = rejectReason,
           submittedAt = 0L,
@@ -70,13 +70,13 @@ class CompletionStatusTest {
   /** Each kind of proof gives its own type, which is what the quest's proof type is checked on. */
   @Test
   fun proof_hasTheTypeOfItsKind() {
-    assertEquals(ProofType.PHOTO, Proof.Photo("https://example.com/proof.jpg").type)
+    assertEquals(ProofType.PHOTO, Proof.Photo(PHOTO_LOCATION).type)
     assertEquals(ProofType.TEXT, Proof.Text("A fox behind the bar").type)
   }
 
-  /** A photo proof without its URL points at nothing, so it is refused. */
+  /** A photo proof without its location points at nothing, so it is refused. */
   @Test(expected = IllegalArgumentException::class)
-  fun photoProof_withBlankUrl_isRejected() {
+  fun photoProof_withBlankLocation_isRejected() {
     Proof.Photo(" ")
   }
 
@@ -84,5 +84,10 @@ class CompletionStatusTest {
   @Test(expected = IllegalArgumentException::class)
   fun textProof_withBlankAnswer_isRejected() {
     Proof.Text("  ")
+  }
+
+  private companion object {
+    /** Where [ProofPhotoRepository.upload] stores a photo of the reservation `r1`. */
+    const val PHOTO_LOCATION = "gs://bucket/proofs/r1/photo-1"
   }
 }

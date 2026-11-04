@@ -27,9 +27,9 @@ class FakeProofPhotoRepository(private val read: (Uri) -> ByteArray = { ByteArra
   /**
    * Simulates a failed transfer (e.g. no network or a refused photo) so callers' error paths can be
    * tested. While non-null, [upload] and [download] return `Result.failure(forcedFailure)`, and
-   * [upload] records nothing. A photo that is too large or a location outside its bucket is the
-   * caller's mistake, so it fails first, as it would without a backend. Set it back to null to make
-   * them succeed again.
+   * [upload] records nothing. An invalid reservation id, a photo that is too large or a location
+   * outside its bucket is the caller's mistake, so it fails first, as it would without a backend.
+   * Set it back to null to make them succeed again.
    */
   var forcedFailure: Throwable? = null
 
@@ -44,10 +44,14 @@ class FakeProofPhotoRepository(private val read: (Uri) -> ByteArray = { ByteArra
 
   /**
    * Records [photo] and its bytes under a new location in [reservationId]'s proofs and returns it.
-   * Fails, recording nothing, with [IllegalArgumentException] if its bytes are
-   * [PROOF_PHOTO_LIMIT_BYTES] or more, before anything else, and with [forcedFailure] if it is set.
+   * Fails, recording nothing, with [IllegalArgumentException] if [reservationId] is blank or has a
+   * `/`, or if the photo's bytes are [PROOF_PHOTO_LIMIT_BYTES] or more, before anything else, and
+   * with [forcedFailure] if it is set.
    */
   override suspend fun upload(reservationId: String, photo: Uri): Result<String> {
+    if (reservationId.isBlank() || '/' in reservationId) {
+      return Result.failure(IllegalArgumentException("Invalid reservation id \"$reservationId\""))
+    }
     val bytes = read(photo)
     if (bytes.size >= PROOF_PHOTO_LIMIT_BYTES) {
       return Result.failure(

@@ -25,8 +25,13 @@ interface ProofPhotoRepository {
    * Firestore write, an upload isn't kept for later while offline, so it fails if it doesn't finish
    * in time.
    *
-   * A photo of [PROOF_PHOTO_LIMIT_BYTES] or more fails with [IllegalArgumentException] before
-   * anything is uploaded, so it must be made smaller first.
+   * A blank [reservationId], or one with a `/` that would nest the folder, and a photo of
+   * [PROOF_PHOTO_LIMIT_BYTES] or more fail with [IllegalArgumentException] before anything is
+   * uploaded; a photo that large must be made smaller first.
+   *
+   * The Storage implementation uploads with an `image/...` content type, which the security rules
+   * require: from the `ContentResolver`, or `image/jpeg` when it has none, as for some camera
+   * files.
    *
    * The security rules only let a joined member of an approved reservation upload, and only an
    * image, so the Storage implementation can fail where the fake doesn't check. Such a refusal
@@ -40,9 +45,9 @@ interface ProofPhotoRepository {
    *
    * @param reservationId id of the approved reservation the photo proves.
    * @param photo the photo to upload, e.g. as returned by the photo picker or the camera.
-   * @return the photo's `gs://` location, or a failure if [photo] is too large
-   *   ([IllegalArgumentException]) or can't be read, or if the upload was refused, failed, or
-   *   didn't finish in time.
+   * @return the photo's `gs://` location, or a failure if [reservationId] isn't valid or [photo] is
+   *   too large ([IllegalArgumentException]), if [photo] can't be read, or if the upload was
+   *   refused, failed, or didn't finish in time.
    */
   suspend fun upload(reservationId: String, photo: Uri): Result<String>
 

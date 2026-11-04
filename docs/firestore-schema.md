@@ -102,7 +102,7 @@ One completion per explorer and reservation (`completionId`). The id is built fr
 | `reservationId` | string | The quest is the reservation's, so it isn't stored here. |
 | `venueId` | string | Id of the venue that owns the quest. |
 | `explorerUid` | string | |
-| `photoUrl` | string? | Cloud Storage URL of the photo, under `proofs/{reservationId}/` (see [Cloud Storage](#cloud-storage)), for a `PHOTO` quest. |
+| `photoUrl` | string? | The photo's Cloud Storage location (`gs://...`, not a download URL), under `proofs/{reservationId}/` (see [Cloud Storage](#cloud-storage)), for a `PHOTO` quest. |
 | `textAnswer` | string? | The written answer, for a `TEXT` quest. |
 | `status` | `PENDING`, `APPROVED` or `REJECTED` | |
 | `rejectReason` | string? | Required when `status` is `REJECTED`; must be absent otherwise. Enforced in `Completion`. |
