@@ -38,10 +38,11 @@ jobs:
       AVD_CORES: "4"
 
     steps:
-      # The emulator needs a lot of disk: the restored AVD, its system image and Gradle's caches. On
-      # 4 Nov, the first run on runner image 20261101 ran out of space installing the system image,
-      # so this removes preinstalled SDKs the build never uses (.NET, Haskell, Swift, CodeQL). df
-      # prints the free space before and after.
+      # The emulator needs a lot of disk: the restored AVD, its system image and Gradle's caches.
+      # Azure-hosted runners have plenty (88 GB free), but on 4 Nov a run placed on an AWS-hosted
+      # runner ran out of space installing the system image. Deleting preinstalled SDKs the build
+      # never uses (.NET, Haskell, Swift, CodeQL) frees 14 GB in about 15 s; df prints the free
+      # space before and after.
       - name: Free disk space
         run: |
           df -h /
