@@ -54,14 +54,18 @@ fun ComposeTestRule.signIn(email: String, landsOn: String) {
   leaveAuthFor(landsOn)
 }
 
+/** Closes the soft keyboard, then taps the auth form's submit button. */
+fun ComposeTestRule.submitAuthForm() = tapAfterTyping(C.Tag.AUTH_SUBMIT)
+
 /**
- * Closes the soft keyboard, then taps the auth form's submit button. While the keyboard slides in,
- * the form's imePadding is still catching up, so the button can still be under the keyboard or
- * moving when the tap lands, and the form is never sent (CI run 41899891610).
+ * Closes the soft keyboard, then scrolls to the node tagged [tag] and taps it. Use it for every tap
+ * that follows typing: while the keyboard slides in, a screen with imePadding is still catching up,
+ * so a button can still be under the keyboard or moving when the tap lands, and the tap is lost
+ * (the auth form in CI run 41899891610, the venue name's Continue in 41918593997).
  */
-fun ComposeTestRule.submitAuthForm() {
+fun ComposeTestRule.tapAfterTyping(tag: String) {
   Espresso.closeSoftKeyboard()
-  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+  onNodeWithTag(tag).performScrollTo().performClick()
 }
 
 /**

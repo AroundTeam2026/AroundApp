@@ -59,10 +59,7 @@ class VenueJourneyTest : TestCase() {
     step("Register through the venue link") { composeTestRule.createVenueAccount() }
     step("Name the venue") {
       composeTestRule.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput(venueName)
-      composeTestRule
-          .onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE)
-          .performScrollTo()
-          .performClick()
+      composeTestRule.tapAfterTyping(C.Tag.VENUE_INITIALIZATION_CONTINUE)
       waitFor(hasTestTag(C.Tag.VENUE_AREA_SCREEN))
     }
     step("Place the venue on the map and set its visit radius") {
@@ -94,7 +91,7 @@ class VenueJourneyTest : TestCase() {
           }
       // Enabled once the form has read the venue's location, where the quest goes
       waitFor(hasTestTag(C.Tag.CREATE_QUEST_SUBMIT) and isEnabled())
-      composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
+      composeTestRule.tapAfterTyping(C.Tag.CREATE_QUEST_SUBMIT)
       // Saving closes the form, back to the Quests tab it was opened from
       composeTestRule.waitUntil(TIMEOUT_MS) { !exists(hasTestTag(C.Tag.CREATE_QUEST_SCREEN)) }
       composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_SCREEN).assertIsDisplayed()
