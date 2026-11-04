@@ -113,6 +113,28 @@ class GoogleAuthScreenTest {
   }
 
   @Test
+  fun explorerSignupWithExistingVenueGoogleAccountShowsErrorWithoutChangingRole() {
+    val uid = runBlocking { auth.signUpWithGoogle("existing-venue").getOrThrow() }
+    runBlocking {
+      pending.pending = PendingRole(Role.VENUE, uid)
+      ProfileSetup(auth, users, pending).finish().getOrThrow()
+    }
+    auth.signOut()
+    show(form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT) {
+      GoogleCredentialResult.Token("existing-venue")
+    }
+
+    click(C.Tag.AUTH_GOOGLE)
+
+    compose.onNodeWithTag(C.Tag.AUTH_ERROR).assertTextContains("Sign in instead", substring = true)
+    compose.runOnIdle {
+      assertNull(auth.currentUserId.value)
+      assertNull(pending.pending)
+      assertEquals(Role.VENUE, runBlocking { users.getUser(uid) }?.role)
+    }
+  }
+
+  @Test
   fun cancellingBusinessGoogleSignupLeavesNoRoleOrSession() {
     show(
         form = C.Tag.AUTH_WELCOME_CREATE_ACCOUNT,
