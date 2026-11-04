@@ -192,7 +192,7 @@ class CompletionRepositoryFirestore(
   /** The document field that holds this proof. */
   private fun Proof.toField(): Pair<String, String> =
       when (this) {
-        is Proof.Photo -> PHOTO_URL to url
+        is Proof.Photo -> PHOTO_URL to location
         is Proof.Text -> TEXT_ANSWER to answer
       }
 

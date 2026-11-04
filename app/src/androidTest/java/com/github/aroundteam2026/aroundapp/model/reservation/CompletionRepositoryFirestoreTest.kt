@@ -359,7 +359,7 @@ class CompletionRepositoryFirestoreTest {
     val malformed =
         mapOf(
             "no proof" to validFields() - "textAnswer",
-            "two proofs" to validFields() + ("photoUrl" to PHOTO_PROOF.url),
+            "two proofs" to validFields() + ("photoUrl" to PHOTO_PROOF.location),
             "no submittedAt" to validFields() - "submittedAt",
             "an unknown status" to validFields() + ("status" to "LOST"),
             "a reason while pending" to validFields() + ("rejectReason" to REASON),
