@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -20,6 +21,7 @@ fun testQuest(
     title: String = "Order the secret menu",
     reward: Reward? = Reward.FreeItem("Coffee", specifics = null),
     minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
+    proofType: ProofType = ProofType.PHOTO,
     status: QuestStatus = QuestStatus.ACTIVE,
     createdAt: Long = 1_000L,
     updatedAt: Long = createdAt,
@@ -31,7 +33,7 @@ fun testQuest(
         title = title,
         description = "Description",
         requirements = "Requirements",
-        proofType = ProofType.PHOTO,
+        proofType = proofType,
         minPartySize = minPartySize,
         reward = reward,
         status = status,
