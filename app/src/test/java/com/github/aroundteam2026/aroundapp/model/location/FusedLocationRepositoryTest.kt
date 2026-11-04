@@ -180,6 +180,24 @@ class FusedLocationRepositoryTest {
 
     assertNull(repository.currentPreciseLocation())
   }
+
+  @Test
+  fun preciseLocationReturnsNullWhenPlayServicesFails() = runTest {
+    grant(ACCESS_FINE_LOCATION)
+    every { client.getCurrentLocation(any<CurrentLocationRequest>(), any()) } returns
+        Tasks.forException(ApiException(Status(CommonStatusCodes.API_NOT_CONNECTED)))
+
+    assertNull(repository.currentPreciseLocation())
+  }
+
+  @Test
+  fun preciseLocationReturnsNullWhenPermissionIsRevokedDuringTheRequest() = runTest {
+    grant(ACCESS_FINE_LOCATION)
+    every { client.getCurrentLocation(any<CurrentLocationRequest>(), any()) } throws
+        SecurityException("revoked")
+
+    assertNull(repository.currentPreciseLocation())
+  }
 }
 
 /** Whether the garbage collector frees this reference's object; collection can take a few tries. */

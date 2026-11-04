@@ -12,6 +12,7 @@ class FakeLocationRepository(var location: Location?) : LocationRepository {
   var preciseLocation: Location? = location
   var preciseCalls = 0
   var preciseGate: CompletableDeferred<Unit>? = null
+  var preciseFailure: Exception? = null
 
   override suspend fun currentLocation(): Location? {
     calls++
@@ -22,6 +23,7 @@ class FakeLocationRepository(var location: Location?) : LocationRepository {
   override suspend fun currentPreciseLocation(): Location? {
     preciseCalls++
     preciseGate?.await()
+    preciseFailure?.let { throw it }
     return preciseLocation
   }
 }

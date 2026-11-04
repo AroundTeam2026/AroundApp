@@ -321,6 +321,26 @@ class CompletionViewModelTest {
   }
 
   @Test
+  fun aLocationProviderFailureLeavesTheProofReadyForRetry() = test {
+    open("fox")
+    locations.preciseFailure = IOException("location service unavailable")
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(CompletionLocationError.UNAVAILABLE, state.locationError)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals("The fox", state.answer)
+    assertEquals(0, completions.calls)
+
+    locations.preciseFailure = null
+    viewModel.submit()
+    runCurrent()
+    assertEquals(1, completions.calls)
+  }
+
+  @Test
   fun aMissingVenueMarkerCannotAuthorizeSubmission() = test {
     venues = FakeVenueRepository(listOf(testVenue(id = CAFE, location = null)))
     open("fox")

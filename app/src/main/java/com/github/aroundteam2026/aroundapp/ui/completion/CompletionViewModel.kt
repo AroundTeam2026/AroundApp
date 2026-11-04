@@ -227,14 +227,17 @@ class CompletionViewModel(
    */
   private suspend fun listenToCompletions() {
     val id = completionId(reservationId, explorerUid)
-    completionRepository
-        .observeForReservation(reservationId)
-        .catch { Log.w(TAG, "Listening to the completions of $reservationId failed", it) }
-        .collect { completions ->
-          if (completions.any { it.id == id }) {
-            mutableUiState.update { it.copy(saveState = SaveState.Saved(id)) }
-          }
+    try {
+      completionRepository.observeForReservation(reservationId).collect { completions ->
+        if (completions.any { it.id == id }) {
+          mutableUiState.update { it.copy(saveState = SaveState.Saved(id)) }
         }
+      }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      Log.w(TAG, "Listening to the completions of $reservationId failed", e)
+    }
   }
 
   private companion object {
