@@ -1,7 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import android.util.Log
+import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -162,10 +164,6 @@ class QuestRepositoryFirestore(
       else -> throw IllegalArgumentException("Unknown reward type $type")
     }
   }
-
-  /** Reads [field] with [read], throwing if it is absent. */
-  private fun <T : Any> required(field: String, read: (String) -> T?): T =
-      read(field) ?: throw IllegalArgumentException("Missing field $field")
 
   private companion object {
     const val TAG = "QuestRepositoryFirestore"
