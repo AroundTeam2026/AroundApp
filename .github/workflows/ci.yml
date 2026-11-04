@@ -298,13 +298,13 @@ jobs:
           pattern: instrumented-coverage-*
           path: app/build/outputs/code_coverage/debugAndroidTest/connected/
 
-      # jacocoTestReport reports on the class files and coverage data it finds, so the classes are
-      # compiled first; Sonar reads the test classes too. Then the report and the upload to Sonar.
+      # jacocoTestReport compiles the app's classes and reports on the coverage data it finds; Sonar
+      # reads the test classes too, so they are compiled as well. One Gradle call for both.
       - name: Generate Coverage Report and upload it to SonarCloud
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./gradlew compileDebugKotlin compileDebugUnitTestKotlin compileDebugAndroidTestKotlin \
-            jacocoTestReport sonar --parallel --build-cache
+          ./gradlew compileDebugUnitTestKotlin compileDebugAndroidTestKotlin jacocoTestReport sonar \
+            --parallel --build-cache
