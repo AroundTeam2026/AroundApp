@@ -1,8 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
-import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
@@ -47,7 +45,6 @@ enum class CancelStatus {
  * @property questId Id of the accepted quest.
  * @property venueId Id of the quest's venue, whose page a tap opens.
  * @property questTitle The quest's title.
- * @property proofType The kind of proof the quest asks for, which completing it needs.
  * @property reward The quest's reward, or null if it has none.
  * @property venueName The venue's name.
  * @property address The venue's street address, or null if it gave none.
@@ -61,7 +58,6 @@ data class OverviewRow(
     val questId: String,
     val venueId: String,
     val questTitle: String,
-    val proofType: ProofType,
     val reward: Reward?,
     val venueName: String,
     val address: String?,

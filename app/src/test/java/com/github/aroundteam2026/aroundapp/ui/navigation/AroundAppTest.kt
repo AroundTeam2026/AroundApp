@@ -25,7 +25,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
-import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
@@ -292,7 +291,6 @@ private fun overviewRow() =
         questId = "fox",
         venueId = "venue-1",
         questTitle = "Find the hidden fox",
-        proofType = ProofType.PHOTO,
         reward = null,
         venueName = "Café Lumen",
         address = null,

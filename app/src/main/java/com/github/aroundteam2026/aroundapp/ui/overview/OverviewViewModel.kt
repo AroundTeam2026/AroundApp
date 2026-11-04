@@ -1,5 +1,4 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.util.Log
@@ -219,7 +218,6 @@ private fun overviewRow(reservation: Reservation, quest: Quest, venue: Venue, pa
         questId = quest.id,
         venueId = venue.id,
         questTitle = quest.title,
-        proofType = quest.proofType,
         reward = quest.reward,
         venueName = venue.name,
         address = venue.address,
