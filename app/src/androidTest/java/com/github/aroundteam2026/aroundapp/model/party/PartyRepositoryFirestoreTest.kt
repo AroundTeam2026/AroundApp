@@ -28,7 +28,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -47,7 +46,7 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class PartyRepositoryFirestoreTest {
-  /** Fails a stuck test, including its setUp and tearDown, instead of blocking CI forever. */
+  /** Fails a stuck test, including its setUp, instead of blocking CI forever. */
   @get:Rule val timeout: Timeout = Timeout.millis(RULE_TIMEOUT_MS)
 
   private lateinit var explorerDb: FirebaseFirestore
@@ -81,17 +80,6 @@ class PartyRepositoryFirestoreTest {
         explorer = PartyRepositoryFirestore(explorerDb) { JOINED_AT }
         friend = PartyRepositoryFirestore(friendDb) { JOINED_AT }
         venue = PartyRepositoryFirestore(venueDb)
-      }
-
-  /** Terminates every client, so no listener or cached data leaks between tests. */
-  @After
-  fun tearDown() =
-      runBlocking<Unit> {
-        withTimeout(SETUP_TIMEOUT_MS) {
-          explorerDb.terminate().await()
-          friendDb.terminate().await()
-          venueDb.terminate().await()
-        }
       }
 
   /**
@@ -422,8 +410,8 @@ class PartyRepositoryFirestoreTest {
     /** The display name signInNewUser gives every profile; the rules require it on reservations. */
     const val EXPLORER_NAME = "Test"
 
-    /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
-    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
+    /** Bounds a whole test: setUp and the test body, plus a margin. */
+    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + 5_000L
 
     /** A confirmation timeout far below [TIMEOUT_MS], so the offline test outlasts it quickly. */
     const val SHORT_TIMEOUT_MS = 500L
