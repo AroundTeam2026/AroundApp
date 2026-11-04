@@ -6,6 +6,8 @@ import android.text.format.DateUtils
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -149,6 +151,16 @@ class VenueDashboardScreenTest {
 
     assertEquals(listOf("b"), approved)
     assertEquals(listOf("a"), declined)
+  }
+
+  @Test
+  fun anAnswerBeingSavedDisablesOnlyItsRowsButtons() {
+    show(loaded(needsAnswer = listOf(pending("a"), pending("b"))).copy(savingIds = setOf("a")))
+
+    inRow("a", C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    inRow("a", C.Tag.DASHBOARD_ROW_DECLINE).assertIsNotEnabled()
+    inRow("b", C.Tag.DASHBOARD_ROW_APPROVE).assertIsEnabled()
+    inRow("b", C.Tag.DASHBOARD_ROW_DECLINE).assertIsEnabled()
   }
 
   @Test
