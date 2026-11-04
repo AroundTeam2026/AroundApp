@@ -6,6 +6,8 @@ import android.text.format.DateUtils
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -32,13 +34,18 @@ class DashboardReservationRowTest {
   private var approvals = 0
   private var declines = 0
 
-  private fun show(reservation: DashboardReservation, clock: Clock = CLOCK) {
+  private fun show(
+      reservation: DashboardReservation,
+      clock: Clock = CLOCK,
+      saving: Boolean = false,
+  ) {
     compose.setContent {
       AroundAppTheme {
         DashboardReservationRow(
             reservation,
             onDecline = { declines++ },
             onApprove = { approvals++ },
+            saving = saving,
             clock = clock,
         )
       }
@@ -70,9 +77,22 @@ class DashboardReservationRowTest {
         context.resources.getQuantityString(R.plurals.dashboard_party_size, 3, 3),
         node(C.Tag.DASHBOARD_ROW_PARTY).text(),
     )
-    node(C.Tag.DASHBOARD_ROW_DECLINE).assertIsDisplayed()
-    node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsDisplayed()
+    node(C.Tag.DASHBOARD_ROW_DECLINE).assertIsDisplayed().assertIsEnabled()
+    node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsDisplayed().assertIsEnabled()
     node(C.Tag.DASHBOARD_ROW_APPROVED).assertDoesNotExist()
+  }
+
+  @Test
+  fun aRowWhoseAnswerIsSavingDisablesBothButtons() {
+    show(pending(), saving = true)
+
+    node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    node(C.Tag.DASHBOARD_ROW_DECLINE).assertIsNotEnabled()
+    node(C.Tag.DASHBOARD_ROW_APPROVE).performClick()
+    node(C.Tag.DASHBOARD_ROW_DECLINE).performClick()
+
+    assertEquals(0, approvals)
+    assertEquals(0, declines)
   }
 
   @Test

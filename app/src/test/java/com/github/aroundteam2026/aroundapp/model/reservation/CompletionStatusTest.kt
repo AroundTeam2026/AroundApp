@@ -12,7 +12,7 @@ import org.junit.Test
 
 /** Tests [canTransition] and the construction rules of [Completion] and its [Proof]. */
 class CompletionStatusTest {
-  private val allowed = setOf(PENDING to APPROVED, PENDING to REJECTED)
+  private val allowed = setOf(PENDING to APPROVED, PENDING to REJECTED, REJECTED to APPROVED)
 
   /** Builds a completion with the given [status] and [rejectReason]; other fields are fixed. */
   private fun completion(status: CompletionStatus, rejectReason: String?) =

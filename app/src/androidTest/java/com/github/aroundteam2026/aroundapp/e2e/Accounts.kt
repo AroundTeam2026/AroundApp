@@ -41,6 +41,19 @@ fun ComposeTestRule.createVenueAccount(email: String = "e2e-${UUID.randomUUID()}
     )
 
 /**
+ * Signs in to the existing account [email] through the app's "Sign in" form, from the auth screen,
+ * and waits for the screen tagged [landsOn], e.g. a set-up venue's dashboard.
+ */
+fun ComposeTestRule.signIn(email: String, landsOn: String) {
+  onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+  onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
+  onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
+  onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
+  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+  leaveAuthFor(landsOn)
+}
+
+/**
  * Chooses [accountType], fills credentials, submits, and waits for the screen tagged [landsOn] in
  * place of the auth screen.
  */
@@ -61,7 +74,12 @@ private fun ComposeTestRule.register(
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
-  // Signing up creates the Auth account and writes the profile, which is slow on a cold emulator
+  leaveAuthFor(landsOn)
+}
+
+/** Waits for the screen tagged [landsOn] to replace the auth screen after submitting its form. */
+private fun ComposeTestRule.leaveAuthFor(landsOn: String) {
+  // Signing up or in reads or writes the profile, which is slow on a cold emulator
   waitUntil(SETUP_TIMEOUT_MS) { onAllNodes(hasTestTag(landsOn)).fetchSemanticsNodes().isNotEmpty() }
   onNodeWithTag(landsOn).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()

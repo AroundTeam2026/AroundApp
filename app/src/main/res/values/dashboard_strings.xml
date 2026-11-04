@@ -30,4 +30,6 @@
     <string name="dashboard_empty_body">When explorers accept your quests, their requests show up here.</string>
     <string name="dashboard_failed">Couldn\'t load your dashboard. Try again.</string>
     <string name="dashboard_retry">Try again</string>
+    <!-- Snackbar when approving or declining a reservation fails -->
+    <string name="dashboard_update_failed">Couldn\'t save your answer. Try again.</string>
 </resources>

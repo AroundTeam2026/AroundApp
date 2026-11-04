@@ -102,6 +102,19 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
+  fun observeForReservation_returnsEveryExplorerOfThatReservationOnly() =
+      runBlocking<Unit> {
+        val mine = submit()
+        val friends = submit(explorerUid = OTHER_ID)
+        submit(reservationId = OTHER_ID)
+
+        assertEquals(
+            setOf(mine, friends),
+            repository.observeForReservation(RESERVATION_ID).first().map { it.id }.toSet(),
+        )
+      }
+
+  @Test
   fun observe_emitsAgainOnlyWhenItsOwnListChanges() =
       runBlocking<Unit> {
         val emissions =
@@ -141,6 +154,18 @@ class FakeCompletionRepositoryTest {
             before.copy(status = CompletionStatus.REJECTED, rejectReason = REASON),
             stored(),
         )
+      }
+
+  @Test
+  fun approve_rejectedCompletion_removesTheReason() =
+      runBlocking<Unit> {
+        val id = submit()
+        val before = stored()
+        repository.reject(id, REASON).getOrThrow()
+
+        repository.approve(id).getOrThrow()
+
+        assertEquals(before.copy(status = CompletionStatus.APPROVED), stored())
       }
 
   @Test

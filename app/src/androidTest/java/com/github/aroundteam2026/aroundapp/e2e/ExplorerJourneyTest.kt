@@ -62,7 +62,7 @@ private val HERE = Location(46.5191, 6.5668)
  * An explorer's first visit, through the app as it ships on the Auth and Firestore emulators: they
  * create an account, find a venue's quest saved in Firestore among the map's nearby quests, view
  * that venue's page and accept the quest there, then see it waiting for the venue on the Quests
- * tab.
+ * tab. The venue then signs in on the same device and finds the request on its dashboard.
  */
 @RunWith(AndroidJUnit4::class)
 class ExplorerJourneyTest : TestCase() {
@@ -70,6 +70,7 @@ class ExplorerJourneyTest : TestCase() {
   private val composeTestRule = e2e.composeTestRule
 
   private val id = UUID.randomUUID()
+  private val venueEmail = "venue-$id@around.test"
   private val venueName = "Journey venue $id"
   private val questTitle = "Journey quest $id"
 
@@ -93,12 +94,7 @@ class ExplorerJourneyTest : TestCase() {
       val app = seedApp(context)
       val auth = Firebase.auth(app)
       val db = Firebase.firestore(app)
-      val uid =
-          auth
-              .createUserWithEmailAndPassword("venue-$id@around.test", E2E_PASSWORD)
-              .await()
-              .user!!
-              .uid
+      val uid = auth.createUserWithEmailAndPassword(venueEmail, E2E_PASSWORD).await().user!!.uid
       venueId = uid
       // The rules let only an account with the VENUE role write a venue and its quests
       UserRepositoryFirestore(db).createUser(User(uid, "Test", Role.VENUE, 0L)).getOrThrow()
@@ -139,7 +135,7 @@ class ExplorerJourneyTest : TestCase() {
   }
 
   @Test
-  fun anExplorerAcceptsTheSeededQuestOnItsVenuesPage() = run {
+  fun anExplorerAcceptsTheSeededQuestAndItsVenueSeesTheRequest() = run {
     step("Register a new explorer and open the venue's page") {
       composeTestRule.createAccount()
       findTheQuestNearby()
@@ -194,6 +190,25 @@ class ExplorerJourneyTest : TestCase() {
               useUnmergedTree = true,
           )
           .assertIsDisplayed()
+    }
+    step("The explorer signs out") {
+      composeTestRule.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
+      composeTestRule.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
+      waitFor(hasTestTag(C.Tag.AUTH_SCREEN))
+    }
+    step("The quest's venue signs in and its dashboard lists the request") {
+      composeTestRule.signIn(venueEmail, landsOn = C.Tag.VENUE_DASHBOARD_SCREEN)
+      // Only this reservation's row, whatever else the dashboard lists
+      val inItsRow = hasAnyAncestor(hasTestTag("${C.Tag.DASHBOARD_ROW}_$reservationId"))
+      waitFor(hasTestTag(C.Tag.DASHBOARD_ROW_TITLE) and hasText(questTitle) and inItsRow)
+      // Only a request still waiting for an answer offers to approve it
+      waitFor(hasTestTag(C.Tag.DASHBOARD_ROW_APPROVE) and inItsRow)
+      // The party comes from its memberships, which the venue may read: the explorer alone
+      val solo =
+          InstrumentationRegistry.getInstrumentation()
+              .targetContext
+              .getString(R.string.dashboard_party_solo)
+      waitFor(hasTestTag(C.Tag.DASHBOARD_ROW_PARTY) and hasText(solo) and inItsRow)
     }
   }
 
