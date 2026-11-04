@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
@@ -28,9 +29,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * The security rules decide who may do what: a joined member of an approved reservation may only
  * create their own pending completion, only the explorer, the party's joined members and the venue
- * read it, and only the venue answers it, once. A submission the rules refuse within
- * [confirmTimeoutMs] comes back as a failure, and one they refuse later is only logged; a refused
- * answer comes back as a failure.
+ * read it, and only the venue answers it, which it can change from rejected to approved. A
+ * submission the rules refuse within [confirmTimeoutMs] comes back as a failure, and one they
+ * refuse later is only logged; a refused answer comes back as a failure.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it
@@ -128,7 +129,8 @@ class CompletionRepositoryFirestore(
 
   /**
    * Reads the completion and writes the venue's answer in one transaction, so the transition is
-   * checked against the status that is actually stored. Only [status] and [rejectReason] are
+   * checked against the status that is actually stored. A null [rejectReason] deletes the stored
+   * one, as an approval of a rejected completion must. Only [status] and [rejectReason] are
    * written, which is all the rules let the venue change. Needs a connection: a transaction fails
    * while the device is offline.
    *
@@ -144,7 +146,7 @@ class CompletionRepositoryFirestore(
       try {
         val document = completions.document(id)
         val fields =
-            mapOf(STATUS to status.name) + listOfNotNull(rejectReason?.let { REJECT_REASON to it })
+            mapOf(STATUS to status.name, REJECT_REASON to (rejectReason ?: FieldValue.delete()))
         // The transaction returns the reason for refusing instead of throwing it, so the caller
         // gets the exact exception rather than one wrapped by Firestore.
         val refusal =

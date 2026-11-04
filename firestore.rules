@@ -255,14 +255,15 @@ service cloud.firestore {
           && isProofOfType(data, get(quest).data.proofType);
     }
 
-    // The venue's answer: a pending completion becomes approved, changing nothing else, or rejected
-    // with a reason, changing nothing else.
+    // The venue's answer, changing nothing else: a pending completion becomes rejected with a
+    // reason, and a pending or rejected one becomes approved, without a reason.
     function isCompletionAnswer(before, after) {
-      let changed = after.diff(before).affectedKeys();
-      return before.status == 'PENDING'
-          && ((after.status == 'APPROVED' && changed.hasOnly(['status']))
-              || (after.status == 'REJECTED'
-                  && changed.hasOnly(['status', 'rejectReason'])
+      return after.diff(before).affectedKeys().hasOnly(['status', 'rejectReason'])
+          && ((before.status in ['PENDING', 'REJECTED']
+                  && after.status == 'APPROVED'
+                  && !('rejectReason' in after))
+              || (before.status == 'PENDING'
+                  && after.status == 'REJECTED'
                   && isFilledText(after.rejectReason, 300)));
     }
 
@@ -369,9 +370,9 @@ service cloud.firestore {
     // joined member of an approved reservation submits their own, pending, with the proof its quest
     // asks for; only explorer accounts join parties, so that needs no role check. They can only
     // create it, so a second submission is refused whatever the first one's status. Only the venue
-    // answers it, once. The explorer, the party's joined members and the venue read it. Anyone
-    // signed in may find that an id has no completion, which is how an answer to an unknown id
-    // reports it. Completions are never deleted.
+    // answers it, and can still approve what it rejected, but an approval is final. The explorer,
+    // the party's joined members and the venue read it. Anyone signed in may find that an id has no
+    // completion, which is how an answer to an unknown id reports it. Completions are never deleted.
     match /completions/{completionId} {
       allow get: if signedIn()
           && (resource == null

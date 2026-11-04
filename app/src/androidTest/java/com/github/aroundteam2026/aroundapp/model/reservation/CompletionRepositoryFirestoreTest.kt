@@ -402,6 +402,20 @@ class CompletionRepositoryFirestoreTest {
     assertEquals(before.copy(status = CompletionStatus.REJECTED, rejectReason = REASON), after)
   }
 
+  /** Bug: the rejection's reason stays on the document, which the rules and [Completion] refuse. */
+  @Test
+  fun approve_aRejectedCompletion_removesTheReason() = withTimeoutBlocking {
+    val id = submit(approvedReservation())
+    val before = fetchAsVenue(id)
+    venueRepository.reject(id, REASON).getOrThrow()
+
+    venueRepository.approve(id).getOrThrow()
+
+    val after = fetchAsVenue(id) { it.status == CompletionStatus.APPROVED }
+    assertEquals(before.copy(status = CompletionStatus.APPROVED), after)
+    assertFalse(stored(id).contains("rejectReason"))
+  }
+
   /** Bug: a blank reason reaches the transaction, where [Completion] or the rules would refuse. */
   @Test
   fun reject_withABlankReason_failsAndChangesNothing() = withTimeoutBlocking {

@@ -82,7 +82,7 @@ enum class CompletionStatus {
   PENDING,
   /** Accepted by the venue. Final. */
   APPROVED,
-  /** Declined by the venue. Final. */
+  /** Declined by the venue, which can still approve it. The explorer can't submit again. */
   REJECTED,
 }
 
@@ -92,7 +92,11 @@ enum class CompletionStatus {
  */
 fun completionId(reservationId: String, explorerUid: String) = "${reservationId}_$explorerUid"
 
-/** Whether a completion may change from [from] to [to]: only pending ones can be answered. */
+/**
+ * Whether a completion may change from [from] to [to]: a pending one can be answered, and a venue
+ * that changes its mind can approve one it rejected.
+ */
 fun canTransition(from: CompletionStatus, to: CompletionStatus): Boolean =
-    from == CompletionStatus.PENDING &&
-        (to == CompletionStatus.APPROVED || to == CompletionStatus.REJECTED)
+    (from == CompletionStatus.PENDING &&
+        (to == CompletionStatus.APPROVED || to == CompletionStatus.REJECTED)) ||
+        (from == CompletionStatus.REJECTED && to == CompletionStatus.APPROVED)

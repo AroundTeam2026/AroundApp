@@ -71,8 +71,10 @@ interface CompletionRepository {
   fun observeForReservation(reservationId: String): Flow<List<Completion>>
 
   /**
-   * Moves a completion to [CompletionStatus.APPROVED], changing nothing else. The security rules
-   * only let the venue that owns it do so, so the Firestore implementation fails for anyone else.
+   * Moves a pending or rejected completion to [CompletionStatus.APPROVED], removing any reject
+   * reason and changing nothing else, so a venue can change its mind about a rejection. The
+   * security rules only let the venue that owns it do so, so the Firestore implementation fails for
+   * anyone else.
    *
    * @param id id of the completion.
    * @return success, or a failure if there is no completion with this id

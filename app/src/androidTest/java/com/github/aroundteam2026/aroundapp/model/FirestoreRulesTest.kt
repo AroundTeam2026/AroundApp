@@ -843,7 +843,7 @@ class FirestoreRulesTest {
   }
 
   @Test
-  fun rejectionNeedsAReasonAndIsFinal() {
+  fun rejectionNeedsAReason() {
     val explorer = newUser(Role.EXPLORER)
     val venue = newUser(Role.VENUE)
     val completion = submittedCompletion(explorer, venue)
@@ -859,10 +859,27 @@ class FirestoreRulesTest {
 
     assertSucceeds(completion.update(rejection()))
     assertDenied(completion.update("rejectReason", "Other"), "a new reason")
-    assertDenied(
-        completion.update(mapOf("status" to "APPROVED", "rejectReason" to FieldValue.delete())),
-        "approving a rejected completion",
-    )
+  }
+
+  @Test
+  fun venueApprovesARejectedCompletionWithoutItsReason() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+    signInAs(venue)
+    assertSucceeds(completion.update(rejection()))
+    val approval = mapOf("status" to "APPROVED", "rejectReason" to FieldValue.delete())
+
+    assertDenied(completion.update("status", "APPROVED"), "keeping the reason")
+    assertDenied(completion.update(approval + ("textAnswer" to "Other")), "with a new answer")
+    assertDenied(completion.update(approval + ("status" to "PENDING")), "back to pending")
+
+    signInAs(explorer)
+    assertDenied(completion.update(approval), "the explorer")
+
+    signInAs(venue)
+    assertSucceeds(completion.update(approval))
+    assertDenied(completion.update(rejection()), "rejecting it again")
   }
 
   @Test

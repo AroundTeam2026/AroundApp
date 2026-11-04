@@ -157,6 +157,18 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
+  fun approve_rejectedCompletion_removesTheReason() =
+      runBlocking<Unit> {
+        val id = submit()
+        val before = stored()
+        repository.reject(id, REASON).getOrThrow()
+
+        repository.approve(id).getOrThrow()
+
+        assertEquals(before.copy(status = CompletionStatus.APPROVED), stored())
+      }
+
+  @Test
   fun reject_blankReason_failsBeforeTheBackendAndTheLookup() =
       runBlocking<Unit> {
         repository.forcedFailure = IllegalStateException(OFFLINE)
