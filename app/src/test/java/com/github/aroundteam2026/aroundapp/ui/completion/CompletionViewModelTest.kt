@@ -2,30 +2,25 @@
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
-import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
-import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
-import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
-import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
-import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
-import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRow
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRowStatus
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewStatus
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewUiState
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -43,33 +38,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** The ViewModel of the completion screen, on fakes of every repository it reads or writes. */
+/**
+ * The ViewModel of the completion screen, which reads the overview's state for the reservation and
+ * its quest, and writes through fakes of the completion and photo repositories.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class CompletionViewModelTest {
   private val dispatcher = StandardTestDispatcher()
 
-  private val party = FakePartyRepository { NOW }
-  private val reservations = FakeReservationRepository({ NOW }, party)
-  private val listener = BreakableReservations(reservations)
-  private val quests =
-      FakeQuestRepository(
-          { NOW },
-          listOf(
-              testQuest(
-                  id = "fox",
-                  venueId = CAFE,
-                  title = "Find the fox",
-                  proofType = ProofType.TEXT,
-              ),
-              testQuest(
-                  id = "photo",
-                  venueId = CAFE,
-                  title = "Snap the owl",
-                  proofType = ProofType.PHOTO,
-              ),
-          ),
-      )
+  /** The overview's state, which tests change as the overview would. */
+  private val overview = MutableStateFlow(OverviewUiState())
+  private var overviewRetries = 0
   private val fakeCompletions = FakeCompletionRepository { NOW }
   private val completions = GatedCompletions(fakeCompletions)
   private val photos = ScriptedProofPhotos()
@@ -79,10 +59,10 @@ class CompletionViewModelTest {
 
   private val viewModel by lazy {
     CompletionViewModel(
-        reservationId,
+        RESERVATION,
         EXPLORER,
-        listener,
-        quests,
+        overview,
+        { overviewRetries++ },
         if (completionsBreak) BrokenCompletions(completions) else completions,
         photos,
     )
@@ -91,49 +71,51 @@ class CompletionViewModelTest {
   private val state
     get() = viewModel.uiState.value
 
-  private lateinit var reservationId: String
-
   @Before fun setUp() = Dispatchers.setMain(dispatcher)
 
   @After fun tearDown() = Dispatchers.resetMain()
 
   private fun test(body: suspend TestScope.() -> Unit) = runTest(dispatcher) { body() }
 
-  /** Books [questId] as the explorer and has the venue answer with [status]; returns its id. */
-  private suspend fun book(
-      questId: String,
-      status: ReservationStatus = ReservationStatus.APPROVED,
-  ): String {
-    val id =
-        reservations
-            .createReservation(
-                newPendingReservation(questId, CAFE, TEST_EXPLORER_NAME, NOW),
-                EXPLORER,
-            )
-            .getOrThrow()
-    if (status != ReservationStatus.PENDING) reservations.updateStatus(id, status).getOrThrow()
-    return id
-  }
+  /** The overview's row of the reservation [RESERVATION], approved unless [status] says not. */
+  private fun row(
+      proofType: ProofType,
+      status: OverviewRowStatus = OverviewRowStatus.APPROVED,
+      reservationId: String = RESERVATION,
+  ) =
+      OverviewRow(
+          reservationId = reservationId,
+          questId = "quest",
+          venueId = CAFE,
+          questTitle = "Find the fox",
+          proofType = proofType,
+          reward = null,
+          venueName = "Café Lumen",
+          address = null,
+          avatar = VenueAvatar.Initials("CL"),
+          slotStart = NOW,
+          partySize = 1,
+          status = status,
+      )
 
-  /** Opens the completion of an approved reservation of [questId]. */
-  private suspend fun TestScope.open(questId: String) {
-    reservationId = book(questId)
+  /** An overview that has loaded [rows]. */
+  private fun loaded(vararg rows: OverviewRow) =
+      OverviewUiState(status = OverviewStatus.LOADED, rows = rows.toList())
+
+  /** Opens the completion of the approved reservation, whose quest asks for [proofType]. */
+  private fun TestScope.open(proofType: ProofType) {
+    overview.value = loaded(row(proofType))
     viewModel
     runCurrent()
   }
 
   private suspend fun stored() = fakeCompletions.observeForExplorer(EXPLORER).first()
 
-  @Test
-  fun startsLoading() = test {
-    reservationId = book("fox")
-
-    assertEquals(CompletionUiState(), state)
-  }
+  @Test fun startsLoading() = test { assertEquals(CompletionUiState(), state) }
 
   @Test
   fun anApprovedReservationShowsItsQuestAndTheProofItAsksFor() = test {
-    open("fox")
+    open(ProofType.TEXT)
 
     assertEquals(CompletionFormStatus.READY, state.status)
     assertEquals("Find the fox", state.questTitle)
@@ -144,15 +126,23 @@ class CompletionViewModelTest {
 
   @Test
   fun aPhotoQuestAsksForAPhoto() = test {
-    open("photo")
+    open(ProofType.PHOTO)
 
     assertEquals(ProofType.PHOTO, state.proofType)
     assertEquals(null, state.photo)
   }
 
   @Test
+  fun theFormLoadsWhileTheOverviewDoes() = test {
+    viewModel
+    runCurrent()
+
+    assertEquals(CompletionFormStatus.LOADING, state.status)
+  }
+
+  @Test
   fun aReservationTheVenueHasNotApprovedIsUnavailable() = test {
-    reservationId = book("fox", ReservationStatus.PENDING)
+    overview.value = loaded(row(ProofType.TEXT, OverviewRowStatus.WAITING))
     viewModel
     runCurrent()
 
@@ -160,8 +150,8 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun aRejectedReservationIsUnavailable() = test {
-    reservationId = book("fox", ReservationStatus.REJECTED)
+  fun aReservationTheOverviewDoesNotShowIsUnavailable() = test {
+    overview.value = loaded(row(ProofType.TEXT, reservationId = "another"))
     viewModel
     runCurrent()
 
@@ -169,63 +159,57 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun anUnknownReservationIsUnavailable() = test {
-    reservationId = "nobody-booked-this"
-    viewModel
+  fun aReservationThatLeavesTheOverviewWhileTheFormIsOpenBecomesUnavailable() = test {
+    open(ProofType.TEXT)
+
+    overview.value = loaded()
     runCurrent()
 
     assertEquals(CompletionFormStatus.UNAVAILABLE, state.status)
   }
 
   @Test
-  fun aQuestThatNoLongerExistsIsUnavailable() = test {
-    reservationId = book("deleted")
-    viewModel
-    runCurrent()
-
-    assertEquals(CompletionFormStatus.UNAVAILABLE, state.status)
-  }
-
-  @Test
-  fun aReservationCancelledWhileTheFormIsOpenBecomesUnavailable() = test {
-    open("fox")
-
-    reservations.updateStatus(reservationId, ReservationStatus.CANCELLED).getOrThrow()
-    runCurrent()
-
-    assertEquals(CompletionFormStatus.UNAVAILABLE, state.status)
-  }
-
-  @Test
-  fun aFailingReservationListenerFailsAndRetryingLoadsAgain() = test {
-    reservationId = book("fox")
-    listener.broken = true
+  fun aFailedOverviewFailsTheFormAndRetryingAsksItToLoadAgain() = test {
+    overview.value = OverviewUiState(status = OverviewStatus.FAILED)
     viewModel
     runCurrent()
     assertEquals(CompletionFormStatus.FAILED, state.status)
 
-    listener.broken = false
     viewModel.onRetry()
-    assertEquals(CompletionFormStatus.LOADING, state.status)
-    runCurrent()
+    assertEquals(1, overviewRetries)
 
+    overview.value = loaded(row(ProofType.TEXT))
+    runCurrent()
     assertEquals(CompletionFormStatus.READY, state.status)
   }
 
   @Test
   fun retryingWithoutAFailureDoesNothing() = test {
-    open("fox")
-    val listened = listener.collections
+    open(ProofType.TEXT)
 
     viewModel.onRetry()
+
+    assertEquals(0, overviewRetries)
+  }
+
+  @Test
+  fun whatWasTypedSurvivesTheOverviewLoadingAgain() = test {
+    open(ProofType.TEXT)
+    viewModel.updateAnswer("By the till")
+
+    overview.value = OverviewUiState()
+    runCurrent()
+    assertEquals(CompletionFormStatus.LOADING, state.status)
+    overview.value = loaded(row(ProofType.TEXT))
     runCurrent()
 
-    assertEquals(listened, listener.collections)
+    assertEquals(CompletionFormStatus.READY, state.status)
+    assertEquals("By the till", state.answer)
   }
 
   @Test
   fun aBlankAnswerCannotBeSubmitted() = test {
-    open("fox")
+    open(ProofType.TEXT)
     viewModel.updateAnswer("   ")
 
     assertFalse(state.canSubmit)
@@ -238,7 +222,7 @@ class CompletionViewModelTest {
 
   @Test
   fun aTextAnswerIsSubmittedTrimmedAndShowsSubmitted() = test {
-    open("fox")
+    open(ProofType.TEXT)
     viewModel.updateAnswer("  The fox is by the till  ")
     assertTrue(state.canSubmit)
 
@@ -247,16 +231,16 @@ class CompletionViewModelTest {
 
     val completion = stored().single()
     assertEquals(Proof.Text("The fox is by the till"), completion.proof)
-    assertEquals(reservationId, completion.reservationId)
+    assertEquals(RESERVATION, completion.reservationId)
     assertEquals(CAFE, completion.venueId)
     assertEquals(EXPLORER, completion.explorerUid)
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
     assertEquals(0, photos.calls.size)
   }
 
   @Test
   fun aTextQuestIgnoresAPickedPhoto() = test {
-    open("fox")
+    open(ProofType.TEXT)
     viewModel.pickPhoto(PHOTO)
 
     assertFalse(state.canSubmit)
@@ -264,7 +248,7 @@ class CompletionViewModelTest {
 
   @Test
   fun aPhotoQuestCannotBeSubmittedWithoutAPhoto() = test {
-    open("photo")
+    open(ProofType.PHOTO)
     viewModel.updateAnswer("a written answer")
 
     assertFalse(state.canSubmit)
@@ -276,21 +260,21 @@ class CompletionViewModelTest {
 
   @Test
   fun aPhotoIsUploadedThenSubmittedWithItsUrl() = test {
-    open("photo")
+    open(ProofType.PHOTO)
     viewModel.pickPhoto(PHOTO)
     assertTrue(state.canSubmit)
 
     viewModel.submit()
     runCurrent()
 
-    assertEquals(listOf(reservationId to PHOTO), photos.calls)
+    assertEquals(listOf(RESERVATION to PHOTO), photos.calls)
     assertEquals(Proof.Photo(photos.urlOf(1)), stored().single().proof)
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
   }
 
   @Test
   fun savingShowsWhileTheWriteIsPendingThenSubmitted() = test {
-    open("fox")
+    open(ProofType.TEXT)
     viewModel.updateAnswer("By the till")
     val gate = CompletableDeferred<Unit>().also { completions.gate = it }
 
@@ -301,12 +285,12 @@ class CompletionViewModelTest {
 
     gate.complete(Unit)
     runCurrent()
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
   }
 
   @Test
   fun aDoubleTapSubmitsOnce() = test {
-    open("fox")
+    open(ProofType.TEXT)
     viewModel.updateAnswer("By the till")
     val gate = CompletableDeferred<Unit>().also { completions.gate = it }
 
@@ -322,7 +306,7 @@ class CompletionViewModelTest {
 
   @Test
   fun aDoubleTapUploadsAPhotoOnce() = test {
-    open("photo")
+    open(ProofType.PHOTO)
     viewModel.pickPhoto(PHOTO)
     val gate = CompletableDeferred<Unit>().also { completions.gate = it }
 
@@ -338,7 +322,7 @@ class CompletionViewModelTest {
 
   @Test
   fun theFormCannotBeEditedWhileItIsSaving() = test {
-    open("fox")
+    open(ProofType.TEXT)
     viewModel.updateAnswer("By the till")
     completions.gate = CompletableDeferred()
 
@@ -351,7 +335,7 @@ class CompletionViewModelTest {
 
   @Test
   fun aFailedSubmitKeepsTheAnswerAndCanBeRetried() = test {
-    open("fox")
+    open(ProofType.TEXT)
     viewModel.updateAnswer("By the till")
     fakeCompletions.forcedFailure = IOException("offline")
 
@@ -367,13 +351,13 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
     assertEquals(1, stored().size)
   }
 
   @Test
   fun aFailedUploadSubmitsNothingAndTheRetryUploadsAgain() = test {
-    open("photo")
+    open(ProofType.PHOTO)
     viewModel.pickPhoto(PHOTO)
     photos.failure = IOException("offline")
 
@@ -394,7 +378,7 @@ class CompletionViewModelTest {
 
   @Test
   fun aSubmitThatFailsAfterTheUploadReusesTheUploadOnRetry() = test {
-    open("photo")
+    open(ProofType.PHOTO)
     viewModel.pickPhoto(PHOTO)
     fakeCompletions.forcedFailure = IOException("offline")
     viewModel.submit()
@@ -411,7 +395,7 @@ class CompletionViewModelTest {
 
   @Test
   fun aNewPhotoAfterAFailureIsUploadedInsteadOfTheOldOne() = test {
-    open("photo")
+    open(ProofType.PHOTO)
     viewModel.pickPhoto(PHOTO)
     fakeCompletions.forcedFailure = IOException("offline")
     viewModel.submit()
@@ -422,18 +406,16 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(listOf(reservationId to PHOTO, reservationId to OTHER_PHOTO), photos.calls)
+    assertEquals(listOf(RESERVATION to PHOTO, RESERVATION to OTHER_PHOTO), photos.calls)
     assertEquals(Proof.Photo(photos.urlOf(2)), stored().single().proof)
   }
 
   @Test
   fun aCompletionAlreadySubmittedShowsSubmittedWhenTheFormOpens() = test {
-    reservationId = book("fox")
-    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
-    viewModel
-    runCurrent()
+    fakeCompletions.submit(RESERVATION, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    open(ProofType.TEXT)
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
     assertFalse(state.canSubmit)
     viewModel.submit()
     runCurrent()
@@ -442,14 +424,10 @@ class CompletionViewModelTest {
 
   @Test
   fun aRejectedCompletionStillCountsAsSubmitted() = test {
-    reservationId = book("fox")
     val id =
-        fakeCompletions
-            .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
-            .getOrThrow()
+        fakeCompletions.submit(RESERVATION, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
     fakeCompletions.reject(id, "Not the right fox").getOrThrow()
-    viewModel
-    runCurrent()
+    open(ProofType.TEXT)
 
     assertEquals(SaveState.Saved(id), state.saveState)
     assertEquals(CompletionStatus.REJECTED, stored().single().status)
@@ -457,59 +435,43 @@ class CompletionViewModelTest {
 
   @Test
   fun aCompletionOfAnotherReservationDoesNotCount() = test {
-    val other = book("fox")
-    fakeCompletions.submit(other, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
-    open("photo")
+    fakeCompletions.submit("another", CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    open(ProofType.PHOTO)
 
     assertEquals(SaveState.Idle, state.saveState)
   }
 
   @Test
   fun aCompletionThatAppearsWhileTheFormIsOpenShowsSubmitted() = test {
-    open("fox")
+    open(ProofType.TEXT)
     assertEquals(SaveState.Idle, state.saveState)
 
-    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    fakeCompletions.submit(RESERVATION, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
   }
 
   @Test
   fun aFailingCompletionListenerLeavesTheFormUsable() = test {
     completionsBreak = true
-    open("fox")
+    open(ProofType.TEXT)
     assertEquals(CompletionFormStatus.READY, state.status)
 
     viewModel.updateAnswer("By the till")
     viewModel.submit()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
   }
 
   private companion object {
+    const val RESERVATION = "reservation-1"
     const val CAFE = "cafe"
     const val EXPLORER = "explorer"
     const val NOW = 1_800_000_000_000L
     val PHOTO: Uri = Uri.parse("content://media/photos/1")
     val OTHER_PHOTO: Uri = Uri.parse("content://media/photos/2")
-  }
-}
-
-/** Delegates to [inner], and can have the explorer's reservations fail when collected. */
-private class BreakableReservations(private val inner: ReservationRepository) :
-    ReservationRepository by inner {
-  var broken = false
-
-  /** How many times the explorer's reservations were collected. */
-  var collections = 0
-    private set
-
-  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
-    collections++
-    if (broken) throw IOException("offline")
-    emitAll(inner.observeForExplorer(uid))
   }
 }
 

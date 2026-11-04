@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import androidx.compose.ui.test.assertIsDisplayed
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -205,6 +207,7 @@ class OverviewScreenTest {
           questId = "fox",
           venueId = venueId,
           questTitle = "Find the hidden fox",
+          proofType = ProofType.PHOTO,
           reward = reward,
           venueName = "Café Lumen",
           address = address,

@@ -6,22 +6,19 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
-import com.github.aroundteam2026.aroundapp.model.quest.Quest
-import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
-import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.ui.SaveState
-import kotlinx.coroutines.Job
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRow
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRowStatus
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewStatus
+import com.github.aroundteam2026.aroundapp.ui.overview.OverviewUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -29,22 +26,30 @@ import kotlinx.coroutines.launch
  * Holds the completion of the reservation [reservationId] by the explorer [explorerUid]: its quest
  * and the proof the quest asks for, what the explorer filled in, and submitting it.
  *
- * It listens to the explorer's reservations, so the form is [CompletionFormStatus.READY] only while
- * the reservation is approved, and to the explorer's completions, so a reservation that was already
- * completed shows as [SaveState.Saved] and can't be submitted again, also when the answer to an
- * earlier submit was lost. If listening to the completions fails, the form stays usable: the
- * repository refuses a second completion anyway. If loading the reservation fails, the form is
- * [CompletionFormStatus.FAILED] until [onRetry].
+ * The quest comes from the overview, which the screen is opened from and which already loads each
+ * approved reservation with its quest: the form follows [overview], and is
+ * [CompletionFormStatus.READY] only while the overview shows the reservation as approved. If the
+ * overview fails, so does the form, and [onRetry] calls [retryOverview]. What the explorer filled
+ * in is kept through all of it.
+ *
+ * It also listens to the explorer's completions, so a reservation that was already completed shows
+ * as [SaveState.Saved] and can't be submitted again, also when the answer to an earlier submit was
+ * lost. If that listener fails, the form stays usable: the repository refuses a second completion
+ * anyway.
  *
  * A text proof is submitted as it is. A photo is uploaded through [proofPhotoRepository] first; a
  * photo that was uploaded is not uploaded again when only the submit failed, until another photo is
  * picked.
+ *
+ * @param overview The overview's state, e.g. the `OverviewViewModel`'s `uiState` of the Quests tab.
+ * @param retryOverview Asks the overview to load again after it failed, e.g.
+ *   `OverviewViewModel.retry`.
  */
 class CompletionViewModel(
     private val reservationId: String,
     private val explorerUid: String,
-    private val reservationRepository: ReservationRepository,
-    private val questRepository: QuestRepository,
+    private val overview: StateFlow<OverviewUiState>,
+    private val retryOverview: () -> Unit,
     private val completionRepository: CompletionRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
 ) : ViewModel() {
@@ -52,16 +57,15 @@ class CompletionViewModel(
   /** What the completion screen shows now; the screen observes it. */
   val uiState: StateFlow<CompletionUiState> = mutableUiState.asStateFlow()
 
-  private var listening: Job? = null
-
-  /** The venue of the reservation, once it is known to be approved. */
+  /** The venue of the reservation, while the overview shows it as approved. */
   private var venueId: String? = null
 
   /** The photo that was uploaded last, with the URL it was stored at. */
   private var uploaded: Pair<Uri, String>? = null
 
   init {
-    listen()
+    viewModelScope.launch { overview.collect { showing(it) } }
+    viewModelScope.launch { listenToCompletions() }
   }
 
   /** Called when the explorer types [answer] for a text proof; ignored once the form is locked. */
@@ -86,9 +90,8 @@ class CompletionViewModel(
     if (!form.canSubmit || venueId == null) return
     mutableUiState.update { it.copy(saveState = SaveState.Saving) }
     viewModelScope.launch {
-      val proof = proofOf(form)
       val saveState =
-          proof
+          proofOf(form)
               ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
               ?.fold(
                   { SaveState.Saved(it) },
@@ -104,9 +107,28 @@ class CompletionViewModel(
 
   /** Called when the explorer asks to try again after a failure to load; does nothing otherwise. */
   fun onRetry() {
-    if (mutableUiState.value.status != CompletionFormStatus.FAILED) return
-    mutableUiState.update { it.copy(status = CompletionFormStatus.LOADING) }
-    listen()
+    if (mutableUiState.value.status == CompletionFormStatus.FAILED) retryOverview()
+  }
+
+  /** Shows what [overviewState] says about the reservation, keeping what the explorer filled in. */
+  private fun showing(overviewState: OverviewUiState) {
+    val row = overviewState.rows.find { it.reservationId == reservationId }?.takeIf { it.approved }
+    venueId = row?.venueId
+    mutableUiState.update {
+      when {
+        overviewState.status == OverviewStatus.LOADING ->
+            it.copy(status = CompletionFormStatus.LOADING)
+        overviewState.status == OverviewStatus.FAILED ->
+            it.copy(status = CompletionFormStatus.FAILED)
+        row == null -> it.copy(status = CompletionFormStatus.UNAVAILABLE)
+        else ->
+            it.copy(
+                status = CompletionFormStatus.READY,
+                questTitle = row.questTitle,
+                proofType = row.proofType,
+            )
+      }
+    }
   }
 
   /**
@@ -134,49 +156,6 @@ class CompletionViewModel(
   }
 
   /**
-   * Listens to the reservation and, apart from it, to the explorer's completions, until the
-   * ViewModel is cleared or listening to the reservation fails. The quest doesn't change, so it is
-   * read once per listening.
-   */
-  private fun listen() {
-    listening?.cancel()
-    val quests = mutableMapOf<String, Quest?>()
-    listening = viewModelScope.launch {
-      launch { listenToCompletions() }
-      reservationRepository
-          .observeForExplorer(explorerUid)
-          .map { reservations ->
-            val approved = reservations.approvedReservation(reservationId)
-            approved?.let { reservation ->
-              if (reservation.questId !in quests) {
-                quests[reservation.questId] = questRepository.getQuest(reservation.questId)
-              }
-              quests[reservation.questId]?.let { quest -> reservation to quest }
-            }
-          }
-          .catch {
-            Log.w(TAG, "Loading the reservation $reservationId failed", it)
-            mutableUiState.update { state -> state.copy(status = CompletionFormStatus.FAILED) }
-          }
-          .collect { booked ->
-            venueId = booked?.first?.venueId
-            mutableUiState.update { state ->
-              if (booked == null) {
-                state.copy(status = CompletionFormStatus.UNAVAILABLE)
-              } else {
-                val (_, quest) = booked
-                state.copy(
-                    status = CompletionFormStatus.READY,
-                    questTitle = quest.title,
-                    proofType = quest.proofType,
-                )
-              }
-            }
-          }
-    }
-  }
-
-  /**
    * Shows the reservation as completed once the explorer has a completion of it, whatever its
    * status.
    */
@@ -198,9 +177,8 @@ class CompletionViewModel(
 }
 
 /**
- * The reservation [id] among these, if it is approved, the only status a quest can be completed in.
+ * Whether the venue approved the reservation this row shows, the status a quest can be completed
+ * in.
  */
-private fun List<Reservation>.approvedReservation(id: String): Reservation? = find {
-  it.id == id
-}
-    ?.takeIf { it.status == ReservationStatus.APPROVED }
+private val OverviewRow.approved: Boolean
+  get() = status == OverviewRowStatus.APPROVED

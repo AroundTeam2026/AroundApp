@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
@@ -6,6 +7,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -60,6 +62,13 @@ class OverviewViewModelTest {
           "fox" to testQuest(id = "fox", venueId = CAFE, title = "Find the hidden fox"),
           "bread" to testQuest(id = "bread", venueId = BAKERY, title = "Bake with us"),
           "cake" to testQuest(id = "cake", venueId = CAFE, title = "Taste the cake"),
+          "riddle" to
+              testQuest(
+                  id = "riddle",
+                  venueId = CAFE,
+                  title = "Answer the riddle",
+                  proofType = ProofType.TEXT,
+              ),
       )
   private val questReads = mutableListOf<String>()
   private val questRepository = ScriptedQuestRepository(quest = ::readQuest)
@@ -133,6 +142,7 @@ class OverviewViewModelTest {
                 questId = "fox",
                 venueId = CAFE,
                 questTitle = "Find the hidden fox",
+                proofType = ProofType.PHOTO,
                 reward = Reward.FreeItem("Coffee", specifics = null),
                 venueName = "Café Lumen",
                 address = "Rue du Pont 1",
@@ -153,6 +163,19 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(OverviewRowStatus.APPROVED, state.rows.single().status)
+  }
+
+  @Test
+  fun aRowCarriesTheProofItsQuestAsksFor() = test {
+    book("fox")
+    book("riddle", slotStart = START + HOUR)
+    viewModel
+    runCurrent()
+
+    assertEquals(
+        listOf(ProofType.PHOTO, ProofType.TEXT),
+        state.rows.map { it.proofType },
+    )
   }
 
   @Test

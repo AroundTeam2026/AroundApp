@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.content.res.Configuration
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -358,6 +360,7 @@ private fun OverviewQuestRowPreview() {
               questId = "fox",
               venueId = "cafe",
               questTitle = "Find the hidden fox",
+              proofType = ProofType.PHOTO,
               reward = Reward.FreeItem("croissant", specifics = null),
               venueName = "Café Lumière",
               address = "Rue de Bourg 12",
