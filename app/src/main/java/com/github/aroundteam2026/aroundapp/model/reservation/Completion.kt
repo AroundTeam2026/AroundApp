@@ -86,6 +86,12 @@ enum class CompletionStatus {
   REJECTED,
 }
 
+/**
+ * The id of [explorerUid]'s completion of the reservation [reservationId]. Built from both, so a
+ * retried submission writes the same document and an explorer can't complete a reservation twice.
+ */
+fun completionId(reservationId: String, explorerUid: String) = "${reservationId}_$explorerUid"
+
 /** Whether a completion may change from [from] to [to]: only pending ones can be answered. */
 fun canTransition(from: CompletionStatus, to: CompletionStatus): Boolean =
     from == CompletionStatus.PENDING &&

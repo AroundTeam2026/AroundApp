@@ -10,7 +10,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -28,21 +27,24 @@ class FakeCompletionRepositoryTest {
     repository = FakeCompletionRepository(now = { FIXED_NOW })
   }
 
-  /** Submits a completion of [RESERVATION_ID] and returns its id. */
-  private suspend fun submit(venueId: String = VENUE_ID, explorerUid: String = EXPLORER_UID) =
-      repository.submit(RESERVATION_ID, venueId, explorerUid, PROOF).getOrThrow()
+  /** Submits a completion with [PROOF] and returns its id. */
+  private suspend fun submit(
+      reservationId: String = RESERVATION_ID,
+      venueId: String = VENUE_ID,
+      explorerUid: String = EXPLORER_UID,
+  ) = repository.submit(reservationId, venueId, explorerUid, PROOF).getOrThrow()
 
   /** The only completion stored for [VENUE_ID]. */
   private suspend fun stored() = repository.observeForVenue(VENUE_ID).first().single()
 
   @Test
-  fun submit_storesAPendingCompletionSubmittedNow() =
+  fun submit_storesAPendingCompletionSubmittedNowUnderItsId() =
       runBlocking<Unit> {
-        val id = submit()
+        assertEquals(COMPLETION_ID, submit())
 
         val expected =
             Completion(
-                id = id,
+                id = COMPLETION_ID,
                 reservationId = RESERVATION_ID,
                 venueId = VENUE_ID,
                 explorerUid = EXPLORER_UID,
@@ -55,8 +57,16 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
-  fun submit_generatesADifferentIdEachTime() =
-      runBlocking<Unit> { assertNotEquals(submit(), submit()) }
+  fun submit_twiceForTheSameReservationAndExplorer_failsAndKeepsTheFirst() =
+      runBlocking<Unit> {
+        submit()
+        val first = stored()
+
+        val result = repository.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, OTHER_PROOF)
+
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        assertEquals(first, stored())
+      }
 
   @Test
   fun submit_whenFailureIsForced_returnsItAndStoresNothing() =
@@ -74,7 +84,7 @@ class FakeCompletionRepositoryTest {
   fun observeForVenue_returnsOnlyThatVenuesCompletions() =
       runBlocking<Unit> {
         val mine = submit()
-        submit(venueId = OTHER_ID)
+        submit(reservationId = OTHER_ID, venueId = OTHER_ID)
 
         assertEquals(listOf(mine), repository.observeForVenue(VENUE_ID).first().map { it.id })
       }
@@ -99,7 +109,7 @@ class FakeCompletionRepositoryTest {
               repository.observeForVenue(VENUE_ID).take(2).toList()
             }
 
-        submit(venueId = OTHER_ID)
+        submit(reservationId = OTHER_ID, venueId = OTHER_ID)
         // Lets the collector see the write above before the next one replaces it
         yield()
         val mine = submit()
@@ -134,14 +144,13 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
-  fun reject_blankReason_failsAndChangesNothing() =
+  fun reject_blankReason_failsBeforeTheBackendAndTheLookup() =
       runBlocking<Unit> {
-        val id = submit()
+        repository.forcedFailure = IllegalStateException(OFFLINE)
 
-        val result = repository.reject(id, BLANK)
+        val result = repository.reject(OTHER_ID, BLANK)
 
         assertTrue(result.exceptionOrNull() is IllegalArgumentException)
-        assertEquals(CompletionStatus.PENDING, stored().status)
       }
 
   @Test
@@ -181,9 +190,11 @@ class FakeCompletionRepositoryTest {
     const val VENUE_ID = "v1"
     const val EXPLORER_UID = "u1"
     const val OTHER_ID = "other"
+    const val COMPLETION_ID = "${RESERVATION_ID}_$EXPLORER_UID"
     const val REASON = "Blurry photo"
     const val BLANK = " "
     const val OFFLINE = "offline"
     val PROOF = Proof.Text("The answer")
+    val OTHER_PROOF = Proof.Text("Another answer")
   }
 }

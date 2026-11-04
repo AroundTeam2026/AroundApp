@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.update
  * In-memory [CompletionRepository] for unit tests and for running the app without Firestore.
  *
  * Completions are kept in insertion order in a [MutableStateFlow]. Each `observe*` flow emits again
- * only when its own result changes, not on every write. Ids are generated as `completion-1`,
- * `completion-2`, ... and are unique per instance. Not thread-safe; use one instance per test.
+ * only when its own result changes, not on every write. Each completion is stored under its
+ * [completionId]. Not thread-safe; use one instance per test.
  *
  * Unlike the security rules, it doesn't check who writes, that the reservation is approved, or that
  * the proof is of the quest's type; set [forcedFailure] to test a refusal.
@@ -24,20 +24,20 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     CompletionRepository {
   /**
    * Simulates a backend error (e.g. no network or a refused write) so callers' error paths can be
-   * tested. While non-null, [submit], [approve] and [reject] return `Result.failure(forcedFailure)`
-   * and change nothing. Set it back to null to make writes succeed again.
+   * tested. While non-null, [submit], [approve] and [reject] with a non-blank reason return
+   * `Result.failure(forcedFailure)` and change nothing; a blank reason is the caller's mistake, so
+   * it fails first, as it would without a backend. Set it back to null to make writes succeed
+   * again.
    */
   var forcedFailure: Throwable? = null
 
   /** All stored completions, keyed by id. */
   private val completions = MutableStateFlow<Map<String, Completion>>(emptyMap())
 
-  /** Number used for the next generated id. */
-  private var nextId = 1
-
   /**
-   * Stores a pending completion with a new id and [now] as its submission time, and returns the id.
-   * Returns [forcedFailure] instead, storing nothing, if it is set.
+   * Stores a pending completion under its [completionId] with [now] as its submission time, and
+   * returns the id. Returns [forcedFailure] instead, storing nothing, if it is set, and an
+   * [IllegalStateException], changing nothing, if a completion is already stored under that id.
    */
   override suspend fun submit(
       reservationId: String,
@@ -48,7 +48,10 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     forcedFailure?.let {
       return Result.failure(it)
     }
-    val id = "$ID_PREFIX${nextId++}"
+    val id = completionId(reservationId, explorerUid)
+    if (id in completions.value) {
+      return Result.failure(IllegalStateException("Completion $id was already submitted"))
+    }
     val stored =
         Completion(
             id = id,
@@ -74,6 +77,10 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     it.venueId == venueId
   }
 
+  /**
+   * Approves the completion with [id]. Fails, changing nothing, if there is no such completion, if
+   * [canTransition] forbids the change, or if [forcedFailure] is set.
+   */
   override suspend fun approve(id: String): Result<Unit> =
       answer(id, CompletionStatus.APPROVED, rejectReason = null)
 
@@ -108,9 +115,5 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     }
     completions.update { it + (id to current.copy(status = status, rejectReason = rejectReason)) }
     return Result.success(Unit)
-  }
-
-  private companion object {
-    const val ID_PREFIX = "completion-"
   }
 }

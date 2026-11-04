@@ -93,7 +93,9 @@ One membership per explorer and reservation. The id is built from both, so the r
 
 The size of a party is the number of its `JOINED` members (`observeJoinedCounts`). An explorer's reservations are those they have a `JOINED` membership of (`observeForExplorer`).
 
-### `completions/{id}`
+### `completions/{reservationId}_{explorerUid}`
+
+One completion per explorer and reservation (`completionId`). The id is built from both, so a retried submission writes the same document instead of a second one, and an explorer can't complete a reservation twice.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -108,7 +110,7 @@ The size of a party is the number of its `JOINED` members (`observeJoinedCounts`
 
 Exactly one of `photoUrl` and `textAnswer` is present, and it isn't blank (enforced by `Proof`). Which one must match the quest's `proofType`; the rules will check that.
 
-Model only for now: there is no completions repository yet.
+Read and written through `CompletionRepository`, with `FakeCompletionRepository` for unit tests. The Firestore implementation and the rules come with #326.
 
 ## Allowed status transitions
 

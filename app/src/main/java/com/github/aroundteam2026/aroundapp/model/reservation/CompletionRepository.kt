@@ -7,18 +7,25 @@ import kotlinx.coroutines.flow.Flow
 interface CompletionRepository {
   /**
    * Stores a new completion of the reservation [reservationId]. The repository, not the caller,
-   * sets the rest: it generates a fresh id, sets the submission time, and starts the completion as
-   * [CompletionStatus.PENDING], without a reject reason.
+   * sets the rest: it stores it under [completionId], sets the submission time, and starts the
+   * completion as [CompletionStatus.PENDING], without a reject reason. An explorer submits at most
+   * one completion per reservation: if one is already stored under that id, whatever its status,
+   * this fails and changes nothing, so a retry can't create a second one.
    *
-   * The security rules only let an explorer of an approved reservation submit, as themselves, a
-   * proof of the type its quest asks for, so the Firestore implementation can fail where the fake
-   * doesn't check.
+   * Waits for the backend to confirm the write, for a bounded time. The security rules only let an
+   * explorer of an approved reservation submit, as themselves, a proof of the type its quest asks
+   * for, so the Firestore implementation's server can refuse the write where the fake doesn't
+   * check; a refusal that arrives in time is returned as a failure and nothing is stored. When no
+   * answer arrives in time, e.g. while offline, the write stays queued, is sent once the device is
+   * back online, and this returns success: a refusal after that is not reported here.
    *
    * @param reservationId id of the approved reservation the proof belongs to.
    * @param venueId id of the venue that owns the reservation's quest.
    * @param explorerUid uid of the explorer submitting the proof.
    * @param proof what the explorer submits.
-   * @return the new completion's id, or a failure if the write failed or was refused.
+   * @return the new completion's id, or a failure if one is already stored under it
+   *   ([IllegalStateException]), if the write could not be issued, or if the backend refused it in
+   *   time.
    */
   suspend fun submit(
       reservationId: String,
