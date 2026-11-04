@@ -1,7 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
-import android.text.format.DateFormat
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -21,10 +20,10 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -88,24 +87,32 @@ class OverviewQuestRowTest {
     ShadowSettings.set24HourTimeFormat(true)
     show(row(slotStart = later))
 
-    // In English, e.g. "Sun, Jan 17 · 08:00"
-    val day =
-        DateTimeFormatter.ofPattern(
-                DateFormat.getBestDateTimePattern(Locale.ENGLISH, "EEEdMMM"),
-                Locale.ENGLISH,
-            )
-            .format(Instant.ofEpochMilli(later).atZone(UTC))
-    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("$day · 08:00")
+    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("Sun, Jan 17 · 08:00")
   }
 
-  // The app passes no clock, so the card reads the device's: a quest booked now is today
+  // The day and time follow the phone's language, here German on the 24-hour clock
+  @Test
+  @Config(qualifiers = "de")
+  fun inGermanTheSlotShowsTheGermanDay() {
+    ShadowSettings.set24HourTimeFormat(true)
+    show(row(slotStart = SLOT + 2 * DAY))
+
+    part(C.Tag.OVERVIEW_ROW_SLOT)
+        .assert(hasText("17. Jan", substring = true) and hasText("08:00", substring = true))
+  }
+
+  // The app passes no clock, so the card reads the device's: a quest booked now is today. Skipped
+  // on the rare run where midnight passes while the card is drawn, as then "now" is yesterday.
   @Test
   fun withoutAClockTheCardUsesTheDevicesDay() {
+    val dayBefore = LocalDate.now()
     compose.setContent {
       AroundAppTheme {
         OverviewQuestRow(row(slotStart = System.currentTimeMillis()), onClick = { clicks++ })
       }
     }
+    compose.waitForIdle()
+    assumeTrue(LocalDate.now() == dayBefore)
 
     part(C.Tag.OVERVIEW_ROW_SLOT).assert(hasText("Today · ", substring = true))
   }
@@ -138,6 +145,18 @@ class OverviewQuestRowTest {
               it.config.getOrNull(SemanticsActions.OnClick)?.label == "Open Café Lumen"
             }
         )
+  }
+
+  // On some Android versions, Traditional Chinese writes the 12-hour clock with a day period
+  // letter java.time can't read. Robolectric's patterns don't use it, so this only checks the
+  // language still shows its time.
+  @Test
+  @Config(qualifiers = "zh-rTW")
+  fun inTraditionalChineseOnThe12HourClockTheSlotShowsItsTime() {
+    ShadowSettings.set24HourTimeFormat(false)
+    show(row(slotStart = SLOT + 2 * DAY))
+
+    part(C.Tag.OVERVIEW_ROW_SLOT).assert(hasText("8:00", substring = true))
   }
 
   // The phone's 12-hour setting adds AM or PM; checked in parts, as the space before it varies
