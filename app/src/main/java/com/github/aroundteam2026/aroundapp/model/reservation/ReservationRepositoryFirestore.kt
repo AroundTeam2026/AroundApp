@@ -6,6 +6,7 @@ import android.util.Log
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyUserFirestore
 import com.github.aroundteam2026.aroundapp.model.party.partyMemberId
+import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -223,10 +224,6 @@ class ReservationRepositoryFirestore(
       null
     }
   }
-
-  /** Reads [field] with [read], throwing if it is absent. */
-  private fun <T : Any> required(field: String, read: (String) -> T?): T =
-      read(field) ?: throw IllegalArgumentException("Missing field $field")
 
   private companion object {
     const val TAG = "ReservationRepositoryFirestore"

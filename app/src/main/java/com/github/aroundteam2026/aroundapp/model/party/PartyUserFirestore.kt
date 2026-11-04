@@ -1,7 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.party
 
 import android.util.Log
+import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 
@@ -58,10 +60,4 @@ internal object PartyUserFirestore {
       null
     }
   }
-
-  /** Reads [field] with [read], throwing if it is absent. */
-  private fun <T : Any> DocumentSnapshot.required(
-      field: String,
-      read: DocumentSnapshot.(String) -> T?,
-  ): T = read(field) ?: throw IllegalArgumentException("Missing field $field")
 }
