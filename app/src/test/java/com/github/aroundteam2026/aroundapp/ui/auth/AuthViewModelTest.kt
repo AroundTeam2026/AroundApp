@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.auth
 
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.github.aroundteam2026.aroundapp.model.auth.AuthError
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
@@ -14,9 +15,11 @@ import com.github.aroundteam2026.aroundapp.model.user.Role
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -377,6 +380,31 @@ class AuthViewModelTest {
         advanceUntilIdle()
         assertNotNull(repo.currentUserId.value)
         assertEquals(Role.VENUE, pending.pending?.role)
+      }
+
+  @Test
+  fun cancellingGoogleSignupAfterSavingChoiceDiscardsPendingRole() =
+      runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val pending = FakePendingRoleStore()
+        val delayed =
+            object : AuthRepository by repo {
+              override suspend fun signUpWithGoogle(idToken: String): Result<String> {
+                gate.await()
+                return repo.signUpWithGoogle(idToken)
+              }
+            }
+        val form = AuthViewModel(delayed, ProfileSetup(delayed, FakeUserRepository(), pending))
+        assertTrue(form.beginGoogleSignIn(Role.VENUE))
+        form.onGoogleCredential(GoogleCredentialResult.Token("token"))
+        runCurrent()
+        assertEquals(Role.VENUE, pending.pending?.role)
+
+        form.viewModelScope.cancel()
+        advanceUntilIdle()
+
+        assertNull(pending.pending)
+        assertNull(repo.currentUserId.value)
       }
 
   @Test

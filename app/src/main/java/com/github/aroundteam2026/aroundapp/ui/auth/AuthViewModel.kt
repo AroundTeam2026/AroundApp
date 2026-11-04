@@ -12,11 +12,13 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthInputValidation
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.user.RegistrationChoice
 import com.github.aroundteam2026.aroundapp.model.user.Role
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Why the form can't go ahead. The screen turns each into a string resource. */
 enum class AuthFormError {
@@ -256,15 +258,25 @@ class AuthViewModel(
       call: suspend () -> Result<String>,
   ) {
     viewModelScope.launch {
-      if (prepare().isFailure) {
-        _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
-        return@launch
+      var result: Result<String>? = null
+      var prepared = false
+      try {
+        if (prepare().isFailure) {
+          _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
+          return@launch
+        }
+        prepared = true
+        result = call()
+      } finally {
+        if (prepared && result?.isSuccess != true) {
+          // The caller may already be cancelled; the saved signup choice must still be removed.
+          withContext(NonCancellable) { onFailure() }
+        }
       }
-      val result = call()
-      if (result.isFailure) onFailure()
+      val completed = checkNotNull(result)
       _uiState.update {
-        if (result.isSuccess) AuthUiState()
-        else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))
+        if (completed.isSuccess) AuthUiState()
+        else it.copy(isLoading = false, error = completed.exceptionOrNull()?.let(::toFormError))
       }
     }
   }

@@ -40,8 +40,12 @@ class AuthRepositoryFirebaseGoogleSignupTest {
 
     val repository = AuthRepositoryFirebase(auth)
 
-    fun completeNewAccount() {
-      val info = mockk<AdditionalUserInfo> { every { isNewUser } returns true }
+    fun completeNewAccount() = completeAccount(newUser = true)
+
+    fun completeExistingAccount() = completeAccount(newUser = false)
+
+    private fun completeAccount(newUser: Boolean) {
+      val info = mockk<AdditionalUserInfo> { every { isNewUser } returns newUser }
       val result =
           mockk<AuthResult> {
             every { user } returns this@PendingFirebase.user
@@ -67,6 +71,21 @@ class AuthRepositoryFirebaseGoogleSignupTest {
     )
     assertEquals("new-google-uid", firebase.repository.currentUserId.value)
     verify(exactly = 0) { firebase.auth.signInWithCredential(any()) }
+  }
+
+  @Test
+  fun existingGoogleAccountIsRejectedBeforePublishingSession() = runTest {
+    val firebase = PendingFirebase()
+    val request = async { firebase.repository.signUpWithGoogle("token") }
+    runCurrent()
+    assertNull(firebase.repository.currentUserId.value)
+
+    firebase.completeExistingAccount()
+    runCurrent()
+
+    assertEquals(AuthError.EmailAlreadyInUse, request.await().exceptionOrNull())
+    assertNull(firebase.repository.currentUserId.value)
+    verify(exactly = 1) { firebase.auth.signOut() }
   }
 
   @Test
