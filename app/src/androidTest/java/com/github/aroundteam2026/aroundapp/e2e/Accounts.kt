@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import java.util.UUID
@@ -49,8 +50,24 @@ fun ComposeTestRule.signIn(email: String, landsOn: String) {
   onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
-  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+  submitAuthForm()
   leaveAuthFor(landsOn)
+}
+
+/** Closes the soft keyboard, then taps the auth form's submit button, scrolled into view. */
+fun ComposeTestRule.submitAuthForm() {
+  closeKeyboard()
+  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+}
+
+/**
+ * Closes the soft keyboard and waits until it is hidden. Call it before every tap that follows
+ * typing: while the keyboard slides in, a screen with imePadding is still catching up, so a button
+ * can still be under the keyboard or moving when the tap lands, and the tap is lost (the auth form
+ * in CI run 41899891610, the venue name's Continue in 41918593997).
+ */
+fun ComposeTestRule.closeKeyboard() {
+  Espresso.closeSoftKeyboard()
 }
 
 /**
@@ -73,7 +90,7 @@ private fun ComposeTestRule.register(
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
-  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+  submitAuthForm()
   leaveAuthFor(landsOn)
 }
 

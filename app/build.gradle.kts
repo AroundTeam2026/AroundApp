@@ -208,6 +208,9 @@ tasks.withType<Test> {
 tasks.register("jacocoTestReport", JacocoReport::class) {
   group = "verification"
   description = "Generates the JaCoCo coverage report from unit and instrumented tests."
+  // Reports on the compiled classes and whatever coverage data the tests left behind: the CI's
+  // report job runs it without the tests, on the data its other jobs uploaded.
+  dependsOn("compileDebugKotlin")
   mustRunAfter("testDebugUnitTest", "connectedDebugAndroidTest")
 
   reports {
@@ -225,24 +228,28 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
           "android/**/*.*",
       )
 
+  // Each tree is rooted at the directory it reads, not at the build directory, so Gradle sees
+  // which tasks' outputs the report depends on
+  val build = project.layout.buildDirectory
   val debugTree =
-      fileTree(project.layout.buildDirectory) {
-        include(
-            // AGP 9 compiles Kotlin with its built-in compiler, which writes here
-            "intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/**",
-            // Fallback for the AGP 8 layout
-            "tmp/kotlin-classes/debug/**",
-        )
-        exclude(fileFilter)
-      }
+      listOf(
+              // AGP 9 compiles Kotlin with its built-in compiler, which writes here
+              "intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes",
+              // Fallback for the AGP 8 layout
+              "tmp/kotlin-classes/debug",
+          )
+          .map { dir -> fileTree(build.dir(dir)) { exclude(fileFilter) } }
 
   val mainSrc = "${project.layout.projectDirectory}/src/main/java"
   sourceDirectories.setFrom(files(mainSrc))
-  classDirectories.setFrom(files(debugTree))
+  classDirectories.setFrom(debugTree)
   executionData.setFrom(
-      fileTree(project.layout.buildDirectory.get()) {
-        include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-        include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
-      }
+      fileTree(build.dir("outputs/unit_test_code_coverage/debugUnitTest")) {
+        include("testDebugUnitTest.exec")
+      },
+      fileTree(build.dir("outputs/code_coverage/debugAndroidTest/connected")) {
+        // Below the device's directory locally; on CI, each shard's is one level deeper
+        include("**/coverage.ec")
+      },
   )
 }
