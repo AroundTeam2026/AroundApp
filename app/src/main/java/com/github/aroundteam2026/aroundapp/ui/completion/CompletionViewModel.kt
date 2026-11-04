@@ -32,10 +32,10 @@ import kotlinx.coroutines.launch
  * overview fails, so does the form, and [onRetry] calls [retryOverview]. What the explorer filled
  * in is kept through all of it.
  *
- * It also listens to the explorer's completions, so a reservation that was already completed shows
- * as [SaveState.Saved] and can't be submitted again, also when the answer to an earlier submit was
- * lost. If that listener fails, the form stays usable: the repository refuses a second completion
- * anyway.
+ * It also listens to the reservation's completions, so a reservation the explorer already completed
+ * shows as [SaveState.Saved] and can't be submitted again, also when the answer to an earlier
+ * submit was lost. If that listener fails, the form stays usable: the repository refuses a second
+ * completion anyway.
  *
  * A text proof is submitted as it is. A photo is uploaded through [proofPhotoRepository] first; a
  * photo that was uploaded is not uploaded again when only the submit failed, until another photo is
@@ -60,7 +60,7 @@ class CompletionViewModel(
   /** The venue of the reservation, while the overview shows it as approved. */
   private var venueId: String? = null
 
-  /** The photo that was uploaded last, with the URL it was stored at. */
+  /** The photo that was uploaded last, with the Storage location it was stored at. */
   private var uploaded: Pair<Uri, String>? = null
 
   init {
@@ -137,16 +137,16 @@ class CompletionViewModel(
   private suspend fun proofOf(form: CompletionUiState): Proof? =
       when (form.proofType) {
         ProofType.TEXT -> Proof.Text(form.answer.trim())
-        ProofType.PHOTO -> form.photo?.let { photoUrl(it) }?.let { Proof.Photo(it) }
+        ProofType.PHOTO -> form.photo?.let { photoLocation(it) }?.let { Proof.Photo(it) }
         null -> null
       }
 
   /** Where [photo] is stored: where it was uploaded before, or else uploaded now. */
-  private suspend fun photoUrl(photo: Uri): String? {
+  private suspend fun photoLocation(photo: Uri): String? {
     uploaded
         ?.takeIf { (uploadedPhoto, _) -> uploadedPhoto == photo }
-        ?.let { (_, url) ->
-          return url
+        ?.let { (_, location) ->
+          return location
         }
     return proofPhotoRepository
         .upload(reservationId, photo)
@@ -157,13 +157,14 @@ class CompletionViewModel(
 
   /**
    * Shows the reservation as completed once the explorer has a completion of it, whatever its
-   * status.
+   * status. It listens to the completions of this reservation, the party's included, and looks for
+   * the explorer's own, so what it reads doesn't grow with everything the explorer ever completed.
    */
   private suspend fun listenToCompletions() {
     val id = completionId(reservationId, explorerUid)
     completionRepository
-        .observeForExplorer(explorerUid)
-        .catch { Log.w(TAG, "Listening to the completions of $explorerUid failed", it) }
+        .observeForReservation(reservationId)
+        .catch { Log.w(TAG, "Listening to the completions of $reservationId failed", it) }
         .collect { completions ->
           if (completions.any { it.id == id }) {
             mutableUiState.update { it.copy(saveState = SaveState.Saved(id)) }

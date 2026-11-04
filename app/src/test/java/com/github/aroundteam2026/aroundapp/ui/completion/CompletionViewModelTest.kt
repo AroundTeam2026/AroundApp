@@ -7,8 +7,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
-import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRow
@@ -52,7 +52,7 @@ class CompletionViewModelTest {
   private var overviewRetries = 0
   private val fakeCompletions = FakeCompletionRepository { NOW }
   private val completions = GatedCompletions(fakeCompletions)
-  private val photos = ScriptedProofPhotos()
+  private val photos = FakeProofPhotoRepository()
 
   /** Whether the completions' listener fails when collected. */
   private var completionsBreak = false
@@ -110,6 +110,9 @@ class CompletionViewModelTest {
   }
 
   private suspend fun stored() = fakeCompletions.observeForExplorer(EXPLORER).first()
+
+  /** Where the fake stores the [upload]th photo of the reservation. */
+  private fun location(upload: Int) = "gs://fake-bucket/proofs/$RESERVATION/photo-$upload"
 
   @Test fun startsLoading() = test { assertEquals(CompletionUiState(), state) }
 
@@ -235,7 +238,7 @@ class CompletionViewModelTest {
     assertEquals(CAFE, completion.venueId)
     assertEquals(EXPLORER, completion.explorerUid)
     assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
-    assertEquals(0, photos.calls.size)
+    assertEquals(0, photos.uploads.size)
   }
 
   @Test
@@ -267,8 +270,8 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(listOf(RESERVATION to PHOTO), photos.calls)
-    assertEquals(Proof.Photo(photos.urlOf(1)), stored().single().proof)
+    assertEquals(listOf(PHOTO), photos.uploads.values.toList())
+    assertEquals(Proof.Photo(location(1)), stored().single().proof)
     assertEquals(SaveState.Saved(completionId(RESERVATION, EXPLORER)), state.saveState)
   }
 
@@ -316,7 +319,7 @@ class CompletionViewModelTest {
     gate.complete(Unit)
     runCurrent()
 
-    assertEquals(1, photos.calls.size)
+    assertEquals(1, photos.uploads.size)
     assertEquals(1, completions.calls)
   }
 
@@ -359,7 +362,7 @@ class CompletionViewModelTest {
   fun aFailedUploadSubmitsNothingAndTheRetryUploadsAgain() = test {
     open(ProofType.PHOTO)
     viewModel.pickPhoto(PHOTO)
-    photos.failure = IOException("offline")
+    photos.forcedFailure = IOException("offline")
 
     viewModel.submit()
     runCurrent()
@@ -368,12 +371,12 @@ class CompletionViewModelTest {
     assertEquals(PHOTO, state.photo)
     assertEquals(0, completions.calls)
 
-    photos.failure = null
+    photos.forcedFailure = null
     viewModel.submit()
     runCurrent()
 
-    assertEquals(2, photos.calls.size)
-    assertEquals(Proof.Photo(photos.urlOf(2)), stored().single().proof)
+    assertEquals(1, photos.uploads.size)
+    assertEquals(Proof.Photo(location(1)), stored().single().proof)
   }
 
   @Test
@@ -389,8 +392,8 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(1, photos.calls.size)
-    assertEquals(Proof.Photo(photos.urlOf(1)), stored().single().proof)
+    assertEquals(1, photos.uploads.size)
+    assertEquals(Proof.Photo(location(1)), stored().single().proof)
   }
 
   @Test
@@ -406,8 +409,8 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(listOf(RESERVATION to PHOTO, RESERVATION to OTHER_PHOTO), photos.calls)
-    assertEquals(Proof.Photo(photos.urlOf(2)), stored().single().proof)
+    assertEquals(listOf(PHOTO, OTHER_PHOTO), photos.uploads.values.toList())
+    assertEquals(Proof.Photo(location(2)), stored().single().proof)
   }
 
   @Test
@@ -439,6 +442,15 @@ class CompletionViewModelTest {
     open(ProofType.PHOTO)
 
     assertEquals(SaveState.Idle, state.saveState)
+  }
+
+  @Test
+  fun aPartyMembersCompletionOfTheSameReservationDoesNotCount() = test {
+    fakeCompletions.submit(RESERVATION, CAFE, "friend", Proof.Text("By the till")).getOrThrow()
+    open(ProofType.TEXT)
+
+    assertEquals(SaveState.Idle, state.saveState)
+    assertTrue(state.status == CompletionFormStatus.READY)
   }
 
   @Test
@@ -499,20 +511,4 @@ private class BrokenCompletions(private val inner: CompletionRepository) :
     CompletionRepository by inner {
   override fun observeForExplorer(uid: String) =
       flow<List<Completion>> { throw IOException("denied") }
-}
-
-/** Records every upload, answering with a URL numbered by the upload, or [failure] when set. */
-private class ScriptedProofPhotos : ProofPhotoRepository {
-  val calls = mutableListOf<Pair<String, Uri>>()
-  var failure: Throwable? = null
-
-  fun urlOf(upload: Int) = "https://storage.test/proofs/photo-$upload.jpg"
-
-  override suspend fun upload(reservationId: String, photo: Uri): Result<String> {
-    calls += reservationId to photo
-    failure?.let {
-      return Result.failure(it)
-    }
-    return Result.success(urlOf(calls.size))
-  }
 }
