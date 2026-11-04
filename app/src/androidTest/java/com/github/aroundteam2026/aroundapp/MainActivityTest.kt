@@ -9,13 +9,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.e2e.E2E_PASSWORD
 import com.github.aroundteam2026.aroundapp.e2e.E2eRule
 import com.github.aroundteam2026.aroundapp.e2e.createAccount
+import com.github.aroundteam2026.aroundapp.e2e.submitAuthForm
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.screen.MainScreen
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
@@ -71,7 +71,7 @@ class MainActivityTest : TestCase() {
     composeTestRule.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     composeTestRule.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
-    composeTestRule.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+    composeTestRule.submitAuthForm()
     composeTestRule.waitUntil(SETUP_TIMEOUT_MS) {
       composeTestRule.onAllNodes(hasTestTag(C.Tag.NAV_BAR)).fetchSemanticsNodes().isNotEmpty()
     }

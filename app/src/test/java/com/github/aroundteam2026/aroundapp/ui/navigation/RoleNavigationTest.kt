@@ -124,7 +124,7 @@ class RoleNavigationTest {
     launch(auth)
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_EXPLORER_CARD).performScrollTo().performClick()
     compose.onNodeWithTag("explorer").assertIsDisplayed()
     compose.runOnIdle {
       assertEquals(Role.EXPLORER, runBlocking { users.getUser("restored") }?.role)
@@ -132,10 +132,32 @@ class RoleNavigationTest {
   }
 
   @Test
+  fun firstGoogleSignInWaitsForRoleChoiceInsteadOfOpeningExplorer() {
+    val auth = FakeAuthRepository()
+    launch(auth)
+    compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+
+    val uid = runBlocking { auth.signInWithGoogle("new-google-account").getOrThrow() }
+
+    compose
+        .onNodeWithTag(C.Tag.AUTH_ACCOUNT_TYPE_TITLE)
+        .assertTextEquals("Choose your account type")
+    compose.onNodeWithTag(C.Tag.AUTH_EXPLORER_CARD).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.AUTH_BUSINESS_CARD).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertDoesNotExist()
+    compose.onNodeWithTag("explorer").assertDoesNotExist()
+    compose.onNodeWithTag("venue").assertDoesNotExist()
+    compose.runOnIdle {
+      assertEquals(null, runBlocking { users.getUser(uid) })
+      assertEquals(null, pending.pending)
+    }
+  }
+
+  @Test
   fun unsetRoleCanBeCompletedAsVenue() {
     profile("restored", null)
     launch(FakeAuthRepository("restored"))
-    compose.onNodeWithTag(C.Tag.AUTH_VENUE_LINK).performScrollTo().performClick()
+    compose.onNodeWithTag(C.Tag.AUTH_BUSINESS_CARD).performScrollTo().performClick()
     compose.onNodeWithTag("venue").assertTextEquals("restored")
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
   }

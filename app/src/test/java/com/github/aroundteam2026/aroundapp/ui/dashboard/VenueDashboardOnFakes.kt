@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -24,6 +25,7 @@ fun venueDashboardFactoryOnFakes(venueId: String = "venue"): ViewModelProvider.F
             FakeQuestRepository(),
             FakeVenueRepository(listOf(testVenue(id = venueId))),
             FakePartyRepository(),
+            FakeCompletionRepository(),
         )
       }
     }

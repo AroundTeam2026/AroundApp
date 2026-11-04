@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.auth
 
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,15 @@ interface AuthRepository {
    *   rejected, or [AuthError.Network] if Firebase can't be reached.
    */
   suspend fun signInWithGoogle(idToken: String): Result<String>
+
+  /**
+   * Creates an account with a Google credential. An existing Google account is rejected without
+   * publishing a signed-in session; callers can direct its owner to [signInWithGoogle] instead. A
+   * blank token, an already signed-in session, or another sign-up in progress fails with
+   * [AuthError.InvalidCredentials]. An existing Google account fails with
+   * [AuthError.EmailAlreadyInUse].
+   */
+  suspend fun signUpWithGoogle(idToken: String): Result<String>
 
   /** Signs the current user out. Does nothing if nobody is signed in. */
   fun signOut()

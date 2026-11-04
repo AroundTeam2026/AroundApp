@@ -7,7 +7,10 @@ import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -93,6 +96,24 @@ class AuthRepositoryFirebaseTest {
     val token = fakeGoogleIdToken()
     val uid = repo.signInWithGoogle(token).getOrThrow()
     repo.signOut()
+    assertEquals(uid, repo.signInWithGoogle(token).getOrThrow())
+  }
+
+  @Test
+  fun googleSignupRejectsAnExistingAccountWithoutPublishingItsSession() = runBlocking {
+    val token = fakeGoogleIdToken()
+    val uid = repo.signUpWithGoogle(token).getOrThrow()
+    repo.signOut()
+    val observed = mutableListOf<String?>()
+    val collector = launch(Dispatchers.Unconfined) { repo.currentUserId.collect { observed += it } }
+    try {
+      assertEquals(AuthError.EmailAlreadyInUse, repo.signUpWithGoogle(token).exceptionOrNull())
+      assertEquals(listOf(null), observed)
+      assertNull(repo.currentUserId.value)
+      assertNull(Firebase.auth.currentUser)
+    } finally {
+      collector.cancel()
+    }
     assertEquals(uid, repo.signInWithGoogle(token).getOrThrow())
   }
 

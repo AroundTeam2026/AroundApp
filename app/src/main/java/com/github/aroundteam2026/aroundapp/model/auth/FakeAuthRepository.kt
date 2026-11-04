@@ -86,6 +86,18 @@ class FakeAuthRepository(signedInUserId: String? = null) : AuthRepository {
     }
   }
 
+  override suspend fun signUpWithGoogle(idToken: String): Result<String> {
+    return synchronized(lock) {
+      consumeNextError()?.let {
+        return Result.failure(it)
+      }
+      if (idToken.isBlank()) return Result.failure(AuthError.InvalidCredentials)
+      if (_currentUserId.value != null) return Result.failure(AuthError.InvalidCredentials)
+      if (idToken in googleAccounts) return Result.failure(AuthError.EmailAlreadyInUse)
+      signIn(newUid().also { googleAccounts[idToken] = it })
+    }
+  }
+
   override fun signOut() {
     synchronized(lock) { _currentUserId.value = null }
   }
