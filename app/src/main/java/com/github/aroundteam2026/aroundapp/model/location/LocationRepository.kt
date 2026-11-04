@@ -1,11 +1,12 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.location
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
 
 /**
- * Gives the device's approximate position, to about a city block: enough to show what's around the
- * explorer, but not to check that they visit a venue or enter a geofence.
+ * Gives the device's position. [currentLocation] is approximate, while [currentPreciseLocation]
+ * requests a fresh, fine-permission fix for a venue visit.
  */
 interface LocationRepository {
   /**
@@ -14,4 +15,7 @@ interface LocationRepository {
    * fail, or no fix is available.
    */
   suspend fun currentLocation(): Location?
+
+  /** A fresh precise position, or null without fine permission or an available fix. */
+  suspend fun currentPreciseLocation(): Location? = null
 }

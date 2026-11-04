@@ -1,10 +1,13 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.aroundteam2026.aroundapp.model.common.distanceTo
+import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
@@ -15,7 +18,9 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +50,8 @@ class CompletionViewModel(
     private val explorerUid: String,
     private val reservationRepository: ReservationRepository,
     private val questRepository: QuestRepository,
+    private val venueRepository: VenueRepository,
+    private val locationRepository: LocationRepository,
     private val completionRepository: CompletionRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
 ) : ViewModel() {
@@ -56,6 +63,7 @@ class CompletionViewModel(
 
   /** The venue of the reservation, once it is known to be approved. */
   private var venueId: String? = null
+  private var questRadiusMeters: Int? = null
 
   /** The photo that was uploaded last, with the Storage location it was stored at. */
   private var uploaded: Pair<Uri, String>? = null
@@ -78,14 +86,29 @@ class CompletionViewModel(
    * Called when the explorer submits the proof. Does nothing unless the proof is filled in and the
    * form is not already saving or saved, so a double tap submits once. A failure, at the upload or
    * at the submit, keeps what the explorer filled in and shows [SaveState.Failed]; calling this
-   * again retries.
+   * again retries. A precise location is checked before any photo upload or completion write.
    */
   fun submit() {
     val form = mutableUiState.value
     val venueId = venueId
-    if (!form.canSubmit || venueId == null) return
-    mutableUiState.update { it.copy(saveState = SaveState.Saving) }
+    val questRadius = questRadiusMeters
+    if (!form.canSubmit || venueId == null || questRadius == null) return
+    mutableUiState.update { it.copy(saveState = SaveState.Saving, locationError = null) }
     viewModelScope.launch {
+      val locationError = locationError(venueId, questRadius)
+      if (locationError != null) {
+        mutableUiState.update {
+          if (it.saveState is SaveState.Saved) it
+          else it.copy(saveState = SaveState.Idle, locationError = locationError)
+        }
+        return@launch
+      }
+      // Approval may be withdrawn while the device is finding its position.
+      if (
+          mutableUiState.value.status != CompletionFormStatus.READY ||
+              mutableUiState.value.saveState is SaveState.Saved
+      )
+          return@launch
       val proof = proofOf(form)
       val saveState =
           proof
@@ -105,6 +128,23 @@ class CompletionViewModel(
       }
     }
   }
+
+  /** Checks the venue's current marker and a fresh precise device fix on every submit attempt. */
+  private suspend fun locationError(venueId: String, radiusMeters: Int): CompletionLocationError? =
+      try {
+        val venueLocation = venueRepository.getVenue(venueId)?.location
+        val deviceLocation = venueLocation?.let { locationRepository.currentPreciseLocation() }
+        when {
+          venueLocation == null || deviceLocation == null -> CompletionLocationError.UNAVAILABLE
+          deviceLocation.distanceTo(venueLocation) > radiusMeters -> CompletionLocationError.TOO_FAR
+          else -> null
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Log.w(TAG, "Checking location for $reservationId failed", e)
+        CompletionLocationError.UNAVAILABLE
+      }
 
   /** Called when the explorer asks to try again after a failure to load; does nothing otherwise. */
   fun onRetry() {
@@ -164,6 +204,7 @@ class CompletionViewModel(
           }
           .collect { booked ->
             venueId = booked?.first?.venueId
+            questRadiusMeters = booked?.second?.radiusMeters
             mutableUiState.update { state ->
               if (booked == null) {
                 state.copy(status = CompletionFormStatus.UNAVAILABLE)

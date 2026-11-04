@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.location
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -12,6 +13,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Status
+import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationToken
@@ -148,6 +150,35 @@ class FusedLocationRepositoryTest {
     call.cancel()
     runCurrent()
     assertTrue(token.captured.isCancellationRequested)
+  }
+
+  @Test
+  fun preciseLocationRequiresFinePermission() = runTest {
+    grant(ACCESS_COARSE_LOCATION)
+
+    assertNull(repository.currentPreciseLocation())
+    verify(exactly = 0) { client.getCurrentLocation(any<CurrentLocationRequest>(), any()) }
+  }
+
+  @Test
+  fun preciseLocationRequestsAFreshHighAccuracyFix() = runTest {
+    grant(ACCESS_FINE_LOCATION)
+    val request = slot<CurrentLocationRequest>()
+    every { client.getCurrentLocation(capture(request), any()) } returns
+        Tasks.forResult(deviceAt(46.5197, 6.6323))
+
+    assertEquals(Location(46.5197, 6.6323), repository.currentPreciseLocation())
+    assertEquals(Priority.PRIORITY_HIGH_ACCURACY, request.captured.priority)
+    assertEquals(0L, request.captured.maxUpdateAgeMillis)
+  }
+
+  @Test
+  fun preciseLocationReturnsNullWhenNoFixIsAvailable() = runTest {
+    grant(ACCESS_FINE_LOCATION)
+    every { client.getCurrentLocation(any<CurrentLocationRequest>(), any()) } returns
+        Tasks.forResult(null)
+
+    assertNull(repository.currentPreciseLocation())
   }
 }
 
