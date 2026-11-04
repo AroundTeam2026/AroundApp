@@ -22,9 +22,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,11 +104,13 @@ private fun PickedPhoto(
         stringResource(R.string.proof_photo_retake),
         Modifier.align(Alignment.BottomEnd)
             .padding(AroundSpacing.InsetPadding)
+            // A 48dp touch target around the smaller pill, without enlarging it
+            .minimumInteractiveComponentSize()
+            .testTag(C.Tag.PROOF_PHOTO_RETAKE)
             .clip(AroundPillShape)
             .background(colors.surface)
             .clickable(role = Role.Button, onClick = onRetake)
-            .padding(horizontal = AroundSpacing.InsetPadding, vertical = AroundSpacing.Small)
-            .testTag(C.Tag.PROOF_PHOTO_RETAKE),
+            .padding(horizontal = AroundSpacing.InsetPadding, vertical = AroundSpacing.Small),
         color = colors.onSurface,
         style = AroundTextStyles.Helper,
     )
