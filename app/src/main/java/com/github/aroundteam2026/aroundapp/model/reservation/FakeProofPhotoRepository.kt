@@ -8,9 +8,17 @@ import android.net.Uri
  *
  * Nothing is uploaded: each photo is recorded in [uploads] under a location like
  * `gs://fake-bucket/proofs/{reservationId}/photo-1`, numbered per instance, together with the bytes
- * [read] gives for it, which [download] returns. Unlike the security rules, it doesn't check who
- * uploads or downloads, that the reservation is approved, or the photo's type and size; set
- * [forcedFailure] to test a refusal. Not thread-safe; use one instance per test.
+ * [read] gives for it, which [download] returns. Not thread-safe; use one instance per test.
+ *
+ * What it can't simulate, so callers' tests must use [forcedFailure] for it instead:
+ * - The security rules: it doesn't check who uploads or downloads, that the reservation is
+ *   approved, or the photo's type and size.
+ * - An unreadable photo: it never reads a [Uri] itself, so one the app may no longer read uploads.
+ * - Time: [upload] and [download] finish at once, so a test can't time out, cancel, or act while
+ *   one is in progress, e.g. tap submit twice during an upload. Hold the caller's dispatcher
+ *   instead, e.g. with `runTest`'s `StandardTestDispatcher`.
+ *
+ * [download] returns the same array every time, so callers mustn't change it.
  *
  * @param read Gives the bytes of an uploaded photo, read once when it is uploaded. A unit test
  *   can't read a [Uri], so pass the bytes [download] should return; by default they're empty.
@@ -19,8 +27,10 @@ class FakeProofPhotoRepository(private val read: (Uri) -> ByteArray = { ByteArra
     ProofPhotoRepository {
   /**
    * Simulates a failed transfer (e.g. no network or a refused photo) so callers' error paths can be
-   * tested. While non-null, [upload] and [download] return `Result.failure(forcedFailure)`, and
-   * [upload] records nothing. Set it back to null to make them succeed again.
+   * tested. While non-null, [upload] and [download] of a location in its bucket return
+   * `Result.failure(forcedFailure)`, and [upload] records nothing; a location outside its bucket is
+   * the caller's mistake, so it fails first, as it would without a backend. Set it back to null to
+   * make them succeed again.
    */
   var forcedFailure: Throwable? = null
 
@@ -48,9 +58,14 @@ class FakeProofPhotoRepository(private val read: (Uri) -> ByteArray = { ByteArra
 
   /**
    * Returns the bytes recorded for [location] when it was uploaded. Fails with
-   * [NoSuchElementException] if nothing was uploaded there, and with [forcedFailure] if it is set.
+   * [IllegalArgumentException] if [location] isn't in its `gs://fake-bucket/` bucket, before
+   * anything else, with [forcedFailure] if it is set, and with [NoSuchElementException] if nothing
+   * was uploaded there.
    */
   override suspend fun download(location: String): Result<ByteArray> {
+    if (!location.startsWith(BUCKET)) {
+      return Result.failure(IllegalArgumentException("$location isn't in $BUCKET"))
+    }
     forcedFailure?.let {
       return Result.failure(it)
     }
@@ -64,7 +79,8 @@ class FakeProofPhotoRepository(private val read: (Uri) -> ByteArray = { ByteArra
   private class StoredPhoto(val photo: Uri, val bytes: ByteArray)
 
   private companion object {
-    const val PROOFS = "gs://fake-bucket/proofs/"
+    const val BUCKET = "gs://fake-bucket/"
+    const val PROOFS = "${BUCKET}proofs/"
     const val PHOTO_ID_PREFIX = "photo-"
   }
 }

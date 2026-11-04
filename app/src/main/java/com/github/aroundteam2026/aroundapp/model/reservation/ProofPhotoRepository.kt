@@ -20,12 +20,19 @@ interface ProofPhotoRepository {
    * in time.
    *
    * The security rules only let a joined member of an approved reservation upload, and only an
-   * image under 5 MB, so the Storage implementation can fail where the fake doesn't check.
+   * image under 5 MB, so the Storage implementation can fail where the fake doesn't check. Such a
+   * refusal fails the same way on every retry: e.g. a larger photo must be made smaller first, and
+   * a reservation cancelled after its approval never takes a proof again.
+   *
+   * [photo] must still be readable when this is called: the photo picker only lets the app read
+   * what it picked while the screen that picked it lives, so after the app was closed, or if the
+   * photo was deleted, it fails and the photo must be picked again. Cancelling the caller cancels
+   * the upload.
    *
    * @param reservationId id of the approved reservation the photo proves.
    * @param photo the photo to upload, e.g. as returned by the photo picker or the camera.
-   * @return the photo's `gs://` location, or a failure if the upload was refused, failed, or didn't
-   *   finish in time.
+   * @return the photo's `gs://` location, or a failure if [photo] can't be read, or if the upload
+   *   was refused, failed, or didn't finish in time.
    */
   suspend fun upload(reservationId: String, photo: Uri): Result<String>
 
@@ -39,8 +46,9 @@ interface ProofPhotoRepository {
    *
    * @param location the photo's `gs://` location, as returned by [upload] and stored in
    *   [Proof.Photo].
-   * @return the photo's bytes, or a failure if there is no photo at [location]
-   *   ([NoSuchElementException]), if the read was refused, failed, or didn't finish in time.
+   * @return the photo's bytes, or a failure if [location] isn't a `gs://` location in this
+   *   repository's bucket ([IllegalArgumentException]), if there is no photo at it
+   *   ([NoSuchElementException]), or if the read was refused, failed, or didn't finish in time.
    */
   suspend fun download(location: String): Result<ByteArray>
 }

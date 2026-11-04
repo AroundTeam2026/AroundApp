@@ -81,6 +81,16 @@ class FakeProofPhotoRepositoryTest {
       }
 
   @Test
+  fun download_outsideItsBucket_failsBeforeTheBackend() =
+      runBlocking<Unit> {
+        repository.forcedFailure = IllegalStateException(OFFLINE)
+
+        val result = repository.download(FOREIGN_LOCATION)
+
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+      }
+
+  @Test
   fun download_whenFailureIsForced_returnsIt() =
       runBlocking<Unit> {
         val location = repository.upload(RESERVATION_ID, mockk()).getOrThrow()
@@ -95,6 +105,7 @@ class FakeProofPhotoRepositoryTest {
     const val GS_SCHEME = "gs://"
     const val RESERVATION_PROOFS = "/proofs/$RESERVATION_ID/"
     const val OFFLINE = "offline"
+    const val FOREIGN_LOCATION = "gs://other-bucket/proofs/$RESERVATION_ID/photo-1"
     const val UNKNOWN_LOCATION = "gs://fake-bucket/proofs/$RESERVATION_ID/missing"
     val FIRST_BYTES = byteArrayOf(1)
     val RETAKE_BYTES = byteArrayOf(2)
