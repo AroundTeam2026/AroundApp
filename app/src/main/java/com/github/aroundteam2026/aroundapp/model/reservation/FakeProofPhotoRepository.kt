@@ -12,7 +12,8 @@ import android.net.Uri
  *
  * What it can't simulate, so callers' tests must use [forcedFailure] for it instead:
  * - The security rules: it doesn't check who uploads or downloads, that the reservation is
- *   approved, or the photo's type.
+ *   approved, or the photo's type. So a location in its bucket that no upload returned fails with
+ *   [NoSuchElementException], where the rules might refuse it instead.
  * - An unreadable photo: it never reads a [Uri] itself, so one the app may no longer read uploads.
  * - Time: [upload] and [download] finish at once, so a test can't time out, cancel, or act while
  *   one is in progress, e.g. tap submit twice during an upload. Hold the caller's dispatcher
