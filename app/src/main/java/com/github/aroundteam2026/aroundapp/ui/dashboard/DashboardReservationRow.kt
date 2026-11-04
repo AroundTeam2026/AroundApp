@@ -60,6 +60,8 @@ import kotlinx.coroutines.delay
  * @param reservation The reservation to draw.
  * @param onDecline Declines it; only a pending reservation offers it.
  * @param onApprove Approves it; only a pending reservation offers it.
+ * @param saving Whether its answer is being saved: both buttons are disabled meanwhile, so the
+ *   venue can't answer twice.
  * @param clock Tells how long ago it was requested; read again each time the minute shown changes,
  *   so a dashboard left open keeps up.
  */
@@ -69,6 +71,7 @@ internal fun DashboardReservationRow(
     onDecline: () -> Unit,
     onApprove: () -> Unit,
     modifier: Modifier = Modifier,
+    saving: Boolean = false,
     clock: Clock = Clock.systemDefaultZone(),
 ) {
   val colors = MaterialTheme.colorScheme
@@ -108,6 +111,7 @@ internal fun DashboardReservationRow(
             background = colors.background,
             content = colors.onSurface,
             tag = C.Tag.DASHBOARD_ROW_DECLINE,
+            enabled = !saving,
             onClick = onDecline,
         )
         RowButton(
@@ -116,6 +120,7 @@ internal fun DashboardReservationRow(
             background = colors.primary,
             content = colors.onPrimary,
             tag = C.Tag.DASHBOARD_ROW_APPROVE,
+            enabled = !saving,
             onClick = onApprove,
         )
       }
@@ -299,7 +304,10 @@ private fun ApprovedPill() {
   }
 }
 
-/** One of the pending row's two buttons, sharing the row's width with the other. */
+/**
+ * One of the pending row's two buttons, sharing the row's width with the other. Disabled, it keeps
+ * its colours, faded.
+ */
 @Composable
 private fun RowScope.RowButton(
     @StringRes label: Int,
@@ -307,13 +315,21 @@ private fun RowScope.RowButton(
     background: Color,
     content: Color,
     tag: String,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
   Button(
       onClick = onClick,
       modifier = Modifier.weight(1f).height(BUTTON_HEIGHT).testTag(tag),
+      enabled = enabled,
       shape = AroundPillShape,
-      colors = ButtonDefaults.buttonColors(containerColor = background, contentColor = content),
+      colors =
+          ButtonDefaults.buttonColors(
+              containerColor = background,
+              contentColor = content,
+              disabledContainerColor = background.copy(alpha = DISABLED_ALPHA),
+              disabledContentColor = content.copy(alpha = DISABLED_ALPHA),
+          ),
       contentPadding = PaddingValues(horizontal = AroundSpacing.Small),
   ) {
     Icon(painterResource(icon), contentDescription = null, Modifier.size(BUTTON_ICON_SIZE))
@@ -327,6 +343,8 @@ private fun RowScope.RowButton(
 }
 
 private const val TITLE_MAX_LINES = 2
+// Material's opacity for disabled content
+private const val DISABLED_ALPHA = 0.38f
 private val TEXT_GAP = 2.dp
 private val AVATAR_SIZE = 32.dp
 private val AVATAR_RING = 2.5.dp
