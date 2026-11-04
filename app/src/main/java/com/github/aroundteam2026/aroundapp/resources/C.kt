@@ -248,5 +248,13 @@ object C {
     const val CREATE_QUEST_REWARD_EXPIRY_CLEAR = "create_quest_reward_expiry_clear"
     const val CREATE_QUEST_REWARD_EXPIRY_ERROR = "create_quest_reward_expiry_error"
     const val CREATE_QUEST_REWARD_EXPIRY_CONFIRM = "create_quest_reward_expiry_confirm"
+
+    // Proof photo picker
+    const val PROOF_PHOTO = "proof_photo"
+    const val PROOF_PHOTO_IMAGE = "proof_photo_image"
+    const val PROOF_PHOTO_TAKE = "proof_photo_take"
+    const val PROOF_PHOTO_GALLERY = "proof_photo_gallery"
+    const val PROOF_PHOTO_RETAKE = "proof_photo_retake"
+    const val PROOF_PHOTO_OPEN_SETTINGS = "proof_photo_open_settings"
   }
 }
