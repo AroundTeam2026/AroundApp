@@ -38,6 +38,16 @@ jobs:
       AVD_CORES: "4"
 
     steps:
+      # The emulator needs a lot of disk: the restored AVD, its system image and Gradle's caches. On
+      # 4 Nov, the first run on runner image 20261101 ran out of space installing the system image,
+      # so this removes preinstalled SDKs the build never uses (.NET, Haskell, Swift, CodeQL). df
+      # prints the free space before and after.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /usr/share/swift "$AGENT_TOOLSDIRECTORY/CodeQL"
+          df -h /
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
