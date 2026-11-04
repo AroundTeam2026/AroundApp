@@ -94,14 +94,14 @@ jobs:
       # The emulator needs a lot of disk: the restored AVD, its system image and Gradle's caches.
       # Azure-hosted runners have plenty (88 GB free), but on 4 Nov a run placed on an AWS-hosted
       # runner ran out of space installing the system image. Deleting preinstalled SDKs the build
-      # never uses (.NET, Haskell, Swift, CodeQL) frees 14 GB in about 20 s, in the background:
-      # nothing needs the space before the caches restore a minute later. Its output goes nowhere,
-      # since a process still writing to the step's output dies with the step. df prints the free
-      # space here and again once the emulators are up.
+      # never uses (.NET, Haskell, Swift, CodeQL) frees 14 GB in about 20 s. It runs detached, in
+      # its own session with its output dropped, so it outlives this step, which a plain background
+      # job does not: nothing needs the space before the caches restore a minute later. df prints
+      # the free space here and again once the emulators are up.
       - name: Free disk space
         run: |
           df -h /
-          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /usr/share/swift "$AGENT_TOOLSDIRECTORY/CodeQL" > /dev/null 2>&1 &
+          sudo setsid --fork rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /usr/share/swift "$AGENT_TOOLSDIRECTORY/CodeQL" > /dev/null 2>&1
 
       - name: Checkout
         uses: actions/checkout@v7
