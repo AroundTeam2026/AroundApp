@@ -656,14 +656,300 @@ class FirestoreRulesTest {
   // ---- completions ----
 
   @Test
-  fun completionsAreDeniedUntilTheyGetRules() {
-    val explorer = newUser()
-    signInAs(explorer)
+  fun explorerSubmitsOnlyAsThemselvesUnderTheirCompletionId() {
+    val explorer = newUser(Role.EXPLORER)
+    val friend = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val reservation = approvedReservationOf(explorer, venue)
+    val valid = completion(reservation.id, explorer, venue)
+
+    assertDenied(completions().document(UUID.randomUUID().toString()).set(valid), "a random id")
+    assertDenied(completionOf(reservation, friend).set(valid), "another explorer's id")
     assertDenied(
-        db.collection("completions")
-            .document(UUID.randomUUID().toString())
-            .set(mapOf("explorerUid" to explorer.uid))
+        completionOf(reservation, explorer).set(valid + ("explorerUid" to friend.uid)),
+        "another explorer's uid",
     )
+    assertSucceeds(completionOf(reservation, explorer).set(valid))
+  }
+
+  @Test
+  fun everyJoinedMemberSubmitsTheirOwnButNobodyElse() {
+    val creator = newUser(Role.EXPLORER)
+    val joined = newUser(Role.EXPLORER)
+    val withdrawn = newUser(Role.EXPLORER)
+    val stranger = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val reservation = pendingReservationOf(creator, venue, proofType = "TEXT")
+    signInAs(joined)
+    assertSucceeds(join(reservation.id, joined))
+    signInAs(withdrawn)
+    assertSucceeds(join(reservation.id, withdrawn))
+    signInAs(venue)
+    assertSucceeds(reservation.update("status", "APPROVED"))
+    signInAs(withdrawn)
+    assertSucceeds(withdraw(reservation.id, withdrawn))
+
+    assertDenied(
+        completionOf(reservation, withdrawn).set(completion(reservation.id, withdrawn, venue)),
+        "a withdrawn member",
+    )
+    signInAs(stranger)
+    assertDenied(
+        completionOf(reservation, stranger).set(completion(reservation.id, stranger, venue)),
+        "an explorer outside the party",
+    )
+    signInAs(joined)
+    assertSucceeds(completionOf(reservation, joined).set(completion(reservation.id, joined, venue)))
+  }
+
+  @Test
+  fun signedOutUserCannotSubmit() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val reservation = approvedReservationOf(explorer, venue)
+
+    signOut()
+    assertDenied(
+        completionOf(reservation, explorer).set(completion(reservation.id, explorer, venue))
+    )
+  }
+
+  @Test
+  fun completionNeedsAnApprovedReservation() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+
+    val pending = pendingReservationOf(explorer, venue, proofType = "TEXT")
+    assertDenied(
+        completionOf(pending, explorer).set(completion(pending.id, explorer, venue)),
+        "a pending reservation",
+    )
+
+    val cancelled = approvedReservationOf(explorer, venue)
+    assertSucceeds(cancelled.update("status", "CANCELLED"))
+    assertDenied(
+        completionOf(cancelled, explorer).set(completion(cancelled.id, explorer, venue)),
+        "a cancelled reservation",
+    )
+
+    val missing = newReservation()
+    assertDenied(
+        completionOf(missing, explorer).set(completion(missing.id, explorer, venue)),
+        "a missing reservation",
+    )
+  }
+
+  @Test
+  fun completionMustFollowTheSchema() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val reservation = approvedReservationOf(explorer, venue)
+    val valid = completion(reservation.id, explorer, venue)
+
+    assertOnlyValidWriteSucceeds(
+        completionOf(reservation, explorer),
+        valid,
+        mapOf(
+            "an unknown field" to valid + ("questId" to "quest-1"),
+            "no submittedAt" to valid - "submittedAt",
+            "a submittedAt that is not a timestamp" to valid + ("submittedAt" to 42),
+            "already approved" to valid + ("status" to "APPROVED"),
+            "a reject reason" to valid + ("rejectReason" to "Blurry"),
+            "another venue" to valid + ("venueId" to explorer.uid),
+        ),
+    )
+  }
+
+  @Test
+  fun proofMustBeTheOneTheQuestAsksFor() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+
+    val text = approvedReservationOf(explorer, venue, proofType = "TEXT")
+    val textCompletion = completion(text.id, explorer, venue)
+    assertOnlyValidWriteSucceeds(
+        completionOf(text, explorer),
+        textCompletion,
+        mapOf(
+            "no proof" to textCompletion - "textAnswer",
+            "both proofs" to textCompletion + ("photoUrl" to PHOTO_URL),
+            "a photo instead" to textCompletion - "textAnswer" + ("photoUrl" to PHOTO_URL),
+            "a blank answer" to textCompletion + ("textAnswer" to " "),
+            "an answer that is not a string" to textCompletion + ("textAnswer" to 42),
+            "a too long answer" to textCompletion + ("textAnswer" to "a".repeat(1001)),
+        ),
+    )
+
+    val photo = approvedReservationOf(explorer, venue, proofType = "PHOTO")
+    val photoCompletion =
+        completion(photo.id, explorer, venue) - "textAnswer" + ("photoUrl" to PHOTO_URL)
+    assertOnlyValidWriteSucceeds(
+        completionOf(photo, explorer),
+        photoCompletion,
+        mapOf(
+            "an answer instead" to completion(photo.id, explorer, venue),
+            "a blank URL" to photoCompletion + ("photoUrl" to " "),
+            "a too long URL" to photoCompletion + ("photoUrl" to "a".repeat(2001)),
+        ),
+    )
+  }
+
+  @Test
+  fun explorerSubmitsOnlyOnce() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+    val again = assertSucceeds(completion.get(Source.SERVER)).data!!
+
+    assertDenied(completion.set(again), "a second submission")
+
+    signInAs(venue)
+    assertSucceeds(completion.update(rejection()))
+    signInAs(explorer)
+    assertDenied(completion.set(again), "a second submission after a rejection")
+  }
+
+  @Test
+  fun onlyItsVenueAnswersACompletion() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val otherVenue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+
+    assertDenied(completion.update("status", "APPROVED"), "the explorer")
+    signInAs(otherVenue)
+    assertDenied(completion.update("status", "APPROVED"), "another venue")
+    signInAs(venue)
+    assertSucceeds(completion.update("status", "APPROVED"))
+  }
+
+  @Test
+  fun approvalChangesOnlyTheStatusAndIsFinal() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+    signInAs(venue)
+
+    assertDenied(completion.update(rejection() + ("status" to "APPROVED")), "with a reason")
+    assertDenied(
+        completion.update(mapOf("status" to "APPROVED", "textAnswer" to "Other")),
+        "with a new answer",
+    )
+    assertDenied(completion.update("status", "PENDING"), "to pending")
+    assertDenied(completion.update("status", "LOST"), "to an unknown status")
+
+    assertSucceeds(completion.update("status", "APPROVED"))
+    assertDenied(completion.update(rejection()), "rejecting an approved completion")
+  }
+
+  @Test
+  fun rejectionNeedsAReasonAndIsFinal() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+    signInAs(venue)
+
+    assertDenied(completion.update("status", "REJECTED"), "no reason")
+    assertDenied(completion.update(rejection() + ("rejectReason" to " ")), "a blank reason")
+    assertDenied(
+        completion.update(rejection() + ("rejectReason" to "a".repeat(301))),
+        "a too long reason",
+    )
+    assertDenied(completion.update(rejection() + ("explorerUid" to venue.uid)), "another explorer")
+
+    assertSucceeds(completion.update(rejection()))
+    assertDenied(completion.update("rejectReason", "Other"), "a new reason")
+    assertDenied(
+        completion.update(mapOf("status" to "APPROVED", "rejectReason" to FieldValue.delete())),
+        "approving a rejected completion",
+    )
+  }
+
+  @Test
+  fun completionIsReadableByItsExplorerAndVenueOnly() {
+    val explorer = newUser(Role.EXPLORER)
+    val stranger = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val otherVenue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+
+    assertSucceeds(completion.get(Source.SERVER))
+    assertSucceeds(completions().whereEqualTo("explorerUid", explorer.uid).get(Source.SERVER))
+
+    signInAs(venue)
+    assertSucceeds(completion.get(Source.SERVER))
+    assertSucceeds(completions().whereEqualTo("venueId", venue.uid).get(Source.SERVER))
+
+    signInAs(otherVenue)
+    assertDenied(completion.get(Source.SERVER), "another venue")
+    assertDenied(
+        completions().whereEqualTo("venueId", venue.uid).get(Source.SERVER),
+        "another venue's query",
+    )
+
+    signInAs(stranger)
+    assertDenied(completion.get(Source.SERVER), "another explorer")
+    assertDenied(
+        completions().whereEqualTo("explorerUid", explorer.uid).get(Source.SERVER),
+        "another explorer's query",
+    )
+    assertDenied(completions().get(Source.SERVER), "a query of every completion")
+
+    signOut()
+    assertDenied(completion.get(Source.SERVER), "signed out")
+  }
+
+  @Test
+  fun joinedMembersReadTheirPartysCompletions() {
+    val creator = newUser(Role.EXPLORER)
+    val joined = newUser(Role.EXPLORER)
+    val withdrawn = newUser(Role.EXPLORER)
+    val stranger = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val reservation = pendingReservationOf(creator, venue, proofType = "TEXT")
+    signInAs(joined)
+    assertSucceeds(join(reservation.id, joined))
+    signInAs(withdrawn)
+    assertSucceeds(join(reservation.id, withdrawn))
+    signInAs(venue)
+    assertSucceeds(reservation.update("status", "APPROVED"))
+    signInAs(withdrawn)
+    assertSucceeds(withdraw(reservation.id, withdrawn))
+    signInAs(creator)
+    val completion = completionOf(reservation, creator)
+    assertSucceeds(completion.set(completion(reservation.id, creator, venue)))
+    val ofTheParty = completions().whereEqualTo("reservationId", reservation.id)
+
+    signInAs(joined)
+    assertSucceeds(completion.get(Source.SERVER))
+    assertEquals(1, assertSucceeds(ofTheParty.get(Source.SERVER)).size())
+
+    signInAs(withdrawn)
+    assertDenied(completion.get(Source.SERVER), "a withdrawn member")
+    assertDenied(ofTheParty.get(Source.SERVER), "a withdrawn member's query")
+
+    signInAs(stranger)
+    assertDenied(ofTheParty.get(Source.SERVER), "a query from outside the party")
+  }
+
+  @Test
+  fun aMissingCompletionIsReadableOnceSignedIn() {
+    val missing = completions().document(UUID.randomUUID().toString())
+
+    assertDenied(missing.get(Source.SERVER), "signed out")
+    newUser(Role.VENUE)
+    assertEquals(false, assertSucceeds(missing.get(Source.SERVER)).exists())
+  }
+
+  @Test
+  fun completionIsNeverDeleted() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+
+    assertDenied(completion.delete(), "the explorer")
+    signInAs(venue)
+    assertDenied(completion.delete(), "the venue")
   }
 
   // ---- helpers ----
@@ -709,11 +995,18 @@ class FirestoreRulesTest {
   private fun newReservation() =
       db.collection("reservations").document(UUID.randomUUID().toString())
 
-  /** Has [venue] create a quest with [status] and returns its id. Leaves [venue] signed in. */
-  private fun questOf(venue: TestUser, status: String = "ACTIVE"): String {
+  /**
+   * Has [venue] create a quest with [status] and [proofType] and returns its id. Leaves [venue]
+   * signed in.
+   */
+  private fun questOf(
+      venue: TestUser,
+      status: String = "ACTIVE",
+      proofType: String = "PHOTO",
+  ): String {
     signInAs(venue)
     val quest = newQuest()
-    assertSucceeds(quest.set(questData(venue) + ("status" to status)))
+    assertSucceeds(quest.set(questData(venue) + ("status" to status) + ("proofType" to proofType)))
     return quest.id
   }
 
@@ -774,15 +1067,62 @@ class FirestoreRulesTest {
   }
 
   /**
-   * Has [explorer] reserve a new active quest of [venue], for a party of just them, and returns the
-   * reservation. Leaves [explorer] signed in.
+   * Has [explorer] reserve a new active quest of [venue] asking for [proofType], for a party of
+   * just them, and returns the reservation. Leaves [explorer] signed in.
    */
-  private fun pendingReservationOf(explorer: TestUser, venue: TestUser): DocumentReference {
-    val quest = questOf(venue)
+  private fun pendingReservationOf(
+      explorer: TestUser,
+      venue: TestUser,
+      proofType: String = "PHOTO",
+  ): DocumentReference {
+    val quest = questOf(venue, proofType = proofType)
     val reservation = newReservation()
     assertSucceeds(createWithMembership(reservation, reservation(quest, venue), explorer))
     return reservation
   }
+
+  /** Same as [pendingReservationOf], with [venue] approving it. Leaves [explorer] signed in. */
+  private fun approvedReservationOf(
+      explorer: TestUser,
+      venue: TestUser,
+      proofType: String = "TEXT",
+  ): DocumentReference {
+    val reservation = pendingReservationOf(explorer, venue, proofType)
+    signInAs(venue)
+    assertSucceeds(reservation.update("status", "APPROVED"))
+    signInAs(explorer)
+    return reservation
+  }
+
+  private fun completions() = db.collection("completions")
+
+  private fun completionOf(reservation: DocumentReference, user: TestUser) =
+      completions().document("${reservation.id}_${user.uid}")
+
+  /** A pending completion of [reservationId] by [explorer], for a `TEXT` quest of [venue]. */
+  private fun completion(reservationId: String, explorer: TestUser, venue: TestUser) =
+      mapOf(
+          "reservationId" to reservationId,
+          "venueId" to venue.uid,
+          "explorerUid" to explorer.uid,
+          "textAnswer" to "The answer",
+          "status" to "PENDING",
+          "submittedAt" to Timestamp.now(),
+      )
+
+  /**
+   * Has [explorer] submit a completion of a new approved reservation of [venue] and returns it.
+   * Leaves [explorer] signed in.
+   */
+  private fun submittedCompletion(explorer: TestUser, venue: TestUser): DocumentReference {
+    val reservation = approvedReservationOf(explorer, venue)
+    val completion = completionOf(reservation, explorer)
+    assertSucceeds(completion.set(completion(reservation.id, explorer, venue)))
+    return completion
+  }
+
+  /** The fields a venue changes to reject a completion. */
+  private fun rejection() = mapOf("status" to "REJECTED", "rejectReason" to "Blurry photo")
 
   private fun partyUser(id: String) = db.collection("party_user").document(id)
 
@@ -890,6 +1230,7 @@ class FirestoreRulesTest {
   private companion object {
     const val PASSWORD = "password123"
     const val DISPLAY_NAME = "Test"
+    const val PHOTO_URL = "https://example.test/proof.jpg"
     const val TIMEOUT_S = 10L
   }
 }

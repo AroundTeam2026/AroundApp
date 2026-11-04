@@ -102,6 +102,19 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
+  fun observeForReservation_returnsEveryExplorerOfThatReservationOnly() =
+      runBlocking<Unit> {
+        val mine = submit()
+        val friends = submit(explorerUid = OTHER_ID)
+        submit(reservationId = OTHER_ID)
+
+        assertEquals(
+            setOf(mine, friends),
+            repository.observeForReservation(RESERVATION_ID).first().map { it.id }.toSet(),
+        )
+      }
+
+  @Test
   fun observe_emitsAgainOnlyWhenItsOwnListChanges() =
       runBlocking<Unit> {
         val emissions =
