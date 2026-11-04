@@ -2,6 +2,8 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.content.res.Configuration
+import android.icu.text.DateFormat as IcuDateFormat
+import android.icu.util.TimeZone as IcuTimeZone
 import android.text.format.DateFormat
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
@@ -23,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,7 +61,10 @@ import com.github.aroundteam2026.aroundapp.ui.venuepage.venueQuestChipStyle
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.ZoneId
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * One accepted quest in the overview, as the Figma card `Overview/Quest card` (after the active
@@ -257,27 +263,21 @@ private fun Status(status: OverviewRowStatus, modifier: Modifier) {
   }
 }
 
-/** The slot in a pill on the background colour: "Today · 15:30", or the day, e.g. "Sun 2 Nov". */
+/**
+ * The slot in a pill on the background colour: the day, "Today" or a date such as "Fri, Jan 15",
+ * always followed by the time, e.g. "Today · 15:30" or "Fri, Jan 15 · 8:00 AM".
+ */
 @Composable
 private fun Slot(slotStart: Long, clock: Clock) {
   val colors = MaterialTheme.colorScheme
   val locale = currentLocale()
-  val slot = Instant.ofEpochMilli(slotStart).atZone(clock.zone)
-  val day =
-      if (slot.toLocalDate() == LocalDate.now(clock)) stringResource(R.string.overview_slot_today)
-      else
-          DateTimeFormatter.ofPattern(
-                  DateFormat.getBestDateTimePattern(locale, DAY_SKELETON),
-                  locale,
-              )
-              .format(slot)
   val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
-  val time =
-      DateTimeFormatter.ofPattern(
-              DateFormat.getBestDateTimePattern(locale, if (is24Hour) HOURS_24 else HOURS_12),
-              locale,
-          )
-          .format(slot)
+  val formats = remember(locale, is24Hour, clock.zone) { SlotFormats(locale, is24Hour, clock.zone) }
+  val day =
+      if (Instant.ofEpochMilli(slotStart).atZone(clock.zone).toLocalDate() == LocalDate.now(clock))
+          stringResource(R.string.overview_slot_today)
+      else formats.day.format(Date(slotStart))
+  val time = formats.time.format(Date(slotStart))
   Row(
       Modifier.background(colors.background, AroundPillShape)
           .padding(horizontal = AroundSpacing.CompactGap, vertical = SLOT_VERTICAL_PADDING),
@@ -298,6 +298,23 @@ private fun Slot(slotStart: Long, clock: Clock) {
     )
   }
 }
+
+/** The day and time formats of a slot, for the phone's [locale] and clock setting, in [zone]. */
+private class SlotFormats(locale: Locale, is24Hour: Boolean, zone: ZoneId) {
+  val day: IcuDateFormat = slotFormat(DAY_SKELETON, locale, zone)
+  val time: IcuDateFormat = slotFormat(if (is24Hour) HOURS_24 else HOURS_12, locale, zone)
+}
+
+/**
+ * The format Android picks for [skeleton] in [locale], writing times in [zone]. It uses Android's
+ * ICU formatter, which reads every pattern letter Android returns; java.time does not, e.g. the day
+ * period of Traditional Chinese on the 12-hour clock on some Android versions.
+ */
+internal fun slotFormat(skeleton: String, locale: Locale, zone: ZoneId): IcuDateFormat =
+    IcuDateFormat.getInstanceForSkeleton(skeleton, locale).also {
+      // Through java.util first, so that java.time's "Z" becomes ICU's "UTC"
+      it.timeZone = IcuTimeZone.getTimeZone(TimeZone.getTimeZone(zone).id)
+    }
 
 /** A muted line of [text] after a small [icon], cut off with an ellipsis. */
 @Composable
