@@ -17,6 +17,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -69,6 +70,7 @@ class VenueDashboardActionsTest {
             ),
             FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
             party,
+            FakeCompletionRepository(),
         )
     compose.setContent { AroundAppTheme { VenueDashboardScreen(viewModel) } }
     compose.waitForIdle()
