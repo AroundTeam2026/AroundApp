@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.e2e.E2eRule
+import com.github.aroundteam2026.aroundapp.e2e.submitAuthForm
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.user.Role
@@ -79,7 +80,7 @@ class RoleRoutingActivityTest {
     compose.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
-    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+    compose.submitAuthForm()
     awaitTag(C.Tag.VENUE_INITIALIZATION_SCREEN)
     compose.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
     compose.activityRule.scenario.recreate()
@@ -108,7 +109,7 @@ class RoleRoutingActivityTest {
     compose.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
     compose.onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput("123456")
-    compose.onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+    compose.submitAuthForm()
     awaitTag(C.Tag.VENUE_DASHBOARD_SCREEN)
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.VENUE_AREA_SCREEN).assertDoesNotExist()

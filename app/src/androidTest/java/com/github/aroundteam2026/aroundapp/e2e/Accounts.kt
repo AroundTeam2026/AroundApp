@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import java.util.UUID
@@ -49,8 +50,18 @@ fun ComposeTestRule.signIn(email: String, landsOn: String) {
   onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
-  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+  submitAuthForm()
   leaveAuthFor(landsOn)
+}
+
+/**
+ * Closes the soft keyboard, then taps the auth form's submit button. While the keyboard slides in,
+ * the form's imePadding is still catching up, so the button can still be under the keyboard or
+ * moving when the tap lands, and the form is never sent (CI run 41899891610).
+ */
+fun ComposeTestRule.submitAuthForm() {
+  Espresso.closeSoftKeyboard()
+  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
 }
 
 /**
@@ -73,7 +84,7 @@ private fun ComposeTestRule.register(
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
-  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+  submitAuthForm()
   leaveAuthFor(landsOn)
 }
 
