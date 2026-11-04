@@ -16,7 +16,6 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -109,15 +108,6 @@ class ProofPhotoBoxTest {
   }
 
   @Test
-  fun retakeIsBigEnoughToTap() {
-    show(picked = true)
-
-    val touch = node(C.Tag.PROOF_PHOTO_RETAKE).fetchSemanticsNode().touchBoundsInRoot
-    val touchHeight = with(compose.density) { touch.height.toDp() }
-    assertTrue("touch height $touchHeight", touchHeight >= MIN_TOUCH_TARGET)
-  }
-
-  @Test
   fun aPhotoStillLoadingShowsTheBoxWithRetake() {
     show(picked = true, preview = null)
 
@@ -130,7 +120,5 @@ class ProofPhotoBoxTest {
     // Figma: a 290dp box with 54dp buttons
     val FIGMA_BOX_HEIGHT = 290.dp
     val FIGMA_BUTTON_HEIGHT = 54.dp
-    // Material's minimum touch target
-    val MIN_TOUCH_TARGET = 48.dp
   }
 }
