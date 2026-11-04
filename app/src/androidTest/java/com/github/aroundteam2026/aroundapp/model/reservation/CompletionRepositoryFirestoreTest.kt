@@ -27,7 +27,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,24 +42,24 @@ import org.junit.runner.RunWith
  *
  * Two clients take part, each from [emulatorClient] on its own named [FirebaseApp] on the
  * `demo-project` id, never the default app, so the tests cannot reach the real project: the
- * explorer submits completions and the venue answers them. Each client has its own empty cache, so
- * what the venue reads has been accepted by the server. Each test signs in fresh users and has them
- * make an approved reservation of a new quest, as the rules require, so tests never see each
- * other's completions. Each test's KDoc names the production bug it catches.
+ * explorer submits completions and the venue answers them. Each client has its own cache, so what
+ * the venue reads has been accepted by the server. Each test signs in fresh users and has them make
+ * an approved reservation of a new quest, as the rules require, so tests never see each other's
+ * completions. Each test's KDoc names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class CompletionRepositoryFirestoreTest {
   /**
-   * Fails any test, including its setUp and tearDown, that runs longer than this instead of
-   * blocking CI forever. It is longer than the setUp, test body and tearDown timeouts added
-   * together, so one of those reports where the test was stuck before this rule cuts it off.
+   * Fails any test, including its setUp, that runs longer than this instead of blocking CI forever.
+   * It is longer than the setUp and test body timeouts added together, so one of those reports
+   * where the test was stuck before this rule cuts it off.
    */
   @get:Rule val timeout: Timeout = Timeout.millis(RULE_TIMEOUT_MS)
 
-  /** The signed-in explorer's client, created by [setUp] and terminated by [tearDown]. */
+  /** The signed-in explorer's client, from [setUp]. */
   private lateinit var explorerDb: FirebaseFirestore
 
-  /** The signed-in venue's client, created by [setUp] and terminated by [tearDown]. */
+  /** The signed-in venue's client, from [setUp]. */
   private lateinit var venueDb: FirebaseFirestore
 
   /** Repository used by the signed-in explorer, who submits every completion. */
@@ -87,16 +86,6 @@ class CompletionRepositoryFirestoreTest {
         }
         explorerRepository = CompletionRepositoryFirestore(explorerDb) { FIXED_NOW }
         venueRepository = CompletionRepositoryFirestore(venueDb) { FIXED_NOW }
-      }
-
-  /** Terminates both clients, so no listener or cached data leaks between tests. */
-  @After
-  fun tearDown() =
-      runBlocking<Unit> {
-        withTimeout(SETUP_TIMEOUT_MS) {
-          explorerDb.terminate().await()
-          venueDb.terminate().await()
-        }
       }
 
   /**
@@ -593,8 +582,8 @@ class CompletionRepositoryFirestoreTest {
     /** Why the tests' venue rejects a proof. */
     const val REASON = "Blurry photo"
 
-    /** Longer than the setUp, test body and tearDown timeouts added together. */
-    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
+    /** Longer than the setUp and test body timeouts added together. */
+    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + 5_000L
 
     /** Short wait for a server that can't answer, as the device is offline. */
     const val SHORT_TIMEOUT_MS = 500L
