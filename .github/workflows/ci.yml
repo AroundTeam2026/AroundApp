@@ -24,6 +24,11 @@ jobs:
   ci:
     name: CI
     runs-on: ubuntu-latest
+    # TEMPORARY (#125): times the emulator at 2, 3 and 4 cores in one run; reverted after.
+    strategy:
+      fail-fast: false
+      matrix:
+        cores: ["2", "3", "4"]
 
     # The emulator the team develops on, a Pixel 10a with API 37.1, so a test means the same thing
     # on CI as locally. The command-line tools have no pixel_10a profile; pixel_9 has the same
@@ -35,7 +40,7 @@ jobs:
       AVD_API_LEVEL: "37.1"
       AVD_TARGET: google_apis_ps16k
       AVD_PROFILE: pixel_9
-      AVD_CORES: "4"
+      AVD_CORES: ${{ matrix.cores }}
 
     steps:
       # The emulator needs a lot of disk: the restored AVD, its system image and Gradle's caches.
@@ -137,7 +142,7 @@ jobs:
 
       # Cache the Emulator, if the cache does not hit, create the emulator
       - name: AVD cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         id: avd-cache
         with:
           path: |
@@ -257,7 +262,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: instrumented-test-results
+          name: instrumented-test-results-${{ matrix.cores }}cores
           path: app/build/outputs/androidTest-results/connected/
           retention-days: 7
 
