@@ -242,7 +242,8 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
   executionData.setFrom(
       fileTree(project.layout.buildDirectory.get()) {
         include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-        include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
+        // Below the device's directory locally; on CI, each shard's is one level deeper
+        include("outputs/code_coverage/debugAndroidTest/connected/**/coverage.ec")
       }
   )
 }
