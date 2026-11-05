@@ -3,7 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
-import com.github.aroundteam2026.aroundapp.ui.overview.CancelStatus
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame

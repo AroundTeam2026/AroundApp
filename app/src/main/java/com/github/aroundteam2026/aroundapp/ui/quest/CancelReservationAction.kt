@@ -1,5 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-package com.github.aroundteam2026.aroundapp.ui.overview
+package com.github.aroundteam2026.aroundapp.ui.quest
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +22,16 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+
+/** How cancelling a reservation stands. */
+enum class CancelStatus {
+  /** Not cancelled, and not being cancelled. */
+  NONE,
+  /** The cancel is being written. */
+  CANCELLING,
+  /** The last try failed; cancelling again retries. */
+  FAILED,
+}
 
 /**
  * The button that cancels a reservation at [venueName]: "Cancel reservation", which asks first
@@ -49,8 +59,8 @@ internal fun CancelReservationAction(
   ) {
     if (status == CancelStatus.FAILED) {
       Text(
-          stringResource(R.string.overview_cancel_failed),
-          Modifier.testTag(C.Tag.OVERVIEW_ROW_CANCEL_FAILED),
+          stringResource(R.string.cancel_reservation_failed),
+          Modifier.testTag(C.Tag.CANCEL_RESERVATION_FAILED),
           color = colors.error,
           style = AroundTextStyles.Caption,
       )
@@ -60,14 +70,14 @@ internal fun CancelReservationAction(
         onClick = { if (status == CancelStatus.FAILED) onCancel() else asking = true },
         enabled = status != CancelStatus.CANCELLING,
         colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
-        modifier = Modifier.testTag(C.Tag.OVERVIEW_ROW_CANCEL),
+        modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION),
     ) {
       Text(
           stringResource(
               when (status) {
-                CancelStatus.NONE -> R.string.overview_cancel
-                CancelStatus.CANCELLING -> R.string.overview_cancelling
-                CancelStatus.FAILED -> R.string.overview_cancel_retry
+                CancelStatus.NONE -> R.string.cancel_reservation
+                CancelStatus.CANCELLING -> R.string.cancel_reservation_cancelling
+                CancelStatus.FAILED -> R.string.cancel_reservation_retry
               }
           ),
           style = AroundTextStyles.Button,
@@ -84,22 +94,22 @@ internal fun CancelReservationAction(
                 onCancel()
               },
               colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
-              modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_CONFIRM),
+              modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_CONFIRM),
           ) {
-            Text(stringResource(R.string.overview_cancel_confirm))
+            Text(stringResource(R.string.cancel_reservation_confirm))
           }
         },
         dismissButton = {
           TextButton(
               onClick = { asking = false },
-              modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_KEEP),
+              modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_KEEP),
           ) {
-            Text(stringResource(R.string.overview_cancel_keep))
+            Text(stringResource(R.string.cancel_reservation_keep))
           }
         },
-        title = { Text(stringResource(R.string.overview_cancel_title)) },
-        text = { Text(stringResource(R.string.overview_cancel_text, venueName)) },
-        modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_DIALOG),
+        title = { Text(stringResource(R.string.cancel_reservation_title)) },
+        text = { Text(stringResource(R.string.cancel_reservation_text, venueName)) },
+        modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_DIALOG),
     )
   }
 }

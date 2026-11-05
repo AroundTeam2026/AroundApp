@@ -19,7 +19,7 @@ import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
-import com.github.aroundteam2026.aroundapp.ui.overview.CancelStatus
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers

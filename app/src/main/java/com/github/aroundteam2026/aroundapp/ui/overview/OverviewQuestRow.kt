@@ -40,6 +40,8 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine

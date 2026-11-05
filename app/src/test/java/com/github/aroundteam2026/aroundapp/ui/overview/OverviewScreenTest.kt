@@ -117,7 +117,7 @@ class OverviewScreenTest {
     show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
 
     cancelButtonOf("reservation-2").performClick()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     assertEquals(listOf("reservation-2"), cancelled)
     assertEquals(emptyList<String>(), opened)
@@ -151,8 +151,8 @@ class OverviewScreenTest {
         )
     compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
 
-    compose.onNode(hasTestTag(C.Tag.OVERVIEW_ROW_CANCEL), useUnmergedTree = true).performClick()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+    compose.onNode(hasTestTag(C.Tag.CANCEL_RESERVATION), useUnmergedTree = true).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     compose.onNodeWithTag(C.Tag.OVERVIEW_EMPTY).assertIsDisplayed()
   }
@@ -186,7 +186,7 @@ class OverviewScreenTest {
   /** The cancel button is a clickable of its own, so the card's merged node leaves it out. */
   private fun cancelButtonOf(reservationId: String) =
       compose.onNode(
-          hasTestTag(C.Tag.OVERVIEW_ROW_CANCEL) and
+          hasTestTag(C.Tag.CANCEL_RESERVATION) and
               hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
           useUnmergedTree = true,
       )
