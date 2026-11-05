@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.completion.Completion
 import com.github.aroundteam2026.aroundapp.ui.completion.completionDestination
+import com.github.aroundteam2026.aroundapp.ui.completion.navigateToCompletion
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
@@ -72,7 +73,7 @@ fun AroundApp(
     navController: NavHostController = rememberNavController(),
     onSignOut: () -> Unit,
     venuePage: @Composable (venueId: String, onBack: () -> Unit) -> Unit = { venueId, onBack ->
-      VenuePage(venueId, explorerUid, onBack)
+      VenuePage(venueId, explorerUid, onBack, onSubmitProof = navController::navigateToCompletion)
     },
     completion: @Composable (reservationId: String, venueName: String, close: () -> Unit) -> Unit =
         { reservationId, venueName, close ->

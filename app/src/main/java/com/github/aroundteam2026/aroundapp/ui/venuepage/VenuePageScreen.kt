@@ -76,6 +76,8 @@ typealias VenuePageQuestRow =
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
  *   [AcceptQuestBar] that accepts through [viewModel] unless replaced.
+ * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
+ *   venue's name, from the quest's details.
  */
 @Composable
 fun VenuePageScreen(
@@ -84,6 +86,7 @@ fun VenuePageScreen(
     modifier: Modifier = Modifier,
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
+    onSubmitProof: (reservationId: String, venueName: String) -> Unit = { _, _ -> },
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val acceptBar: @Composable (VenuePageQuest?) -> Unit = {
@@ -101,6 +104,7 @@ fun VenuePageScreen(
       modifier = modifier,
       questRow = questRow,
       bottomBar = bottomBar ?: acceptBar,
+      onSubmitProof = { onSubmitProof(it, state.venueName) },
   )
 }
 
@@ -108,7 +112,8 @@ fun VenuePageScreen(
  * Stateless page: the top bar, then what [state] says the page can show. Under the list sits
  * [bottomBar], or by default an [AcceptQuestBar] whose button calls [onAccept]. While
  * [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen] takes the page's place, and
- * [onCancel] cancels the reservation from there.
+ * [onCancel] cancels the reservation from there, or [onSubmitProof] opens the proof form of an
+ * approved one, given its id.
  */
 @Composable
 fun VenuePageContent(
@@ -125,12 +130,21 @@ fun VenuePageContent(
     bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {
       AcceptQuestBar(state, onAccept)
     },
+    onSubmitProof: (reservationId: String) -> Unit = {},
 ) {
   // Out here, so that the list is back where it was when the details close
   val listState = rememberLazyListState()
   val detailQuest = state.detailQuest?.takeIf { state.status == VenuePageStatus.LOADED }
   if (detailQuest != null) {
-    QuestDetailsScreen(state, detailQuest, onQuestDetailsClosed, onAccept, onCancel, modifier)
+    QuestDetailsScreen(
+        state,
+        detailQuest,
+        onQuestDetailsClosed,
+        onAccept,
+        onCancel,
+        modifier,
+        onSubmitProof = onSubmitProof,
+    )
     return
   }
   Column(

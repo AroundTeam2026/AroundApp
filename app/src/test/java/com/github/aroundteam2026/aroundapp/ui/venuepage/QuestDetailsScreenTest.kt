@@ -38,6 +38,7 @@ class QuestDetailsScreenTest {
   private var backs = 0
   private var accepts = 0
   private var cancels = 0
+  private val proofsOpened = mutableListOf<String>()
 
   private fun quest(
       description: String = "Spot the ceramic fox hidden in the café.",
@@ -85,6 +86,7 @@ class QuestDetailsScreenTest {
             onAccept = { accepts++ },
             onCancel = { cancels++ },
             clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+            onSubmitProof = { proofsOpened += it },
         )
       }
     }
@@ -296,6 +298,31 @@ class QuestDetailsScreenTest {
 
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
     assertEquals(0, cancels)
+  }
+
+  // Figma's "Quest details · submit proof": the venue approved, so the bar sends the proof
+  @Test
+  fun anApprovedReservationOffersToSubmitTheProof() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(approvedIds = setOf("r")))
+
+    node(C.Tag.ACCEPT_QUEST_BUTTON).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.SUBMIT_PROOF_BUTTON).assertTextEquals("Submit proof").performClick()
+
+    assertEquals(listOf("r"), proofsOpened)
+    // Cancelling stays possible under it
+    node(C.Tag.CANCEL_RESERVATION).assertIsDisplayed()
+  }
+
+  @Test
+  fun aReservationTheVenueHasntApprovedOffersNoProof() {
+    val quest = quest()
+    show(quest, accepted(quest))
+
+    node(C.Tag.SUBMIT_PROOF_BUTTON).assertDoesNotExist()
+    compose
+        .onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON)
+        .assertTextEquals("Accepted, waiting for the venue")
   }
 
   @Test

@@ -36,10 +36,22 @@ fun NavGraphBuilder.venuePageDestination(
 
 /**
  * A venue's page as the app shows it to the explorer [explorerUid], with the app's repositories.
+ *
+ * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
+ *   venue's name.
  */
 @Composable
-fun VenuePage(venueId: String, explorerUid: String, onBack: () -> Unit) =
-    VenuePageScreen(viewModel(factory = VenuePageViewModel.factory(venueId, explorerUid)), onBack)
+fun VenuePage(
+    venueId: String,
+    explorerUid: String,
+    onBack: () -> Unit,
+    onSubmitProof: (reservationId: String, venueName: String) -> Unit = { _, _ -> },
+) =
+    VenuePageScreen(
+        viewModel(factory = VenuePageViewModel.factory(venueId, explorerUid)),
+        onBack,
+        onSubmitProof = onSubmitProof,
+    )
 
 /**
  * Opens the page of the venue with [venueId]. Not single-top, so opening another venue's page from

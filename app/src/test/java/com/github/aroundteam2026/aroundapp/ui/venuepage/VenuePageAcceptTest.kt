@@ -320,6 +320,19 @@ class VenuePageAcceptTest {
     assertEquals(id, state.cancellableReservationId)
   }
 
+  // The venue answers while the page is open: its approval makes the quest completable
+  @Test
+  fun aQuestCanBeCompletedOnceTheVenueApprovesItsReservation() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+    assertNull(state.completableReservationId)
+
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    runCurrent()
+
+    assertEquals(id, state.completableReservationId)
+  }
+
   @Test
   fun cancelEndsTheReservationAndReopensTheQuest() = test {
     val id = storeFor("a")

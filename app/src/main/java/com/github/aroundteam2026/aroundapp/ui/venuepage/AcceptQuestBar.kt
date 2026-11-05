@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.animation.core.RepeatMode
@@ -57,12 +58,16 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
  *
  * It draws nothing while no quest is picked. It only shows the state: [onAccept] is the
  * ViewModel's. [footer] sits under the button.
+ *
+ * @param onSubmitProof Given once the venue approved the reservation, as in the Figma frame "Quest
+ *   details · submit proof": the button then says "Submit proof" and calls it.
  */
 @Composable
 fun AcceptQuestBar(
     state: VenuePageUiState,
     onAccept: () -> Unit,
     modifier: Modifier = Modifier,
+    onSubmitProof: (() -> Unit)? = null,
     footer: @Composable ColumnScope.() -> Unit = {},
 ) {
   if (state.selectedQuest == null) return
@@ -94,12 +99,25 @@ fun AcceptQuestBar(
           C.Tag.ACCEPT_QUEST_NEEDS_MORE,
       )
     }
-    if (status == AcceptStatus.ACCEPTING) {
-      AcceptingSkeleton(stringResource(R.string.accept_quest_accepting))
-    } else {
-      AcceptButton(status, enabled = state.acceptAvailable, onAccept)
+    when {
+      onSubmitProof != null -> SubmitProofButton(onSubmitProof)
+      status == AcceptStatus.ACCEPTING ->
+          AcceptingSkeleton(stringResource(R.string.accept_quest_accepting))
+      else -> AcceptButton(status, enabled = state.acceptAvailable, onAccept)
     }
     footer()
+  }
+}
+
+/** The button once the venue approved the reservation: "Submit proof". */
+@Composable
+private fun SubmitProofButton(onSubmitProof: () -> Unit) {
+  Button(
+      onClick = onSubmitProof,
+      shape = AroundPillShape,
+      modifier = Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.SUBMIT_PROOF_BUTTON),
+  ) {
+    Text(stringResource(R.string.submit_proof), style = AroundTextStyles.Button)
   }
 }
 

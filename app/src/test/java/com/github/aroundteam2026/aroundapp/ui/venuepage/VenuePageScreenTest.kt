@@ -33,6 +33,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -397,10 +399,38 @@ class VenuePageScreenTest {
     compose.onNodeWithText("Order the secret menu").assertIsDisplayed()
   }
 
+  // The proof form needs the venue's name, which only the page knows
+  @Test
+  fun submittingTheProofOfAnApprovedQuestPassesItsReservationAndTheVenue() {
+    val party = FakePartyRepository()
+    val reservations = FakeReservationRepository(party = party)
+    val id = runBlocking {
+      val id =
+          reservations
+              .createReservation(newPendingReservation("a", VENUE_ID, "Ece", 0L), "explorer")
+              .getOrThrow()
+      reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+      id
+    }
+    val opened = mutableListOf<Pair<String, String>>()
+    showScreen(
+        activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) },
+        party = party,
+        reservations = reservations,
+        onSubmitProof = { reservation, venue -> opened += reservation to venue },
+    )
+
+    compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
+    compose.onNodeWithTag(C.Tag.SUBMIT_PROOF_BUTTON).performClick()
+
+    assertEquals(listOf(id to "Café Lumen"), opened)
+  }
+
   private fun showScreen(
       activeQuestsByVenue: (String) -> Flow<List<Quest>>,
       party: FakePartyRepository = FakePartyRepository(),
       reservations: FakeReservationRepository = FakeReservationRepository(party = party),
+      onSubmitProof: (String, String) -> Unit = { _, _ -> },
   ) {
     val viewModel =
         VenuePageViewModel(
@@ -412,7 +442,9 @@ class VenuePageScreenTest {
             party,
             "explorer",
         )
-    compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }
+    compose.setContent {
+      AroundAppTheme { VenuePageScreen(viewModel, onBack = {}, onSubmitProof = onSubmitProof) }
+    }
   }
 
   private fun <T> failing(): Flow<T> = flow { throw IOException("offline") }
