@@ -97,6 +97,7 @@ fun VenuePageScreen(
       onQuestDetails = viewModel::onQuestDetailsOpened,
       onQuestDetailsClosed = viewModel::onQuestDetailsClosed,
       onAccept = viewModel::accept,
+      onCancel = viewModel::cancel,
       modifier = modifier,
       questRow = questRow,
       bottomBar = bottomBar ?: acceptBar,
@@ -106,7 +107,8 @@ fun VenuePageScreen(
 /**
  * Stateless page: the top bar, then what [state] says the page can show. Under the list sits
  * [bottomBar], or by default an [AcceptQuestBar] whose button calls [onAccept]. While
- * [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen] takes the page's place.
+ * [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen] takes the page's place, and
+ * [onCancel] cancels the reservation from there.
  */
 @Composable
 fun VenuePageContent(
@@ -118,6 +120,7 @@ fun VenuePageContent(
     onQuestDetails: (questId: String) -> Unit = {},
     onQuestDetailsClosed: () -> Unit = {},
     onAccept: () -> Unit = {},
+    onCancel: () -> Unit = {},
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {
       AcceptQuestBar(state, onAccept)
@@ -127,7 +130,7 @@ fun VenuePageContent(
   val listState = rememberLazyListState()
   val detailQuest = state.detailQuest?.takeIf { state.status == VenuePageStatus.LOADED }
   if (detailQuest != null) {
-    QuestDetailsScreen(state, detailQuest, onQuestDetailsClosed, onAccept, modifier)
+    QuestDetailsScreen(state, detailQuest, onQuestDetailsClosed, onAccept, onCancel, modifier)
     return
   }
   Column(

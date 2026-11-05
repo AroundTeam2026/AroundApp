@@ -6,6 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.ui.overview.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
 /**
@@ -27,9 +28,12 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
  *   its party has. A pending or approved reservation counts; a rejected or cancelled one does not.
+ * @property reservationIds For each quest in [acceptedParties], the id of its reservation.
  * @property acceptingQuestIds Ids of the quests being accepted right now.
  * @property failedQuestIds Ids of the quests whose last accept failed: the write could not be
  *   issued, or the server refused it afterwards.
+ * @property cancellingIds Ids of the reservations being cancelled right now.
+ * @property failedCancelIds Ids of the reservations whose last cancel failed.
  * @property acceptAvailable False once the explorer's reservations can't be read, since then the
  *   page can't tell what they accepted and so doesn't book anything.
  */
@@ -44,8 +48,11 @@ data class VenuePageUiState(
     val detailQuestId: String? = null,
     val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
+    val reservationIds: Map<String, String> = emptyMap(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
+    val cancellingIds: Set<String> = emptySet(),
+    val failedCancelIds: Set<String> = emptySet(),
     val acceptAvailable: Boolean = true,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
@@ -67,6 +74,22 @@ data class VenuePageUiState(
         else -> AcceptStatus.NONE
       }
     }
+
+  /**
+   * The reservation the explorer can cancel for the picked quest, or null when there is none. While
+   * the reservations can't be read it is null too, since the page can't tell if it still stands.
+   */
+  val cancellableReservationId: String?
+    get() = selectedQuestId?.takeIf { acceptAvailable }?.let(reservationIds::get)
+
+  /** How cancelling the picked quest's reservation stands; [CancelStatus.NONE] when none is. */
+  val cancelStatus: CancelStatus
+    get() =
+        when (selectedQuestId?.let(reservationIds::get)) {
+          in cancellingIds -> CancelStatus.CANCELLING
+          in failedCancelIds -> CancelStatus.FAILED
+          else -> CancelStatus.NONE
+        }
 
   /**
    * How many more people the picked quest needs: its minimum party size less the party's size,

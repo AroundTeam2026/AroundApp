@@ -100,6 +100,7 @@ fun VenueQuestRow(
           distanceMeters = null,
           venueQuestChipStyle(),
           Modifier.padding(top = AroundSpacing.ExtraSmall),
+          exactPartySize = quest.exactPartySize,
       )
     }
     if (onDetails == null) {
