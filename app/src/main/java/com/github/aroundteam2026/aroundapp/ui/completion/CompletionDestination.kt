@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
@@ -58,11 +59,18 @@ private fun NavController.close(entry: NavBackStackEntry) {
  * repositories.
  *
  * @param close Closes the screen, on its back arrow, system back, or once the proof is sent.
+ * @param factory Builds the screen's ViewModel; the app's unless a test needs fakes.
  */
 @Composable
-fun Completion(reservationId: String, venueName: String, explorerUid: String, close: () -> Unit) =
+fun Completion(
+    reservationId: String,
+    venueName: String,
+    explorerUid: String,
+    close: () -> Unit,
+    factory: ViewModelProvider.Factory = CompletionViewModel.factory(reservationId, explorerUid),
+) =
     CompletionScreen(
-        viewModel(factory = CompletionViewModel.factory(reservationId, explorerUid)),
+        viewModel(factory = factory),
         venueName,
         onBack = close,
         onSubmitted = { close() },

@@ -73,20 +73,20 @@ typealias VenuePageQuestRow =
  *
  * @param viewModel Loads the venue and its quests, and keeps the picked one.
  * @param onBack Called when the explorer taps the back arrow.
+ * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
+ *   venue's name, from the quest's details.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
  *   [AcceptQuestBar] that accepts through [viewModel] unless replaced.
- * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
- *   venue's name, from the quest's details.
  */
 @Composable
 fun VenuePageScreen(
     viewModel: VenuePageViewModel,
     onBack: () -> Unit,
+    onSubmitProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
-    onSubmitProof: (reservationId: String, venueName: String) -> Unit = { _, _ -> },
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val acceptBar: @Composable (VenuePageQuest?) -> Unit = {

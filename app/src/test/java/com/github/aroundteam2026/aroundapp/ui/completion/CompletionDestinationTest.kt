@@ -10,20 +10,36 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.Routes
 import com.github.aroundteam2026.aroundapp.ui.navigation.Tab
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Rule
@@ -44,14 +60,17 @@ class CompletionDestinationTest {
   /** Closes the screen shown last, as its back arrow or a sent proof does. */
   private var close: () -> Unit = {}
 
-  private fun launch() {
+  /** Opens the app; with [approvedQuestId], the venue pages offer that quest, approved. */
+  private fun launch(approvedQuestId: String? = null) {
     compose.setContent {
       navController = rememberNavController()
       AroundApp(
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+          venuePage = { venueId, onBack, onSubmitProof ->
+            VenuePageOnFakes(venueId, onBack, onSubmitProof, approvedQuestId)
+          },
           overview = { OverviewOnFakes(it) },
           completion = { reservationId, venueName, close ->
             this.close = close
@@ -90,6 +109,20 @@ class CompletionDestinationTest {
 
     node(RESERVATION).assertTextEquals("a b/c?d")
     node(VENUE).assertTextEquals("Café & Co / 50%")
+  }
+
+  // The app's own wiring: the venue page's button must open this route, not a stand-in callback
+  @Test
+  fun submitProofOnTheQuestDetailsOpensItsReservationAndVenue() {
+    launch(approvedQuestId = "quest")
+    open { navigateToVenuePage("venue-1") }
+
+    compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
+    node(C.Tag.SUBMIT_PROOF_BUTTON).performClick()
+    compose.waitForIdle()
+
+    node(RESERVATION).assertTextEquals("reservation-1")
+    node(VENUE).assertTextEquals("Café Lumen")
   }
 
   // "complete_quest/" matches no route: opening it would crash the app
@@ -166,7 +199,69 @@ class CompletionDestinationTest {
     assertEquals(Routes.VENUE_PAGE, route)
   }
 
+  /**
+   * Shows [Completion] for an approved reservation, on fakes, counting its closes in [closes]. With
+   * [alreadySent], the explorer's proof of it is stored before the screen opens.
+   */
+  private fun showCompletion(alreadySent: Boolean = false) {
+    val reservations = FakeReservationRepository()
+    val completions = FakeCompletionRepository()
+    val venue = testVenue()
+    val reservationId = runBlocking {
+      val id =
+          reservations
+              .createReservation(newPendingReservation("quest", venue.id, "Ada", 1_000), EXPLORER)
+              .getOrThrow()
+      reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+      if (alreadySent) {
+        completions.submit(id, venue.id, EXPLORER, Proof.Text("By the window")).getOrThrow()
+      }
+      id
+    }
+    val factory = viewModelFactory {
+      initializer {
+        CompletionViewModel(
+            reservationId,
+            EXPLORER,
+            reservations,
+            FakeQuestRepository(initialQuests = listOf(testQuest())),
+            FakeVenueRepository(listOf(venue)),
+            FakeLocationRepository(venue.location),
+            completions,
+            FakeProofPhotoRepository(),
+        )
+      }
+    }
+    compose.setContent {
+      AroundAppTheme {
+        Completion(reservationId, venue.name, EXPLORER, close = { closes++ }, factory = factory)
+      }
+    }
+    compose.waitForIdle()
+  }
+
+  private var closes = 0
+
+  @Test
+  fun theAppsScreenShowsTheFormAndItsBackArrowClosesIt() {
+    showCompletion()
+
+    node(C.Tag.COMPLETION_SCREEN).assertIsDisplayed()
+    compose.onNodeWithContentDescription("Back").performClick()
+
+    assertEquals(1, closes)
+  }
+
+  // Opened again after the proof was sent, the screen has nothing left to do
+  @Test
+  fun anAlreadySentProofClosesTheAppsScreen() {
+    showCompletion(alreadySent = true)
+
+    compose.waitUntil { closes == 1 }
+  }
+
   private companion object {
+    const val EXPLORER = "explorer"
     const val SCREEN = "completion_stand_in"
     const val RESERVATION = "completion_stand_in_reservation"
     const val VENUE = "completion_stand_in_venue"

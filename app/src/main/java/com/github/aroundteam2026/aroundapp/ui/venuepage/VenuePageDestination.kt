@@ -18,11 +18,21 @@ private const val TAG = "VenuePageDestination"
  * Registers a venue's page, which takes the venue's id as [Routes.VENUE_ID].
  *
  * @param onBack Called when the explorer taps the page's back arrow.
- * @param page Draws the page of the venue with the given id, with [onBack] as its back action.
+ * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
+ *   venue's name.
+ * @param page Draws the page of the venue with the given id, with [onBack] as its back action and
+ *   [onSubmitProof] as what its "Submit proof" button opens.
  */
 fun NavGraphBuilder.venuePageDestination(
     onBack: () -> Unit,
-    page: @Composable (venueId: String, onBack: () -> Unit) -> Unit,
+    onSubmitProof: (reservationId: String, venueName: String) -> Unit,
+    page:
+        @Composable
+        (
+            venueId: String,
+            onBack: () -> Unit,
+            onSubmitProof: (reservationId: String, venueName: String) -> Unit,
+        ) -> Unit,
 ) {
   composable(
       Routes.VENUE_PAGE,
@@ -30,7 +40,7 @@ fun NavGraphBuilder.venuePageDestination(
   ) { entry ->
     // The route only matches a non-blank id, so the argument is always there
     val venueId = requireNotNull(entry.arguments?.getString(Routes.VENUE_ID))
-    page(venueId, onBack)
+    page(venueId, onBack, onSubmitProof)
   }
 }
 
@@ -45,12 +55,12 @@ fun VenuePage(
     venueId: String,
     explorerUid: String,
     onBack: () -> Unit,
-    onSubmitProof: (reservationId: String, venueName: String) -> Unit = { _, _ -> },
+    onSubmitProof: (reservationId: String, venueName: String) -> Unit,
 ) =
     VenuePageScreen(
         viewModel(factory = VenuePageViewModel.factory(venueId, explorerUid)),
         onBack,
-        onSubmitProof = onSubmitProof,
+        onSubmitProof,
     )
 
 /**

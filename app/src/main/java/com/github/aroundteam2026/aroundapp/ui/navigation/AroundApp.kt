@@ -59,8 +59,8 @@ private val START_TAB = Tab.QUESTS
  * @param onSignOut supplies the Profile sign-out action.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  * @param explorerUid the signed-in explorer, who accepts quests on a venue's page.
- * @param venuePage draws a venue's page, given its id and back action; tests pass their own so the
- *   page doesn't read Firestore.
+ * @param venuePage draws a venue's page, given its id, its back action and what its "Submit proof"
+ *   button opens; tests pass their own so the page doesn't read Firestore.
  * @param overview draws the Quests tab's overview, given what opens a venue's page; tests pass
  *   their own so the overview doesn't read Firestore.
  * @param completion draws the screen where the explorer completes a reservation's quest, given the
@@ -72,9 +72,16 @@ fun AroundApp(
     explorerUid: String,
     navController: NavHostController = rememberNavController(),
     onSignOut: () -> Unit,
-    venuePage: @Composable (venueId: String, onBack: () -> Unit) -> Unit = { venueId, onBack ->
-      VenuePage(venueId, explorerUid, onBack, onSubmitProof = navController::navigateToCompletion)
-    },
+    venuePage:
+        @Composable
+        (
+            venueId: String,
+            onBack: () -> Unit,
+            onSubmitProof: (reservationId: String, venueName: String) -> Unit,
+        ) -> Unit =
+        { venueId, onBack, onSubmitProof ->
+          VenuePage(venueId, explorerUid, onBack, onSubmitProof)
+        },
     completion: @Composable (reservationId: String, venueName: String, close: () -> Unit) -> Unit =
         { reservationId, venueName, close ->
           Completion(reservationId, venueName, explorerUid, close)
@@ -93,7 +100,11 @@ fun AroundApp(
       modifier = Modifier.testTag(C.Tag.APP),
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
-    venuePageDestination(onBack = { navController.popBackStack() }, page = venuePage)
+    venuePageDestination(
+        onBack = { navController.popBackStack() },
+        onSubmitProof = navController::navigateToCompletion,
+        page = venuePage,
+    )
     completionDestination(navController, screen = completion)
   }
 }
