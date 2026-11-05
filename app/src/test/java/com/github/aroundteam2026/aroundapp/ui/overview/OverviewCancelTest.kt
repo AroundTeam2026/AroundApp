@@ -6,6 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -39,6 +40,7 @@ class OverviewCancelTest {
   private val party = FakePartyRepository { START }
   private val fake = FakeReservationRepository({ START }, party)
   private val reservations = GatedStatusUpdates(fake)
+  private val completions = FakeCompletionRepository()
 
   private val viewModel by lazy {
     OverviewViewModel(
@@ -47,7 +49,7 @@ class OverviewCancelTest {
         ScriptedQuestRepository(quest = { id -> testQuest(id = id, venueId = CAFE) }),
         FakeVenueRepository(listOf(testVenue(id = CAFE))),
         party,
-        FakeCompletionRepository(),
+        completions,
     )
   }
 
@@ -233,6 +235,24 @@ class OverviewCancelTest {
     runCurrent()
 
     assertEquals(0, reservations.updates)
+  }
+
+  // The card hides Cancel once the proof is sent; the ViewModel holds the same rule
+  @Test
+  fun aReservationWhoseProofWasSentIsNotCancelled() = test {
+    val id = book("fox")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    completions.submit(id, CAFE, EXPLORER, Proof.Text("By the window")).getOrThrow()
+    viewModel
+    runCurrent()
+    assertEquals(OverviewRowStatus.PROOF_SENT, state.rows.single().status)
+
+    viewModel.cancel(id)
+    runCurrent()
+
+    assertEquals(0, reservations.updates)
+    assertEquals(ReservationStatus.APPROVED, stored(id))
+    assertEquals(emptySet<String>(), state.cancellingIds)
   }
 
   @Test

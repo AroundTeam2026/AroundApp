@@ -71,15 +71,16 @@ class OverviewViewModel(
 
   /**
    * Called when the explorer cancels the reservation [reservationId]. Does nothing unless it is one
-   * of the rows, or while it is being cancelled, so a double tap cancels once. The row shows as
-   * cancelling until the listener drops it. A failure, such as being offline, keeps the row and
-   * marks it failed, unless the row left meanwhile; calling this again retries.
+   * of the rows and still [OverviewRowStatus.cancellable], or while it is being cancelled, so a
+   * double tap cancels once. The row shows as cancelling until the listener drops it. A failure,
+   * such as being offline, keeps the row and marks it failed, unless the row left meanwhile;
+   * calling this again retries.
    */
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
     if (
         reservationId in current.cancellingIds ||
-            current.rows.none { it.reservationId == reservationId }
+            current.rows.none { it.reservationId == reservationId && it.status.cancellable }
     ) {
       return
     }
