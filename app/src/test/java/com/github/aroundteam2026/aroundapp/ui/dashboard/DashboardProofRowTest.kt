@@ -136,6 +136,14 @@ class DashboardProofRowTest {
     assertEquals(1, opens)
   }
 
+  @Test
+  fun thePreviewShowsAPhotoAndAWrittenAnswer() {
+    compose.setContent { DashboardProofRowPreview() }
+
+    compose.onNodeWithTag("${C.Tag.DASHBOARD_PROOF_ROW}_photo").assertIsDisplayed()
+    compose.onNodeWithTag("${C.Tag.DASHBOARD_PROOF_ROW}_text").assertIsDisplayed()
+  }
+
   /** A clock the test moves on by hand, like the phone's while the dashboard stays open. */
   private class MovingClock(var now: Long) : Clock() {
     override fun getZone(): ZoneId = ZONE

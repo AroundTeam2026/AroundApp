@@ -369,10 +369,11 @@ private val BADGE_VERTICAL = 2.dp
 private val HEADER_AVATAR_SIZE = 48.dp
 private val HEADER_AVATAR_STYLE = AroundTextStyles.AvatarLarge.copy(fontSize = 17.sp)
 
+// Internal, not private, so a test can draw it: the previews are code too
 @Preview(name = "Light", heightDp = 917)
 @Preview(name = "Dark", heightDp = 917, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun VenueDashboardPreview() {
+internal fun VenueDashboardPreview() {
   val now = System.currentTimeMillis()
   fun reservation(id: String, title: String, name: String, party: Int, approved: Boolean) =
       DashboardReservation(

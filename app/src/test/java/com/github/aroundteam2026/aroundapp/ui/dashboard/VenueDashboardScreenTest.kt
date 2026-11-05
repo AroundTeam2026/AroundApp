@@ -244,6 +244,15 @@ class VenueDashboardScreenTest {
     compose.onNodeWithTag(C.Tag.DASHBOARD_NEEDS_ANSWER).assertDoesNotExist()
   }
 
+  @Test
+  fun thePreviewShowsItsProofAboveTheReservations() {
+    compose.setContent { VenueDashboardPreview() }
+
+    compose.onNodeWithTag(C.Tag.DASHBOARD_PROOFS).assertIsDisplayed()
+    proofRow("p").assertIsDisplayed()
+    assertTrue(top(C.Tag.DASHBOARD_PROOFS) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
+  }
+
   /** Where the node tagged [tag] starts, from the top of the screen. */
   private fun top(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.top
 

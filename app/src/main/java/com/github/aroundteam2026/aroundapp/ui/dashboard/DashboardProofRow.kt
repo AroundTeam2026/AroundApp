@@ -174,21 +174,13 @@ private fun sentText(proof: DashboardProof, now: Long): String {
  */
 @Composable
 private fun ProofIcon(type: ProofType) {
-  val (icon, background, tint) =
-      when (type) {
-        ProofType.PHOTO ->
-            Triple(
-                R.drawable.ic_proof_photo,
-                AroundTheme.colors.sage,
-                MaterialTheme.colorScheme.onPrimary,
-            )
-        ProofType.TEXT ->
-            Triple(
-                R.drawable.ic_proof_text,
-                AroundTheme.colors.panel,
-                MaterialTheme.colorScheme.onSurface,
-            )
-      }
+  // An if rather than a when on the type: a when gets a branch for unknown values that no test
+  // can reach
+  val photo = type == ProofType.PHOTO
+  val icon = if (photo) R.drawable.ic_proof_photo else R.drawable.ic_proof_text
+  val background = if (photo) AroundTheme.colors.sage else AroundTheme.colors.panel
+  val colors = MaterialTheme.colorScheme
+  val tint = if (photo) colors.onPrimary else colors.onSurface
   Box(
       Modifier.size(PROOF_TILE_SIZE)
           .background(background, PROOF_TILE_SHAPE)
@@ -206,10 +198,11 @@ private val PROOF_TILE_SHAPE = RoundedCornerShape(12.dp)
 private val PROOF_ICON_SIZE = 22.dp
 private val CHEVRON_SIZE = 20.dp
 
+// Internal, not private, so a test can draw it: the previews are code too
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun DashboardProofRowPreview() {
+internal fun DashboardProofRowPreview() {
   val now = System.currentTimeMillis()
   AroundAppTheme {
     Column(
