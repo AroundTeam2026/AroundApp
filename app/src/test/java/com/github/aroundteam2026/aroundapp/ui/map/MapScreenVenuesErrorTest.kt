@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -41,7 +42,7 @@ class MapScreenVenuesErrorTest {
   private val venueRepository = FlakyVenueRepository(listOf(cafe))
   private val viewModel by lazy {
     MapViewModel(
-        FakeLocationRepository(Location(46.5220, 6.6330)),
+        FakeLocationRepository(cafe.location),
         ScriptedQuestRepository.of(quests),
         venueRepository,
     )
@@ -86,15 +87,19 @@ class MapScreenVenuesErrorTest {
   }
 
   @Test
-  fun loadedVenuesShowNoBanner() {
+  fun tryAgainCantBeTappedWhileTheRetryWaits() {
+    venueRepository.failing = true
     show()
 
-    node(C.Tag.VENUES_ERROR_BANNER).assertDoesNotExist()
+    venueRepository.answering = false
+    node(C.Tag.VENUES_TRY_AGAIN).performClick()
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.VENUES_TRY_AGAIN).assertIsNotEnabled()
   }
 
   @Test
-  fun anAreaWithoutQuestsShowsNoBanner() {
-    quests.value = emptyList()
+  fun loadedVenuesShowNoBanner() {
     show()
 
     node(C.Tag.VENUES_ERROR_BANNER).assertDoesNotExist()

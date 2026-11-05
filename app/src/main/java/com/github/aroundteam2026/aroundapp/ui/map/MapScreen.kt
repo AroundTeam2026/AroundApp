@@ -123,7 +123,9 @@ fun MapScreen(
         Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
-      if (state.venuesFailed) VenuesErrorBanner(viewModel::onRetryVenues)
+      if (state.venuesFailed) {
+        VenuesErrorBanner(viewModel::onRetryVenues, retrying = state.retryingVenues)
+      }
       if (state.locationRefused) LocationBanner(turnOnLocation)
     }
   }

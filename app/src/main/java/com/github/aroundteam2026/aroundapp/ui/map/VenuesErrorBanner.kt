@@ -13,9 +13,10 @@ import com.github.aroundteam2026.aroundapp.resources.C
  * a "Try again" button, as in Figma (frame 4484:9165).
  *
  * @param onTryAgain Called when the explorer taps "Try again"; see [MapViewModel.onRetryVenues].
+ * @param retrying Whether a retry waits for the venues, so "Try again" can't be tapped yet.
  */
 @Composable
-fun VenuesErrorBanner(onTryAgain: () -> Unit, modifier: Modifier = Modifier) {
+fun VenuesErrorBanner(onTryAgain: () -> Unit, retrying: Boolean, modifier: Modifier = Modifier) {
   MapBanner(
       icon = R.drawable.ic_cloud_off,
       title = stringResource(R.string.map_venues_failed),
@@ -24,6 +25,7 @@ fun VenuesErrorBanner(onTryAgain: () -> Unit, modifier: Modifier = Modifier) {
       onAction = onTryAgain,
       actionTag = C.Tag.VENUES_TRY_AGAIN,
       modifier = modifier.testTag(C.Tag.VENUES_ERROR_BANNER),
+      actionEnabled = !retrying,
       isError = true,
   )
 }

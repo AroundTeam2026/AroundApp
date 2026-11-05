@@ -48,6 +48,7 @@ private val BANNER_SHADOW = Color(0x296B5947)
  * [action] button.
  *
  * @param onAction Called when the explorer taps the [action] button, tagged [actionTag].
+ * @param actionEnabled Whether the [action] button can be tapped.
  * @param isError Whether something failed: the card is then outlined, and its title and icon are
  *   drawn, in the theme's error colour.
  */
@@ -60,6 +61,7 @@ internal fun MapBanner(
     onAction: () -> Unit,
     actionTag: String,
     modifier: Modifier = Modifier,
+    actionEnabled: Boolean = true,
     isError: Boolean = false,
 ) {
   val colors = MaterialTheme.colorScheme
@@ -105,6 +107,7 @@ internal fun MapBanner(
     Button(
         onAction,
         Modifier.testTag(actionTag).height(BUTTON_HEIGHT),
+        enabled = actionEnabled,
         shape = AroundCorners.InsetField,
         colors =
             ButtonDefaults.buttonColors(

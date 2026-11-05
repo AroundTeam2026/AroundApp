@@ -14,6 +14,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -124,6 +125,34 @@ class MapViewModelVenuesErrorTest {
     runCurrent()
 
     assertTrue(state.venuesFailed)
+    assertFalse(state.retryingVenues)
+    assertEquals(2, venueRepository.requests)
+  }
+
+  @Test
+  fun aRetryWaitsForTheVenuesToAnswer() = test {
+    venueRepository.failing = true
+    showing()
+
+    venueRepository.answering = false
+    viewModel.onRetryVenues()
+    runCurrent()
+
+    assertTrue(state.retryingVenues)
+    assertTrue(state.venuesFailed)
+  }
+
+  @Test
+  fun aSecondTapWhileRetryingDoesNotListenAgain() = test {
+    venueRepository.failing = true
+    showing()
+
+    venueRepository.answering = false
+    viewModel.onRetryVenues()
+    runCurrent()
+    viewModel.onRetryVenues()
+    runCurrent()
+
     assertEquals(2, venueRepository.requests)
   }
 
@@ -159,18 +188,23 @@ class MapViewModelVenuesErrorTest {
 
 /**
  * Serves [venues] like [FakeVenueRepository] while [failing] is false; while it is true, each new
- * request fails. Counts the [requests].
+ * request fails. Without [answering], each new request waits forever. Counts the [requests].
  */
 internal class FlakyVenueRepository(
     venues: List<Venue>,
     private val delegate: FakeVenueRepository = FakeVenueRepository(venues),
 ) : VenueRepository by delegate {
   var failing = false
+  var answering = true
   var requests = 0
     private set
 
   override fun observeVenues(venueIds: Set<String>): Flow<List<Venue>> {
     requests++
-    return if (failing) flow { throw IOException("offline") } else delegate.observeVenues(venueIds)
+    return when {
+      !answering -> flow { awaitCancellation() }
+      failing -> flow { throw IOException("offline") }
+      else -> delegate.observeVenues(venueIds)
+    }
   }
 }
