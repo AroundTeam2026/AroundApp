@@ -43,6 +43,16 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
+/** Why the last photo couldn't be used, which the box says under its buttons. */
+internal enum class ProofPhotoError {
+  /** The phone has no app that takes photos. */
+  NO_CAMERA,
+  /** The taken or picked photo couldn't be read as an image. */
+  UNREADABLE,
+  /** Even shrunk, the photo is too big to upload. */
+  TOO_BIG,
+}
+
 /**
  * The proof photo box of a photo quest, as the Figma "Photo" box of `S4 · Submit proof`. Before a
  * photo: the camera icon, what to do at [venueName], and "Take photo" above "Choose from gallery";
@@ -54,6 +64,8 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
  *
  * @param preview The picked photo, scaled for the screen, or null while it loads; the box then
  *   shows its background colour.
+ * @param error Why the last photo failed, said under the buttons, or null.
+ * @param enabled False while a photo is being prepared, which locks the buttons.
  */
 @Composable
 internal fun ProofPhotoBox(
@@ -66,14 +78,18 @@ internal fun ProofPhotoBox(
     onOpenSettings: () -> Unit,
     onRetake: () -> Unit,
     modifier: Modifier = Modifier,
+    error: ProofPhotoError? = null,
+    enabled: Boolean = true,
 ) {
   val box = modifier.fillMaxWidth().clip(BOX_SHAPE).testTag(C.Tag.PROOF_PHOTO)
   if (picked) {
-    PickedPhoto(preview, onRetake, box)
+    PickedPhoto(preview, enabled, onRetake, box)
   } else {
     Choices(
         venueName,
         cameraRefused,
+        error,
+        enabled,
         onTakePhoto,
         onChooseFromGallery,
         onOpenSettings,
@@ -86,6 +102,7 @@ internal fun ProofPhotoBox(
 @Composable
 private fun PickedPhoto(
     preview: ImageBitmap?,
+    enabled: Boolean,
     onRetake: () -> Unit,
     modifier: Modifier,
 ) {
@@ -106,7 +123,7 @@ private fun PickedPhoto(
             .testTag(C.Tag.PROOF_PHOTO_RETAKE)
             .clip(AroundPillShape)
             .background(colors.surface)
-            .clickable(role = Role.Button, onClick = onRetake)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onRetake)
             .padding(horizontal = AroundSpacing.InsetPadding, vertical = AroundSpacing.Small),
         color = colors.onSurface,
         style = AroundTextStyles.Helper,
@@ -116,12 +133,14 @@ private fun PickedPhoto(
 
 /**
  * Before a photo: the camera icon, what to do, and "Take photo" (or "Open settings" after a refused
- * camera) above "Choose from gallery".
+ * camera) above "Choose from gallery", then the [error] if the last photo failed.
  */
 @Composable
 private fun Choices(
     venueName: String,
     cameraRefused: Boolean,
+    error: ProofPhotoError?,
+    enabled: Boolean,
     onTakePhoto: () -> Unit,
     onChooseFromGallery: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -161,6 +180,7 @@ private fun Choices(
     Spacer(Modifier.height(BUTTONS_EXTRA_GAP))
     Button(
         onClick = if (cameraRefused) onOpenSettings else onTakePhoto,
+        enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         modifier =
             Modifier.fillMaxWidth()
@@ -178,6 +198,7 @@ private fun Choices(
     }
     OutlinedButton(
         onClick = onChooseFromGallery,
+        enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(OUTLINE_WIDTH, colors.primary),
         colors =
@@ -188,6 +209,21 @@ private fun Choices(
         modifier = Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.PROOF_PHOTO_GALLERY),
     ) {
       Text(stringResource(R.string.proof_photo_gallery), style = AroundTextStyles.Button)
+    }
+    if (error != null) {
+      Text(
+          stringResource(
+              when (error) {
+                ProofPhotoError.NO_CAMERA -> R.string.proof_photo_no_camera
+                ProofPhotoError.UNREADABLE -> R.string.proof_photo_unreadable
+                ProofPhotoError.TOO_BIG -> R.string.proof_photo_too_big
+              }
+          ),
+          Modifier.testTag(C.Tag.PROOF_PHOTO_ERROR),
+          color = colors.error,
+          style = AroundTextStyles.Caption,
+          textAlign = TextAlign.Center,
+      )
     }
   }
 }
@@ -214,6 +250,18 @@ private fun ProofPhotoBoxPreview() {
       listOf(false to false, false to true, true to false).forEach { (picked, refused) ->
         ProofPhotoBox("Café Lumière", picked, null, refused, {}, {}, {}, {})
       }
+      // A photo that failed
+      ProofPhotoBox(
+          "Café Lumière",
+          picked = false,
+          preview = null,
+          cameraRefused = false,
+          onTakePhoto = {},
+          onChooseFromGallery = {},
+          onOpenSettings = {},
+          onRetake = {},
+          error = ProofPhotoError.TOO_BIG,
+      )
     }
   }
 }

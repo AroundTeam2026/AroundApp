@@ -64,17 +64,14 @@ private val DOT_SIZE = 6.dp
 private val SHOWN_DOT_WIDTH = 18.dp
 
 /**
- * The quests near the explorer, one per page, in the order of [quests]: each page shows its venue's
- * avatar, the quest's title, the venue's name and the quest card's chips. A counter says which page
- * is shown and how the quests are ordered, and up to five dots mark it.
+ * The quests near the explorer, one per page in the order of [quests], with a counter and up to
+ * five dots marking the shown page.
  *
- * The explorer swipes between pages, or pages with the arrows, which wrap around from the last
- * quest to the first and back. When [quests] change, the shown quest stays shown wherever it moved;
- * if it is gone, the quest now in its place is shown, or the last one when the list got shorter.
- * Quests arriving after the list emptied start again from the first.
- *
- * Without [locationOn], a hint asks for the location, which orders the quests closest first. With
- * no quests, an empty state stands in for the pages.
+ * The explorer swipes or uses the arrows, which wrap around. When [quests] change, the shown quest
+ * stays shown wherever it moved; if it is gone, the one now in its place shows, or the last one
+ * when the list got shorter, and quests arriving after it emptied start from the first. Without
+ * [locationOn], a hint asks for the location, which orders the quests closest first; with no
+ * quests, an empty state replaces the pages.
  *
  * @param quests The quests to page through, already ordered.
  * @param locationOn Whether the explorer's location is on, so [quests] are ordered closest first
@@ -310,6 +307,7 @@ private fun QuestPage(quest: NearbyQuest, style: MarkerStyle, onClick: () -> Uni
           quest.minPartySize,
           quest.distanceMeters,
           style.chipStyle,
+          quest.exactPartySize,
           // Figma sets the chips a little further below the venue's name than the lines' gap
           Modifier.padding(top = AroundSpacing.ExtraSmall),
       )

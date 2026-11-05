@@ -151,7 +151,8 @@ private fun Rows(
           onClick = { onOpenVenue(row.venueId) },
           clock = clock,
           cancelStatus = state.cancelStatusOf(row.reservationId),
-          onCancel = { onCancel(row.reservationId) },
+          // Once the proof is sent, the quest is done on the explorer's side
+          onCancel = if (row.status.cancellable) ({ onCancel(row.reservationId) }) else null,
       )
     }
   }

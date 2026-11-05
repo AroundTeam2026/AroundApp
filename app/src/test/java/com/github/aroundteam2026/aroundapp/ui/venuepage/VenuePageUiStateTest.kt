@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -91,6 +92,48 @@ class VenuePageUiStateTest {
   }
 
   @Test
+  fun closingTheDetailsGivesBackTheEarlierPick() {
+    val closed = loaded.withQuestTapped("a").withQuestDetails("b").withoutQuestDetails()
+
+    assertEquals("a", closed.selectedQuestId)
+    assertNull(closed.detailQuestId)
+    assertNull(closed.pickBeforeDetails)
+  }
+
+  @Test
+  fun closingTheDetailsPicksNothingWithoutAnEarlierPick() {
+    assertNull(loaded.withQuestDetails("b").withoutQuestDetails().selectedQuestId)
+  }
+
+  @Test
+  fun closingDetailsThatAreNotOpenChangesNothing() {
+    val picked = loaded.withQuestTapped("a")
+    assertSame(picked, picked.withoutQuestDetails())
+  }
+
+  @Test
+  fun detailsThatLeaveTheListGiveBackTheEarlierPick() {
+    val left = loaded.withQuestTapped("a").withQuestDetails("b").withQuests(listOf(quest("a")))
+
+    assertEquals("a", left.selectedQuestId)
+    assertNull(left.detailQuestId)
+    assertNull(left.pickBeforeDetails)
+  }
+
+  @Test
+  fun anEarlierPickThatLeftTheListIsNotGivenBack() {
+    val closed =
+        loaded
+            .withQuestTapped("a")
+            .withQuestDetails("b")
+            .withQuests(listOf(quest("b")))
+            .withQuests(listOf(quest("a"), quest("b")))
+            .withoutQuestDetails()
+
+    assertNull(closed.selectedQuestId)
+  }
+
+  @Test
   fun openingAListedQuestsDetailsShowsThem() {
     val open = loaded.withQuestDetails("b")
 
@@ -99,8 +142,66 @@ class VenuePageUiStateTest {
   }
 
   @Test
-  fun openingTheDetailsDoesNotPickTheQuest() {
-    assertNull(loaded.withQuestDetails("a").selectedQuestId)
+  fun openingTheDetailsPicksTheQuestSoThatItCanBeAccepted() {
+    assertEquals("a", loaded.withQuestDetails("a").selectedQuestId)
+  }
+
+  @Test
+  fun onlyTheReservationOfThePickedQuestCanBeCancelled() {
+    val booked = loaded.copy(reservationIds = mapOf("a" to "r"))
+
+    assertNull(booked.cancellableReservationId)
+    assertEquals("r", booked.withQuestTapped("a").cancellableReservationId)
+    assertNull(booked.withQuestTapped("b").cancellableReservationId)
+  }
+
+  @Test
+  fun nothingCanBeCancelledWhileTheReservationsCantBeRead() {
+    val booked = loaded.copy(reservationIds = mapOf("a" to "r"), selectedQuestId = "a")
+
+    assertNull(booked.copy(acceptAvailable = false).cancellableReservationId)
+  }
+
+  @Test
+  fun onlyAnApprovedReservationOfThePickedQuestCanBeCompleted() {
+    val booked = loaded.copy(reservationIds = mapOf("a" to "r"), selectedQuestId = "a")
+
+    assertNull(booked.completableReservationId)
+    assertEquals("r", booked.copy(approvedIds = setOf("r")).completableReservationId)
+    assertNull(
+        booked.copy(approvedIds = setOf("r"), selectedQuestId = "b").completableReservationId
+    )
+  }
+
+  @Test
+  fun nothingCanBeCompletedWhileTheReservationsCantBeRead() {
+    val approved =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            approvedIds = setOf("r"),
+        )
+
+    assertNull(approved.copy(acceptAvailable = false).completableReservationId)
+  }
+
+  @Test
+  fun cancelStatusFollowsThePickedQuestsReservation() {
+    val picked = loaded.copy(selectedQuestId = "a", reservationIds = mapOf("a" to "r"))
+
+    assertEquals(CancelStatus.NONE, picked.cancelStatus)
+    assertEquals(
+        CancelStatus.CANCELLING,
+        picked.copy(cancellingIds = setOf("r")).cancelStatus,
+    )
+    assertEquals(
+        CancelStatus.FAILED,
+        picked.copy(failedCancelIds = setOf("r")).cancelStatus,
+    )
+    assertEquals(
+        CancelStatus.NONE,
+        picked.copy(cancellingIds = setOf("other")).cancelStatus,
+    )
   }
 
   @Test

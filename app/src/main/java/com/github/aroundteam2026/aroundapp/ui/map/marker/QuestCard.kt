@@ -75,7 +75,13 @@ private fun CardText(pin: VenuePin, style: MarkerStyle) {
   val typography = style.typography
   QuestLine(quest.title, C.Tag.QUEST_CARD_TITLE, typography.questTitle, colors.onSurface, 2)
   QuestLine(pin.venueName, C.Tag.QUEST_CARD_VENUE, typography.venueName, colors.onSurfaceVariant)
-  QuestChips(quest.reward, quest.minPartySize, pin.distanceMeters, style.chipStyle)
+  QuestChips(
+      quest.reward,
+      quest.minPartySize,
+      pin.distanceMeters,
+      style.chipStyle,
+      exactPartySize = quest.exactPartySize,
+  )
   if (pin.otherQuestCount > 0) {
     QuestLine(
         pluralStringResource(

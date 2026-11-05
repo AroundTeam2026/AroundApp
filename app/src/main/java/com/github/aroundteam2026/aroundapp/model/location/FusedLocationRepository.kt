@@ -1,11 +1,13 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.location
 
 import android.annotation.SuppressLint
 import android.content.Context
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -45,6 +47,28 @@ class FusedLocationRepository(
       null
     } catch (e: SecurityException) {
       // The permission was revoked after the check above
+      null
+    }
+  }
+
+  // Fine permission is checked here; a caller may still revoke it before Play services responds.
+  @SuppressLint("MissingPermission")
+  @OptIn(ExperimentalCoroutinesApi::class)
+  override suspend fun currentPreciseLocation(): Location? {
+    if (!LocationPermissions.isPreciseGranted(appContext)) return null
+    val cancellation = CancellationTokenSource()
+    val request =
+        CurrentLocationRequest.Builder()
+            .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+            .setMaxUpdateAgeMillis(0)
+            .build()
+    return try {
+      client.getCurrentLocation(request, cancellation.token).await(cancellation)?.let {
+        Location(it.latitude, it.longitude)
+      }
+    } catch (e: ApiException) {
+      null
+    } catch (e: SecurityException) {
       null
     }
   }

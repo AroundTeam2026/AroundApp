@@ -63,6 +63,7 @@ class NearbyQuestPagerTest {
       venueName: String = "Venue $id",
       reward: Reward? = null,
       minPartySize: Int = 1,
+      exactPartySize: Boolean = false,
       distanceMeters: Double? = null,
   ) =
       NearbyQuest(
@@ -73,6 +74,7 @@ class NearbyQuestPagerTest {
           title = title,
           reward = reward,
           minPartySize = minPartySize,
+          exactPartySize = exactPartySize,
           distanceMeters = distanceMeters,
       )
 
@@ -167,6 +169,14 @@ class NearbyQuestPagerTest {
         .assertTextEquals(context.getString(R.string.map_card_party_size, 3))
     node(C.Tag.QUEST_CHIP_DISTANCE)
         .assertTextEquals(context.getString(R.string.map_card_distance_meters, "120"))
+  }
+
+  @Test
+  fun anExactQuestsChipHasNoPlus() {
+    show(listOf(row("fox", minPartySize = 3, exactPartySize = true)))
+
+    node(C.Tag.QUEST_CHIP_PARTY)
+        .assertTextEquals(context.getString(R.string.map_card_exact_party_size, 3))
   }
 
   @Test

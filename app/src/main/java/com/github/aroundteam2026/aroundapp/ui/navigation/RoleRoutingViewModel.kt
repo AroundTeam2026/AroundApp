@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> (KDoc reformatting)
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import android.util.Log
@@ -27,8 +28,10 @@ import kotlinx.coroutines.flow.update
 
 /** Access is resolved from the authenticated account and its saved profile role. */
 sealed interface RoleSessionState {
+  /** The session and role are still being resolved. */
   data object Checking : RoleSessionState
 
+  /** No user is signed in. */
   data object SignedOut : RoleSessionState
 
   /** A missing profile or unset role requires role selection. */
