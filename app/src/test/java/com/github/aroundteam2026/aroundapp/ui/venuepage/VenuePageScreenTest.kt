@@ -306,8 +306,8 @@ class VenuePageScreenTest {
         )
     )
 
-    compose.onNodeWithTag(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     assertEquals(1, cancels)
   }

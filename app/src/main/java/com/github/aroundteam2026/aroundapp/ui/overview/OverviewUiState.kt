@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
 /**
@@ -26,16 +27,6 @@ data class OverviewUiState(
         in failedCancelIds -> CancelStatus.FAILED
         else -> CancelStatus.NONE
       }
-}
-
-/** How cancelling a row's reservation stands. */
-enum class CancelStatus {
-  /** Not cancelled, and not being cancelled. */
-  NONE,
-  /** The cancel is being written. */
-  CANCELLING,
-  /** The last try failed; cancelling again retries. */
-  FAILED,
 }
 
 /**

@@ -44,12 +44,12 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.overview.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.overview.slotFormat
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
+import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
-import com.github.aroundteam2026.aroundapp.ui.quest.create.StillRadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape

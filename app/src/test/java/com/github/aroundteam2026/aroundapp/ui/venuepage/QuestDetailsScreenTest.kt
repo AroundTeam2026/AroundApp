@@ -282,7 +282,7 @@ class QuestDetailsScreenTest {
   fun aQuestNotAcceptedHasNothingToCancel() {
     show()
 
-    node(C.Tag.OVERVIEW_ROW_CANCEL).assertDoesNotExist()
+    node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
   }
 
   @Test
@@ -290,11 +290,11 @@ class QuestDetailsScreenTest {
     val quest = quest()
     show(quest, accepted(quest))
 
-    node(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertIsDisplayed()
     compose.onNodeWithText("Keep it").performClick()
 
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
     assertEquals(0, cancels)
   }
 
@@ -303,13 +303,13 @@ class QuestDetailsScreenTest {
     val quest = quest()
     show(quest, accepted(quest))
 
-    node(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
+    node(C.Tag.CANCEL_RESERVATION).performClick()
     compose
         .onNodeWithText(
             "Café Lumen will see it cancelled. To go after all, accept the quest again."
         )
         .assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     assertEquals(1, cancels)
   }
@@ -319,7 +319,7 @@ class QuestDetailsScreenTest {
     val quest = quest()
     show(quest, accepted(quest).copy(cancellingIds = setOf("r")))
 
-    node(C.Tag.OVERVIEW_ROW_CANCEL).assertIsNotEnabled()
+    node(C.Tag.CANCEL_RESERVATION).assertIsNotEnabled()
     compose.onNodeWithText("Cancelling…").assertExists()
   }
 
@@ -328,11 +328,11 @@ class QuestDetailsScreenTest {
     val quest = quest()
     show(quest, accepted(quest).copy(failedCancelIds = setOf("r")))
 
-    node(C.Tag.OVERVIEW_ROW_CANCEL_FAILED).assertIsDisplayed()
-    node(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
+    node(C.Tag.CANCEL_RESERVATION_FAILED).assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).performClick()
 
     assertEquals(1, cancels)
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
   }
 
   @Test

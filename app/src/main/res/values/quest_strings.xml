@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- Cancelling a reservation, from the overview's rows and the venue page's quest details -->
+    <string name="cancel_reservation">Cancel reservation</string>
+    <string name="cancel_reservation_cancelling">Cancelling…</string>
+    <string name="cancel_reservation_retry">Try again</string>
+    <string name="cancel_reservation_failed">Couldn\'t cancel this reservation.</string>
+    <!-- Asked before cancelling, which can't be undone; the argument is the venue's name -->
+    <string name="cancel_reservation_title">Cancel this reservation?</string>
+    <string name="cancel_reservation_text">%1$s will see it cancelled. To go after all, accept the quest again.</string>
+    <string name="cancel_reservation_confirm">Cancel reservation</string>
+    <string name="cancel_reservation_keep">Keep it</string>
+</resources>
