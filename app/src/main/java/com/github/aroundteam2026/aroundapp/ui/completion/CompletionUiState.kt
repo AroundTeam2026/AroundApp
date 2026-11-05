@@ -27,6 +27,7 @@ data class CompletionUiState(
     val answer: String = "",
     val photo: Uri? = null,
     val saveState: SaveState = SaveState.Idle,
+    val requirements: String = "",
     val locationError: CompletionLocationError? = null,
 ) {
   /** Whether the form can still be changed: the quest is ready and nothing is saving or saved. */

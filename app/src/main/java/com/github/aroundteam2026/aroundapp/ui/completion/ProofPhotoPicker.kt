@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.Manifest
@@ -56,6 +57,7 @@ fun ProofPhotoPicker(
     onRetake: () -> Unit,
     modifier: Modifier = Modifier,
     photos: ProofPhotos = rememberProofPhotos(),
+    enabled: Boolean = true,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -133,7 +135,7 @@ fun ProofPhotoPicker(
       preview = preview,
       cameraRefused = cameraRefused,
       error = error,
-      enabled = !shrinking,
+      enabled = enabled && !shrinking,
       onTakePhoto = {
         error = null
         if (cameraAllowed(context)) openCamera()

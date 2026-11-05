@@ -158,9 +158,20 @@ class CompletionViewModelTest {
 
     assertEquals(CompletionFormStatus.READY, state.status)
     assertEquals("Find the fox", state.questTitle)
+    assertEquals(quests.getQuest("fox")!!.requirements, state.requirements)
     assertEquals(ProofType.TEXT, state.proofType)
     assertEquals("", state.answer)
     assertEquals(SaveState.Idle, state.saveState)
+  }
+
+  @Test
+  fun retakingAPhotoClearsItAndRequiresAnotherProof() = test {
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    assertTrue(state.canSubmit)
+    viewModel.pickPhoto(null)
+    assertEquals(null, state.photo)
+    assertFalse(state.canSubmit)
   }
 
   @Test

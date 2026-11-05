@@ -249,6 +249,12 @@ object C {
     const val CREATE_QUEST_REWARD_EXPIRY_ERROR = "create_quest_reward_expiry_error"
     const val CREATE_QUEST_REWARD_EXPIRY_CONFIRM = "create_quest_reward_expiry_confirm"
 
+    // Quest completion screen
+    const val COMPLETION_SCREEN = "completion_screen"
+    const val COMPLETION_SUBMIT = "completion_submit"
+    const val COMPLETION_ANSWER = "completion_answer"
+    const val COMPLETION_SAVE_ERROR = "completion_save_error"
+
     // Proof photo picker
     const val PROOF_PHOTO = "proof_photo"
     const val PROOF_PHOTO_IMAGE = "proof_photo_image"

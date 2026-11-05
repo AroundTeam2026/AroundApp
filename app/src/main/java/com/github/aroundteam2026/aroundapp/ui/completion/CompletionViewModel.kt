@@ -79,7 +79,7 @@ class CompletionViewModel(
   }
 
   /** Called when the explorer takes or picks [photo]; ignored once the form is locked. */
-  fun pickPhoto(photo: Uri) {
+  fun pickPhoto(photo: Uri?) {
     mutableUiState.update { if (it.isEditable) it.copy(photo = photo) else it }
   }
 
@@ -217,6 +217,7 @@ class CompletionViewModel(
                     status = CompletionFormStatus.READY,
                     questTitle = quest.title,
                     proofType = quest.proofType,
+                    requirements = quest.requirements,
                 )
               }
             }
