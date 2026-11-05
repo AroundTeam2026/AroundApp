@@ -14,8 +14,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
  *   too.
  * @property partySize How many explorers the reservation's party has; 0 if it can't be read.
  * @property sentAt When the proof was sent, in epoch milliseconds.
- * @property questTitle Title of the quest, or null if the venue deleted it or the reservation can't
- *   be read.
+ * @property questTitle Title of the quest, or null if the venue deleted it, or the quest or the
+ *   reservation can't be read.
  * @property requirements What the quest asks the explorers to do, or null like [questTitle].
  * @property reward What approving gives the party, or null if the quest has no reward or is
  *   unknown.
@@ -43,9 +43,16 @@ data class ReviewProofUiState(
     val saving: Boolean = false,
     val updateFailed: Boolean = false,
 ) {
-  /** Whether Approve and Reject can be tapped: the proof is shown, pending, and not saving. */
-  val canAnswer: Boolean
+  /** Whether Reject can be tapped: the proof is shown, pending, and not saving. */
+  val canReject: Boolean
     get() = status == ReviewProofStatus.LOADED && !reviewed && !saving
+
+  /**
+   * Whether Approve can be tapped: as [canReject], and a photo proof's photo is shown. An approval
+   * is final and gives the reward, so the venue must have seen what it approves.
+   */
+  val canApprove: Boolean
+    get() = canReject && (proof !is Proof.Photo || photo is ProofPhoto.Loaded)
 }
 
 /** Where the Review proof screen stands. */

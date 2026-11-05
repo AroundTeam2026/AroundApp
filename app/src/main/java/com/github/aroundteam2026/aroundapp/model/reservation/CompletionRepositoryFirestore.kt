@@ -22,17 +22,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * [CompletionRepository] backed by the Firestore `completions` collection.
  *
- * Firestore types stay inside this class. Epoch-millisecond times are stored as `Timestamp`s, the
- * status as its enum name, and the proof as `photoUrl` or `textAnswer`. The completion id is the
- * document id rather than a stored field, and a null `rejectReason` isn't stored. Documents that
- * cannot be mapped back to a [Completion] are logged and skipped: the `observe*` flows leave them
- * out, and [approve] and [reject] treat them as missing.
+ * Documents that cannot be mapped back to a [Completion] are logged and skipped: the `observe*`
+ * flows leave them out, and [approve] and [reject] treat them as missing.
  *
- * The security rules decide who may do what: a joined member of an approved reservation may only
- * create their own pending completion, only the explorer, the party's joined members and the venue
- * read it, and only the venue answers it, which it can change from rejected to approved. A
- * submission the rules refuse within [confirmTimeoutMs] comes back as a failure, and one they
- * refuse later is only logged; a refused answer comes back as a failure.
+ * The security rules let a joined member of an approved reservation create only their own pending
+ * completion, and only the venue answer it. A submission refused within [confirmTimeoutMs] comes
+ * back as a failure, and one refused later is only logged.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it
@@ -49,15 +44,12 @@ class CompletionRepositoryFirestore(
 
   /**
    * Writes the completion under its [completionId] and waits up to [confirmTimeoutMs] for the
-   * server's answer. A plain write works offline, which a transaction wouldn't, so it doesn't read
-   * first: the rules refuse a second submission instead, as an update nobody may make, and only
-   * then does it read the document to tell that refusal apart from the others.
+   * server's answer.
    *
-   * A refusal in that time is returned as the Firestore exception (`PERMISSION_DENIED`), or as an
-   * [IllegalStateException] if the completion was already there, and Firestore drops its local
-   * copy. Without an answer in time, e.g. while offline, it returns success: Firestore sends the
-   * write once the device is back online, and a refusal then is only logged. Exceptions thrown
-   * while issuing the write (e.g. on a terminated client) are returned as a failure too.
+   * A refusal in that time is returned as the Firestore exception, or as an [IllegalStateException]
+   * if the completion was already there. Without an answer in time, e.g. while offline, it returns
+   * success and a later refusal is only logged. Errors while issuing the write are returned as a
+   * failure too.
    */
   override suspend fun submit(
       reservationId: String,
@@ -67,6 +59,9 @@ class CompletionRepositoryFirestore(
   ): Result<String> =
       try {
         val document = completions.document(completionId(reservationId, explorerUid))
+        // A plain write, unlike a transaction, works offline, so it doesn't read first: the rules
+        // refuse a second submission as an update, and only then is the document read to tell
+        // that refusal apart from the others
         val write =
             document.set(
                 mapOf(
@@ -130,14 +125,14 @@ class CompletionRepositoryFirestore(
 
   /**
    * Reads the completion and writes the venue's answer in one transaction, so the transition is
-   * checked against the status that is actually stored. A null [rejectReason] deletes the stored
-   * one, as an approval of a rejected completion must. Only [status] and [rejectReason] are
-   * written, which is all the rules let the venue change. Needs a connection: a transaction fails
-   * while the device is offline.
+   * checked against the stored status.
    *
-   * Fails with [NoSuchElementException] if the completion is missing or malformed, with
-   * [IllegalStateException] if [canTransition] forbids the change, and with the Firestore exception
-   * if the rules refuse it, which they do for everyone but its venue.
+   * Only [status] and [rejectReason] are written, which is all the rules let the venue change; a
+   * null [rejectReason] deletes the stored one. Needs a connection, as a transaction fails offline.
+   *
+   * Fails with [NoSuchElementException] if the completion is missing or malformed,
+   * [IllegalStateException] if [canTransition] forbids the change, and the Firestore exception if
+   * the rules refuse it.
    */
   private suspend fun answer(
       id: String,

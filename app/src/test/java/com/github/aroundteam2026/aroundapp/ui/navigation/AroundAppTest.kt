@@ -75,7 +75,9 @@ class AroundAppTest {
         onSignOut = {},
         navController = navController,
         screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
-        venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+        venuePage = { venueId, onBack, onSubmitProof ->
+          VenuePageOnFakes(venueId, onBack, onSubmitProof)
+        },
     )
   }
 
@@ -166,7 +168,9 @@ class AroundAppTest {
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+          venuePage = { venueId, onBack, onSubmitProof ->
+            VenuePageOnFakes(venueId, onBack, onSubmitProof)
+          },
           overview = { onOpenVenue ->
             OverviewContent(
                 OverviewUiState(OverviewStatus.LOADED, listOf(overviewRow())),

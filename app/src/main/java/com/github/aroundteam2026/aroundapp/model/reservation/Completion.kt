@@ -94,6 +94,9 @@ enum class CompletionStatus {
  */
 fun completionId(reservationId: String, explorerUid: String) = "${reservationId}_$explorerUid"
 
+/** The longest reason a venue can give for rejecting a proof: the security rules refuse longer. */
+const val MAX_REJECT_REASON_LENGTH = 300
+
 /**
  * Whether a completion may change from [from] to [to]: a pending one can be answered, and a venue
  * that changes its mind can approve one it rejected.

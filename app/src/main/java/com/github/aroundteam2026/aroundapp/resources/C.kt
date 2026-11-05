@@ -4,8 +4,9 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.resources
 
-// Like R, but C
+/** App-wide constants, named like `R`. */
 object C {
+  /** Test tags that UI tests use to find composables. */
   object Tag {
     const val ROLE_PROFILE_ERROR = "role_profile_error"
     const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
@@ -121,6 +122,7 @@ object C {
     const val VENUE_PAGE_QUEST_COUNT = "venue_page_quest_count"
     const val ACCEPT_QUEST_BAR = "accept_quest_bar"
     const val ACCEPT_QUEST_BUTTON = "accept_quest_button"
+    const val SUBMIT_PROOF_BUTTON = "submit_proof_button"
     const val ACCEPT_QUEST_NEEDS_MORE = "accept_quest_needs_more"
     const val ACCEPT_QUEST_FAILED = "accept_quest_failed"
     const val ACCEPT_QUEST_UNAVAILABLE = "accept_quest_unavailable"
@@ -128,13 +130,22 @@ object C {
     const val VENUE_QUEST_ROW_TITLE = "venue_quest_row_title"
     const val VENUE_QUEST_ROW_DESCRIPTION = "venue_quest_row_description"
     const val VENUE_QUEST_ROW_DETAILS = "venue_quest_row_details"
-    const val QUEST_DETAIL_SHEET = "quest_detail_sheet"
+    const val QUEST_DETAIL_SCREEN = "quest_detail_screen"
     const val QUEST_DETAIL_TITLE = "quest_detail_title"
-    const val QUEST_DETAIL_CLOSE = "quest_detail_close"
+    const val QUEST_DETAIL_VENUE_NAME = "quest_detail_venue_name"
+    const val QUEST_DETAIL_VENUE_ADDRESS = "quest_detail_venue_address"
     const val QUEST_DETAIL_DESCRIPTION = "quest_detail_description"
     const val QUEST_DETAIL_REQUIREMENTS = "quest_detail_requirements"
     const val QUEST_DETAIL_PROOF = "quest_detail_proof"
     const val QUEST_DETAIL_REWARD_DETAILS = "quest_detail_reward_details"
+    const val QUEST_DETAIL_REWARD_EXPIRY = "quest_detail_reward_expiry"
+    const val QUEST_DETAIL_PARTY_RULE = "quest_detail_party_rule"
+    const val QUEST_DETAIL_PARTY_JOINED = "quest_detail_party_joined"
+    const val QUEST_DETAIL_PARTY_BIGGER = "quest_detail_party_bigger"
+    const val QUEST_DETAIL_SEAT_EMPTY = "quest_detail_seat_empty"
+    const val QUEST_DETAIL_RADIUS = "quest_detail_radius"
+    const val QUEST_DETAIL_RADIUS_MAP = "quest_detail_radius_map"
+    const val QUEST_DETAIL_RADIUS_NOTE = "quest_detail_radius_note"
 
     const val NEARBY_COUNTER = "nearby_counter"
     const val NEARBY_LOCATION_HINT = "nearby_location_hint"
@@ -152,6 +163,8 @@ object C {
     const val NEARBY_FILTERS = "nearby_filters"
     const val LOCATION_BANNER = "location_banner"
     const val LOCATION_TURN_ON = "location_turn_on"
+    const val VENUES_ERROR_BANNER = "venues_error_banner"
+    const val VENUES_TRY_AGAIN = "venues_try_again"
 
     const val CREATE_QUEST_SCREEN = "create_quest_screen"
     const val CREATE_QUEST_CLOSE = "create_quest_close"
@@ -229,11 +242,11 @@ object C {
     const val OVERVIEW_ROW_SLOT = "overview_row_slot"
     const val OVERVIEW_ROW_PARTY = "overview_row_party"
     const val OVERVIEW_ROW_STATUS = "overview_row_status"
-    const val OVERVIEW_ROW_CANCEL = "overview_row_cancel"
-    const val OVERVIEW_ROW_CANCEL_FAILED = "overview_row_cancel_failed"
-    const val OVERVIEW_CANCEL_DIALOG = "overview_cancel_dialog"
-    const val OVERVIEW_CANCEL_CONFIRM = "overview_cancel_confirm"
-    const val OVERVIEW_CANCEL_KEEP = "overview_cancel_keep"
+    const val CANCEL_RESERVATION = "cancel_reservation"
+    const val CANCEL_RESERVATION_FAILED = "cancel_reservation_failed"
+    const val CANCEL_RESERVATION_DIALOG = "cancel_reservation_dialog"
+    const val CANCEL_RESERVATION_CONFIRM = "cancel_reservation_confirm"
+    const val CANCEL_RESERVATION_KEEP = "cancel_reservation_keep"
     const val CREATE_QUEST_REWARD_NONE = "create_quest_reward_none"
     const val CREATE_QUEST_REWARD_DISCOUNT = "create_quest_reward_discount"
     const val CREATE_QUEST_REWARD_AMOUNT = "create_quest_reward_amount"

@@ -25,6 +25,7 @@ class NearbyFiltersTest {
           title = "Find the hidden fox",
           reward = reward,
           minPartySize = 1,
+          exactPartySize = false,
           distanceMeters = distanceMeters,
       )
 

@@ -144,15 +144,13 @@ object AddressSearchDefaults {
 }
 
 /**
- * Where a venue searches its address: a rounded field showing [query], then a card listing
- * [state]'s suggestions, or a message saying it is searching or why there are none. Nothing shows
- * under the field while there is nothing to say. When the bar has less height than the card needs,
- * as above the keyboard, the card scrolls.
+ * Where a venue searches its address: a rounded field showing [query], then a card with [state]'s
+ * suggestions or why there are none.
  *
- * Typing reports each change to [onQueryChange]; the keyboard's search key calls [onSearch]; the
- * clear button, shown once there is a query, calls [onClear]. Tapping a suggestion calls [onPick]
- * and hides the keyboard. While a search runs, the suggestions from the previous query stay in view
- * but can't be picked, as they may not match the query anymore.
+ * Nothing shows under the field while there is nothing to say, and the card scrolls when the bar is
+ * short, as above the keyboard. Typing calls [onQueryChange], the search key [onSearch], and the
+ * clear button [onClear]. Tapping a suggestion calls [onPick] and hides the keyboard. While a
+ * search runs, the previous suggestions stay in view but can't be picked.
  */
 @Composable
 fun AddressSearchBar(

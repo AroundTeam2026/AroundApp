@@ -2,8 +2,11 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
 /**
@@ -16,30 +19,44 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property venueName The venue's name, shown in the header.
  * @property avatar What the header shows for the venue, or null until the venue is loaded.
  * @property address The venue's street address, or null if it gave none.
+ * @property venueLocation Where the venue is, or null until it confirms its marker on the map.
  * @property quests The venue's valid quests, in the order the page lists them.
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
- * @property detailQuestId Id of the quest whose details are open in a sheet, or null when none is.
+ * @property detailQuestId Id of the quest whose details are open, or null when none is.
+ * @property pickBeforeDetails What closing the details picks: the pick from before they opened, or
+ *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
  *   its party has. A pending or approved reservation counts; a rejected or cancelled one does not.
+ * @property reservationIds For each quest in [acceptedParties], the id of its reservation.
  * @property acceptingQuestIds Ids of the quests being accepted right now.
  * @property failedQuestIds Ids of the quests whose last accept failed: the write could not be
  *   issued, or the server refused it afterwards.
+ * @property cancellingIds Ids of the reservations being cancelled right now.
+ * @property failedCancelIds Ids of the reservations whose last cancel failed.
  * @property acceptAvailable False once the explorer's reservations can't be read, since then the
  *   page can't tell what they accepted and so doesn't book anything.
+ * @property approvedIds Ids of the explorer's reservations the venue approved, whose quest they can
+ *   now complete.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
     val venueName: String = "",
     val avatar: VenueAvatar? = null,
     val address: String? = null,
+    val venueLocation: Location? = null,
     val quests: List<VenuePageQuest> = emptyList(),
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
+    val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
+    val reservationIds: Map<String, String> = emptyMap(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
+    val cancellingIds: Set<String> = emptySet(),
+    val failedCancelIds: Set<String> = emptySet(),
     val acceptAvailable: Boolean = true,
+    val approvedIds: Set<String> = emptySet(),
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -62,6 +79,29 @@ data class VenuePageUiState(
     }
 
   /**
+   * The reservation the explorer can cancel for the picked quest, or null when there is none. While
+   * the reservations can't be read it is null too, since the page can't tell if it still stands.
+   */
+  val cancellableReservationId: String?
+    get() = selectedQuestId?.takeIf { acceptAvailable }?.let(reservationIds::get)
+
+  /**
+   * The reservation whose quest the explorer can complete, for the picked quest: the one they can
+   * cancel, once the venue approved it. Null otherwise.
+   */
+  val completableReservationId: String?
+    get() = cancellableReservationId?.takeIf { it in approvedIds }
+
+  /** How cancelling the picked quest's reservation stands; [CancelStatus.NONE] when none is. */
+  val cancelStatus: CancelStatus
+    get() =
+        when (selectedQuestId?.let(reservationIds::get)) {
+          in cancellingIds -> CancelStatus.CANCELLING
+          in failedCancelIds -> CancelStatus.FAILED
+          else -> CancelStatus.NONE
+        }
+
+  /**
    * How many more people the picked quest needs: its minimum party size less the party's size,
    * never below 0. Until the quest is accepted the party is the explorer alone. 0 when none is
    * picked.
@@ -76,21 +116,43 @@ data class VenuePageUiState(
   /**
    * This page listing [quests] instead. A picked quest that isn't among them is unpicked, so it
    * isn't picked again if it comes back, as when its venue extends an expired reward; likewise, its
-   * details close.
+   * details close, which gives back the pick from before they opened.
    */
-  fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState =
-      copy(
-          quests = quests,
-          selectedQuestId = selectedQuestId?.takeIf { id -> quests.any { it.questId == id } },
-          detailQuestId = detailQuestId?.takeIf { id -> quests.any { it.questId == id } },
-      )
+  fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState {
+    fun String?.ifListed() = this?.takeIf { id -> quests.any { it.questId == id } }
+    val detailsClosed = detailQuestId != null && detailQuestId.ifListed() == null
+    val pick = if (detailsClosed) pickBeforeDetails else selectedQuestId
+    return copy(
+        quests = quests,
+        selectedQuestId = pick.ifListed(),
+        detailQuestId = detailQuestId.ifListed(),
+        pickBeforeDetails = pickBeforeDetails.ifListed().takeIf { !detailsClosed },
+    )
+  }
 
   /**
-   * This page with the details of the quest [questId] open; a quest it doesn't list changes
-   * nothing.
+   * This page with the details of the quest [questId] open, and that quest picked, since the
+   * details offer to accept it, until [withoutQuestDetails] gives back the earlier pick. A quest it
+   * doesn't list changes nothing.
    */
   fun withQuestDetails(questId: String): VenuePageUiState =
-      if (quests.any { it.questId == questId }) copy(detailQuestId = questId) else this
+      if (quests.any { it.questId == questId }) {
+        copy(
+            detailQuestId = questId,
+            selectedQuestId = questId,
+            pickBeforeDetails = selectedQuestId,
+        )
+      } else {
+        this
+      }
+
+  /** This page with the details closed and the pick from before they opened back. */
+  fun withoutQuestDetails(): VenuePageUiState =
+      if (detailQuestId == null) {
+        this
+      } else {
+        copy(detailQuestId = null, selectedQuestId = pickBeforeDetails, pickBeforeDetails = null)
+      }
 
   /**
    * This page once the explorer tapped the quest [questId]: picked, or unpicked if it was picked. A
@@ -117,7 +179,7 @@ enum class AcceptStatus {
 }
 
 /** The party of an explorer who has not formed one yet: themself. */
-private const val SOLO_PARTY = 1
+internal const val SOLO_PARTY = 1
 
 /** Where the venue page stands. */
 enum class VenuePageStatus {
@@ -141,6 +203,8 @@ enum class VenuePageStatus {
  * @property proofType The kind of proof explorers submit.
  * @property minPartySize How many people the quest needs at least.
  * @property reward The quest's reward, or null when it has none.
+ * @property exactPartySize Whether the party must have exactly [minPartySize] people.
+ * @property radiusMeters How close to the venue explorers must be to send their proof.
  */
 data class VenuePageQuest(
     val questId: String,
@@ -150,4 +214,6 @@ data class VenuePageQuest(
     val proofType: ProofType,
     val minPartySize: Int,
     val reward: Reward?,
+    val exactPartySize: Boolean = false,
+    val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
 )

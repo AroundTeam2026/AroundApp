@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.res.Configuration
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -59,7 +61,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
  * @param quest The quest to draw.
  * @param selected Whether the explorer picked it to accept.
  * @param onClick Picks the quest, or unpicks it if it was picked.
- * @param onDetails Opens the quest's details in a [QuestDetailSheet].
+ * @param onDetails Opens the quest's [QuestDetailsScreen].
  */
 typealias VenuePageQuestRow =
     @Composable
@@ -71,6 +73,8 @@ typealias VenuePageQuestRow =
  *
  * @param viewModel Loads the venue and its quests, and keeps the picked one.
  * @param onBack Called when the explorer taps the back arrow.
+ * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
+ *   venue's name, from the quest's details.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
  *   [AcceptQuestBar] that accepts through [viewModel] unless replaced.
@@ -79,6 +83,7 @@ typealias VenuePageQuestRow =
 fun VenuePageScreen(
     viewModel: VenuePageViewModel,
     onBack: () -> Unit,
+    onSubmitProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
@@ -95,16 +100,20 @@ fun VenuePageScreen(
       onQuestDetails = viewModel::onQuestDetailsOpened,
       onQuestDetailsClosed = viewModel::onQuestDetailsClosed,
       onAccept = viewModel::accept,
+      onCancel = viewModel::cancel,
       modifier = modifier,
       questRow = questRow,
       bottomBar = bottomBar ?: acceptBar,
+      onSubmitProof = { onSubmitProof(it, state.venueName) },
   )
 }
 
 /**
- * Stateless page: the top bar, then what [state] says the page can show, with the details of
- * [VenuePageUiState.detailQuest] in a sheet on top. Under the list sits [bottomBar], or by default
- * an [AcceptQuestBar] whose button calls [onAccept].
+ * Stateless page: the top bar, then what [state] says the page can show. Under the list sits
+ * [bottomBar], or by default an [AcceptQuestBar] whose button calls [onAccept]. While
+ * [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen] takes the page's place, and
+ * [onCancel] cancels the reservation from there, or [onSubmitProof] opens the proof form of an
+ * approved one, given its id.
  */
 @Composable
 fun VenuePageContent(
@@ -116,18 +125,35 @@ fun VenuePageContent(
     onQuestDetails: (questId: String) -> Unit = {},
     onQuestDetailsClosed: () -> Unit = {},
     onAccept: () -> Unit = {},
+    onCancel: () -> Unit = {},
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {
       AcceptQuestBar(state, onAccept)
     },
+    onSubmitProof: (reservationId: String) -> Unit = {},
 ) {
+  // Out here, so that the list is back where it was when the details close
+  val listState = rememberLazyListState()
+  val detailQuest = state.detailQuest?.takeIf { state.status == VenuePageStatus.LOADED }
+  if (detailQuest != null) {
+    QuestDetailsScreen(
+        state,
+        detailQuest,
+        onQuestDetailsClosed,
+        onAccept,
+        onCancel,
+        modifier,
+        onSubmitProof = onSubmitProof,
+    )
+    return
+  }
   Column(
       modifier
           .fillMaxSize()
           .background(MaterialTheme.colorScheme.background)
           .testTag(C.Tag.VENUE_PAGE_SCREEN)
   ) {
-    TopBar(onBack)
+    VenuePageTopBar(onBack)
     when (state.status) {
       VenuePageStatus.LOADING ->
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_PAGE_LOADING)) }
@@ -139,6 +165,7 @@ fun VenuePageContent(
       VenuePageStatus.LOADED -> {
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth().testTag(C.Tag.VENUE_PAGE_QUESTS),
+            state = listState,
             contentPadding = PaddingValues(AroundSpacing.ScreenHorizontal),
             verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
         ) {
@@ -157,27 +184,26 @@ fun VenuePageContent(
           }
         }
         bottomBar(state.selectedQuest)
-        state.detailQuest?.let { quest ->
-          key(quest.questId) { QuestDetailSheet(quest, onQuestDetailsClosed) }
-        }
       }
     }
   }
 }
 
-/** The round back button, on the start side. */
+/** The round back button, on the start side, with the centred [title] when there is one. */
 @Composable
-private fun TopBar(onBack: () -> Unit) {
+internal fun VenuePageTopBar(onBack: () -> Unit, @StringRes title: Int? = null) {
   Box(
       Modifier.fillMaxWidth()
-          .padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.Medium)
+          .padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.Medium),
+      contentAlignment = Alignment.Center,
   ) {
     Surface(
         onClick = onBack,
         shape = AroundPillShape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.size(BACK_SIZE).testTag(C.Tag.VENUE_PAGE_BACK),
+        modifier =
+            Modifier.align(Alignment.CenterStart).size(BACK_SIZE).testTag(C.Tag.VENUE_PAGE_BACK),
     ) {
       Box(contentAlignment = Alignment.Center) {
         Icon(
@@ -186,6 +212,14 @@ private fun TopBar(onBack: () -> Unit) {
             tint = MaterialTheme.colorScheme.onSurface,
         )
       }
+    }
+    title?.let {
+      Text(
+          stringResource(it),
+          Modifier.semantics { heading() },
+          color = MaterialTheme.colorScheme.onSurface,
+          style = AroundTextStyles.CardTitle,
+      )
     }
   }
 }

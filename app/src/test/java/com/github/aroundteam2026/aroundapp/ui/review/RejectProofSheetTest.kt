@@ -6,21 +6,25 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipe
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.R
@@ -50,7 +54,7 @@ class RejectProofSheetTest {
   private val snackbar = SnackbarHostState()
 
   /** Shows the sheet until it is dismissed, as the Review proof screen does. */
-  private fun show(proofType: ProofType = ProofType.PHOTO, explorerName: String? = "yusuf.s") {
+  private fun show(proofType: ProofType = ProofType.PHOTO, explorerName: String? = EXPLORER) {
     var open by mutableStateOf(true)
     compose.setContent {
       AroundAppTheme {
@@ -79,6 +83,33 @@ class RejectProofSheetTest {
 
   private fun confirm() = compose.onNodeWithTag(C.Tag.REJECT_PROOF_CONFIRM)
 
+  /**
+   * Drags the sheet down from its handle: inside the sheet, so only the sheet's own drag sees it. A
+   * swipe from the sheet's top edge would also land on the scrim, and test both guards at once.
+   */
+  private fun dragTheSheetDown() {
+    compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).performTouchInput {
+      swipe(Offset(centerX, top + HANDLE_Y), bottomCenter, durationMillis = 300)
+    }
+    compose.waitForIdle()
+  }
+
+  /** Taps the scrim above the sheet, in the sheet's window. */
+  private fun tapAboveTheSheet() {
+    compose
+        .onNode(isRoot() and hasAnyDescendant(hasTestTag(C.Tag.REJECT_PROOF_SHEET)))
+        .performTouchInput { click(Offset(centerX, top + 10f)) }
+    compose.waitForIdle()
+  }
+
+  /** Picks a reason, rejects, and leaves the rejection saving. */
+  private fun startSaving() {
+    reason(RejectReason.NO_MATCH).performClick()
+    confirm().performClick()
+    saving = true
+    compose.waitForIdle()
+  }
+
   private fun writeNote(note: String) {
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_NOTE).performTextInput(note)
   }
@@ -88,7 +119,7 @@ class RejectProofSheetTest {
     show()
 
     compose.onNodeWithText(string(R.string.reject_proof_title)).assertIsDisplayed()
-    compose.onNodeWithText(string(R.string.reject_proof_body, "yusuf.s")).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.reject_proof_body, EXPLORER)).assertIsDisplayed()
     confirm().assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_NEEDS_REASON).assertIsDisplayed()
     RejectReason.entries.forEach { reason(it).assertIsDisplayed().assertIsNotSelected() }
@@ -227,32 +258,66 @@ class RejectProofSheetTest {
     show()
     reason(RejectReason.NO_MATCH).performClick()
 
-    compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).performTouchInput { swipeDown() }
-    compose.waitForIdle()
+    dragTheSheetDown()
 
     assertEquals(1, dismissals)
     assertEquals(emptyList<String>(), rejected)
   }
 
   @Test
-  fun whileSavingNothingCanBeChangedOrDismissed() {
+  fun tappingAboveTheSheetClosesItWithoutRejecting() {
     show()
     reason(RejectReason.NO_MATCH).performClick()
-    confirm().performClick()
 
-    saving = true
-    compose.waitForIdle()
+    tapAboveTheSheet()
+
+    assertEquals(1, dismissals)
+    assertEquals(emptyList<String>(), rejected)
+  }
+
+  @Test
+  fun whileSavingNothingCanBeChanged() {
+    show()
+    startSaving()
 
     confirm().assertIsNotEnabled()
     compose.onNodeWithText(string(R.string.reject_proof_rejecting)).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_BACK).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_NOTE).assertIsNotEnabled()
     reason(RejectReason.OTHER).assertIsNotEnabled()
-    compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).performTouchInput { swipeDown() }
-    compose.waitForIdle()
+  }
+
+  // The drag and the tap fail without the sheet's confirmValueChange, Back without its BackHandler
+  @Test
+  fun whileSavingADragDoesNotCloseTheSheet() {
+    show()
+    startSaving()
+
+    dragTheSheetDown()
+
+    compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).assertIsDisplayed()
     assertEquals(0, dismissals)
+  }
+
+  @Test
+  fun whileSavingATapAboveDoesNotCloseTheSheet() {
+    show()
+    startSaving()
+
+    tapAboveTheSheet()
+
+    compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).assertIsDisplayed()
+    assertEquals(0, dismissals)
+  }
+
+  @Test
+  fun whileSavingSystemBackDoesNotCloseTheSheet() {
+    show()
+    startSaving()
+
     Espresso.pressBack()
     compose.waitForIdle()
+
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).assertIsDisplayed()
     assertEquals(0, dismissals)
   }
@@ -292,5 +357,12 @@ class RejectProofSheetTest {
 
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_NEEDS_REASON).assertIsDisplayed()
     confirm().assertIsNotEnabled()
+  }
+
+  private companion object {
+    const val EXPLORER = "yusuf.s"
+
+    /** Where the handle is, below the sheet's top edge, in pixels at mdpi. */
+    const val HANDLE_Y = 14f
   }
 }

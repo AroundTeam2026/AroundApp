@@ -3,23 +3,34 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
+import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -32,19 +43,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the completion of the reservation [reservationId] by the explorer [explorerUid]: its quest
- * and the proof the quest asks for, what the explorer filled in, and submitting it.
+ * Holds the completion of the reservation [reservationId] by the explorer [explorerUid]: its quest,
+ * the proof it asks for, what the explorer filled in, and submitting it.
  *
- * It listens to the explorer's reservations, so the form is [CompletionFormStatus.READY] only while
- * the reservation is approved, and to the completions of the reservation, the party's included, for
- * the explorer's own, so a reservation that was already completed shows as [SaveState.Saved] and
- * can't be submitted again, also when the answer to an earlier submit was lost. If listening to the
- * completions fails, the form stays usable: the repository refuses a second completion anyway. If
- * loading the reservation fails, the form is [CompletionFormStatus.FAILED] until [onRetry].
- *
- * A text proof is submitted as it is. A photo is uploaded through [proofPhotoRepository] first; a
- * photo that was uploaded is not uploaded again when only the submit failed, until another photo is
- * picked.
+ * The form is [CompletionFormStatus.READY] only while the reservation is approved, and
+ * [SaveState.Saved] once the explorer's completion is stored, even if an earlier submit's answer
+ * was lost. If loading the reservation fails, it is [CompletionFormStatus.FAILED] until [onRetry];
+ * if listening to completions fails, it stays usable, as the repository refuses a second one. A
+ * photo is uploaded through [proofPhotoRepository] first, and not again when only the submit
+ * failed.
  */
 class CompletionViewModel(
     private val reservationId: String,
@@ -244,8 +251,38 @@ class CompletionViewModel(
     }
   }
 
-  private companion object {
-    const val TAG = "CompletionViewModel"
+  companion object {
+    private const val TAG = "CompletionViewModel"
+
+    /**
+     * Builds the [CompletionViewModel] of the reservation [reservationId] for the explorer
+     * [explorerUid], with the app's repositories. The location and photo repositories are built
+     * from the application, so they never keep a screen in memory.
+     *
+     * @param locations Builds the location repository; the app's unless a test can't use Play
+     *   services.
+     * @param photos Builds the proof photo repository; the app's unless a test needs another.
+     */
+    fun factory(
+        reservationId: String,
+        explorerUid: String,
+        locations: (Context) -> LocationRepository = LocationRepositoryProvider::repository,
+        photos: (Context) -> ProofPhotoRepository = ProofPhotoRepositoryProvider::repository,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer {
+        val app = this[APPLICATION_KEY]!!
+        CompletionViewModel(
+            reservationId,
+            explorerUid,
+            ReservationRepositoryProvider.repository,
+            QuestRepositoryProvider.repository,
+            VenueRepositoryProvider.repository,
+            locations(app),
+            CompletionRepositoryProvider.repository,
+            photos(app),
+        )
+      }
+    }
   }
 }
 

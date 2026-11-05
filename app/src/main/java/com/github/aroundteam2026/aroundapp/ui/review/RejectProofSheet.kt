@@ -21,7 +21,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetValue
@@ -49,6 +48,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_REJECT_REASON_LENGTH
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
@@ -93,6 +93,9 @@ fun RejectProofSheet(
     onDismiss: () -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+  // While saving, refusing to hide stops both a drag down and a tap on the scrim, which goes
+  // through
+  // this check too; system Back doesn't, hence the BackHandler inside the sheet
   val currentSaving by rememberUpdatedState(saving)
   val sheetState =
       rememberModalBottomSheetState(
@@ -109,7 +112,6 @@ fun RejectProofSheet(
       shape = AroundCorners.BottomSheet,
       containerColor = MaterialTheme.colorScheme.surface,
       dragHandle = { Handle() },
-      properties = ModalBottomSheetProperties(shouldDismissOnClickOutside = !saving),
   ) {
     // Taken before the sheet's own Back, which would close it
     BackHandler(enabled = saving) {}
@@ -299,8 +301,9 @@ private fun Handle() {
 }
 
 /**
- * The longest note. The rules refuse a reason over 300 characters, and the longest preset with its
- * separator takes about 25 of them; if a preset gets much longer, compute this from the labels.
+ * The longest note. A reason is at most [MAX_REJECT_REASON_LENGTH] characters, and the longest
+ * preset with its separator takes about 25 of them; if a preset gets much longer, compute this from
+ * the labels.
  */
 internal const val NOTE_MAX_LENGTH = 250
 

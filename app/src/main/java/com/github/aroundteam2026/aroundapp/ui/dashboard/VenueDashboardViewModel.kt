@@ -47,18 +47,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
 /**
- * Holds the dashboard of the signed-in venue: its name, the proofs it has to review, read from
- * [completionRepository], its reservations, split into those it has to answer and the approved
- * ones, with each reservation's quest title, explorer's name and party size, read from
- * [partyRepository], and how many of its quests are active.
+ * Holds the dashboard of the signed-in venue: its name, the proofs to review, its pending and
+ * approved reservations with their quest titles, explorer names and party sizes, and how many of
+ * its quests are active.
  *
- * It follows the signed-in venue, and keeps up as it, its proofs, its reservations, their parties
- * and its quests change. It only listens while the dashboard is watched. If listening fails, the
- * dashboard shows [VenueDashboardStatus.FAILED] until [retry].
- *
- * [approve] and [decline] answer a pending reservation through an [AnswerSaver]; a failure sets
- * [VenueDashboardUiState.updateFailed] until [clearUpdateError]. Proofs are reviewed on their own
- * screen.
+ * It keeps up with changes while the dashboard is watched; if listening fails, it shows
+ * [VenueDashboardStatus.FAILED] until [retry]. [approve] and [decline] answer a pending reservation
+ * through an [AnswerSaver]; a failure sets [VenueDashboardUiState.updateFailed] until
+ * [clearUpdateError]. Proofs are reviewed on their own screen.
  */
 class VenueDashboardViewModel(
     authRepository: AuthRepository,
@@ -199,16 +195,13 @@ private fun partyIdsOf(reservations: List<Reservation>, completions: List<Comple
         completions.filter { it.status == CompletionStatus.PENDING }.map { it.reservationId }
 
 /**
- * The loaded dashboard of [venue] for [reservations], with the number of joined members of each
- * party in [partySizes], keyed by reservation id, titled from [quests], which also give the active
- * quests count. A party missing from [partySizes] counts as empty. A [venue] that can't be read
- * leaves the header empty. Pending reservations need an answer and approved ones are upcoming, each
- * oldest request first, ties going to the smallest id. Rejected and cancelled ones are left out.
- * The pending [completions] are the proofs to review, oldest first, ties going to the smallest id,
- * each named, titled and sized from its reservation.
+ * The loaded dashboard of [venue], built from [reservations], their joined [partySizes] keyed by
+ * reservation id, [quests] and the pending [completions].
  *
- * Reservations have no visit time yet, so nothing is sorted or filtered by their slot: a pending
- * reservation's slot only dates the request, and an approved one keeps it.
+ * Pending reservations need an answer and approved ones are upcoming, each oldest request first,
+ * ties going to the smallest id; rejected and cancelled ones are left out. The proofs to review
+ * follow the same order. A missing party counts as empty, and an unreadable [venue] leaves the
+ * header empty. Reservations have no visit time yet, so nothing is sorted or filtered by slot.
  */
 internal fun dashboardOf(
     reservations: List<Reservation>,

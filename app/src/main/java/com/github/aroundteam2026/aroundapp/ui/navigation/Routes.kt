@@ -7,13 +7,10 @@ import android.net.Uri
  * Routes of the screens added in Sprint 2, kept in one place so that every screen navigates with
  * the same names.
  *
- * Each route starts as a "Coming soon" stub. The task that builds a screen replaces its stub, and
- * the route stays the same, so nothing that navigates to it has to change.
- *
- * Explorer routes are registered in the explorer's NavHost, [AroundApp]. Venue routes belong to the
- * venue's own NavHost, so an explorer can't reach them. [venueDestinations] registers the home, the
- * create-quest form and the Review proof screen there; the dashboard is still a tab of [VenueHome],
- * and its route is registered when its screen is built.
+ * Each route starts as a "Coming soon" stub that the screen's task replaces, keeping the route.
+ * Explorer routes are registered in [AroundApp]'s NavHost. Venue routes belong to the venue's own
+ * NavHost, so an explorer can't reach them; [venueDestinations] registers them there, while the
+ * dashboard is still a tab of [VenueHome].
  */
 object Routes {
   /** Argument of [VENUE_PAGE]: the venue's id, equal to its owner's uid. */
@@ -23,6 +20,20 @@ object Routes {
 
   /** A venue's page, with its quests. Build the route to one venue with [venuePage]. */
   const val VENUE_PAGE = "$VENUE_PAGE_PREFIX/{$VENUE_ID}"
+
+  /** Argument of [COMPLETE_QUEST]: the id of the reservation whose quest the explorer completes. */
+  const val RESERVATION_ID = "reservationId"
+
+  /** Argument of [COMPLETE_QUEST]: the name of the quest's venue, which the screen shows. */
+  const val VENUE_NAME = "venueName"
+
+  private const val COMPLETE_QUEST_PREFIX = "complete_quest"
+
+  /**
+   * The screen where the explorer sends the proof of an approved reservation's quest. Build the
+   * route to one reservation with [completeQuest].
+   */
+  const val COMPLETE_QUEST = "$COMPLETE_QUEST_PREFIX/{$RESERVATION_ID}?$VENUE_NAME={$VENUE_NAME}"
 
   /** The venue's home, with its tabs ([VenueHome]). */
   const val VENUE_HOME = "venue_home"
@@ -42,7 +53,7 @@ object Routes {
   const val REVIEW_PROOF = "$REVIEW_PROOF_PREFIX/{$COMPLETION_ID}"
 
   /** Routes of the explorer's screens, registered in [AroundApp]. */
-  val EXPLORER = listOf(VENUE_PAGE)
+  val EXPLORER = listOf(VENUE_PAGE, COMPLETE_QUEST)
 
   /** Routes of the venue's screens, for the venue's own NavHost. */
   val VENUE = listOf(VENUE_HOME, CREATE_QUEST, DASHBOARD, REVIEW_PROOF)
@@ -70,5 +81,18 @@ object Routes {
   fun reviewProof(completionId: String): String {
     require(completionId.isNotBlank()) { "A proof to review needs a completion id" }
     return "$REVIEW_PROOF_PREFIX/${Uri.encode(completionId)}"
+  }
+
+  /**
+   * The route to completing the quest of one reservation.
+   *
+   * @param reservationId id of the approved reservation; it is encoded, so it may contain any
+   *   character.
+   * @param venueName name of the quest's venue, shown on the screen; encoded too.
+   * @throws IllegalArgumentException if [reservationId] is blank, which no route could match.
+   */
+  fun completeQuest(reservationId: String, venueName: String): String {
+    require(reservationId.isNotBlank()) { "Completing a quest needs a reservation id" }
+    return "$COMPLETE_QUEST_PREFIX/${Uri.encode(reservationId)}?$VENUE_NAME=${Uri.encode(venueName)}"
   }
 }
