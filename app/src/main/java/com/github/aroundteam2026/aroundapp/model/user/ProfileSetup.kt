@@ -17,14 +17,13 @@ sealed interface ProfileStatus {
 /**
  * Saves the account type chosen at registration as the user's profile (`users/{uid}`).
  *
- * The role is recorded with [choose], and [finish] turns it into a profile once the user is signed
- * in. The record is cleared only once the profile has a role, so a save interrupted by a failure or
- * by process death is finished by the next [finish] with the chosen role. It never falls back to
- * [Role.EXPLORER]: roles are write-once, so a wrong one would stick for good.
+ * [choose] records the role and [finish] turns it into a profile once the user is signed in. The
+ * record is cleared only once the profile has a role, so a save interrupted by a failure or process
+ * death is finished by the next [finish]. It never falls back to [Role.EXPLORER]: roles are
+ * write-once.
  *
- * Both ways of becoming a venue are supported: choosing before sign-up (a dedicated venue entry),
- * and choosing once signed in to an account without a role (any user who signed up). A choice made
- * while signed in belongs to that account and is never applied to another one.
+ * A venue can choose before sign-up or once signed in without a role; a choice made while signed in
+ * is never applied to another account.
  *
  * @param now Clock used for a new profile's `createdAt`, in epoch milliseconds.
  */

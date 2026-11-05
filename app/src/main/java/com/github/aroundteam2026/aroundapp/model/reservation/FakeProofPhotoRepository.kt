@@ -6,18 +6,12 @@ import android.net.Uri
 /**
  * In-memory [ProofPhotoRepository] for unit tests and for running the app without Cloud Storage.
  *
- * Nothing is uploaded: each photo is recorded in [uploads] under a location like
- * `gs://fake-bucket/proofs/{reservationId}/photo-1`, numbered per instance, together with the bytes
- * [read] gives for it, which [download] returns. Not thread-safe; use one instance per test.
+ * Each upload is recorded in [uploads] under a `gs://fake-bucket/proofs/...` location, and
+ * [download] returns the bytes [read] gave for it; an unknown location fails with
+ * [NoSuchElementException]. Not thread-safe; use one instance per test.
  *
- * What it can't simulate, so callers' tests must use [forcedFailure] for it instead:
- * - The security rules: it doesn't check who uploads or downloads, that the reservation is
- *   approved, or the photo's type. So a location in its bucket that no upload returned fails with
- *   [NoSuchElementException], where the rules might refuse it instead.
- * - An unreadable photo: it never reads a [Uri] itself, so one the app may no longer read uploads.
- * - Time: [upload] and [download] finish at once, so a test can't time out, cancel, or act while
- *   one is in progress, e.g. tap submit twice during an upload. Hold the caller's dispatcher
- *   instead, e.g. with `runTest`'s `StandardTestDispatcher`.
+ * It doesn't check the security rules, never reads a [Uri] itself, and finishes at once: test those
+ * cases with [forcedFailure], or hold the caller's dispatcher, e.g. with `StandardTestDispatcher`.
  *
  * @param read Gives the bytes of an uploaded photo, read once when it is uploaded. A unit test
  *   can't read a [Uri], so pass the bytes [download] should return; by default they're empty.

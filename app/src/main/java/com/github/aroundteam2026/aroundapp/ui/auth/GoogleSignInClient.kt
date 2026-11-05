@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> (KDoc reformatting)
 package com.github.aroundteam2026.aroundapp.ui.auth
 
 import android.annotation.SuppressLint
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.collectLatest
 
 /** Android credential acquisition belongs to the UI layer, independently testable from auth. */
 fun interface GoogleSignInClient {
+  /** Asks the user to pick a Google account and returns its ID token or why there is none. */
   suspend fun requestToken(): GoogleCredentialResult
 }
 

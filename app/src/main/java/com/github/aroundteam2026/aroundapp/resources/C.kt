@@ -4,8 +4,9 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.resources
 
-// Like R, but C
+/** App-wide constants, named like `R`. */
 object C {
+  /** Test tags that UI tests use to find composables. */
   object Tag {
     const val ROLE_PROFILE_ERROR = "role_profile_error"
     const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
