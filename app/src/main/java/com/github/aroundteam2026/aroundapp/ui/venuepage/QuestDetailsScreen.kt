@@ -191,6 +191,7 @@ private fun RewardCard(reward: Reward, clock: Clock) {
         QuestLimits.MIN_PARTY_SIZE,
         distanceMeters = null,
         venueQuestChipStyle(),
+        exactPartySize = false,
     )
     rewardDetails(reward)?.let { CardText(it, C.Tag.QUEST_DETAIL_REWARD_DETAILS) }
     reward.expiresAt?.let { expiresAt ->

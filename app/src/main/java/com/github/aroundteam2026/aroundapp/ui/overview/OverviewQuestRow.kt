@@ -135,6 +135,7 @@ fun OverviewQuestRow(
             minPartySize = QuestLimits.MIN_PARTY_SIZE,
             distanceMeters = null,
             venueQuestChipStyle(),
+            exactPartySize = false,
             Modifier.padding(top = REWARD_TOP),
         )
       }

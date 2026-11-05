@@ -36,8 +36,8 @@ fun QuestChips(
     minPartySize: Int,
     distanceMeters: Double?,
     style: QuestChipStyle,
+    exactPartySize: Boolean,
     modifier: Modifier = Modifier,
-    exactPartySize: Boolean = false,
 ) {
   val partySize = minPartySize.takeIf { it > 1 }
   if (reward == null && partySize == null && distanceMeters == null) return
