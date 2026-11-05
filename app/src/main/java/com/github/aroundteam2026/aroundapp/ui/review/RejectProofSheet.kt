@@ -27,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -101,6 +100,9 @@ fun RejectProofSheet(
     onDismiss: () -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+  // While saving, refusing to hide stops both a drag down and a tap on the scrim, which goes
+  // through
+  // this check too; system Back doesn't, hence the BackHandler inside the sheet
   val currentSaving by rememberUpdatedState(saving)
   val sheetState =
       rememberModalBottomSheetState(
@@ -117,7 +119,6 @@ fun RejectProofSheet(
       shape = AroundCorners.BottomSheet,
       containerColor = MaterialTheme.colorScheme.surface,
       dragHandle = { Handle() },
-      properties = ModalBottomSheetProperties(shouldDismissOnClickOutside = !saving),
   ) {
     // Taken before the sheet's own Back, which would close it
     BackHandler(enabled = saving) {}
