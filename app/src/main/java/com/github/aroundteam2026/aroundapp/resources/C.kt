@@ -162,6 +162,8 @@ object C {
     const val NEARBY_FILTERS = "nearby_filters"
     const val LOCATION_BANNER = "location_banner"
     const val LOCATION_TURN_ON = "location_turn_on"
+    const val VENUES_ERROR_BANNER = "venues_error_banner"
+    const val VENUES_TRY_AGAIN = "venues_try_again"
 
     const val CREATE_QUEST_SCREEN = "create_quest_screen"
     const val CREATE_QUEST_CLOSE = "create_quest_close"

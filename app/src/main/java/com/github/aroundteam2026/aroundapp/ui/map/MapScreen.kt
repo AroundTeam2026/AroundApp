@@ -3,8 +3,11 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,11 +34,11 @@ import com.google.maps.android.compose.MapUiSettings
  * framing [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
  *
  * It asks for the location permission if needed; while the location is off, a banner's "Turn on"
- * asks again or opens the settings. Each venue on screen with valid quests gets a pin that opens
- * into a card; the card opens the venue's page and tapping the map closes it. A "Nearby quests"
- * pill opens the nearby quests over the map, closed by Back or by opening a card. Tapping a quest
- * frames its venue and opens its card, "View quest" opens its page, and filters narrow the list,
- * not the pins.
+ * asks again or opens the settings, and while the venues fail to load, another's "Try again" loads
+ * them again. Each venue on screen with valid quests gets a pin that opens into a card; the card
+ * opens the venue's page and tapping the map closes it. A "Nearby quests" pill opens the nearby
+ * quests over the map, closed by Back or by opening a card. Tapping a quest frames its venue and
+ * opens its card, "View quest" opens its page, and filters narrow the list, not the pins.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card or "View
@@ -109,11 +112,15 @@ fun MapScreen(
           Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Large),
       )
     }
-    if (state.locationRefused) {
-      LocationBanner(
-          turnOnLocation,
-          Modifier.align(Alignment.TopCenter).padding(AroundSpacing.Large),
-      )
+    // Both can show at once: the failure first, as the map has no pins until it is fixed
+    Column(
+        Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
+        verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+    ) {
+      if (state.venuesFailed) {
+        VenuesErrorBanner(viewModel::onRetryVenues, retrying = state.retryingVenues)
+      }
+      if (state.locationRefused) LocationBanner(turnOnLocation)
     }
   }
   BackHandler(enabled = state.showsNearby, onBack = viewModel::onNearbyClose)
