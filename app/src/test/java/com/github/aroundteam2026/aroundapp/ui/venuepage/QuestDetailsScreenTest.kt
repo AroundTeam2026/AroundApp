@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -28,7 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Tests the screen with the whole of a quest: what it shows, and how it accepts. */
+/** Tests the screen with the whole of a quest: what it shows, and how it accepts and cancels. */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class QuestDetailsScreenTest {
@@ -36,6 +37,7 @@ class QuestDetailsScreenTest {
 
   private var backs = 0
   private var accepts = 0
+  private var cancels = 0
 
   private fun quest(
       description: String = "Spot the ceramic fox hidden in the café.",
@@ -70,7 +72,8 @@ class QuestDetailsScreenTest {
       )
 
   private fun accepted(quest: VenuePageQuest, party: Int = 1) =
-      state(quest).copy(acceptedParties = mapOf(QUEST to party))
+      state(quest)
+          .copy(acceptedParties = mapOf(QUEST to party), reservationIds = mapOf(QUEST to "r"))
 
   private fun show(quest: VenuePageQuest = quest(), state: VenuePageUiState = state(quest)) {
     compose.setContent {
@@ -80,6 +83,7 @@ class QuestDetailsScreenTest {
             quest,
             onBack = { backs++ },
             onAccept = { accepts++ },
+            onCancel = { cancels++ },
             clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
         )
       }
@@ -272,6 +276,63 @@ class QuestDetailsScreenTest {
     node(C.Tag.ACCEPT_QUEST_BUTTON).performClick()
 
     assertEquals(1, accepts)
+  }
+
+  @Test
+  fun aQuestNotAcceptedHasNothingToCancel() {
+    show()
+
+    node(C.Tag.OVERVIEW_ROW_CANCEL).assertDoesNotExist()
+  }
+
+  @Test
+  fun cancellingAsksFirstAndKeepingItChangesNothing() {
+    val quest = quest()
+    show(quest, accepted(quest))
+
+    node(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertIsDisplayed()
+    compose.onNodeWithText("Keep it").performClick()
+
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+    assertEquals(0, cancels)
+  }
+
+  @Test
+  fun confirmingCancels() {
+    val quest = quest()
+    show(quest, accepted(quest))
+
+    node(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
+    compose
+        .onNodeWithText(
+            "Café Lumen will see it cancelled. To go after all, accept the quest again."
+        )
+        .assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+
+    assertEquals(1, cancels)
+  }
+
+  @Test
+  fun whileCancellingTheButtonIsDisabled() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(cancellingQuestIds = setOf(QUEST)))
+
+    node(C.Tag.OVERVIEW_ROW_CANCEL).assertIsNotEnabled()
+    compose.onNodeWithText("Cancelling…").assertExists()
+  }
+
+  @Test
+  fun afterAFailureTheButtonRetriesAtOnce() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(failedCancelQuestIds = setOf(QUEST)))
+
+    node(C.Tag.OVERVIEW_ROW_CANCEL_FAILED).assertIsDisplayed()
+    node(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
+
+    assertEquals(1, cancels)
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
   }
 
   @Test

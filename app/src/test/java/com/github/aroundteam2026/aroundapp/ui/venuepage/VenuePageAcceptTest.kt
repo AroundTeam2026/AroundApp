@@ -19,6 +19,7 @@ import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.ui.overview.CancelStatus
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -297,6 +299,128 @@ class VenuePageAcceptTest {
 
     assertEquals(AcceptStatus.NONE, state.acceptStatus)
   }
+
+  @Test
+  fun anAcceptedQuestKnowsItsReservation() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+
+    assertEquals(id, state.cancellableReservationId)
+  }
+
+  @Test
+  fun cancelEndsTheReservationAndReopensTheQuest() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    assertEquals(CancelStatus.CANCELLING, state.cancelStatus)
+    runCurrent()
+
+    assertEquals(ReservationStatus.CANCELLED, stored().single { it.id == id }.status)
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertNull(state.cancellableReservationId)
+    assertTrue(state.failedQuestIds.isEmpty())
+  }
+
+  @Test
+  fun aQuestAcceptedOnThisPageCanBeCancelledWithoutCountingAsRefused() = test {
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+  }
+
+  @Test
+  fun aDoubleTapCancelsOnce() = test {
+    val gated = CancelFailingRepository(fake)
+    reservationRepository = gated
+    storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(1, gated.cancels)
+  }
+
+  @Test
+  fun aFailedCancelKeepsTheReservationAndCanBeRetried() = test {
+    val failing = CancelFailingRepository(fake, failures = 1)
+    reservationRepository = failing
+    val id = storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+    assertEquals(CancelStatus.FAILED, state.cancelStatus)
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    assertEquals(ReservationStatus.PENDING, stored().single { it.id == id }.status)
+
+    viewModel.cancel()
+    assertEquals(CancelStatus.CANCELLING, state.cancelStatus)
+    runCurrent()
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertEquals(ReservationStatus.CANCELLED, stored().single { it.id == id }.status)
+  }
+
+  @Test
+  fun aFailedCancelOfAReservationThatLeftMeanwhileMarksNothing() = test {
+    val failing = CancelFailingRepository(fake, failures = 1)
+    reservationRepository = failing
+    val id = storeFor("a")
+    openAndPick("a")
+    failing.beforeAnswering = { fake.updateStatus(id, ReservationStatus.REJECTED) }
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertTrue(state.cancellingQuestIds.isEmpty())
+  }
+
+  @Test
+  fun cancelWithoutAReservationDoesNothing() = test {
+    val counting = CancelFailingRepository(fake)
+    reservationRepository = counting
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(0, counting.cancels)
+  }
+
+  @Test
+  fun ofSeveralReservationsTheOneWithTheBiggestPartyIsCancelled() {
+    val small = reservation("small")
+    val big = reservation("big")
+
+    assertEquals(
+        mapOf("a" to "big"),
+        acceptedReservationsOf(listOf(small, big), mapOf("small" to 1, "big" to 3), VENUE_ID),
+    )
+  }
+
+  @Test
+  fun onlyActiveReservationsAtTheVenueCanBeCancelled() {
+    val rejected = reservation("r").copy(status = ReservationStatus.REJECTED)
+    val elsewhere = reservation("e").copy(venueId = "other")
+
+    assertEquals(
+        emptyMap<String, String>(),
+        acceptedReservationsOf(listOf(rejected, elsewhere), emptyMap(), VENUE_ID),
+    )
+  }
+
+  private fun reservation(id: String) =
+      newPendingReservation("a", VENUE_ID, NAME, START).copy(id = id)
 
   @Test
   fun acceptingOneQuestDoesNotMarkTheOthersAccepted() = test {
@@ -662,6 +786,25 @@ private class GatedReservationRepository(private val inner: ReservationRepositor
     if (call == failOnCall) return Result.failure(IOException("offline"))
     gate?.await()
     return inner.createReservation(reservation, creatorUid)
+  }
+}
+
+/**
+ * Delegates to [inner], counting the status changes as [cancels] and failing the first [failures]
+ * of them, after running [beforeAnswering].
+ */
+private class CancelFailingRepository(
+    private val inner: ReservationRepository,
+    private var failures: Int = 0,
+) : ReservationRepository by inner {
+  var cancels = 0
+  var beforeAnswering: suspend () -> Unit = {}
+
+  override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> {
+    cancels++
+    beforeAnswering()
+    if (failures-- > 0) return Result.failure(IOException("offline"))
+    return inner.updateStatus(id, status)
   }
 }
 

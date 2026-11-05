@@ -43,6 +43,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.overview.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.overview.slotFormat
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
@@ -59,13 +60,15 @@ import java.util.Date
 
 /**
  * The whole of [quest], as the Figma frame "Quest details": the venue, the quest's title and chips,
- * then a card for each part of it, over a bar that stays in place to accept the quest. The rows
- * only fit part of a quest, so this is where the rest is read.
+ * then a card for each part of it, over a bar that stays in place to accept the quest or, once it
+ * is accepted, to cancel the reservation after asking. The rows only fit part of a quest, so this
+ * is where the rest is read.
  *
- * @param state The venue's page, for the venue and how accepting stands.
+ * @param state The venue's page, for the venue and how accepting and cancelling stand.
  * @param quest The quest to show.
  * @param onBack Called by the back arrow and system back.
  * @param onAccept Accepts the quest.
+ * @param onCancel Cancels the quest's reservation, once the explorer confirmed.
  * @param clock Tells the time zone the reward's expiry is written in.
  */
 @Composable
@@ -74,6 +77,7 @@ fun QuestDetailsScreen(
     quest: VenuePageQuest,
     onBack: () -> Unit,
     onAccept: () -> Unit,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
 ) {
@@ -108,7 +112,16 @@ fun QuestDetailsScreen(
       ProofCard(quest.proofType)
       RadiusCard(state, quest)
     }
-    AcceptQuestBar(state, onAccept)
+    AcceptQuestBar(state, onAccept) {
+      if (state.cancellableReservationId != null) {
+        CancelReservationAction(
+            state.cancelStatus,
+            state.venueName,
+            onCancel,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        )
+      }
+    }
   }
 }
 
@@ -495,6 +508,7 @@ private fun QuestDetailsPreview() {
         quest,
         onBack = {},
         onAccept = {},
+        onCancel = {},
     )
   }
 }

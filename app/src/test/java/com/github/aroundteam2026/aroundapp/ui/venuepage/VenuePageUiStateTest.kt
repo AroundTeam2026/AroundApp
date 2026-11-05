@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.ui.overview.CancelStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -101,6 +102,41 @@ class VenuePageUiStateTest {
   @Test
   fun openingTheDetailsPicksTheQuestSoThatItCanBeAccepted() {
     assertEquals("a", loaded.withQuestDetails("a").selectedQuestId)
+  }
+
+  @Test
+  fun onlyTheReservationOfThePickedQuestCanBeCancelled() {
+    val booked = loaded.copy(reservationIds = mapOf("a" to "r"))
+
+    assertNull(booked.cancellableReservationId)
+    assertEquals("r", booked.withQuestTapped("a").cancellableReservationId)
+    assertNull(booked.withQuestTapped("b").cancellableReservationId)
+  }
+
+  @Test
+  fun nothingCanBeCancelledWhileTheReservationsCantBeRead() {
+    val booked = loaded.copy(reservationIds = mapOf("a" to "r"), selectedQuestId = "a")
+
+    assertNull(booked.copy(acceptAvailable = false).cancellableReservationId)
+  }
+
+  @Test
+  fun cancelStatusFollowsThePickedQuest() {
+    val picked = loaded.copy(selectedQuestId = "a")
+
+    assertEquals(CancelStatus.NONE, picked.cancelStatus)
+    assertEquals(
+        CancelStatus.CANCELLING,
+        picked.copy(cancellingQuestIds = setOf("a")).cancelStatus,
+    )
+    assertEquals(
+        CancelStatus.FAILED,
+        picked.copy(failedCancelQuestIds = setOf("a")).cancelStatus,
+    )
+    assertEquals(
+        CancelStatus.NONE,
+        picked.copy(cancellingQuestIds = setOf("b")).cancelStatus,
+    )
   }
 
   @Test

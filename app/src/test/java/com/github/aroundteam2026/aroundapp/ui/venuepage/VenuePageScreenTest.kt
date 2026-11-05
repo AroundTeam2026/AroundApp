@@ -61,6 +61,7 @@ class VenuePageScreenTest {
   private var retries = 0
   private val detailsOpened = mutableListOf<String>()
   private var detailsClosed = 0
+  private var cancels = 0
 
   private fun show(
       state: VenuePageUiState,
@@ -76,6 +77,7 @@ class VenuePageScreenTest {
             onRetry = { retries++ },
             onQuestDetails = { detailsOpened += it },
             onQuestDetailsClosed = { detailsClosed++ },
+            onCancel = { cancels++ },
             questRow = questRow,
             bottomBar = bottomBar,
         )
@@ -273,6 +275,23 @@ class VenuePageScreenTest {
 
     assertEquals(1, detailsClosed)
     assertEquals(0, backCalls)
+  }
+
+  @Test
+  fun cancellingFromTheDetailsReachesThePage() {
+    show(
+        LOADED.copy(
+            detailQuestId = "a",
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1),
+            reservationIds = mapOf("a" to "r"),
+        )
+    )
+
+    compose.onNodeWithTag(C.Tag.OVERVIEW_ROW_CANCEL).performClick()
+    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+
+    assertEquals(1, cancels)
   }
 
   @Test

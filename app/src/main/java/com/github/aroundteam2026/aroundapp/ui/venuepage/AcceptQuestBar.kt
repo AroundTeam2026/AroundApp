@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,10 +56,15 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
  * - Accepting unavailable: the button is disabled and says why.
  *
  * It draws nothing while no quest is picked. It only shows the state: [onAccept] is the
- * ViewModel's.
+ * ViewModel's. [footer] sits under the button.
  */
 @Composable
-fun AcceptQuestBar(state: VenuePageUiState, onAccept: () -> Unit, modifier: Modifier = Modifier) {
+fun AcceptQuestBar(
+    state: VenuePageUiState,
+    onAccept: () -> Unit,
+    modifier: Modifier = Modifier,
+    footer: @Composable ColumnScope.() -> Unit = {},
+) {
   if (state.selectedQuest == null) return
   val status = state.acceptStatus
   Column(
@@ -93,6 +99,7 @@ fun AcceptQuestBar(state: VenuePageUiState, onAccept: () -> Unit, modifier: Modi
     } else {
       AcceptButton(status, enabled = state.acceptAvailable, onAccept)
     }
+    footer()
   }
 }
 

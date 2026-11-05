@@ -29,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
+import com.github.aroundteam2026.aroundapp.ui.overview.CancelStatus
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -182,6 +183,40 @@ class VenuePageViewModel(
   }
 
   /**
+   * Called when the explorer cancels their reservation for the picked quest, once they confirmed.
+   * Does nothing without such a reservation, or while it is being cancelled, so a double tap
+   * cancels once. The quest shows as cancelling until the reservations no longer list it as
+   * accepted. A failure, such as being offline, shows [CancelStatus.FAILED]; calling this again
+   * retries.
+   */
+  fun cancel() {
+    val current = mutableUiState.value
+    val reservationId = current.cancellableReservationId ?: return
+    val id = current.selectedQuestId ?: return
+    if (id in current.cancellingQuestIds) return
+    mutableUiState.update {
+      it.copy(
+          cancellingQuestIds = it.cancellingQuestIds + id,
+          failedCancelQuestIds = it.failedCancelQuestIds - id,
+      )
+    }
+    viewModelScope.launch {
+      reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED).onFailure {
+        Log.w(TAG, "Cancelling reservation $reservationId failed", it)
+        mutableUiState.update { state ->
+          // A reservation that left meanwhile, e.g. rejected by the venue, has nothing to mark
+          val shown = id in state.reservationIds
+          state.copy(
+              cancellingQuestIds = state.cancellingQuestIds - id,
+              failedCancelQuestIds =
+                  if (shown) state.failedCancelQuestIds + id else state.failedCancelQuestIds,
+          )
+        }
+      }
+    }
+  }
+
+  /**
    * The display name in the explorer's profile, which the venue sees on their reservation, or a
    * failure if the profile is missing or can't be read.
    */
@@ -273,8 +308,11 @@ class VenuePageViewModel(
     val accepted = booked?.let {
       acceptedPartiesOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
     }
+    val reservationIds = booked?.let {
+      acceptedReservationsOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
+    }
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
-    mutableUiState.update { it.showing(venue, quests, accepted, refused) }
+    mutableUiState.update { it.showing(venue, quests, accepted, reservationIds, refused) }
   }
 
   /**
@@ -358,20 +396,37 @@ internal fun acceptedPartiesOf(
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxOf { partySizes[it.id] ?: 1 } }
 
+/**
+ * The explorer's reservation for each quest of the venue [venueId] they accepted, keyed by quest
+ * id: the one [acceptedPartiesOf] counts, so of several for one quest, the one with the biggest
+ * party.
+ */
+internal fun acceptedReservationsOf(
+    reservations: List<Reservation>,
+    partySizes: Map<String, Int>,
+    venueId: String,
+): Map<String, String> =
+    reservations
+        .filter { it.acceptsAQuestOf(venueId) }
+        .groupBy { it.questId }
+        .mapValues { (_, same) -> same.maxBy { partySizes[it.id] ?: 1 }.id }
+
 /** This reservation is an active one at the venue [venueId], so its quest is accepted. */
 private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
     this.venueId == venueId && status.isActive
 
 /**
- * This page showing [venue], its valid [quests] and the parties of the [accepted] ones, or "not
- * found" when [venue] is null. A quest being accepted that is now accepted is done accepting, and a
- * quest in [refused] failed. A null [accepted] means the reservations can't be read: the page keeps
- * what it knew and stops offering to accept.
+ * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
+ * [accepted] ones, or "not found" when [venue] is null. A quest being accepted that is now accepted
+ * is done accepting, a quest no longer accepted is done cancelling, and a quest in [refused]
+ * failed. A null [accepted] means the reservations can't be read: the page keeps what it knew and
+ * stops offering to accept or cancel.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
     quests: List<VenuePageQuest>,
     accepted: Map<String, Int>?,
+    reservationIds: Map<String, String>?,
     refused: Set<String>,
 ): VenuePageUiState =
     if (venue == null) {
@@ -384,9 +439,12 @@ private fun VenuePageUiState.showing(
               address = venue.address,
               venueLocation = venue.location,
               acceptedParties = accepted ?: acceptedParties,
+              reservationIds = reservationIds ?: this.reservationIds,
               acceptingQuestIds =
                   if (accepted == null) emptySet() else acceptingQuestIds - accepted.keys,
               failedQuestIds = failedQuestIds - (accepted?.keys ?: emptySet()) + refused,
+              cancellingQuestIds = cancellingQuestIds.intersect(accepted?.keys ?: emptySet()),
+              failedCancelQuestIds = failedCancelQuestIds.intersect(accepted?.keys ?: emptySet()),
               acceptAvailable = accepted != null,
           )
           .withQuests(quests)
