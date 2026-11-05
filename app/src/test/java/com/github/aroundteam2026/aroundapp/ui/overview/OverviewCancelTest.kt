@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.overview
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -46,6 +47,7 @@ class OverviewCancelTest {
         ScriptedQuestRepository(quest = { id -> testQuest(id = id, venueId = CAFE) }),
         FakeVenueRepository(listOf(testVenue(id = CAFE))),
         party,
+        FakeCompletionRepository(),
     )
   }
 

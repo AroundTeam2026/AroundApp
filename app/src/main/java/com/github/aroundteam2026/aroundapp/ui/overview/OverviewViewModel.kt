@@ -13,6 +13,10 @@ import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -41,10 +45,11 @@ import kotlinx.coroutines.launch
  * Holds the overview of the quests the explorer [explorerUid] accepted, for the Quests tab.
  *
  * It listens to the explorer's reservations and keeps the pending and approved ones, each with its
- * quest, read once, and its venue and party, which it listens to. Rows follow the reservations, the
- * venues and the parties as they change. If anything fails, including the reservations' listener
- * after sign-out, the overview shows [OverviewStatus.FAILED] until [retry]. The explorer can
- * [cancel] a reservation.
+ * quest, read once, and its venue and party, which it listens to, as well as the explorer's
+ * completions, which say where their proof stands. Rows follow the reservations, the venues, the
+ * parties and the completions as they change. If anything fails, including the reservations'
+ * listener after sign-out, the overview shows [OverviewStatus.FAILED] until [retry]. The explorer
+ * can [cancel] a reservation.
  */
 class OverviewViewModel(
     private val explorerUid: String,
@@ -52,6 +57,7 @@ class OverviewViewModel(
     private val questRepository: QuestRepository,
     private val venueRepository: VenueRepository,
     private val partyRepository: PartyRepository,
+    private val completionRepository: CompletionRepository,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(OverviewUiState())
   /** What the overview shows now; the screen observes it. */
@@ -131,8 +137,9 @@ class OverviewViewModel(
             combine(
                 venueRepository.observeVenues(reservations.map { it.venueId }.toSet()),
                 partyRepository.observeJoinedCounts(reservations.map { it.id }),
-            ) { venues, partySizes ->
-              overviewRows(booked, venues, partySizes)
+                completionRepository.observeForExplorer(explorerUid),
+            ) { venues, partySizes, completions ->
+              overviewRows(booked, venues, partySizes, proofsOf(completions))
             }
           }
           .catch {
@@ -173,6 +180,7 @@ class OverviewViewModel(
             QuestRepositoryProvider.repository,
             VenueRepositoryProvider.repository,
             PartyRepositoryProvider.repository,
+            CompletionRepositoryProvider.repository,
         )
       }
     }
@@ -193,26 +201,57 @@ internal fun activeReservations(reservations: List<Reservation>): List<Reservati
         )
 
 /**
+ * Where the explorer's proof of each reservation stands, keyed by reservation id, from their
+ * [completions]: one per reservation, since an explorer completes a reservation once.
+ */
+internal fun proofsOf(completions: List<Completion>): Map<String, CompletionStatus> =
+    completions.associate {
+      it.reservationId to it.status
+    }
+
+/**
  * The rows for the [booked] reservations and their quests, in their order, with the number of
- * joined members of each party from [partySizes], keyed by reservation id. A reservation whose
- * venue isn't among [venues], because it no longer exists, has no row. A party missing from
- * [partySizes] counts as just the explorer, who is in every party they see here.
+ * joined members of each party from [partySizes] and where the explorer's proof stands from
+ * [proofs], both keyed by reservation id. A reservation whose venue isn't among [venues], because
+ * it no longer exists, has no row. A party missing from [partySizes] counts as just the explorer,
+ * who is in every party they see here.
  */
 internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,
     venues: List<Venue>,
     partySizes: Map<String, Int>,
+    proofs: Map<String, CompletionStatus>,
 ): List<OverviewRow> {
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
     venuesById[reservation.venueId]?.let { venue ->
       // A safety net only: observeJoinedCounts gives the size of every party it is asked for
-      overviewRow(reservation, quest, venue, partySizes[reservation.id] ?: 1)
+      val partySize = partySizes[reservation.id] ?: 1
+      overviewRow(reservation, quest, venue, partySize, rowStatus(reservation, proofs))
     }
   }
 }
 
-private fun overviewRow(reservation: Reservation, quest: Quest, venue: Venue, partySize: Int) =
+/** Where [reservation] stands: with its venue until approved, then with the proof in [proofs]. */
+private fun rowStatus(reservation: Reservation, proofs: Map<String, CompletionStatus>) =
+    if (reservation.status != ReservationStatus.APPROVED) {
+      OverviewRowStatus.WAITING
+    } else {
+      when (proofs[reservation.id]) {
+        null -> OverviewRowStatus.APPROVED
+        CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
+        CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED
+        CompletionStatus.REJECTED -> OverviewRowStatus.PROOF_REJECTED
+      }
+    }
+
+private fun overviewRow(
+    reservation: Reservation,
+    quest: Quest,
+    venue: Venue,
+    partySize: Int,
+    status: OverviewRowStatus,
+) =
     OverviewRow(
         reservationId = reservation.id,
         questId = quest.id,
@@ -224,7 +263,5 @@ private fun overviewRow(reservation: Reservation, quest: Quest, venue: Venue, pa
         avatar = INITIALS_AVATAR(venue, venue.name),
         slotStart = reservation.slotStart,
         partySize = partySize,
-        status =
-            if (reservation.status == ReservationStatus.APPROVED) OverviewRowStatus.APPROVED
-            else OverviewRowStatus.WAITING,
+        status = status,
     )

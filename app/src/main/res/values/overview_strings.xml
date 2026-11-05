@@ -14,6 +14,10 @@
     <!-- Where a reservation stands with its venue -->
     <string name="overview_status_waiting">Waiting for the venue</string>
     <string name="overview_status_approved">Approved</string>
+    <!-- Where the explorer's proof stands, once the reservation is approved -->
+    <string name="overview_status_proof_sent">Proof sent · waiting for review</string>
+    <string name="overview_status_completed">Completed</string>
+    <string name="overview_status_proof_rejected">Proof rejected</string>
     <!-- A reservation's slot: the day, e.g. "Today" or "Sun 2 Nov", then the time -->
     <string name="overview_slot">%1$s · %2$s</string>
     <string name="overview_slot_today">Today</string>

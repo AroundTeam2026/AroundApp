@@ -51,6 +51,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venueAvatarStyle
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venueQuestChipStyle
 import java.time.Clock
@@ -150,8 +151,10 @@ fun OverviewQuestRow(
 }
 
 /**
- * Where the reservation stands, in small capitals: a muted dot and "Waiting for the venue", or a
- * check on the tertiary colour and "Approved".
+ * Where the reservation stands, in small capitals, as in the Figma frames of the Quests tab: a
+ * muted dot and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then,
+ * for the proof, an accent dot and "Proof sent · waiting for review", a check and "Completed", or a
+ * red dot and "Proof rejected".
  */
 @Composable
 private fun Status(status: OverviewRowStatus, modifier: Modifier) {
@@ -164,17 +167,24 @@ private fun Status(status: OverviewRowStatus, modifier: Modifier) {
     val (text, color) =
         when (status) {
           OverviewRowStatus.WAITING -> {
-            Box(Modifier.size(DOT_SIZE).background(colors.onSurfaceVariant, AroundPillShape))
+            Dot(colors.onSurfaceVariant)
             R.string.overview_status_waiting to colors.onSurfaceVariant
           }
           OverviewRowStatus.APPROVED -> {
-            Icon(
-                painterResource(R.drawable.ic_check),
-                contentDescription = null,
-                Modifier.size(CHECK_SIZE),
-                tint = colors.tertiary,
-            )
+            Check()
             R.string.overview_status_approved to colors.onSurface
+          }
+          OverviewRowStatus.PROOF_SENT -> {
+            Dot(AroundTheme.colors.accentText)
+            R.string.overview_status_proof_sent to colors.onSurfaceVariant
+          }
+          OverviewRowStatus.COMPLETED -> {
+            Check()
+            R.string.overview_status_completed to colors.onSurface
+          }
+          OverviewRowStatus.PROOF_REJECTED -> {
+            Dot(colors.error)
+            R.string.overview_status_proof_rejected to colors.error
           }
         }
     Text(
@@ -185,6 +195,23 @@ private fun Status(status: OverviewRowStatus, modifier: Modifier) {
         overflow = TextOverflow.Ellipsis,
     )
   }
+}
+
+/** The status's dot, in [color]. */
+@Composable
+private fun Dot(color: Color) {
+  Box(Modifier.size(DOT_SIZE).background(color, AroundPillShape))
+}
+
+/** The status's check, on the tertiary colour. */
+@Composable
+private fun Check() {
+  Icon(
+      painterResource(R.drawable.ic_check),
+      contentDescription = null,
+      Modifier.size(CHECK_SIZE),
+      tint = MaterialTheme.colorScheme.tertiary,
+  )
 }
 
 /**

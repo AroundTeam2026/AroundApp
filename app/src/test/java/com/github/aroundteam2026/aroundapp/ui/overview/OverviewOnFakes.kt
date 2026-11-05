@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 
@@ -22,6 +23,7 @@ fun OverviewOnFakes(onOpenVenue: (venueId: String) -> Unit) {
         FakeQuestRepository(),
         FakeVenueRepository(),
         party,
+        FakeCompletionRepository(),
     )
   }
   OverviewScreen(viewModel, onOpenVenue)
