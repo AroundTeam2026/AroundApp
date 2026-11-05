@@ -3,8 +3,11 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,7 +38,8 @@ import com.google.maps.android.compose.MapUiSettings
  * card, tapping the card opens the venue's page, and tapping the map closes the card.
  *
  * While the location is off, a banner at the top says so, and its "Turn on" button asks for it
- * again or opens the app's settings.
+ * again or opens the app's settings. While the venues fail to load, another says so, and its "Try
+ * again" button loads them again.
  *
  * A "Nearby quests" pill opens the quests near the explorer over the map, in place of itself. Back
  * closes them before it leaves the map, and so does opening a card, which they would hide. Tapping
@@ -114,11 +118,13 @@ fun MapScreen(
           Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Large),
       )
     }
-    if (state.locationRefused) {
-      LocationBanner(
-          turnOnLocation,
-          Modifier.align(Alignment.TopCenter).padding(AroundSpacing.Large),
-      )
+    // Both can show at once: the failure first, as the map has no pins until it is fixed
+    Column(
+        Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
+        verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+    ) {
+      if (state.venuesFailed) VenuesErrorBanner(viewModel::onRetryVenues)
+      if (state.locationRefused) LocationBanner(turnOnLocation)
     }
   }
   BackHandler(enabled = state.showsNearby, onBack = viewModel::onNearbyClose)
