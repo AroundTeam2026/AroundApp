@@ -153,8 +153,8 @@ fun OverviewQuestRow(
 /**
  * Where the reservation stands, in small capitals, as in the Figma frames of the Quests tab: a
  * muted dot and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then,
- * for the proof, an accent dot and "Proof sent · waiting for review", a check and "Completed", or a
- * red dot and "Proof rejected".
+ * for the proof, an accent dot and "Proof sent", a check and "Completed", or a red dot and "Proof
+ * rejected".
  */
 @Composable
 private fun Status(status: OverviewRowStatus, modifier: Modifier) {

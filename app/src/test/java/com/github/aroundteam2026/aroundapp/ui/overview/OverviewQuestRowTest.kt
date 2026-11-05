@@ -99,7 +99,7 @@ class OverviewQuestRowTest {
     }
 
     mapOf(
-            OverviewRowStatus.PROOF_SENT to "PROOF SENT · WAITING FOR REVIEW",
+            OverviewRowStatus.PROOF_SENT to "PROOF SENT",
             OverviewRowStatus.COMPLETED to "COMPLETED",
             OverviewRowStatus.PROOF_REJECTED to "PROOF REJECTED",
         )
