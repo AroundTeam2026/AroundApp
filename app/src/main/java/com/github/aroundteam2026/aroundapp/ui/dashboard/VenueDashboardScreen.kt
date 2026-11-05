@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
@@ -63,15 +64,20 @@ import kotlinx.coroutines.launch
 
 /**
  * The venue's Dashboard tab, as the Figma frame `Venue dashboard`: a header with the venue and
- * today's date, the pending and active quests counts, then the reservations that need an answer and
- * the approved ones. Approve and Decline answer a pending reservation: its buttons are disabled
- * while the answer is saved, and a failed answer shows a snackbar once.
+ * today's date, the pending and active quests counts, then the proofs to review, the reservations
+ * that need an answer and the approved ones. Approve and Decline answer a pending reservation: its
+ * buttons are disabled while the answer is saved, and a failed answer shows a snackbar once.
+ * Tapping a proof calls [onOpenProof] with its completion's id.
  *
  * Figma's "Today" count is left out: reservations have no visit time yet (see
  * [VenueDashboardUiState]).
  */
 @Composable
-fun VenueDashboardScreen(viewModel: VenueDashboardViewModel, modifier: Modifier = Modifier) {
+fun VenueDashboardScreen(
+    viewModel: VenueDashboardViewModel,
+    modifier: Modifier = Modifier,
+    onOpenProof: (String) -> Unit = {},
+) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
   val scope = rememberCoroutineScope()
@@ -91,14 +97,15 @@ fun VenueDashboardScreen(viewModel: VenueDashboardViewModel, modifier: Modifier 
       onDecline = viewModel::decline,
       onRetry = viewModel::retry,
       modifier = modifier,
+      onOpenProof = onOpenProof,
       snackbarHostState = snackbarHostState,
   )
 }
 
 /**
  * Stateless dashboard showing [state]. [onApprove] and [onDecline] take a reservation's id;
- * [onRetry] listens again after a failure. [snackbarHostState] shows a failed answer. [clock] dates
- * the header and the rows.
+ * [onRetry] listens again after a failure; [onOpenProof] takes a proof's completion id.
+ * [snackbarHostState] shows a failed answer. [clock] dates the header and the rows.
  */
 @Composable
 internal fun VenueDashboardContent(
@@ -107,6 +114,7 @@ internal fun VenueDashboardContent(
     onDecline: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenProof: (String) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     clock: Clock = Clock.systemDefaultZone(),
 ) {
@@ -124,7 +132,7 @@ internal fun VenueDashboardContent(
       VenueDashboardStatus.LOADING ->
           CircularProgressIndicator(Modifier.testTag(C.Tag.DASHBOARD_LOADING))
       VenueDashboardStatus.FAILED -> LoadFailed(onRetry)
-      VenueDashboardStatus.LOADED -> Dashboard(state, onApprove, onDecline, clock)
+      VenueDashboardStatus.LOADED -> Dashboard(state, onApprove, onDecline, onOpenProof, clock)
     }
     SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
   }
@@ -136,6 +144,7 @@ private fun Dashboard(
     state: VenueDashboardUiState,
     onApprove: (String) -> Unit,
     onDecline: (String) -> Unit,
+    onOpenProof: (String) -> Unit,
     clock: Clock,
 ) {
   // Many pending requests would push "Upcoming" far down, so only the first few show at first
@@ -152,6 +161,14 @@ private fun Dashboard(
     if (state.isEmpty) {
       item { NoReservations() }
     } else {
+      section(
+          R.string.dashboard_proofs_to_review,
+          state.proofsToReview.size,
+          C.Tag.DASHBOARD_PROOFS,
+      )
+      items(state.proofsToReview, key = DashboardProof::completionId) {
+        DashboardProofRow(it, onOpen = { onOpenProof(it.completionId) }, clock = clock)
+      }
       section(R.string.dashboard_needs_answer, state.needsAnswer.size, C.Tag.DASHBOARD_NEEDS_ANSWER)
       reservations(pending, state.savingIds, onApprove, onDecline, clock)
       if (pending.size < state.needsAnswer.size) {
@@ -295,7 +312,7 @@ private fun LazyListScope.reservations(
   }
 }
 
-/** No reservation to show yet: why, and where they will come from. */
+/** No reservation or proof to show yet: why, and where they will come from. */
 @Composable
 private fun NoReservations() {
   Column(
@@ -352,10 +369,11 @@ private val BADGE_VERTICAL = 2.dp
 private val HEADER_AVATAR_SIZE = 48.dp
 private val HEADER_AVATAR_STYLE = AroundTextStyles.AvatarLarge.copy(fontSize = 17.sp)
 
+// Internal, not private, so a test can draw it: the previews are code too
 @Preview(name = "Light", heightDp = 917)
 @Preview(name = "Dark", heightDp = 917, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun VenueDashboardPreview() {
+internal fun VenueDashboardPreview() {
   val now = System.currentTimeMillis()
   fun reservation(id: String, title: String, name: String, party: Int, approved: Boolean) =
       DashboardReservation(
@@ -380,6 +398,17 @@ private fun VenueDashboardPreview() {
             upcoming =
                 listOf(reservation("c", "Find the hidden fox", "Camille D.", 1, approved = true)),
             activeQuestsCount = 2,
+            proofsToReview =
+                listOf(
+                    DashboardProof(
+                        completionId = "p",
+                        explorerName = "Yusuf S.",
+                        questTitle = "Find the hidden fox",
+                        partySize = 4,
+                        proofType = ProofType.PHOTO,
+                        sentAt = now - 2 * DateUtils.MINUTE_IN_MILLIS,
+                    )
+                ),
         ),
         onApprove = {},
         onDecline = {},

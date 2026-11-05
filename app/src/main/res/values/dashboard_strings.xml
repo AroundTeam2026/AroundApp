@@ -7,6 +7,17 @@
     <string name="dashboard_stat_active_quests">Active quests</string>
     <string name="dashboard_needs_answer">Needs your answer</string>
     <string name="dashboard_upcoming">Upcoming</string>
+    <string name="dashboard_proofs_to_review">Proofs to review</string>
+    <!-- A proof's quest, then its party, e.g. "Find the hidden fox · Party of 4" -->
+    <string name="dashboard_proof_quest_and_party">%1$s · %2$s</string>
+    <string name="dashboard_proof_solo">Solo visit</string>
+    <string name="dashboard_proof_photo">Photo</string>
+    <string name="dashboard_proof_answer">Answer</string>
+    <!-- The kind of proof, then how long ago it was sent, e.g. "Photo · sent 2 min. ago" -->
+    <string name="dashboard_proof_sent">%1$s · sent %2$s</string>
+    <string name="dashboard_proof_sent_just_now">%1$s · sent just now</string>
+    <!-- What tapping a proof row does, read by screen readers -->
+    <string name="dashboard_proof_open">Review proof</string>
     <!-- How long ago the explorer asked, e.g. "Requested 12 min. ago" -->
     <string name="dashboard_requested">Requested %1$s</string>
     <string name="dashboard_requested_just_now">Requested just now</string>
