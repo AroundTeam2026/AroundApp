@@ -1,6 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -85,6 +88,26 @@ class OverviewQuestRowTest {
     status("APPROVED").assertIsDisplayed()
     status("WAITING FOR THE VENUE").assertDoesNotExist()
     part(C.Tag.OVERVIEW_ROW_PARTY).assertTextEquals("3 people")
+  }
+
+  // The Figma frames "Quests tab · proof sent and rejected" and "Quests tab · completed"
+  @Test
+  fun eachProofStatusSaysWhereTheProofStands() {
+    var current by mutableStateOf(OverviewRowStatus.PROOF_SENT)
+    compose.setContent {
+      AroundAppTheme { OverviewQuestRow(row(status = current), onClick = {}, clock = CLOCK) }
+    }
+
+    mapOf(
+            OverviewRowStatus.PROOF_SENT to "PROOF SENT",
+            OverviewRowStatus.COMPLETED to "COMPLETED",
+            OverviewRowStatus.PROOF_REJECTED to "PROOF REJECTED",
+        )
+        .forEach { (shown, text) ->
+          current = shown
+          status(text).assertIsDisplayed()
+          status("APPROVED").assertDoesNotExist()
+        }
   }
 
   @Test
