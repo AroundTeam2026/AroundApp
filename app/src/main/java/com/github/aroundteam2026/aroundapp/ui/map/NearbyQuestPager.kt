@@ -307,6 +307,7 @@ private fun QuestPage(quest: NearbyQuest, style: MarkerStyle, onClick: () -> Uni
           quest.minPartySize,
           quest.distanceMeters,
           style.chipStyle,
+          quest.exactPartySize,
           // Figma sets the chips a little further below the venue's name than the lines' gap
           Modifier.padding(top = AroundSpacing.ExtraSmall),
       )

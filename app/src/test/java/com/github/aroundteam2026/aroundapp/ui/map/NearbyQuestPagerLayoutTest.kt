@@ -43,6 +43,7 @@ class NearbyQuestPagerLayoutTest {
               title = "Find the hidden fox",
               reward = Reward.Other("15% off hot drinks"),
               minPartySize = 1,
+              exactPartySize = false,
               distanceMeters = 120.0,
           )
         }
