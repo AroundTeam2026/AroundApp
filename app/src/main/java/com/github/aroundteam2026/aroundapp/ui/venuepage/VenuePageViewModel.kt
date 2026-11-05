@@ -48,13 +48,11 @@ import kotlinx.coroutines.launch
 /**
  * Holds the page of the venue [venueId]: its header and the quests explorers can take there.
  *
- * It listens to the venue, its active quests, the only ones the repository sends, and the
- * reservations of the explorer [explorerUid] with their parties, read from [partyRepository], and
- * keeps up as they change and as rewards expire, by [clock]. If listening to the venue or its
- * quests fails, the page shows [VenuePageStatus.FAILED] until [onRetry]. If listening to the
- * reservations or their parties fails, the page stays and accepting is unavailable
- * ([VenuePageUiState.acceptAvailable]) until the page is opened again. Accepting names the explorer
- * by the display name in their profile, read from [userRepository].
+ * It keeps up with the venue, its active quests and the reservations of [explorerUid] with their
+ * parties, and with rewards expiring by [clock]. If the venue or its quests fail to load, the page
+ * is [VenuePageStatus.FAILED] until [onRetry]; if the reservations fail, accepting is unavailable
+ * ([VenuePageUiState.acceptAvailable]) until the page reopens. Accepting names the explorer as in
+ * their profile.
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -124,15 +122,14 @@ class VenuePageViewModel(
   }
 
   /**
-   * Called when the explorer accepts the picked quest: books it as a pending reservation with
-   * themself as the party's first member, named as in their profile, for a slot starting now. Does
-   * nothing when no quest is picked, when accepting is unavailable, or when that quest is already
+   * Books the picked quest as a pending reservation, with the explorer as its party's first member,
+   * for a slot starting now.
+   *
+   * Does nothing when no quest is picked, accepting is unavailable, or that quest is already
    * accepted or being accepted, so a double tap books once; other quests can still be accepted
-   * meanwhile. The quest shows as accepted only once the backend has answered, never while the
-   * write waits for it. A failure keeps the quest picked and shows [AcceptStatus.FAILED], and so
-   * does the server refusing the write later, after the quest showed as accepted, or the explorer's
-   * profile not being readable; calling this again retries. A quest accepted from its details stays
-   * picked once they close.
+   * meanwhile. The quest shows as accepted only once the backend answered. A failure, a later
+   * server refusal or an unreadable profile keeps it picked and shows [AcceptStatus.FAILED];
+   * calling this again retries. A quest accepted from its details stays picked once they close.
    */
   fun accept() {
     val current = mutableUiState.value

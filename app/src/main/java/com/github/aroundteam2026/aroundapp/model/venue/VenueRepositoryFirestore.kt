@@ -26,18 +26,14 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 
 /**
- * [VenueRepository] backed by the Firestore `venues` collection.
+ * [VenueRepository] backed by the Firestore `venues` collection, one document per venue under its
+ * owner's uid.
  *
- * Firestore types stay inside this class. [Location] is stored as a `GeoPoint` and
- * [Venue.createdAt] as a `Timestamp`. Null fields are omitted, and the venue id, its owner's uid,
- * is the document id rather than a stored field. Documents that cannot be mapped back to a [Venue]
- * are logged and read as missing, so one bad venue does not end a list of them. Such a document
- * still exists, so [createVenue] refuses its id and [setArea] does not repair it: its owner cannot
- * finish onboarding until it is fixed or deleted in the console. Only a write outside the app can
- * make one, since the app always writes every required field.
+ * Documents that cannot be mapped back to a [Venue] are logged and read as missing, so one bad
+ * venue does not end a list of them. Such a document still blocks [createVenue] and [setArea]
+ * doesn't repair it, so its owner can't finish onboarding until it is fixed in the console.
  *
- * The security rules let any signed-in user read a venue and only its owner write it, so writing a
- * venue whose id is not the signed-in uid fails with the Firestore exception.
+ * The security rules let any signed-in user read a venue and only its owner write it.
  *
  * @param db Firestore client to read from and write to.
  */

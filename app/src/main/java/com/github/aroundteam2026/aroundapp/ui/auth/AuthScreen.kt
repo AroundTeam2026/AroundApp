@@ -116,14 +116,11 @@ private fun formMode(step: AuthStep): AuthFormMode =
 /**
  * Email/password and Google authentication backed by [viewModel], starting on the Welcome step.
  *
- * Welcome opens Sign in or an account-type choice. Explorer and Business use the same credentials
- * fields but submit their own role. Back follows the path used to open the Venue form. The
- * navigation owner observes AuthRepository.currentUserId for success and decides the destination.
- * Google sign-in users with no profile choose their role afterward; Google signup carries the role
- * chosen here. [completeRegistration] skips Welcome and presents the role cards without
- * credentials. Use [RegistrationFlow] to provide profile setup and receive account-completion
- * notifications. [googleSignInClient] acquires credentials in the UI; tests supply a chooser result
- * without opening a personal account.
+ * Welcome opens Sign in or an account-type choice; Explorer and Business share the credential
+ * fields but submit their own role, and Back retraces the path that opened the Venue form. The
+ * navigation owner observes `AuthRepository.currentUserId` and picks the destination.
+ * [completeRegistration] skips Welcome and shows only the role cards. [RegistrationFlow] provides
+ * profile setup; tests supply a chooser result through [googleSignInClient].
  */
 @Composable
 fun AuthScreen(

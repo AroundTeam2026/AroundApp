@@ -19,6 +19,7 @@ import com.github.aroundteam2026.aroundapp.ui.navigation.VenueEntry
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
+/** Entry activity: shows the explorer or venue app depending on the signed-in role. */
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
