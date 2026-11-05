@@ -1,9 +1,11 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.review
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -22,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.MAX_REJECT_REASON_LENGTH
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -290,12 +293,12 @@ class ReviewProofViewModel(
     private const val STOP_TIMEOUT_MS = 5_000L
 
     /**
-     * Builds the [ReviewProofViewModel] of the proof [completionId] with the app's repositories,
-     * and [proofPhotoRepository] for the photo: the app has no Cloud Storage one to provide yet.
+     * Builds the [ReviewProofViewModel] of the proof [completionId] with the app's repositories;
+     * [photos] builds the photo repository from the app's context, so a test can swap it.
      */
     fun factory(
         completionId: String,
-        proofPhotoRepository: ProofPhotoRepository,
+        photos: (Context) -> ProofPhotoRepository = ProofPhotoRepositoryProvider::repository,
     ): ViewModelProvider.Factory = viewModelFactory {
       initializer {
         ReviewProofViewModel(
@@ -305,7 +308,7 @@ class ReviewProofViewModel(
             ReservationRepositoryProvider.repository,
             PartyRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
-            proofPhotoRepository,
+            photos(this[APPLICATION_KEY]!!),
         )
       }
     }
