@@ -55,20 +55,14 @@ private fun NavController.close(entry: NavBackStackEntry) {
 }
 
 /**
- * The completion screen as the app shows it to the explorer [explorerUid], with the app's
- * repositories.
+ * The completion screen of a reservation at [venueName].
  *
  * @param close Closes the screen, on its back arrow, system back, or once the proof is sent.
- * @param factory Builds the screen's ViewModel; the app's unless a test needs fakes.
+ * @param factory Builds the screen's ViewModel: [CompletionViewModel.factory] in the app, fakes in
+ *   tests.
  */
 @Composable
-fun Completion(
-    reservationId: String,
-    venueName: String,
-    explorerUid: String,
-    close: () -> Unit,
-    factory: ViewModelProvider.Factory = CompletionViewModel.factory(reservationId, explorerUid),
-) =
+fun Completion(venueName: String, close: () -> Unit, factory: ViewModelProvider.Factory) =
     CompletionScreen(
         viewModel(factory = factory),
         venueName,

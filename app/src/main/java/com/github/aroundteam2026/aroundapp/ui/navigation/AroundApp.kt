@@ -15,6 +15,7 @@ import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.completion.Completion
+import com.github.aroundteam2026.aroundapp.ui.completion.CompletionViewModel
 import com.github.aroundteam2026.aroundapp.ui.completion.completionDestination
 import com.github.aroundteam2026.aroundapp.ui.completion.navigateToCompletion
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
@@ -84,7 +85,7 @@ fun AroundApp(
         },
     completion: @Composable (reservationId: String, venueName: String, close: () -> Unit) -> Unit =
         { reservationId, venueName, close ->
-          Completion(reservationId, venueName, explorerUid, close)
+          Completion(venueName, close, CompletionViewModel.factory(reservationId, explorerUid))
         },
     overview: @Composable (onOpenVenue: (venueId: String) -> Unit) -> Unit = {
       OverviewScreen(explorerUid, it)

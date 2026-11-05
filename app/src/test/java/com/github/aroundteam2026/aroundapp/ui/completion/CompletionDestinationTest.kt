@@ -246,9 +246,7 @@ class CompletionDestinationTest {
       }
     }
     compose.setContent {
-      AroundAppTheme {
-        Completion(reservationId, venue.name, EXPLORER, close = { closes++ }, factory = factory)
-      }
+      AroundAppTheme { Completion(venue.name, close = { closes++ }, factory = factory) }
     }
     compose.waitForIdle()
   }
