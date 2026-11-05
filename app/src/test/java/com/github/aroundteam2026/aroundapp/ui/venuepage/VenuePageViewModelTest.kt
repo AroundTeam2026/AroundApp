@@ -248,6 +248,16 @@ class VenuePageViewModelTest {
   }
 
   @Test
+  fun showsWhereTheVenueIs() = test {
+    val location = Location(46.52, 6.63)
+    venueRepository = FakeVenueRepository(listOf(venue.copy(location = location)))
+    viewModel
+    runCurrent()
+
+    assertEquals(location, state.venueLocation)
+  }
+
+  @Test
   fun theDetailsOpenAndClose() = test {
     viewModel
     runCurrent()

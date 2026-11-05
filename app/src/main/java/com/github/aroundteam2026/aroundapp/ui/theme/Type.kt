@@ -50,6 +50,7 @@ object AroundTextStyles {
   val Hero = heading(38, 41)
   val SetupTitle = heading(32, 35)
   val PageTitle = heading(30)
+  val QuestTitle = heading(28, 31, tracking = 0.0)
   val EmptyPageTitle = heading(30, 33)
   val SheetTitle = heading(24, 26)
   val OverlayTitle = heading(22, tracking = 0.0)
