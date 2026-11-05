@@ -163,21 +163,21 @@ class VenuePageUiStateTest {
   }
 
   @Test
-  fun cancelStatusFollowsThePickedQuest() {
-    val picked = loaded.copy(selectedQuestId = "a")
+  fun cancelStatusFollowsThePickedQuestsReservation() {
+    val picked = loaded.copy(selectedQuestId = "a", reservationIds = mapOf("a" to "r"))
 
     assertEquals(CancelStatus.NONE, picked.cancelStatus)
     assertEquals(
         CancelStatus.CANCELLING,
-        picked.copy(cancellingQuestIds = setOf("a")).cancelStatus,
+        picked.copy(cancellingIds = setOf("r")).cancelStatus,
     )
     assertEquals(
         CancelStatus.FAILED,
-        picked.copy(failedCancelQuestIds = setOf("a")).cancelStatus,
+        picked.copy(failedCancelIds = setOf("r")).cancelStatus,
     )
     assertEquals(
         CancelStatus.NONE,
-        picked.copy(cancellingQuestIds = setOf("b")).cancelStatus,
+        picked.copy(cancellingIds = setOf("other")).cancelStatus,
     )
   }
 

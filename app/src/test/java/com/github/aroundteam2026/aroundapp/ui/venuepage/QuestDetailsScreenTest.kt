@@ -317,7 +317,7 @@ class QuestDetailsScreenTest {
   @Test
   fun whileCancellingTheButtonIsDisabled() {
     val quest = quest()
-    show(quest, accepted(quest).copy(cancellingQuestIds = setOf(QUEST)))
+    show(quest, accepted(quest).copy(cancellingIds = setOf("r")))
 
     node(C.Tag.OVERVIEW_ROW_CANCEL).assertIsNotEnabled()
     compose.onNodeWithText("Cancelling…").assertExists()
@@ -326,7 +326,7 @@ class QuestDetailsScreenTest {
   @Test
   fun afterAFailureTheButtonRetriesAtOnce() {
     val quest = quest()
-    show(quest, accepted(quest).copy(failedCancelQuestIds = setOf(QUEST)))
+    show(quest, accepted(quest).copy(failedCancelIds = setOf("r")))
 
     node(C.Tag.OVERVIEW_ROW_CANCEL_FAILED).assertIsDisplayed()
     node(C.Tag.OVERVIEW_ROW_CANCEL).performClick()

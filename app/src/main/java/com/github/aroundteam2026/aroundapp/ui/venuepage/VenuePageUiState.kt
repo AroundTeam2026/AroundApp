@@ -32,8 +32,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property acceptingQuestIds Ids of the quests being accepted right now.
  * @property failedQuestIds Ids of the quests whose last accept failed: the write could not be
  *   issued, or the server refused it afterwards.
- * @property cancellingQuestIds Ids of the quests whose reservation is being cancelled right now.
- * @property failedCancelQuestIds Ids of the quests whose reservation's last cancel failed.
+ * @property cancellingIds Ids of the reservations being cancelled right now.
+ * @property failedCancelIds Ids of the reservations whose last cancel failed.
  * @property acceptAvailable False once the explorer's reservations can't be read, since then the
  *   page can't tell what they accepted and so doesn't book anything.
  */
@@ -51,8 +51,8 @@ data class VenuePageUiState(
     val reservationIds: Map<String, String> = emptyMap(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
-    val cancellingQuestIds: Set<String> = emptySet(),
-    val failedCancelQuestIds: Set<String> = emptySet(),
+    val cancellingIds: Set<String> = emptySet(),
+    val failedCancelIds: Set<String> = emptySet(),
     val acceptAvailable: Boolean = true,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
@@ -85,9 +85,9 @@ data class VenuePageUiState(
   /** How cancelling the picked quest's reservation stands; [CancelStatus.NONE] when none is. */
   val cancelStatus: CancelStatus
     get() =
-        when (selectedQuestId) {
-          in cancellingQuestIds -> CancelStatus.CANCELLING
-          in failedCancelQuestIds -> CancelStatus.FAILED
+        when (selectedQuestId?.let(reservationIds::get)) {
+          in cancellingIds -> CancelStatus.CANCELLING
+          in failedCancelIds -> CancelStatus.FAILED
           else -> CancelStatus.NONE
         }
 

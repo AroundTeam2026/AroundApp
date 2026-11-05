@@ -187,19 +187,17 @@ class VenuePageViewModel(
   /**
    * Called when the explorer cancels their reservation for the picked quest, once they confirmed.
    * Does nothing without such a reservation, or while it is being cancelled, so a double tap
-   * cancels once. The quest shows as cancelling until the reservations no longer list it as
-   * accepted. A failure, such as being offline, shows [CancelStatus.FAILED]; calling this again
-   * retries.
+   * cancels once. It shows as cancelling until the reservations no longer list it. A failure, such
+   * as being offline, shows [CancelStatus.FAILED]; calling this again retries.
    */
   fun cancel() {
     val current = mutableUiState.value
     val reservationId = current.cancellableReservationId ?: return
-    val id = current.selectedQuestId ?: return
-    if (id in current.cancellingQuestIds) return
+    if (reservationId in current.cancellingIds) return
     mutableUiState.update {
       it.copy(
-          cancellingQuestIds = it.cancellingQuestIds + id,
-          failedCancelQuestIds = it.failedCancelQuestIds - id,
+          cancellingIds = it.cancellingIds + reservationId,
+          failedCancelIds = it.failedCancelIds - reservationId,
       )
     }
     viewModelScope.launch {
@@ -207,11 +205,11 @@ class VenuePageViewModel(
         Log.w(TAG, "Cancelling reservation $reservationId failed", it)
         mutableUiState.update { state ->
           // A reservation that left meanwhile, e.g. rejected by the venue, has nothing to mark
-          val shown = id in state.reservationIds
+          val shown = reservationId in state.reservationIds.values
           state.copy(
-              cancellingQuestIds = state.cancellingQuestIds - id,
-              failedCancelQuestIds =
-                  if (shown) state.failedCancelQuestIds + id else state.failedCancelQuestIds,
+              cancellingIds = state.cancellingIds - reservationId,
+              failedCancelIds =
+                  if (shown) state.failedCancelIds + reservationId else state.failedCancelIds,
           )
         }
       }
@@ -420,7 +418,7 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
 /**
  * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
  * [accepted] ones, or "not found" when [venue] is null. A quest being accepted that is now accepted
- * is done accepting, a quest no longer accepted is done cancelling, and a quest in [refused]
+ * is done accepting, a reservation no longer listed is done cancelling, and a quest in [refused]
  * failed. A null [accepted] means the reservations can't be read: the page keeps what it knew and
  * stops offering to accept or cancel.
  */
@@ -445,8 +443,8 @@ private fun VenuePageUiState.showing(
               acceptingQuestIds =
                   if (accepted == null) emptySet() else acceptingQuestIds - accepted.keys,
               failedQuestIds = failedQuestIds - (accepted?.keys ?: emptySet()) + refused,
-              cancellingQuestIds = cancellingQuestIds.intersect(accepted?.keys ?: emptySet()),
-              failedCancelQuestIds = failedCancelQuestIds.intersect(accepted?.keys ?: emptySet()),
+              cancellingIds = cancellingIds.intersect(reservationIds?.values.orEmpty()),
+              failedCancelIds = failedCancelIds.intersect(reservationIds?.values.orEmpty()),
               acceptAvailable = accepted != null,
           )
           .withQuests(quests)

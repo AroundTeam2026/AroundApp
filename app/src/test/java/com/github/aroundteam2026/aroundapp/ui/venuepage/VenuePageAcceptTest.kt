@@ -383,6 +383,26 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun cancellingOneOfTwoReservationsLetsTheOtherBeCancelled() = test {
+    storeFor("a", friends = listOf("f1"))
+    storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(
+        listOf(ReservationStatus.CANCELLED, ReservationStatus.CANCELLED),
+        stored().map { it.status },
+    )
+  }
+
+  @Test
   fun aFailedCancelOfAReservationThatLeftMeanwhileMarksNothing() = test {
     val failing = CancelFailingRepository(fake, failures = 1)
     reservationRepository = failing
@@ -394,7 +414,7 @@ class VenuePageAcceptTest {
     runCurrent()
 
     assertEquals(CancelStatus.NONE, state.cancelStatus)
-    assertTrue(state.cancellingQuestIds.isEmpty())
+    assertTrue(state.cancellingIds.isEmpty())
   }
 
   @Test
