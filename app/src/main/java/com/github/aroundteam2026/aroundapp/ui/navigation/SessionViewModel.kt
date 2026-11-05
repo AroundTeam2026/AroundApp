@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> (KDoc reformatting)
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.lifecycle.ViewModel
@@ -16,10 +17,13 @@ import kotlinx.coroutines.flow.stateIn
 
 /** Authentication determines access to the main graph; role routing is added separately. */
 sealed interface SessionState {
+  /** The saved session is still being restored. */
   data object Checking : SessionState
 
+  /** No user is signed in. */
   data object SignedOut : SessionState
 
+  /** [userId] is signed in. */
   data class SignedIn(val userId: String) : SessionState
 }
 

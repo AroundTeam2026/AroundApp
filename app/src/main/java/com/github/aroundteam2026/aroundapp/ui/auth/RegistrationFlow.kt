@@ -15,12 +15,11 @@ import com.github.aroundteam2026.aroundapp.model.user.RegistrationChoice
  * Content for AppRoot's authFlow and roleSelection slots, sharing the router's [registration] (its
  * [ProfileSetup]).
  *
- * Normal registration records a role before auth emits its uid. The router calls
- * [ProfileSetup.finish] on that session change, including after a restart. In
- * [completeRegistration] mode, only the registration choices are shown: [onAccountSetupComplete]
- * tells the router to call finish again after the signed-in user's choice reaches disk. Profile
- * errors/retry and the final destination belong to the router. This flow never navigates or
- * defaults a missing role.
+ * Normal registration records a role before auth emits its uid, and the router calls
+ * [ProfileSetup.finish] on that session change. In [completeRegistration] mode only the role
+ * choices show, and [onAccountSetupComplete] tells the router to call finish again once the choice
+ * reaches disk. Profile errors, retry and the destination belong to the router: this flow never
+ * navigates or defaults a missing role.
  */
 @Composable
 fun RegistrationFlow(

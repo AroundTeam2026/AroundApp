@@ -46,18 +46,15 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
 /**
- * The bar under a venue's quests, once the explorer picked one: a full-width "Accept quest" button,
- * styled like the one in the quest popup of the Figma frame, and what [state] says about accepting.
+ * The bar under a venue's quests once the explorer picked one: a full-width "Accept quest" button
+ * and what [state] says about accepting.
  *
- * - Ready: the button calls [onAccept].
- * - Accepting: a pulsing skeleton takes the button's place, and can't be tapped.
- * - Accepted: the button is disabled and says the venue is yet to approve.
- * - Failed: an error shows above the button, which now says "Try again" and calls [onAccept].
- * - A quest that needs more people says how many, whatever the state: it can still be accepted.
- * - Accepting unavailable: the button is disabled and says why.
+ * - Ready: the button calls [onAccept]. Failed: an error shows above it, and it says "Try again".
+ * - Accepting: a pulsing skeleton that can't be tapped takes the button's place.
+ * - Accepted: disabled, saying the venue is yet to approve. Unavailable: disabled, saying why.
+ * - A quest that needs more people says how many, whatever the state.
  *
- * It draws nothing while no quest is picked. It only shows the state: [onAccept] is the
- * ViewModel's. [footer] sits under the button.
+ * It draws nothing while no quest is picked. [footer] sits under the button.
  *
  * @param onSubmitProof Given once the venue approved the reservation, as in the Figma frame "Quest
  *   details · submit proof": the button then says "Submit proof" and calls it.

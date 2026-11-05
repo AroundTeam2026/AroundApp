@@ -8,18 +8,14 @@ import kotlinx.coroutines.flow.Flow
 /** Reads and writes [Reservation]s. ViewModels depend on this interface only. */
 interface ReservationRepository {
   /**
-   * Stores a new reservation and makes [creatorUid] the first [PartyMemberStatus.JOINED] member of
-   * its party, in one atomic write: either both are stored or neither is. The repository, not the
-   * caller, sets `id`, `createdAt` and `status`: it generates a fresh id, sets the creation time,
-   * and starts the reservation as [ReservationStatus.PENDING]. The values of those three fields in
-   * [reservation] are ignored.
+   * Stores a new pending reservation and makes [creatorUid] the first [PartyMemberStatus.JOINED]
+   * member of its party, in one atomic write.
    *
-   * Waits for the backend to confirm the write, for a bounded time. The security rules only let an
-   * explorer reserve as themselves, for an active quest, so the Firestore implementation's server
-   * can refuse the write; a refusal that arrives in time is returned as a failure and nothing is
-   * stored. When no answer arrives in time, e.g. while offline, the write stays queued, is sent
-   * once the device is back online, and this returns success: a refusal after that is not reported
-   * here.
+   * The repository sets `id`, `createdAt` and `status`; their values in [reservation] are ignored.
+   *
+   * Waits a bounded time for the backend. A refusal by the security rules in that time, e.g. for an
+   * inactive quest, is returned as a failure. Without an answer, e.g. while offline, the write
+   * stays queued and this returns success, so a later refusal is not reported.
    *
    * @param reservation the reservation to store; its `id`, `createdAt` and `status` are ignored.
    * @param creatorUid uid of the explorer making the reservation, who joins its party.

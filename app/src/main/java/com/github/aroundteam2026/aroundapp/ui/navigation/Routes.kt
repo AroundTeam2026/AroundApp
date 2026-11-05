@@ -7,13 +7,10 @@ import android.net.Uri
  * Routes of the screens added in Sprint 2, kept in one place so that every screen navigates with
  * the same names.
  *
- * Each route starts as a "Coming soon" stub. The task that builds a screen replaces its stub, and
- * the route stays the same, so nothing that navigates to it has to change.
- *
- * Explorer routes are registered in the explorer's NavHost, [AroundApp]. Venue routes belong to the
- * venue's own NavHost, so an explorer can't reach them. [venueDestinations] registers the home and
- * the create-quest form there; the dashboard is still a tab of [VenueHome], and its route is
- * registered when its screen is built.
+ * Each route starts as a "Coming soon" stub that the screen's task replaces, keeping the route.
+ * Explorer routes are registered in [AroundApp]'s NavHost. Venue routes belong to the venue's own
+ * NavHost, so an explorer can't reach them; [venueDestinations] registers them there, while the
+ * dashboard is still a tab of [VenueHome].
  */
 object Routes {
   /** Argument of [VENUE_PAGE]: the venue's id, equal to its owner's uid. */
