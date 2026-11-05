@@ -1,27 +1,32 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
-import android.graphics.Bitmap
 import android.net.Uri
-import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class CompletionScreenTest {
   @get:Rule val compose = createComposeRule()
@@ -39,21 +44,16 @@ class CompletionScreenTest {
   private var requests = 0
   private var servicesEnabled by mutableStateOf(true)
 
-  private fun capture(name: String) {
-    val image = compose.onNodeWithTag("completion_screen").captureToImage()
-    val output = File("build/reports/completion-$name.png")
-    output.parentFile?.mkdirs()
-    output.outputStream().use {
-      image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
-    }
-  }
-
-  private fun show(refused: Boolean = false, dark: Boolean = false) {
+  private fun show(
+      refused: Boolean = false,
+      dark: Boolean = false,
+      venueName: String = "Café Lumière",
+  ) {
     compose.setContent {
       AroundAppTheme(darkTheme = dark) {
         CompletionContent(
             state,
-            "Café Lumière",
+            venueName,
             { state = state.copy(answer = it) },
             { submits++ },
             {},
@@ -63,7 +63,7 @@ class CompletionScreenTest {
             locationServicesEnabled = servicesEnabled,
             photoPicker = {
               ProofPhotoBox(
-                  "Café Lumière",
+                  venueName,
                   state.photo != null,
                   null,
                   false,
@@ -82,11 +82,11 @@ class CompletionScreenTest {
   @Test
   fun textProofRequiresNonblankAnswerAndSends() {
     show()
-    compose.onNodeWithTag("completion_submit").assertIsNotEnabled()
-    compose.onNodeWithTag("completion_answer").performTextInput("   ")
-    compose.onNodeWithTag("completion_submit").assertIsNotEnabled()
-    compose.onNodeWithTag("completion_answer").performTextInput("Mochi")
-    compose.onNodeWithTag("completion_submit").performClick()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("   ")
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("Mochi")
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).performClick()
     assertEquals(1, submits)
   }
 
@@ -94,29 +94,45 @@ class CompletionScreenTest {
   fun photoProofUsesPickerAndRequiresPhoto() {
     state = state.copy(proofType = ProofType.PHOTO)
     show()
-    compose.onNodeWithTag("completion_answer").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO).assertIsDisplayed()
-    capture("photo-light")
-    compose.onNodeWithTag("completion_submit").assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
     compose.runOnIdle { state = state.copy(photo = Uri.parse("content://proof/photo")) }
-    compose.onNodeWithTag("completion_submit").assertIsEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_RETAKE).performClick()
-    compose.onNodeWithTag("completion_submit").assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
   }
 
   @Test
   fun failedSubmissionKeepsAnswerAndCanRetryInDarkTheme() {
     state = state.copy(answer = "Mochi", saveState = SaveState.Failed)
     show(dark = true)
-    capture("text-error-dark")
     compose
-        .onNodeWithText(
-            "Your proof could not be sent. Your answer or photo is still here. Try sending it again."
-        )
+        .onNodeWithText("Couldn't send your proof. Check your connection and try again.")
         .assertIsDisplayed()
-    compose.onNodeWithTag("completion_answer").assertTextContains("Mochi")
-    compose.onNodeWithTag("completion_submit").performClick()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SAVE_ERROR).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertTextContains("Mochi")
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertTextContains("Try again").performClick()
     assertEquals(1, submits)
+  }
+
+  @Test
+  fun failedSubmissionShowsRetryInLightTheme() {
+    state = state.copy(answer = "Mochi", saveState = SaveState.Failed)
+    show()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SAVE_ERROR).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertTextContains("Try again").performClick()
+    assertEquals(1, submits)
+    compose.runOnIdle { state = state.copy(saveState = SaveState.Saving) }
+    compose.onNodeWithTag(C.Tag.COMPLETION_SAVE_ERROR).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
+    compose.onNodeWithText("Sending…").assertIsDisplayed()
+  }
+
+  @Test
+  fun venueInitialsUseTheSharedFirstAndLastWordRules() {
+    show(venueName = "  Café   du   Lac  ")
+    compose.onNodeWithText("CL").assertIsDisplayed()
   }
 
   @Test
@@ -124,8 +140,8 @@ class CompletionScreenTest {
     state = state.copy(answer = "Mochi", saveState = SaveState.Saving)
     show()
     compose.onNodeWithText("Sending…").assertIsDisplayed()
-    compose.onNodeWithTag("completion_submit").assertIsNotEnabled()
-    compose.onNodeWithTag("completion_answer").assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertIsNotEnabled()
     compose.onNodeWithContentDescription("Back").assertIsNotEnabled()
   }
 
@@ -158,7 +174,7 @@ class CompletionScreenTest {
         .assertIsDisplayed()
     compose.onNodeWithText("Check location access").performClick()
     assertEquals(1, requests)
-    compose.onNodeWithTag("completion_answer").assertTextContains("Mochi")
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertTextContains("Mochi")
   }
 
   @Test
@@ -189,10 +205,37 @@ class CompletionScreenTest {
     show(dark = dark)
     compose.onNodeWithText("Open location settings").assertIsDisplayed().performClick()
     assertEquals(1, requests)
-    capture(if (dark) "location-off-dark" else "location-off-light")
     compose.runOnIdle { servicesEnabled = true }
     compose.onNodeWithText("Open location settings").assertDoesNotExist()
     compose.onNodeWithText("Check location access").assertIsDisplayed()
+  }
+
+  @Test
+  fun savedFormCannotEditOrSubmitAgain() {
+    state = state.copy(answer = "Mochi", saveState = SaveState.Saved("proof"))
+    show()
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_SUBMIT)
+        .assertTextContains("Proof sent")
+        .assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertIsNotEnabled()
+    compose.onNodeWithContentDescription("Back").assertIsNotEnabled()
+  }
+
+  @Test
+  fun loadingDoesNotOfferProofOrSubmissionControls() {
+    state = state.copy(status = CompletionFormStatus.LOADING)
+    show()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertDoesNotExist()
+  }
+
+  @Test
+  fun emptyRequirementsDoNotShowAnEmptyCard() {
+    state = state.copy(requirements = "")
+    show()
+    compose.onNodeWithText("WHAT TO DO").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertIsDisplayed()
   }
 
   @Test
@@ -205,6 +248,6 @@ class CompletionScreenTest {
     compose
         .onNodeWithText("This reservation is no longer available to complete.")
         .assertIsDisplayed()
-    compose.onNodeWithTag("completion_submit").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertDoesNotExist()
   }
 }

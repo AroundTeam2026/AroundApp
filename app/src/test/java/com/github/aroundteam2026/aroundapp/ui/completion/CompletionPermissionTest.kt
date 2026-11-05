@@ -21,7 +21,10 @@ import androidx.compose.ui.test.performClick
 import androidx.core.app.ActivityOptionsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +38,7 @@ class CompletionPermissionTest {
   private val locationManager = app.getSystemService(LocationManager::class.java)
   private var submits = 0
   private var requested: Array<String>? = null
+  private var permissionRequests = 0
   private var refused = false
   private var servicesEnabled = false
 
@@ -54,6 +58,7 @@ class CompletionPermissionTest {
                 ) {
                   @Suppress("UNCHECKED_CAST")
                   requested = input as Array<String>
+                  permissionRequests++
                   if (grantFine) shadowOf(app).grantPermissions(ACCESS_FINE_LOCATION)
                   dispatchResult(
                       requestCode,
@@ -115,7 +120,7 @@ class CompletionPermissionTest {
     compose.runOnIdle {
       assertEquals(
           Settings.ACTION_LOCATION_SOURCE_SETTINGS,
-          shadowOf(app).nextStartedActivity.action,
+          shadowOf(app).nextStartedActivity?.action,
       )
       assertNull(requested)
       assertEquals(0, submits)
@@ -144,7 +149,7 @@ class CompletionPermissionTest {
     compose.runOnIdle {
       assertEquals(
           Settings.ACTION_LOCATION_SOURCE_SETTINGS,
-          shadowOf(app).nextStartedActivity.action,
+          shadowOf(app).nextStartedActivity?.action,
       )
       assertNull(requested)
       assertEquals(0, submits)
@@ -170,7 +175,7 @@ class CompletionPermissionTest {
     compose.runOnIdle {
       assertEquals(
           Settings.ACTION_LOCATION_SOURCE_SETTINGS,
-          shadowOf(app).nextStartedActivity.action,
+          shadowOf(app).nextStartedActivity?.action,
       )
       assertNull(requested)
       assertEquals(0, submits)
@@ -186,6 +191,19 @@ class CompletionPermissionTest {
       val intent = shadowOf(app).nextStartedActivity
       assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, intent.action)
       assertEquals("package:${app.packageName}", intent.data.toString())
+      assertEquals(0, submits)
+    }
+  }
+
+  @Test
+  fun recoveryAfterFirstRefusalAsksAgainWhileAndroidAllowsIt() {
+    show(grantFine = false)
+    compose.onNodeWithText("Submit").performClick()
+    shadowOf(app.packageManager).setShouldShowRequestPermissionRationale(ACCESS_FINE_LOCATION, true)
+    compose.onNodeWithText("Recover location").performClick()
+    compose.runOnIdle {
+      assertEquals(2, permissionRequests)
+      assertNull(shadowOf(app).nextStartedActivity)
       assertEquals(0, submits)
     }
   }

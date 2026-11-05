@@ -7,6 +7,7 @@ import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.location.LocationManager
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
@@ -25,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
 @Composable
 internal fun rememberCompletionPermission(onSubmit: () -> Unit): CompletionPermission {
   val context = LocalContext.current
+  val activity = LocalActivity.current
   val locationManager = remember(context) { context.getSystemService(LocationManager::class.java) }
   var servicesEnabled by remember { mutableStateOf(locationManager.isLocationEnabled) }
   val currentSubmit by rememberUpdatedState(onSubmit)
@@ -65,7 +68,16 @@ internal fun rememberCompletionPermission(onSubmit: () -> Unit): CompletionPermi
           context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
         } else if (fineGranted()) {
           currentSubmit()
-        } else if (refused && requested) {
+        } else if (
+            refused &&
+                requested &&
+                (activity == null ||
+                    !ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity,
+                        ACCESS_FINE_LOCATION,
+                    ))
+        ) {
+          // Only use settings once Android will no longer show its permission dialog.
           context.startActivity(
               Intent(
                   Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
