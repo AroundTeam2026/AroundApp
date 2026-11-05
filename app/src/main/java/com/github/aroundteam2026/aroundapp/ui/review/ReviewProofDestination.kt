@@ -9,7 +9,6 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.ui.navigation.Routes
 
 private const val TAG = "ReviewProofDestination"
@@ -34,12 +33,9 @@ fun NavGraphBuilder.reviewProofDestination(
   }
 }
 
-/**
- * The app's ViewModel of the proof [completionId]. The photos come from a fake until #358 adds the
- * Cloud Storage repository, so until then they show as a placeholder.
- */
+/** The app's ViewModel of the proof [completionId], with the app's repositories. */
 internal fun defaultReviewProofFactory(completionId: String) =
-    ReviewProofViewModel.factory(completionId, FakeProofPhotoRepository())
+    ReviewProofViewModel.factory(completionId)
 
 /**
  * Opens the Review proof screen of the completion [completionId], without stacking it again if a

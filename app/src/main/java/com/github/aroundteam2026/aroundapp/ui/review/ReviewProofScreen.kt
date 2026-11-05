@@ -472,7 +472,7 @@ private fun Actions(
       SecondaryButton(
           stringResource(R.string.review_proof_reject),
           onReject,
-          enabled = state.canAnswer,
+          enabled = state.canReject,
           tag = C.Tag.REVIEW_PROOF_REJECT,
       )
       PrimaryButton(
@@ -480,7 +480,7 @@ private fun Actions(
               if (approving) R.string.review_proof_approving else R.string.review_proof_approve
           ),
           onApprove,
-          enabled = state.canAnswer,
+          enabled = state.canApprove,
           tag = C.Tag.REVIEW_PROOF_APPROVE,
           busy = approving,
       )

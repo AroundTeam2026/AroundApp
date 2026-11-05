@@ -146,6 +146,15 @@ class ReviewProofScreenTest {
     assertEquals(1, retries)
   }
 
+  // An approval is final, so the venue must have seen the photo it approves
+  @Test
+  fun aPhotoNotShownYetCanOnlyBeRejected() {
+    show(PHOTO.copy(photo = ProofPhoto.Failed))
+
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_REJECT).assertIsEnabled()
+  }
+
   @Test
   fun aWrittenAnswerIsShownForASoloVisit() {
     show(ANSWER)
@@ -383,7 +392,8 @@ class ReviewProofScreenTest {
             requirements = "Order any drink.",
             reward = Reward.FreeItem("croissant", specifics = null),
             proof = Proof.Photo("gs://around/proofs/p.jpg"),
-            photo = ProofPhoto.Failed,
+            // Downloaded but not an image: the placeholder, without a retry
+            photo = ProofPhoto.Loaded(ByteArray(0)),
         )
 
     val ANSWER =
