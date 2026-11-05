@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -59,8 +59,6 @@ private val OVERLAY_PADDING = 18.dp
 private val BUTTON_ELEVATION = 4.dp
 private val OUTLINE_WIDTH = 1.dp
 private val OVERLAY_ELEVATION = 12.dp
-// Figma gives the overlay this same plum shadow in light and dark mode, so it isn't a theme colour
-private val OVERLAY_SHADOW = Color(0x2E1F142E)
 
 /** How fast a downward fling must be to close the overlay, however short it is. */
 private val CLOSING_FLING = 1_000.dp
@@ -149,8 +147,8 @@ fun NearbyQuestOverlay(
           .shadow(
               OVERLAY_ELEVATION,
               AroundCorners.Overlay,
-              ambientColor = OVERLAY_SHADOW,
-              spotColor = OVERLAY_SHADOW,
+              ambientColor = AroundColors.OverlayShadow,
+              spotColor = AroundColors.OverlayShadow,
           )
           .background(colors.surface, AroundCorners.Overlay)
           .border(OUTLINE_WIDTH, colors.outline, AroundCorners.Overlay)

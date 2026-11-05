@@ -26,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -36,6 +35,7 @@ import androidx.core.app.ActivityCompat
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.location.LocationPermissions
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -47,8 +47,6 @@ private val ICON_SIZE = 20.dp
 private val TEXT_SPACING = 2.dp
 private val BUTTON_HEIGHT = 44.dp
 private val BANNER_ELEVATION = 8.dp
-/** Figma's shadow: warm brown at 16 %. */
-private val BANNER_SHADOW = Color(0x296B5947)
 
 /**
  * Says the location is off, so the map shows the quests around Lausanne rather than around the
@@ -66,8 +64,8 @@ fun LocationBanner(onTurnOn: () -> Unit, modifier: Modifier = Modifier) {
           .shadow(
               BANNER_ELEVATION,
               AroundCorners.LocationBanner,
-              ambientColor = BANNER_SHADOW,
-              spotColor = BANNER_SHADOW,
+              ambientColor = AroundColors.BannerShadow,
+              spotColor = AroundColors.BannerShadow,
           )
           .background(colors.surface, AroundCorners.LocationBanner)
           .padding(

@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -23,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
@@ -58,6 +60,14 @@ class VenueInitializationScreenTest {
           onContinueToLocation = { navigatedIds.add(it) },
       )
     }
+  }
+
+  @Test
+  @Config(qualifiers = "w413dp-h917dp-night-mdpi")
+  fun venueSetupUsesSharedDarkBackground() {
+    launch()
+    val image = compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).captureToImage()
+    assertEquals(AroundColors.Ink, image.toPixelMap()[0, 0])
   }
 
   @Test
