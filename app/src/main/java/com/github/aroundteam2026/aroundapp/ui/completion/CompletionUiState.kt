@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
@@ -25,6 +26,8 @@ data class CompletionUiState(
     val answer: String = "",
     val photo: Uri? = null,
     val saveState: SaveState = SaveState.Idle,
+    val requirements: String = "",
+    val locationError: CompletionLocationError? = null,
 ) {
   /** Whether the form can still be changed: the quest is ready and nothing is saving or saved. */
   val isEditable: Boolean
@@ -41,6 +44,12 @@ data class CompletionUiState(
               ProofType.PHOTO -> photo != null
               null -> false
             }
+}
+
+/** Matches the location errors supplied by the unlock-radius check (#333). */
+enum class CompletionLocationError {
+  TOO_FAR,
+  UNAVAILABLE,
 }
 
 /** Where the completion screen stands. */

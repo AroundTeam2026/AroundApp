@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
@@ -70,7 +71,7 @@ class CompletionViewModel(
   }
 
   /** Called when the explorer takes or picks [photo]; ignored once the form is locked. */
-  fun pickPhoto(photo: Uri) {
+  fun pickPhoto(photo: Uri?) {
     mutableUiState.update { if (it.isEditable) it.copy(photo = photo) else it }
   }
 
@@ -173,6 +174,7 @@ class CompletionViewModel(
                     status = CompletionFormStatus.READY,
                     questTitle = quest.title,
                     proofType = quest.proofType,
+                    requirements = quest.requirements,
                 )
               }
             }

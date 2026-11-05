@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
@@ -147,9 +148,20 @@ class CompletionViewModelTest {
 
     assertEquals(CompletionFormStatus.READY, state.status)
     assertEquals("Find the fox", state.questTitle)
+    assertEquals(quests.getQuest("fox")!!.requirements, state.requirements)
     assertEquals(ProofType.TEXT, state.proofType)
     assertEquals("", state.answer)
     assertEquals(SaveState.Idle, state.saveState)
+  }
+
+  @Test
+  fun retakingAPhotoClearsItAndRequiresAnotherProof() = test {
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    assertTrue(state.canSubmit)
+    viewModel.pickPhoto(null)
+    assertEquals(null, state.photo)
+    assertFalse(state.canSubmit)
   }
 
   @Test
