@@ -108,8 +108,8 @@ class ProofPhotosTest {
     val target = File(folder, "camera-shared.jpg").apply { writeText("photo") }
     val shared = Uri.parse("content://${ProofPhotos.authority(app)}/proofs/${target.name}")
 
-    photos.discard(copy)
-    photos.discard(shared)
+    assertTrue(photos.discard(copy))
+    assertTrue(photos.discard(shared))
 
     assertFalse(File(copy.path!!).exists())
     assertFalse(target.exists())
@@ -120,10 +120,12 @@ class ProofPhotosTest {
     val gallery = testImage(app, 80, 60)
     val elsewhere = File(folder, "kept.jpg").apply { writeText("photo") }
 
-    photos.discard(gallery)
-    photos.discard(Uri.parse("content://media/external/images/1"))
-    photos.discard(Uri.parse("content://other.app.files/proofs/kept.jpg"))
-    photos.discard(Uri.fromFile(File(folder, "../${File(gallery.path!!).name}")))
+    assertFalse(photos.discard(gallery))
+    assertFalse(photos.discard(Uri.parse("content://media/external/images/1")))
+    assertFalse(photos.discard(Uri.parse("content://other.app.files/proofs/kept.jpg")))
+    assertFalse(photos.discard(Uri.fromFile(File(folder, "../${File(gallery.path!!).name}"))))
+    // Already gone: nothing to delete
+    assertFalse(photos.discard(Uri.fromFile(File(folder, "gone.jpg"))))
 
     assertTrue(File(gallery.path!!).exists())
     assertTrue(elsewhere.exists())

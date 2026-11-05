@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.FileProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.PROOF_PHOTO_LIMIT_BYTES
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -56,22 +57,22 @@ class ProofPhotos(
    * if the photo says it was taken on its side. A smaller photo keeps its size.
    *
    * @return the copy, a `file://` [Uri] in the cache.
-   * @throws ProofPhotoTooBigException if the copy is still too big to upload; it is deleted.
+   * @throws ProofPhotoTooBigException if the copy is still too big to upload; nothing is written.
    * @throws IOException if [source] can't be read or isn't an image.
    */
   suspend fun shrink(source: Uri): Uri =
       withContext(io) {
         val bitmap = decode(source, MAX_EDGE)
-        val copy = File(folder, "proof-${UUID.randomUUID()}.jpg")
+        // Compressed in memory first, so a copy too big is never written
+        val jpeg = ByteArrayOutputStream()
         try {
-          copy.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
+          bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, jpeg)
         } finally {
           bitmap.recycle()
         }
-        if (copy.length() >= limitBytes) {
-          copy.delete()
-          throw ProofPhotoTooBigException()
-        }
+        if (jpeg.size() >= limitBytes) throw ProofPhotoTooBigException()
+        val copy = File(folder, "proof-${UUID.randomUUID()}.jpg")
+        copy.outputStream().use(jpeg::writeTo)
         Uri.fromFile(copy)
       }
 
@@ -86,8 +87,10 @@ class ProofPhotos(
   /**
    * Deletes [photo] if it is one of this cache's files: a camera target or a shrunk copy. Anything
    * else, such as a photo from the gallery, is left alone.
+   *
+   * @return whether a file was deleted.
    */
-  fun discard(photo: Uri) {
+  fun discard(photo: Uri): Boolean {
     val file =
         when {
           photo.scheme == ContentResolver.SCHEME_FILE -> photo.path?.let(::File)
@@ -95,7 +98,7 @@ class ProofPhotos(
               photo.lastPathSegment?.let { File(folder, it) }
           else -> null
         }
-    if (file != null && file.canonicalFile.parentFile == folder.canonicalFile) file.delete()
+    return file != null && file.canonicalFile.parentFile == folder.canonicalFile && file.delete()
   }
 
   /** Decodes [uri], scaled down so that its longer side is at most [maxEdge] pixels. */
