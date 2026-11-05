@@ -24,13 +24,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [ProofPhotoRepository] backed by Cloud Storage, under `proofs/{reservationId}/{photoId}` as
  * `storage.rules` and the Cloud Storage section of `docs/firestore-schema.md` describe.
  *
- * Storage types stay inside this class. Each photo gets a random UUID as its id, and its location
- * is the `gs://` form of its reference, which [download] turns back into one. Failures from Storage
- * are returned as its [StorageException], e.g. `ERROR_NOT_AUTHORIZED` when the rules refuse, except
- * a missing photo, which [download] returns as a [NoSuchElementException].
- *
- * It keeps only the application context of [context], so it may outlive the screen that built it
- * without keeping that screen in memory.
+ * Each photo gets a random UUID as its id, and its location is the `gs://` form of its reference.
+ * Failures are returned as Storage's [StorageException], e.g. `ERROR_NOT_AUTHORIZED` when the rules
+ * refuse, except a missing photo, which [download] returns as a [NoSuchElementException]. It keeps
+ * only the application context, so it may outlive the screen that built it.
  *
  * @param context Any context; its application's `ContentResolver` reads the photos.
  * @param storage Cloud Storage client to upload to and download from.
@@ -60,6 +57,7 @@ class ProofPhotoRepositoryStorage(
         require(bytes.size < PROOF_PHOTO_LIMIT_BYTES) {
           "A proof photo must be under $PROOF_PHOTO_LIMIT_BYTES bytes"
         }
+        // The rules require an image/ content type; some camera files have none
         val type = contentResolver.getType(photo) ?: DEFAULT_CONTENT_TYPE
         val reference = storage.reference.child("$PROOFS/$reservationId/${UUID.randomUUID()}")
         val task = reference.putBytes(bytes, StorageMetadata.Builder().setContentType(type).build())

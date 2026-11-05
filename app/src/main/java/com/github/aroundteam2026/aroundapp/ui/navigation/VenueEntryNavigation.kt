@@ -36,16 +36,13 @@ val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
 }
 
 /**
- * Owns the existing venue onboarding and home graphs inside the authenticated session. Business
- * setup reuses an existing venue instead of overwriting it. Saving its location replaces onboarding
- * with the home, so Back cannot reopen setup or authentication. The session gate clears the whole
- * graph on sign-out. Child screens own their ViewModels; repository implementations stay outside
- * them.
+ * Owns the venue onboarding and home graphs inside the authenticated session.
  *
- * The location slot isolates Maps in navigation tests. [venueDestinations] owns the home and quest
- * routes; [createQuestFactory], [venueQuestsFactory] and [dashboardFactory] supply an isolated
- * form, quest list and dashboard in tests. [VenueEntry] chooses [start] from the venue's saved
- * state.
+ * Business setup reuses an existing venue instead of overwriting it, and saving its location
+ * replaces onboarding with the home, so Back cannot reopen setup. The session gate clears the graph
+ * on sign-out, and [VenueEntry] chooses [start] from the venue's saved state. Tests isolate Maps
+ * through the location slot, and the form, quest list and dashboard through [createQuestFactory],
+ * [venueQuestsFactory] and [dashboardFactory].
  *
  * @param start where the graph opens: business setup, its area, or the home of a venue already set
  *   up. A venue resuming on its area starts at business setup with the area opened above it.

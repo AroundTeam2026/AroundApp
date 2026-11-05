@@ -32,16 +32,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * The proof photo of a photo quest, as the Figma "Photo" box of `S4 · Submit proof`: before a
- * photo, "Take photo" and "Choose from gallery"; once one is picked, the photo with "Retake".
+ * The proof photo of a photo quest, as the Figma "Photo" box of `S4 · Submit proof`: "Take photo"
+ * and "Choose from gallery" before a photo, then the photo with "Retake".
  *
- * "Take photo" asks for the camera permission first. After a refusal, the box says so and offers
- * the phone's settings instead, and the gallery still works; back from the settings with the camera
- * allowed, "Take photo" returns. The gallery needs no permission: Android's photo picker shares
- * only the photo the explorer picks.
- *
- * Every photo goes through [ProofPhotos.shrink] before [onPhotoPicked] gets it, so the copy can be
- * uploaded as is. The camera's original and a retaken copy are deleted from the cache.
+ * "Take photo" asks for the camera permission first; after a refusal, the box offers the phone's
+ * settings, and "Take photo" returns once the camera is allowed there. The gallery needs no
+ * permission and always works. Every photo goes through [ProofPhotos.shrink] before [onPhotoPicked]
+ * gets it, and the camera's original and a retaken copy are deleted from the cache.
  *
  * @param venueName The venue the proof is for, named in the box's text.
  * @param photo The picked photo, as [onPhotoPicked] gave it, or null while there is none.

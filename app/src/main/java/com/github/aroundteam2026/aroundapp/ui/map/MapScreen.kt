@@ -27,20 +27,15 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 
 /**
- * The Explorer's map, in the app's colours: a light style in light mode and a night one in dark
- * mode, both hiding Google's place icons (see [mapStyle]). It asks for the location permission if
- * needed, then frames [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
+ * The Explorer's map, styled for light and dark mode without Google's place icons (see [mapStyle]),
+ * framing [MapViewModel.NEARBY_RADIUS_METERS] around the explorer.
  *
- * It marks each venue on screen that has valid quests with a pin. Tapping a pin opens it into a
- * card, tapping the card opens the venue's page, and tapping the map closes the card.
- *
- * While the location is off, a banner at the top says so, and its "Turn on" button asks for it
- * again or opens the app's settings.
- *
- * A "Nearby quests" pill opens the quests near the explorer over the map, in place of itself. Back
- * closes them before it leaves the map, and so does opening a card, which they would hide. Tapping
- * a quest's page frames its venue and opens its card; "View quest" opens the venue's page. Their
- * filters narrow the list, not the map's pins.
+ * It asks for the location permission if needed; while the location is off, a banner's "Turn on"
+ * asks again or opens the settings. Each venue on screen with valid quests gets a pin that opens
+ * into a card; the card opens the venue's page and tapping the map closes it. A "Nearby quests"
+ * pill opens the nearby quests over the map, closed by Back or by opening a card. Tapping a quest
+ * frames its venue and opens its card, "View quest" opens its page, and filters narrow the list,
+ * not the pins.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card or "View

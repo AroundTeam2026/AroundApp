@@ -27,17 +27,15 @@ data class Reservation(
 )
 
 /**
- * The reservation an explorer makes by accepting the quest [questId] of the venue [venueId]: made
- * by the explorer named [explorerName] in their profile, pending, for a slot starting at
- * [slotStart].
+ * The pending reservation an explorer makes by accepting the quest [questId] of the venue
+ * [venueId], named [explorerName] as in their profile, for a slot starting at [slotStart].
  *
- * Accepting a quest doesn't pick a slot yet, so the venue page passes the time of the tap: by the
- * time the venue reads the reservation, that slot has already started. Until explorers choose a
- * slot, it only dates the request, and a screen showing reservations must not treat a pending one
- * with a past [slotStart] as expired.
+ * Accepting doesn't pick a slot yet, so the venue page passes the time of the tap: until explorers
+ * choose a slot, it only dates the request, and a pending reservation with a past [slotStart] must
+ * not be treated as expired.
  *
- * Pass it to [ReservationRepository.createReservation] with the explorer's uid, which makes them
- * the party's first member and assigns the id and creation time; the ones here are placeholders.
+ * Pass it to [ReservationRepository.createReservation] with the explorer's uid, which assigns the
+ * id and creation time; the ones here are placeholders.
  */
 fun newPendingReservation(
     questId: String,

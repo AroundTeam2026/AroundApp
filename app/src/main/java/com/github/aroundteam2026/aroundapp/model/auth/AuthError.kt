@@ -6,13 +6,18 @@ sealed class AuthError(cause: Throwable? = null) : Exception(cause) {
   /** Wrong password, or no account with that email. Deliberately not told apart. */
   data object InvalidCredentials : AuthError()
 
+  /** The email is not well formed. */
   data object InvalidEmail : AuthError()
 
+  /** An account already uses this email. */
   data object EmailAlreadyInUse : AuthError()
 
+  /** The password is too weak for the provider. */
   data object WeakPassword : AuthError()
 
+  /** The provider could not be reached. */
   data object Network : AuthError()
 
+  /** Any other failure; [cause] keeps the original error. */
   class Unknown(cause: Throwable? = null) : AuthError(cause)
 }

@@ -32,19 +32,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the completion of the reservation [reservationId] by the explorer [explorerUid]: its quest
- * and the proof the quest asks for, what the explorer filled in, and submitting it.
+ * Holds the completion of the reservation [reservationId] by the explorer [explorerUid]: its quest,
+ * the proof it asks for, what the explorer filled in, and submitting it.
  *
- * It listens to the explorer's reservations, so the form is [CompletionFormStatus.READY] only while
- * the reservation is approved, and to the completions of the reservation, the party's included, for
- * the explorer's own, so a reservation that was already completed shows as [SaveState.Saved] and
- * can't be submitted again, also when the answer to an earlier submit was lost. If listening to the
- * completions fails, the form stays usable: the repository refuses a second completion anyway. If
- * loading the reservation fails, the form is [CompletionFormStatus.FAILED] until [onRetry].
- *
- * A text proof is submitted as it is. A photo is uploaded through [proofPhotoRepository] first; a
- * photo that was uploaded is not uploaded again when only the submit failed, until another photo is
- * picked.
+ * The form is [CompletionFormStatus.READY] only while the reservation is approved, and
+ * [SaveState.Saved] once the explorer's completion is stored, even if an earlier submit's answer
+ * was lost. If loading the reservation fails, it is [CompletionFormStatus.FAILED] until [onRetry];
+ * if listening to completions fails, it stays usable, as the repository refuses a second one. A
+ * photo is uploaded through [proofPhotoRepository] first, and not again when only the submit
+ * failed.
  */
 class CompletionViewModel(
     private val reservationId: String,
