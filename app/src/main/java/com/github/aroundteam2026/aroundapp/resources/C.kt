@@ -272,5 +272,14 @@ object C {
     const val PROOF_PHOTO_RETAKE = "proof_photo_retake"
     const val PROOF_PHOTO_OPEN_SETTINGS = "proof_photo_open_settings"
     const val PROOF_PHOTO_ERROR = "proof_photo_error"
+
+    // Reject proof sheet
+    const val REJECT_PROOF_SHEET = "reject_proof_sheet"
+    /** Followed by `_` and the `RejectReason`'s name, e.g. `reject_proof_reason_OTHER`. */
+    const val REJECT_PROOF_REASON = "reject_proof_reason"
+    const val REJECT_PROOF_NOTE = "reject_proof_note"
+    const val REJECT_PROOF_BACK = "reject_proof_back"
+    const val REJECT_PROOF_CONFIRM = "reject_proof_confirm"
+    const val REJECT_PROOF_NEEDS_REASON = "reject_proof_needs_reason"
   }
 }
