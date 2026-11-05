@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.ui.SaveState
  * @property photo The photo picked so far, for a [ProofType.PHOTO] quest, or null when none is.
  * @property saveState Where submitting stands: [SaveState.Saved] once the proof is submitted, also
  *   when it was submitted earlier.
+ * @property locationError Why the last location check blocked submission, or null otherwise.
  */
 data class CompletionUiState(
     val status: CompletionFormStatus = CompletionFormStatus.LOADING,
@@ -46,9 +47,11 @@ data class CompletionUiState(
             }
 }
 
-/** Matches the location errors supplied by the unlock-radius check (#333). */
+/** Why a completion could not be submitted from the explorer's current location. */
 enum class CompletionLocationError {
+  /** The explorer is outside the quest's unlock radius. */
   TOO_FAR,
+  /** A precise device or venue location could not be obtained. */
   UNAVAILABLE,
 }
 

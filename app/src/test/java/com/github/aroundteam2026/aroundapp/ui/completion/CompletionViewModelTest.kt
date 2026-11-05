@@ -4,6 +4,8 @@ package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -22,6 +24,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
@@ -71,12 +75,16 @@ class CompletionViewModelTest {
                   title = "Snap the owl",
                   proofType = ProofType.PHOTO,
               ),
+              testQuest(id = "short-radius", venueId = CAFE, proofType = ProofType.TEXT)
+                  .copy(radiusMeters = 20),
           ),
       )
   private val questRepository = GatedQuests(quests)
   private val fakeCompletions = FakeCompletionRepository { NOW }
   private val completions = GatedCompletions(fakeCompletions)
   private val photos = FakeProofPhotoRepository()
+  private var venues = FakeVenueRepository(listOf(testVenue(id = CAFE)))
+  private val locations = FakeLocationRepository(VENUE_LOCATION)
 
   private val viewModel by lazy {
     CompletionViewModel(
@@ -84,6 +92,8 @@ class CompletionViewModelTest {
         EXPLORER,
         listener,
         questRepository,
+        venues,
+        locations,
         completions,
         photos,
     )
@@ -274,6 +284,216 @@ class CompletionViewModelTest {
     assertEquals(EXPLORER, completion.explorerUid)
     assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
     assertEquals(0, photos.uploads.size)
+  }
+
+  @Test
+  fun aQuestCanBeSubmittedFromInsideItsRadius() = test {
+    open("short-radius")
+    locations.preciseLocation = Location(46.52205, 6.6330)
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(1, locations.preciseCalls)
+    assertEquals(1, completions.calls)
+    assertEquals(null, state.locationError)
+  }
+
+  @Test
+  fun outsideTheQuestRadiusBlocksSubmissionEvenInsideTheVenueArea() = test {
+    open("short-radius")
+    // About 30 m from the venue: inside its 50 m area, outside this quest's 20 m radius.
+    locations.preciseLocation = Location(46.52227, 6.6330)
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(CompletionLocationError.TOO_FAR, state.locationError)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(0, completions.calls)
+    assertEquals("The fox", state.answer)
+  }
+
+  @Test
+  fun missingPreciseLocationBlocksSubmissionWithoutLosingTheProof() = test {
+    open("fox")
+    locations.preciseLocation = null
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(CompletionLocationError.UNAVAILABLE, state.locationError)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(0, completions.calls)
+    assertEquals("The fox", state.answer)
+  }
+
+  @Test
+  fun aLocationProviderFailureLeavesTheProofReadyForRetry() = test {
+    open("fox")
+    locations.preciseFailure = IOException("location service unavailable")
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(CompletionLocationError.UNAVAILABLE, state.locationError)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals("The fox", state.answer)
+    assertEquals(0, completions.calls)
+
+    locations.preciseFailure = null
+    viewModel.submit()
+    runCurrent()
+    assertEquals(1, completions.calls)
+  }
+
+  @Test
+  fun aMissingVenueMarkerCannotAuthorizeSubmission() = test {
+    venues = FakeVenueRepository(listOf(testVenue(id = CAFE, location = null)))
+    open("fox")
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(CompletionLocationError.UNAVAILABLE, state.locationError)
+    assertEquals(0, locations.preciseCalls)
+    assertEquals(0, completions.calls)
+  }
+
+  @Test
+  fun retryChecksTheCurrentLocationAgainAndClearsTheOldError() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    locations.preciseLocation = Location(46.5230, 6.6330)
+    viewModel.submit()
+    runCurrent()
+    assertEquals(CompletionLocationError.TOO_FAR, state.locationError)
+
+    locations.preciseLocation = VENUE_LOCATION
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(2, locations.preciseCalls)
+    assertEquals(null, state.locationError)
+    assertEquals(1, completions.calls)
+  }
+
+  @Test
+  fun aSecondTapWhileLocatingDoesNotStartAnotherRequest() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+
+    viewModel.submit()
+    viewModel.submit()
+    runCurrent()
+    assertEquals(SaveState.Saving, state.saveState)
+    assertEquals(1, locations.preciseCalls)
+    assertEquals(0, completions.calls)
+
+    gate.complete(Unit)
+    runCurrent()
+    assertEquals(1, completions.calls)
+  }
+
+  @Test
+  fun approvalWithdrawnWhileLocatingPreventsTheWrite() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    reservations.updateStatus(reservationId, ReservationStatus.CANCELLED).getOrThrow()
+    runCurrent()
+    gate.complete(Unit)
+    runCurrent()
+
+    assertEquals(CompletionFormStatus.UNAVAILABLE, state.status)
+    assertEquals(0, completions.calls)
+  }
+
+  @Test
+  fun reservationListenerFailureWhileLocatingUnlocksTheFormAfterRetry() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    listener.broken = true
+    book("photo") // A new reservation emission makes the active listener fail.
+    runCurrent()
+    assertEquals(CompletionFormStatus.FAILED, state.status)
+
+    gate.complete(Unit)
+    runCurrent()
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(0, completions.calls)
+
+    listener.broken = false
+    viewModel.onRetry()
+    runCurrent()
+    assertEquals(CompletionFormStatus.READY, state.status)
+    viewModel.submit()
+    runCurrent()
+    assertEquals(1, completions.calls)
+  }
+
+  @Test
+  fun completionSavedDuringAnUnavailableFixRemainsSaved() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    locations.preciseLocation = null
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    val id =
+        fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier")).getOrThrow()
+    runCurrent()
+    gate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Saved(id), state.saveState)
+    assertEquals(0, completions.calls)
+  }
+
+  @Test
+  fun completionSavedDuringASuccessfulFixIsNotSubmittedAgain() = test {
+    open("fox")
+    viewModel.updateAnswer("The fox")
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    val id =
+        fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier")).getOrThrow()
+    runCurrent()
+    gate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Saved(id), state.saveState)
+    assertEquals(0, completions.calls)
+  }
+
+  @Test
+  fun anOutOfRangePhotoIsNeverUploaded() = test {
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    locations.preciseLocation = Location(46.5230, 6.6330)
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(CompletionLocationError.TOO_FAR, state.locationError)
+    assertTrue(photos.uploads.isEmpty())
+    assertEquals(0, completions.calls)
   }
 
   @Test
@@ -549,6 +769,7 @@ class CompletionViewModelTest {
     const val CAFE = "cafe"
     const val EXPLORER = "explorer"
     const val NOW = 1_800_000_000_000L
+    val VENUE_LOCATION = Location(46.5220, 6.6330)
     val PHOTO: Uri = Uri.parse("content://media/photos/1")
     val OTHER_PHOTO: Uri = Uri.parse("content://media/photos/2")
   }
@@ -565,8 +786,10 @@ private class BreakableReservations(private val inner: ReservationRepository) :
 
   override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
     collections++
-    if (broken) throw IOException("offline")
-    emitAll(inner.observeForExplorer(uid))
+    inner.observeForExplorer(uid).collect {
+      if (broken) throw IOException("offline")
+      emit(it)
+    }
   }
 }
 

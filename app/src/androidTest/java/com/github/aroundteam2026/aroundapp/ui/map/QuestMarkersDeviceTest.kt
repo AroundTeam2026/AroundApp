@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -67,6 +68,8 @@ class QuestMarkersDeviceTest {
       MapViewModel(
           object : LocationRepository {
             override suspend fun currentLocation() = here
+
+            override suspend fun currentPreciseLocation(): Location? = null
           },
           FakeQuestRepository(initialQuests = listOf(cafe, bar, geneva)),
           FakeVenueRepository(venues.values.toList()),

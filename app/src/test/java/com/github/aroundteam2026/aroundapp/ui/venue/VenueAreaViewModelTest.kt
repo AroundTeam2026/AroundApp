@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
@@ -309,6 +310,8 @@ private class AnsweredInAnyOrder : LocationRepository {
 
   override suspend fun currentLocation(): Location? =
       CompletableDeferred<Location?>().also { answers += it }.await()
+
+  override suspend fun currentPreciseLocation(): Location? = null
 
   /** Ends the [lookup]th lookup, counting from 0, with the position [with]. */
   fun answer(lookup: Int, with: Location?) {

@@ -171,6 +171,8 @@ class MapScreenDeviceTest {
 
 private class StaticLocation(private val location: Location) : LocationRepository {
   override suspend fun currentLocation() = location
+
+  override suspend fun currentPreciseLocation(): Location? = null
 }
 
 private fun LatLngBounds.latitudeSpan() = northeast.latitude - southwest.latitude

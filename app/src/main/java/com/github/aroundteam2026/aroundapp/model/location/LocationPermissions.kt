@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.location
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -16,4 +17,8 @@ object LocationPermissions {
   fun isGranted(context: Context): Boolean = ALL.any {
     ContextCompat.checkSelfPermission(context, it) == PERMISSION_GRANTED
   }
+
+  /** A visit check requires the precise permission, not just approximate access. */
+  fun isPreciseGranted(context: Context): Boolean =
+      ContextCompat.checkSelfPermission(context, ACCESS_FINE_LOCATION) == PERMISSION_GRANTED
 }
