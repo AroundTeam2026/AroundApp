@@ -279,5 +279,23 @@ object C {
     const val REJECT_PROOF_BACK = "reject_proof_back"
     const val REJECT_PROOF_CONFIRM = "reject_proof_confirm"
     const val REJECT_PROOF_NEEDS_REASON = "reject_proof_needs_reason"
+
+    // Review proof screen
+    const val REVIEW_PROOF_SCREEN = "review_proof_screen"
+    const val REVIEW_PROOF_BACK = "review_proof_back"
+    const val REVIEW_PROOF_LOADING = "review_proof_loading"
+    const val REVIEW_PROOF_LOAD_FAILED = "review_proof_load_failed"
+    const val REVIEW_PROOF_RETRY = "review_proof_retry"
+    const val REVIEW_PROOF_EXPLORER = "review_proof_explorer"
+    const val REVIEW_PROOF_SENT = "review_proof_sent"
+    const val REVIEW_PROOF_QUEST = "review_proof_quest"
+    const val REVIEW_PROOF_REQUIREMENTS = "review_proof_requirements"
+    const val REVIEW_PROOF_PHOTO = "review_proof_photo"
+    const val REVIEW_PROOF_PHOTO_IMAGE = "review_proof_photo_image"
+    const val REVIEW_PROOF_PHOTO_RETRY = "review_proof_photo_retry"
+    const val REVIEW_PROOF_ANSWER = "review_proof_answer"
+    const val REVIEW_PROOF_HINT = "review_proof_hint"
+    const val REVIEW_PROOF_REJECT = "review_proof_reject"
+    const val REVIEW_PROOF_APPROVE = "review_proof_approve"
   }
 }

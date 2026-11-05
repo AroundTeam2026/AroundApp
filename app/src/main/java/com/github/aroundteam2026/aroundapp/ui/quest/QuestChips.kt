@@ -125,7 +125,7 @@ private fun distanceText(meters: Double): String {
 
 /** What a [reward] chip says, e.g. "10% off", "CHF 5 off" or "Free coffee". */
 @Composable
-private fun rewardText(reward: Reward): String =
+internal fun rewardText(reward: Reward): String =
     when (reward) {
       is Reward.Discount -> {
         val amount = formatRewardAmount(reward.amount, reward.unit, currentLocale())
