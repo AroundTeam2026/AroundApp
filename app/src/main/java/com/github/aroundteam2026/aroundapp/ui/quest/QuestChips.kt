@@ -27,7 +27,8 @@ import java.util.Locale
 /**
  * Chips for a quest's [reward], the party size it needs when that is more than one person, and how
  * far its venue is when [distanceMeters] is known, wrapping to more lines when they don't fit.
- * Draws nothing when none of them apply.
+ * Draws nothing when none of them apply. With [exactPartySize], the party must have exactly
+ * [minPartySize] people rather than at least that many.
  */
 @Composable
 fun QuestChips(
@@ -36,6 +37,7 @@ fun QuestChips(
     distanceMeters: Double?,
     style: QuestChipStyle,
     modifier: Modifier = Modifier,
+    exactPartySize: Boolean = false,
 ) {
   val partySize = minPartySize.takeIf { it > 1 }
   if (reward == null && partySize == null && distanceMeters == null) return
@@ -51,7 +53,11 @@ fun QuestChips(
     }
     partySize?.let {
       Chip(
-          stringResource(R.string.map_card_party_size, it),
+          stringResource(
+              if (exactPartySize) R.string.map_card_exact_party_size
+              else R.string.map_card_party_size,
+              it,
+          ),
           C.Tag.QUEST_CHIP_PARTY,
           style.party,
           style,

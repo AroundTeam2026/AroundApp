@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,19 +60,36 @@ import com.google.maps.android.compose.rememberUpdatedMarkerState
  */
 @Composable
 internal fun QuestRadiusMap(center: Location, radiusMeters: Int, walkMinutes: Int) {
-  val description = stringResource(R.string.create_quest_radius_map, radiusMeters)
-  BoxWithConstraints(
-      Modifier.fillMaxWidth()
-          .height(MAP_HEIGHT)
-          .clip(MaterialTheme.shapes.medium)
-          .border(BORDER, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
-          .semantics { contentDescription = description }
-          .testTag(C.Tag.CREATE_QUEST_RADIUS_MAP)
+  StillRadiusMap(
+      center,
+      radiusMeters,
+      stringResource(R.string.create_quest_radius_map, radiusMeters),
+      Modifier.border(BORDER, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
+          .testTag(C.Tag.CREATE_QUEST_RADIUS_MAP),
   ) {
-    val width = constraints.maxWidth
-    val height = constraints.maxHeight
-    RadiusMapContent(center, radiusMeters, width, height)
     WalkChip(walkMinutes, Modifier.align(Alignment.TopStart).padding(AroundSpacing.CompactGap))
+  }
+}
+
+/**
+ * The still map alone, read out as [description]: the venue's pin at [center] and the circle of
+ * [radiusMeters] around it, with [overlay] on top.
+ */
+@Composable
+internal fun StillRadiusMap(
+    center: Location,
+    radiusMeters: Int,
+    description: String,
+    modifier: Modifier = Modifier,
+    overlay: @Composable BoxScope.() -> Unit = {},
+) {
+  BoxWithConstraints(
+      modifier.fillMaxWidth().height(MAP_HEIGHT).clip(MaterialTheme.shapes.medium).semantics {
+        contentDescription = description
+      }
+  ) {
+    RadiusMapContent(center, radiusMeters, constraints.maxWidth, constraints.maxHeight)
+    overlay()
   }
 }
 

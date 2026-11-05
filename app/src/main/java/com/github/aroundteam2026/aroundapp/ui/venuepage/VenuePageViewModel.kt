@@ -382,6 +382,7 @@ private fun VenuePageUiState.showing(
               venueName = venue.name,
               avatar = INITIALS_AVATAR(venue, venue.name),
               address = venue.address,
+              venueLocation = venue.location,
               acceptedParties = accepted ?: acceptedParties,
               acceptingQuestIds =
                   if (accepted == null) emptySet() else acceptingQuestIds - accepted.keys,
@@ -400,4 +401,6 @@ private fun Quest.toVenuePageQuest() =
         proofType = proofType,
         minPartySize = minPartySize,
         reward = reward,
+        exactPartySize = exactPartySize,
+        radiusMeters = radiusMeters,
     )

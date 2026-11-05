@@ -28,6 +28,7 @@
 
     <!-- The card a venue's pin opens into on the map -->
     <string name="map_card_party_size">Groups of %1$d+</string>
+    <string name="map_card_exact_party_size">Groups of %1$d</string>
     <plurals name="map_card_more_quests">
         <item quantity="one">and %1$d more</item>
         <item quantity="other">and %1$d more</item>

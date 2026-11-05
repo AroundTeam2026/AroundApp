@@ -2,7 +2,9 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
@@ -16,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property venueName The venue's name, shown in the header.
  * @property avatar What the header shows for the venue, or null until the venue is loaded.
  * @property address The venue's street address, or null if it gave none.
+ * @property venueLocation Where the venue is, or null until it confirms its marker on the map.
  * @property quests The venue's valid quests, in the order the page lists them.
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
@@ -33,6 +36,7 @@ data class VenuePageUiState(
     val venueName: String = "",
     val avatar: VenueAvatar? = null,
     val address: String? = null,
+    val venueLocation: Location? = null,
     val quests: List<VenuePageQuest> = emptyList(),
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
@@ -141,6 +145,8 @@ enum class VenuePageStatus {
  * @property proofType The kind of proof explorers submit.
  * @property minPartySize How many people the quest needs at least.
  * @property reward The quest's reward, or null when it has none.
+ * @property exactPartySize Whether the party must have exactly [minPartySize] people.
+ * @property radiusMeters How close to the venue explorers must be to send their proof.
  */
 data class VenuePageQuest(
     val questId: String,
@@ -150,4 +156,6 @@ data class VenuePageQuest(
     val proofType: ProofType,
     val minPartySize: Int,
     val reward: Reward?,
+    val exactPartySize: Boolean = false,
+    val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
 )
