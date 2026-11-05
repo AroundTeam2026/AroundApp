@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
@@ -67,8 +68,20 @@ class VenueDashboardViewModelTest {
 
   private val completions = FakeCompletionRepository { createdAt }
 
+  /** How many party listeners the dashboard opened, per reservation id. */
+  private val partyReads = mutableMapOf<String, Int>()
+
+  /** The parties the dashboard reads: [party], counting each listener it opens. */
+  private val parties =
+      object : PartyRepository by party {
+        override fun observeMembers(reservationId: String) =
+            party.observeMembers(reservationId).also {
+              partyReads[reservationId] = (partyReads[reservationId] ?: 0) + 1
+            }
+      }
+
   private val viewModel by lazy {
-    VenueDashboardViewModel(auth, reservations, quests, venues, party, completions)
+    VenueDashboardViewModel(auth, reservations, quests, venues, parties, completions)
   }
 
   private val state
@@ -450,6 +463,8 @@ class VenueDashboardViewModelTest {
     assertNull(row.explorerName)
     assertNull(row.questTitle)
     assertEquals(0, row.partySize)
+    // Only the proof is listed, and it's enough for the dashboard not to be empty
+    assertFalse(state.isEmpty)
   }
 
   @Test
@@ -477,6 +492,34 @@ class VenueDashboardViewModelTest {
     backgroundScope.launch { failingViewModel.uiState.collect {} }
 
     assertEquals(VenueDashboardStatus.FAILED, failingViewModel.uiState.value.status)
+  }
+
+  @Test
+  fun newAndReviewedProofsOfShownReservationsDontReadThePartiesAgain() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED, partySize = 2)
+    watch()
+    val readsBefore = partyReads.toMap()
+
+    val proof = sendProof(reservation)
+    assertEquals(listOf(proof), proofIds(state.proofsToReview))
+    completions.approve(proof).getOrThrow()
+    assertTrue(state.proofsToReview.isEmpty())
+
+    assertEquals(readsBefore, partyReads)
+    assertEquals(2, state.upcoming.single().partySize)
+  }
+
+  @Test
+  fun aNewReservationIsNeverShownBeforeItsPartyIsRead() = test {
+    reserve(status = ReservationStatus.APPROVED)
+    val shown = mutableListOf<VenueDashboardUiState>()
+    backgroundScope.launch { viewModel.uiState.collect { shown += it } }
+
+    reserve(questId = "menu")
+
+    assertEquals(1, state.needsAnswer.single().partySize)
+    // Its party of 1 is read before the dashboard shows it, never as an empty party
+    assertTrue(shown.flatMap { it.needsAnswer + it.upcoming }.none { it.partySize == 0 })
   }
 
   private companion object {

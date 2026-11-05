@@ -35,10 +35,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
@@ -115,37 +119,50 @@ class VenueDashboardViewModel(
   /**
    * The dashboard of the venue [venueId], from the venue, its reservations, their parties, its
    * proofs and its quests. A failing listener gives a failed dashboard.
+   *
+   * The parties are read again only when the reservations to read change, not on every new or
+   * reviewed proof or every answer that keeps them.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
-  private fun listen(venueId: String): Flow<VenueDashboardUiState> =
-      combine(
-              combine(
-                      reservationRepository.observeForVenue(venueId),
-                      completionRepository.observeForVenue(venueId),
-                      ::Pair,
-                  )
-                  .flatMapLatest { (reservations, completions) ->
-                    // Only the shown reservations' and proofs' parties are read. A proof's
-                    // reservation may have been cancelled since, so it is read on its own
-                    val ids =
-                        reservations.filter { it.status.isActive }.map { it.id } +
-                            completions
-                                .filter { it.status == CompletionStatus.PENDING }
-                                .map { it.reservationId }
-                    partyRepository.observeJoinedCounts(ids).map {
-                      Triple(reservations, completions, it)
-                    }
-                  },
-              questRepository.observeQuestsByVenue(venueId),
-              venueRepository.observeVenue(venueId),
-          ) { (reservations, completions, partySizes), quests, venue ->
-            dashboardOf(reservations, partySizes, quests, venue, completions)
-          }
-          // The repositories' flows throw if the backend stops a listener
-          .catch {
-            Log.w(TAG, "Listening to the dashboard of $venueId failed", it)
-            emit(VenueDashboardUiState(status = VenueDashboardStatus.FAILED))
-          }
+  private fun listen(venueId: String): Flow<VenueDashboardUiState> = channelFlow {
+    // One listener each, shared by the dashboard and the parties to read
+    val lists =
+        combine(
+                reservationRepository.observeForVenue(venueId),
+                completionRepository.observeForVenue(venueId),
+                ::Pair,
+            )
+            .shareIn(this, SharingStarted.Eagerly, replay = 1)
+    val partySizes =
+        lists
+            .map { (reservations, completions) -> partyIdsOf(reservations, completions) }
+            .distinctUntilChanged()
+            .flatMapLatest { partyRepository.observeJoinedCounts(it) }
+    val listsWithParties =
+        combine(lists, partySizes) { (reservations, completions), sizes ->
+              // Right after the ids change the sizes are still the old ones: wait for
+              // the new ones rather than show an empty party
+              if (sizes.keys.containsAll(partyIdsOf(reservations, completions))) {
+                Triple(reservations, completions, sizes)
+              } else {
+                null
+              }
+            }
+            .filterNotNull()
+    combine(
+            listsWithParties,
+            questRepository.observeQuestsByVenue(venueId),
+            venueRepository.observeVenue(venueId),
+        ) { (reservations, completions, sizes), quests, venue ->
+          dashboardOf(reservations, sizes, quests, venue, completions)
+        }
+        .collect { send(it) }
+  }
+      // The repositories' flows throw if the backend stops a listener
+      .catch {
+        Log.w(TAG, "Listening to the dashboard of $venueId failed", it)
+        emit(VenueDashboardUiState(status = VenueDashboardStatus.FAILED))
+      }
 
   companion object {
     private const val TAG = "VenueDashboardViewModel"
@@ -168,6 +185,14 @@ class VenueDashboardViewModel(
     }
   }
 }
+
+/**
+ * The reservations whose parties the dashboard shows: the pending and approved ones, and those of
+ * the pending proofs, whose reservation may have been cancelled since.
+ */
+private fun partyIdsOf(reservations: List<Reservation>, completions: List<Completion>) =
+    reservations.filter { it.status.isActive }.mapTo(HashSet()) { it.id } +
+        completions.filter { it.status == CompletionStatus.PENDING }.map { it.reservationId }
 
 /**
  * The loaded dashboard of [venue], built from [reservations], their joined [partySizes] keyed by

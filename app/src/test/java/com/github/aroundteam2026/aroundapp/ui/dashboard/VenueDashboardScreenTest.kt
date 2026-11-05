@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -27,6 +28,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +43,7 @@ class VenueDashboardScreenTest {
   private val approved = mutableListOf<String>()
   private val declined = mutableListOf<String>()
   private var retries = 0
+  private val opened = mutableListOf<String>()
 
   private fun show(state: VenueDashboardUiState) {
     compose.setContent {
@@ -50,6 +53,7 @@ class VenueDashboardScreenTest {
             onApprove = { approved += it },
             onDecline = { declined += it },
             onRetry = { retries++ },
+            onOpenProof = { opened += it },
             clock = CLOCK,
         )
       }
@@ -59,6 +63,7 @@ class VenueDashboardScreenTest {
   private fun loaded(
       needsAnswer: List<DashboardReservation> = emptyList(),
       upcoming: List<DashboardReservation> = emptyList(),
+      proofs: List<DashboardProof> = emptyList(),
   ) =
       VenueDashboardUiState(
           status = VenueDashboardStatus.LOADED,
@@ -67,6 +72,7 @@ class VenueDashboardScreenTest {
           needsAnswer = needsAnswer,
           upcoming = upcoming,
           activeQuestsCount = 4,
+          proofsToReview = proofs,
       )
 
   private fun string(id: Int, vararg args: Any) =
@@ -115,6 +121,7 @@ class VenueDashboardScreenTest {
     compose.onNodeWithTag(C.Tag.DASHBOARD_EMPTY).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.DASHBOARD_NEEDS_ANSWER).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.DASHBOARD_UPCOMING).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_PROOFS).assertDoesNotExist()
   }
 
   @Test
@@ -207,6 +214,51 @@ class VenueDashboardScreenTest {
     compose.onNodeWithTag(C.Tag.DASHBOARD_SHOW_ALL).assertDoesNotExist()
   }
 
+  @Test
+  fun proofsToReviewComeFirstWithTheirCount() {
+    show(loaded(needsAnswer = listOf(pending("a")), proofs = listOf(proof("p1"), proof("p2"))))
+
+    compose
+        .onNode(hasText("2") and hasAnyAncestor(hasTestTag(C.Tag.DASHBOARD_PROOFS)), true)
+        .assertExists()
+    assertTrue(top(C.Tag.DASHBOARD_PROOFS) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
+    proofRow("p1").assertIsDisplayed()
+    proofRow("p2").assertIsDisplayed()
+  }
+
+  @Test
+  fun tappingAProofOpensIt() {
+    show(loaded(proofs = listOf(proof("p1"), proof("p2"))))
+
+    proofRow("p2").performClick()
+
+    assertEquals(listOf("p2"), opened)
+  }
+
+  @Test
+  fun onlyProofsShowNoEmptyState() {
+    show(loaded(proofs = listOf(proof("p1"))))
+
+    compose.onNodeWithTag(C.Tag.DASHBOARD_EMPTY).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_PROOFS).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_NEEDS_ANSWER).assertDoesNotExist()
+  }
+
+  @Test
+  fun thePreviewShowsItsProofAboveTheReservations() {
+    compose.setContent { VenueDashboardPreview() }
+
+    compose.onNodeWithTag(C.Tag.DASHBOARD_PROOFS).assertIsDisplayed()
+    proofRow("p").assertIsDisplayed()
+    assertTrue(top(C.Tag.DASHBOARD_PROOFS) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
+  }
+
+  /** Where the node tagged [tag] starts, from the top of the screen. */
+  private fun top(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.top
+
+  /** The row of the proof [id]. */
+  private fun proofRow(id: String) = compose.onNodeWithTag("${C.Tag.DASHBOARD_PROOF_ROW}_$id")
+
   private companion object {
     val ZONE: ZoneId = ZoneId.of("Europe/Zurich")
     val NOW: Long = LocalDateTime.of(2026, 10, 28, 14, 0).atZone(ZONE).toInstant().toEpochMilli()
@@ -215,6 +267,16 @@ class VenueDashboardScreenTest {
 
     // NOW's day as the header writes it in English
     const val TODAY = "Wed, Oct 28"
+
+    fun proof(id: String) =
+        DashboardProof(
+            completionId = id,
+            explorerName = "Nora B.",
+            questTitle = "Name the café cat",
+            partySize = 1,
+            proofType = ProofType.TEXT,
+            sentAt = NOW - REQUEST_AGE_MS,
+        )
 
     fun pending(id: String, partySize: Int = 2) =
         DashboardReservation(

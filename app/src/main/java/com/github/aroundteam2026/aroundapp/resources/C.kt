@@ -220,6 +220,13 @@ object C {
     const val DASHBOARD_ROW_APPROVED = "dashboard_row_approved"
     const val DASHBOARD_ROW_DECLINE = "dashboard_row_decline"
     const val DASHBOARD_ROW_APPROVE = "dashboard_row_approve"
+    const val DASHBOARD_PROOFS = "dashboard_proofs"
+    /** Followed by `_` and the completion's id, e.g. `dashboard_proof_row_r1_explorer`. */
+    const val DASHBOARD_PROOF_ROW = "dashboard_proof_row"
+    const val DASHBOARD_PROOF_EXPLORER = "dashboard_proof_explorer"
+    const val DASHBOARD_PROOF_DETAILS = "dashboard_proof_details"
+    const val DASHBOARD_PROOF_SENT = "dashboard_proof_sent"
+    const val DASHBOARD_PROOF_ICON = "dashboard_proof_icon"
     const val AROUND_HEADER = "around_header"
     const val OVERVIEW_TITLE = "overview_title"
     const val OVERVIEW_COUNT = "overview_count"

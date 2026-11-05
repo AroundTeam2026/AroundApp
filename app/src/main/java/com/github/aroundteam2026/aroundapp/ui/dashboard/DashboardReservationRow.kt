@@ -130,10 +130,11 @@ internal fun DashboardReservationRow(
 
 /**
  * The [clock]'s time, read again when the minute since [requestedAt] changes, so "Requested … ago"
- * moves on while the row stays on screen instead of keeping the time it was first drawn at.
+ * (or a proof's "sent … ago") moves on while the row stays on screen instead of keeping the time it
+ * was first drawn at.
  */
 @Composable
-private fun rememberNow(requestedAt: Long, clock: Clock): Long =
+internal fun rememberNow(requestedAt: Long, clock: Clock): Long =
     produceState(clock.millis(), requestedAt, clock) {
           while (true) {
             val elapsed = (value - requestedAt).coerceAtLeast(0)
