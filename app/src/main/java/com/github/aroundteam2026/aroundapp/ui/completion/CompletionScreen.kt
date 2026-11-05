@@ -52,6 +52,7 @@ fun CompletionScreen(
       onRetry = viewModel::onRetry,
       onRequestLocation = permission.request,
       preciseLocationRefused = permission.refused,
+      locationServicesEnabled = permission.servicesEnabled,
       modifier = modifier,
       photoPicker = {
         ProofPhotoPicker(
@@ -77,6 +78,7 @@ fun CompletionContent(
     onRequestLocation: () -> Unit,
     modifier: Modifier = Modifier,
     preciseLocationRefused: Boolean = false,
+    locationServicesEnabled: Boolean = true,
     photoPicker: @Composable () -> Unit,
 ) {
   val saving = state.saveState == SaveState.Saving
@@ -263,7 +265,13 @@ fun CompletionContent(
                         contentColor = AroundTheme.colors.accentText
                     ),
             ) {
-              Text(stringResource(R.string.completion_enable_location))
+              Text(
+                  stringResource(
+                      if (!locationServicesEnabled) R.string.completion_location_settings
+                      else if (preciseLocationRefused) R.string.completion_enable_location
+                      else R.string.completion_check_location
+                  )
+              )
             }
           }
           if (

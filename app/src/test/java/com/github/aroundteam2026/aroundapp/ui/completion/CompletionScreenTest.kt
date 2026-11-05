@@ -37,6 +37,7 @@ class CompletionScreenTest {
   private var submits = 0
   private var retries = 0
   private var requests = 0
+  private var servicesEnabled by mutableStateOf(true)
 
   private fun capture(name: String) {
     val image = compose.onNodeWithTag("completion_screen").captureToImage()
@@ -59,6 +60,7 @@ class CompletionScreenTest {
             { retries++ },
             { requests++ },
             preciseLocationRefused = refused,
+            locationServicesEnabled = servicesEnabled,
             photoPicker = {
               ProofPhotoBox(
                   "Café Lumière",
@@ -154,7 +156,7 @@ class CompletionScreenTest {
             "Around cannot get a precise device or venue location, so it cannot check that you’re at the venue. Check location access and try again."
         )
         .assertIsDisplayed()
-    compose.onNodeWithText("Enable precise location").performClick()
+    compose.onNodeWithText("Check location access").performClick()
     assertEquals(1, requests)
     compose.onNodeWithTag("completion_answer").assertTextContains("Mochi")
   }
@@ -169,6 +171,28 @@ class CompletionScreenTest {
         .assertIsDisplayed()
     compose.onNodeWithText("Enable precise location").performClick()
     assertEquals(1, requests)
+  }
+
+  @Test
+  fun unavailableWithServicesOffOffersLocationSettingsInLight() {
+    locationServicesRecovery(dark = false)
+  }
+
+  @Test
+  fun unavailableWithServicesOffOffersLocationSettingsInDark() {
+    locationServicesRecovery(dark = true)
+  }
+
+  private fun locationServicesRecovery(dark: Boolean) {
+    state = state.copy(answer = "Mochi", locationError = CompletionLocationError.UNAVAILABLE)
+    servicesEnabled = false
+    show(dark = dark)
+    compose.onNodeWithText("Open location settings").assertIsDisplayed().performClick()
+    assertEquals(1, requests)
+    capture(if (dark) "location-off-dark" else "location-off-light")
+    compose.runOnIdle { servicesEnabled = true }
+    compose.onNodeWithText("Open location settings").assertDoesNotExist()
+    compose.onNodeWithText("Check location access").assertIsDisplayed()
   }
 
   @Test
