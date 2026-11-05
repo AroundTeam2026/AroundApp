@@ -119,7 +119,7 @@ class VenuePageViewModel(
 
   /** Called when the explorer closes the quest details, however they close them. */
   fun onQuestDetailsClosed() {
-    mutableUiState.update { it.copy(detailQuestId = null) }
+    mutableUiState.update { it.withoutQuestDetails() }
   }
 
   /**
@@ -130,7 +130,8 @@ class VenuePageViewModel(
    * meanwhile. The quest shows as accepted only once the backend has answered, never while the
    * write waits for it. A failure keeps the quest picked and shows [AcceptStatus.FAILED], and so
    * does the server refusing the write later, after the quest showed as accepted, or the explorer's
-   * profile not being readable; calling this again retries.
+   * profile not being readable; calling this again retries. A quest accepted from its details stays
+   * picked once they close.
    */
   fun accept() {
     val current = mutableUiState.value
@@ -145,6 +146,7 @@ class VenuePageViewModel(
       it.copy(
           acceptingQuestIds = it.acceptingQuestIds + id,
           failedQuestIds = it.failedQuestIds - id,
+          pickBeforeDetails = if (it.detailQuestId == id) id else it.pickBeforeDetails,
       )
     }
     unconfirmed += id

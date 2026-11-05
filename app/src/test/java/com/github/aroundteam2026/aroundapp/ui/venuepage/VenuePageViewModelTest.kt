@@ -264,7 +264,7 @@ class VenuePageViewModelTest {
 
     viewModel.onQuestDetailsOpened("a")
     assertEquals("a", state.detailQuest?.questId)
-    assertNull(state.selectedQuestId)
+    assertEquals("a", state.selectedQuestId)
 
     viewModel.onQuestDetailsClosed()
     assertNull(state.detailQuestId)

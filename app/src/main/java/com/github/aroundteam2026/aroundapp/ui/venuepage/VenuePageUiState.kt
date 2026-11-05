@@ -22,7 +22,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property quests The venue's valid quests, in the order the page lists them.
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
- * @property detailQuestId Id of the quest whose details are open in a sheet, or null when none is.
+ * @property detailQuestId Id of the quest whose details are open, or null when none is.
+ * @property pickBeforeDetails What closing the details picks: the pick from before they opened, or
+ *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
  *   its party has. A pending or approved reservation counts; a rejected or cancelled one does not.
  * @property acceptingQuestIds Ids of the quests being accepted right now.
@@ -40,6 +42,7 @@ data class VenuePageUiState(
     val quests: List<VenuePageQuest> = emptyList(),
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
+    val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
@@ -80,21 +83,43 @@ data class VenuePageUiState(
   /**
    * This page listing [quests] instead. A picked quest that isn't among them is unpicked, so it
    * isn't picked again if it comes back, as when its venue extends an expired reward; likewise, its
-   * details close.
+   * details close, which gives back the pick from before they opened.
    */
-  fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState =
-      copy(
-          quests = quests,
-          selectedQuestId = selectedQuestId?.takeIf { id -> quests.any { it.questId == id } },
-          detailQuestId = detailQuestId?.takeIf { id -> quests.any { it.questId == id } },
-      )
+  fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState {
+    fun String?.ifListed() = this?.takeIf { id -> quests.any { it.questId == id } }
+    val detailsClosed = detailQuestId != null && detailQuestId.ifListed() == null
+    val pick = if (detailsClosed) pickBeforeDetails else selectedQuestId
+    return copy(
+        quests = quests,
+        selectedQuestId = pick.ifListed(),
+        detailQuestId = detailQuestId.ifListed(),
+        pickBeforeDetails = pickBeforeDetails.ifListed().takeIf { !detailsClosed },
+    )
+  }
 
   /**
-   * This page with the details of the quest [questId] open; a quest it doesn't list changes
-   * nothing.
+   * This page with the details of the quest [questId] open, and that quest picked, since the
+   * details offer to accept it, until [withoutQuestDetails] gives back the earlier pick. A quest it
+   * doesn't list changes nothing.
    */
   fun withQuestDetails(questId: String): VenuePageUiState =
-      if (quests.any { it.questId == questId }) copy(detailQuestId = questId) else this
+      if (quests.any { it.questId == questId }) {
+        copy(
+            detailQuestId = questId,
+            selectedQuestId = questId,
+            pickBeforeDetails = selectedQuestId,
+        )
+      } else {
+        this
+      }
+
+  /** This page with the details closed and the pick from before they opened back. */
+  fun withoutQuestDetails(): VenuePageUiState =
+      if (detailQuestId == null) {
+        this
+      } else {
+        copy(detailQuestId = null, selectedQuestId = pickBeforeDetails, pickBeforeDetails = null)
+      }
 
   /**
    * This page once the explorer tapped the quest [questId]: picked, or unpicked if it was picked. A
@@ -121,7 +146,7 @@ enum class AcceptStatus {
 }
 
 /** The party of an explorer who has not formed one yet: themself. */
-private const val SOLO_PARTY = 1
+internal const val SOLO_PARTY = 1
 
 /** Where the venue page stands. */
 enum class VenuePageStatus {

@@ -14,14 +14,37 @@
     </plurals>
     <string name="venue_quest_details">Details of %1$s</string>
 
-    <!-- The sheet with the whole of a quest, opened from its row -->
-    <string name="quest_detail_close">Close quest details</string>
-    <string name="quest_detail_about">About</string>
-    <string name="quest_detail_to_do">What to do</string>
+    <!-- The screen with the whole of a quest, opened from its row -->
+    <string name="quest_detail_title">Quest details</string>
+    <string name="quest_detail_about">Description</string>
+    <string name="quest_detail_to_do">Requirements</string>
+    <string name="quest_detail_reward">Reward</string>
+    <!-- When the reward stops being valid; the argument is the date -->
+    <string name="quest_detail_reward_expiry">Valid until %1$s</string>
+    <string name="quest_detail_party">Party</string>
+    <plurals name="quest_detail_party_at_least">
+        <item quantity="one">At least %1$d per visit</item>
+        <item quantity="other">At least %1$d per visit</item>
+    </plurals>
+    <plurals name="quest_detail_party_exactly">
+        <item quantity="one">Exactly %1$d per visit</item>
+        <item quantity="other">Exactly %1$d per visit</item>
+    </plurals>
+    <plurals name="quest_detail_party_joined">
+        <item quantity="one">%1$d of %2$d joined</item>
+        <item quantity="other">%1$d of %2$d joined</item>
+    </plurals>
+    <string name="quest_detail_party_bigger">Bigger groups welcome</string>
+    <!-- The explorer's own seat in the party -->
+    <string name="quest_detail_party_me">ME</string>
     <string name="quest_detail_proof">Proof</string>
-    <string name="quest_detail_proof_photo">Send a photo</string>
-    <string name="quest_detail_proof_text">Send a text answer</string>
-    <string name="quest_detail_reward">Reward details</string>
+    <string name="quest_detail_proof_photo">A photo</string>
+    <string name="quest_detail_proof_text">A text answer</string>
+    <string name="quest_detail_proof_checked">The venue checks it, usually within a few minutes.</string>
+    <string name="quest_detail_radius">Unlock radius</string>
+    <string name="quest_detail_radius_meters">%1$d m</string>
+    <string name="quest_detail_radius_map">Map of the %1$d m unlock radius around %2$s</string>
+    <string name="quest_detail_radius_note">%1$s asks for your proof from inside this radius.</string>
 
     <!-- The bar under the quests, where the explorer accepts the picked quest -->
     <string name="accept_quest">Accept quest</string>

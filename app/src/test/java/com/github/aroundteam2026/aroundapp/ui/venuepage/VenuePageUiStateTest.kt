@@ -91,6 +91,48 @@ class VenuePageUiStateTest {
   }
 
   @Test
+  fun closingTheDetailsGivesBackTheEarlierPick() {
+    val closed = loaded.withQuestTapped("a").withQuestDetails("b").withoutQuestDetails()
+
+    assertEquals("a", closed.selectedQuestId)
+    assertNull(closed.detailQuestId)
+    assertNull(closed.pickBeforeDetails)
+  }
+
+  @Test
+  fun closingTheDetailsPicksNothingWithoutAnEarlierPick() {
+    assertNull(loaded.withQuestDetails("b").withoutQuestDetails().selectedQuestId)
+  }
+
+  @Test
+  fun closingDetailsThatAreNotOpenChangesNothing() {
+    val picked = loaded.withQuestTapped("a")
+    assertSame(picked, picked.withoutQuestDetails())
+  }
+
+  @Test
+  fun detailsThatLeaveTheListGiveBackTheEarlierPick() {
+    val left = loaded.withQuestTapped("a").withQuestDetails("b").withQuests(listOf(quest("a")))
+
+    assertEquals("a", left.selectedQuestId)
+    assertNull(left.detailQuestId)
+    assertNull(left.pickBeforeDetails)
+  }
+
+  @Test
+  fun anEarlierPickThatLeftTheListIsNotGivenBack() {
+    val closed =
+        loaded
+            .withQuestTapped("a")
+            .withQuestDetails("b")
+            .withQuests(listOf(quest("b")))
+            .withQuests(listOf(quest("a"), quest("b")))
+            .withoutQuestDetails()
+
+    assertNull(closed.selectedQuestId)
+  }
+
+  @Test
   fun openingAListedQuestsDetailsShowsThem() {
     val open = loaded.withQuestDetails("b")
 
@@ -99,8 +141,8 @@ class VenuePageUiStateTest {
   }
 
   @Test
-  fun openingTheDetailsDoesNotPickTheQuest() {
-    assertNull(loaded.withQuestDetails("a").selectedQuestId)
+  fun openingTheDetailsPicksTheQuestSoThatItCanBeAccepted() {
+    assertEquals("a", loaded.withQuestDetails("a").selectedQuestId)
   }
 
   @Test
