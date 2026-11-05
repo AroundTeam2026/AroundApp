@@ -19,6 +19,8 @@ import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
@@ -37,6 +39,9 @@ import com.github.aroundteam2026.aroundapp.ui.navigation.Tab
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.venuepage.APPROVED_RESERVATION_ID
+import com.github.aroundteam2026.aroundapp.ui.venuepage.FAKE_EXPLORER_UID
+import com.github.aroundteam2026.aroundapp.ui.venuepage.FAKE_SLOT_START
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import kotlinx.coroutines.runBlocking
@@ -60,12 +65,15 @@ class CompletionDestinationTest {
   /** Closes the screen shown last, as its back arrow or a sent proof does. */
   private var close: () -> Unit = {}
 
+  /** How many times the app's [Completion] closed, in [showCompletion]. */
+  private var closes = 0
+
   /** Opens the app; with [approvedQuestId], the venue pages offer that quest, approved. */
   private fun launch(approvedQuestId: String? = null) {
     compose.setContent {
       navController = rememberNavController()
       AroundApp(
-          explorerUid = "explorer",
+          explorerUid = EXPLORER,
           onSignOut = {},
           navController = navController,
           venuePage = { venueId, onBack, onSubmitProof ->
@@ -114,15 +122,17 @@ class CompletionDestinationTest {
   // The app's own wiring: the venue page's button must open this route, not a stand-in callback
   @Test
   fun submitProofOnTheQuestDetailsOpensItsReservationAndVenue() {
-    launch(approvedQuestId = "quest")
+    val quest = testQuest()
+    launch(approvedQuestId = quest.id)
     open { navigateToVenuePage("venue-1") }
 
-    compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
+    val details = compose.activity.getString(R.string.venue_quest_details, quest.title)
+    compose.onNodeWithContentDescription(details).performClick()
     node(C.Tag.SUBMIT_PROOF_BUTTON).performClick()
     compose.waitForIdle()
 
-    node(RESERVATION).assertTextEquals("reservation-1")
-    node(VENUE).assertTextEquals("Café Lumen")
+    node(RESERVATION).assertTextEquals(APPROVED_RESERVATION_ID)
+    node(VENUE).assertTextEquals(testVenue().name)
   }
 
   // "complete_quest/" matches no route: opening it would crash the app
@@ -182,7 +192,7 @@ class CompletionDestinationTest {
     node(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
   }
 
-  // A fast double tap on "Complete quest" would otherwise stack the screen twice
+  // A fast double tap on "Submit proof" would otherwise stack the screen twice
   @Test
   fun aDoubleTapOpensTheScreenOnce() {
     launch()
@@ -210,7 +220,10 @@ class CompletionDestinationTest {
     val reservationId = runBlocking {
       val id =
           reservations
-              .createReservation(newPendingReservation("quest", venue.id, "Ada", 1_000), EXPLORER)
+              .createReservation(
+                  newPendingReservation("quest", venue.id, TEST_EXPLORER_NAME, FAKE_SLOT_START),
+                  EXPLORER,
+              )
               .getOrThrow()
       reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
       if (alreadySent) {
@@ -240,14 +253,14 @@ class CompletionDestinationTest {
     compose.waitForIdle()
   }
 
-  private var closes = 0
-
   @Test
   fun theAppsScreenShowsTheFormAndItsBackArrowClosesIt() {
     showCompletion()
 
     node(C.Tag.COMPLETION_SCREEN).assertIsDisplayed()
-    compose.onNodeWithContentDescription("Back").performClick()
+    compose
+        .onNodeWithContentDescription(compose.activity.getString(R.string.completion_back))
+        .performClick()
 
     assertEquals(1, closes)
   }
@@ -261,7 +274,7 @@ class CompletionDestinationTest {
   }
 
   private companion object {
-    const val EXPLORER = "explorer"
+    const val EXPLORER = FAKE_EXPLORER_UID
     const val SCREEN = "completion_stand_in"
     const val RESERVATION = "completion_stand_in_reservation"
     const val VENUE = "completion_stand_in_venue"
