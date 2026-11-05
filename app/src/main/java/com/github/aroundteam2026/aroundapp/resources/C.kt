@@ -122,6 +122,7 @@ object C {
     const val VENUE_PAGE_QUEST_COUNT = "venue_page_quest_count"
     const val ACCEPT_QUEST_BAR = "accept_quest_bar"
     const val ACCEPT_QUEST_BUTTON = "accept_quest_button"
+    const val SUBMIT_PROOF_BUTTON = "submit_proof_button"
     const val ACCEPT_QUEST_NEEDS_MORE = "accept_quest_needs_more"
     const val ACCEPT_QUEST_FAILED = "accept_quest_failed"
     const val ACCEPT_QUEST_UNAVAILABLE = "accept_quest_unavailable"

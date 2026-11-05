@@ -308,8 +308,9 @@ class VenuePageViewModel(
     val reservationIds = booked?.let {
       acceptedReservationsOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
     }
+    val approved = booked?.reservations?.approvedIds()
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
-    mutableUiState.update { it.showing(venue, quests, accepted, reservationIds, refused) }
+    mutableUiState.update { it.showing(venue, quests, accepted, reservationIds, approved, refused) }
   }
 
   /**
@@ -408,22 +409,30 @@ internal fun acceptedReservationsOf(
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxBy { partySizes[it.id] ?: 1 }.id }
 
+/** The ids of the reservations among these that the venue approved. */
+private fun List<Reservation>.approvedIds(): Set<String> = filter {
+  it.status == ReservationStatus.APPROVED
+}
+    .mapTo(HashSet()) { it.id }
+
 /** This reservation is an active one at the venue [venueId], so its quest is accepted. */
 private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
     this.venueId == venueId && status.isActive
 
 /**
  * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
- * [accepted] ones, or "not found" when [venue] is null. A quest being accepted that is now accepted
- * is done accepting, a reservation no longer listed is done cancelling, and a quest in [refused]
- * failed. A null [accepted] means the reservations can't be read: the page keeps what it knew and
- * stops offering to accept or cancel.
+ * [accepted] ones, with the explorer's [approved] reservations, or "not found" when [venue] is
+ * null. A quest being accepted that is now accepted is done accepting, a reservation no longer
+ * listed is done cancelling, and a quest in [refused] failed. A null [accepted] means the
+ * reservations can't be read: the page keeps what it knew and stops offering to accept, cancel or
+ * complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
     quests: List<VenuePageQuest>,
     accepted: Map<String, Int>?,
     reservationIds: Map<String, String>?,
+    approved: Set<String>?,
     refused: Set<String>,
 ): VenuePageUiState =
     if (venue == null) {
@@ -443,6 +452,7 @@ private fun VenuePageUiState.showing(
               cancellingIds = cancellingIds.intersect(reservationIds?.values.orEmpty()),
               failedCancelIds = failedCancelIds.intersect(reservationIds?.values.orEmpty()),
               acceptAvailable = accepted != null,
+              approvedIds = approved ?: approvedIds,
           )
           .withQuests(quests)
     }

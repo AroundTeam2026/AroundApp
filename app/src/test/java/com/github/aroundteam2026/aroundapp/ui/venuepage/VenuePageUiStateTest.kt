@@ -163,6 +163,29 @@ class VenuePageUiStateTest {
   }
 
   @Test
+  fun onlyAnApprovedReservationOfThePickedQuestCanBeCompleted() {
+    val booked = loaded.copy(reservationIds = mapOf("a" to "r"), selectedQuestId = "a")
+
+    assertNull(booked.completableReservationId)
+    assertEquals("r", booked.copy(approvedIds = setOf("r")).completableReservationId)
+    assertNull(
+        booked.copy(approvedIds = setOf("r"), selectedQuestId = "b").completableReservationId
+    )
+  }
+
+  @Test
+  fun nothingCanBeCompletedWhileTheReservationsCantBeRead() {
+    val approved =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            approvedIds = setOf("r"),
+        )
+
+    assertNull(approved.copy(acceptAvailable = false).completableReservationId)
+  }
+
+  @Test
   fun cancelStatusFollowsThePickedQuestsReservation() {
     val picked = loaded.copy(selectedQuestId = "a", reservationIds = mapOf("a" to "r"))
 

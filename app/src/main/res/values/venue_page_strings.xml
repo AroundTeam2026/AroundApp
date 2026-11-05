@@ -53,6 +53,8 @@
     <string name="accept_quest_failed">Couldn\'t accept this quest.</string>
     <string name="accept_quest_retry">Try again</string>
     <string name="accept_quest_unavailable">Can\'t accept quests right now. Open this page again to try.</string>
+    <!-- Once the venue approved the reservation, on the quest's details -->
+    <string name="submit_proof">Submit proof</string>
     <plurals name="accept_quest_needs_more">
         <item quantity="one">Needs %1$d more person to take this quest</item>
         <item quantity="other">Needs %1$d more people to take this quest</item>

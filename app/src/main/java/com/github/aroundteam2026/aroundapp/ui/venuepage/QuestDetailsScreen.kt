@@ -62,8 +62,9 @@ import java.util.Date
 /**
  * The whole of [quest], as the Figma frame "Quest details": the venue, the quest's title and chips,
  * then a card for each part of it, over a bar that stays in place to accept the quest or, once it
- * is accepted, to cancel the reservation after asking. The rows only fit part of a quest, so this
- * is where the rest is read.
+ * is accepted, to cancel the reservation after asking. Once the venue approved the reservation, the
+ * bar offers to submit the proof. The rows only fit part of a quest, so this is where the rest is
+ * read.
  *
  * @param state The venue's page, for the venue and how accepting and cancelling stand.
  * @param quest The quest to show.
@@ -71,6 +72,7 @@ import java.util.Date
  * @param onAccept Accepts the quest.
  * @param onCancel Cancels the quest's reservation, once the explorer confirmed.
  * @param clock Tells the time zone the reward's expiry is written in.
+ * @param onSubmitProof Opens the proof form of the approved reservation with the given id.
  */
 @Composable
 fun QuestDetailsScreen(
@@ -81,6 +83,7 @@ fun QuestDetailsScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
+    onSubmitProof: (reservationId: String) -> Unit = {},
 ) {
   BackHandler(onBack = onBack)
   Column(
@@ -113,7 +116,11 @@ fun QuestDetailsScreen(
       ProofCard(quest.proofType)
       RadiusCard(state, quest)
     }
-    AcceptQuestBar(state, onAccept) {
+    AcceptQuestBar(
+        state,
+        onAccept,
+        onSubmitProof = state.completableReservationId?.let { id -> { onSubmitProof(id) } },
+    ) {
       if (state.cancellableReservationId != null) {
         CancelReservationAction(
             state.cancelStatus,
