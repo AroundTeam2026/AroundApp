@@ -108,6 +108,18 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun aQuestAcceptedFromItsDetailsStaysPickedOnceTheyClose() = test {
+    openAndPick("a")
+    viewModel.onQuestDetailsOpened("b")
+
+    viewModel.accept()
+    runCurrent()
+    viewModel.onQuestDetailsClosed()
+
+    assertEquals("b", state.selectedQuestId)
+  }
+
+  @Test
   fun acceptCreatesOnePendingReservationForThePickedQuest() = test {
     openAndPick("a")
     advanceTimeBy(5_000)

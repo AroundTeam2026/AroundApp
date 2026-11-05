@@ -346,6 +346,14 @@ class QuestDetailsScreenTest {
     assertNull(rewardDetails(null))
   }
 
+  @Test
+  fun thePreviewShowsAQuest() {
+    compose.setContent { QuestDetailsPreview() }
+
+    node(C.Tag.QUEST_DETAIL_TITLE).assertTextEquals("Find the hidden fox")
+    node(C.Tag.QUEST_DETAIL_PARTY_RULE).assertTextEquals("At least 4 per visit")
+  }
+
   private companion object {
     const val QUEST = "fox"
   }
