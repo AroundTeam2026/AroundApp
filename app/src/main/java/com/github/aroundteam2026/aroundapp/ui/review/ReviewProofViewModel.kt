@@ -19,6 +19,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_REJECT_REASON_LENGTH
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -71,6 +73,15 @@ class ReviewProofViewModel(
   /** Bumped by [retry]: each new value restarts the listeners and the photo's download. */
   private val retries = MutableStateFlow(0)
 
+  /** Whether [retry] restarted the listeners after a failure and they haven't answered yet. */
+  private val reloading = MutableStateFlow(false)
+
+  /**
+   * The photo once downloaded, with its location, so that the listeners restarting, e.g. after the
+   * app was in the background, don't download it again.
+   */
+  private var downloaded: Pair<String, ProofPhoto.Loaded>? = null
+
   /** Saves the venue's answer to the proof. */
   private val answers = AnswerSaver(viewModelScope, TAG)
 
@@ -80,10 +91,16 @@ class ReviewProofViewModel(
       combine(
               combine(authRepository.currentUserId, retries) { venueId, _ -> venueId }
                   .flatMapLatest { venueId ->
-                    if (venueId == null) flowOf(ReviewProofUiState()) else listen(venueId)
-                  },
+                    // Signed out, e.g. the session ended: there is no venue to read the proof as
+                    if (venueId == null)
+                        flowOf(ReviewProofUiState(status = ReviewProofStatus.FAILED))
+                    else listen(venueId)
+                  }
+                  .onEach { reloading.value = false },
               answers.state,
-          ) { listened, answers ->
+              reloading,
+          ) { listened, answers, reloading ->
+            if (reloading) return@combine ReviewProofUiState()
             val pending =
                 if (listened.status == ReviewProofStatus.LOADED && !listened.reviewed) {
                   setOf(completionId)
@@ -110,12 +127,16 @@ class ReviewProofViewModel(
   }
 
   /**
-   * Rejects the proof for [reason], which the explorer sees. Does nothing for a blank reason, which
-   * the repository would refuse.
+   * Rejects the proof for [reason], which the explorer sees. Does nothing for a blank reason, or
+   * one over [MAX_REJECT_REASON_LENGTH] characters, which the repository would refuse.
    */
   fun reject(reason: String) {
     val trimmed = reason.trim()
-    if (trimmed.isEmpty() || !uiState.value.canReject) return
+    if (
+        trimmed.isEmpty() || trimmed.length > MAX_REJECT_REASON_LENGTH || !uiState.value.canReject
+    ) {
+      return
+    }
     answers.answer(completionId, "proof $completionId with a rejection") {
       completionRepository.reject(completionId, trimmed)
     }
@@ -124,8 +145,16 @@ class ReviewProofViewModel(
   /** Clears [ReviewProofUiState.updateFailed], once the screen has shown it. */
   fun clearUpdateError() = answers.clearFailure()
 
-  /** Listens again, and downloads the photo again, after a failure. */
+  /**
+   * Listens again, and downloads the photo again, after a failure; does nothing otherwise. After a
+   * failed proof, the state is [ReviewProofStatus.LOADING] until the listeners answer.
+   */
   fun retry() {
+    val current = uiState.value
+    when {
+      current.status == ReviewProofStatus.FAILED -> reloading.value = true
+      current.photo != ProofPhoto.Failed -> return
+    }
     retries.update { it + 1 }
   }
 
@@ -208,12 +237,19 @@ class ReviewProofViewModel(
         is Proof.Text -> flowOf(null)
         is Proof.Photo ->
             flow<ProofPhoto?> {
+              val kept = downloaded?.takeIf { (location, _) -> location == proof.location }
+              if (kept != null) {
+                emit(kept.second)
+                return@flow
+              }
               emit(ProofPhoto.Loading)
               emit(
                   proofPhotoRepository
                       .download(proof.location)
                       .fold<ProofPhoto, ByteArray>(
-                          { ProofPhoto.Loaded(it) },
+                          { bytes ->
+                            ProofPhoto.Loaded(bytes).also { downloaded = proof.location to it }
+                          },
                           {
                             Log.w(TAG, "Downloading the photo of $completionId failed", it)
                             ProofPhoto.Failed

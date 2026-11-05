@@ -56,6 +56,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_REJECT_REASON_LENGTH
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
@@ -343,8 +344,9 @@ private fun Handle() {
 private fun Color.disabled() = copy(alpha = DISABLED_ALPHA)
 
 /**
- * The longest note. The rules refuse a reason over 300 characters, and the longest preset with its
- * separator takes about 25 of them; if a preset gets much longer, compute this from the labels.
+ * The longest note. A reason is at most [MAX_REJECT_REASON_LENGTH] characters, and the longest
+ * preset with its separator takes about 25 of them; if a preset gets much longer, compute this from
+ * the labels.
  */
 internal const val NOTE_MAX_LENGTH = 250
 

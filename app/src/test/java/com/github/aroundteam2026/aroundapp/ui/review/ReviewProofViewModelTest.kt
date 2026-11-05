@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_REJECT_REASON_LENGTH
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -29,11 +30,13 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -43,6 +46,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -81,10 +85,13 @@ class ReviewProofViewModelTest {
   /** The proof the ViewModel reviews; set by [sendProof] or by the test. */
   private var id = completionId(RESERVATION_ID_UNKNOWN, EXPLORER_UID)
 
+  /** Who is signed in when the ViewModel starts: the venue, unless a test signs it out. */
+  private var signedIn: String? = VENUE_ID
+
   private val viewModel by lazy {
     ReviewProofViewModel(
         id,
-        FakeAuthRepository(VENUE_ID),
+        FakeAuthRepository(signedIn),
         reviewed,
         readReservations,
         readParty,
@@ -175,6 +182,42 @@ class ReviewProofViewModelTest {
     assertTrue(state.canApprove)
   }
 
+  // The listeners stop 5 s after the screen does, e.g. while the app is in the background
+  @Test
+  fun aDownloadedPhotoIsKeptWhenTheListenersRestart() = test {
+    val reservationId = reserve()
+    val location = photos.upload(reservationId, PHOTO).getOrThrow()
+    sendProof(reservationId, Proof.Photo(location))
+    var downloads = 0
+    downloaded =
+        object : ProofPhotoRepository by photos {
+          override suspend fun download(location: String): Result<ByteArray> {
+            downloads++
+            return photos.download(location)
+          }
+        }
+    var listens = 0
+    reviewed =
+        object : CompletionRepository by completions {
+          override fun observeForVenue(venueId: String): Flow<List<Completion>> {
+            listens++
+            return completions.observeForVenue(venueId)
+          }
+        }
+    val watching = backgroundScope.launch { viewModel.uiState.collect {} }
+    val photo = state.photo
+    assertTrue(photo is ProofPhoto.Loaded)
+
+    watching.cancel()
+    advanceTimeBy(STOPPED_LONG_ENOUGH_MS)
+    watch()
+
+    // The listeners did restart, but the photo wasn't downloaded again
+    assertEquals(2, listens)
+    assertEquals(1, downloads)
+    assertSame(photo, state.photo)
+  }
+
   @Test
   fun aPhotoStillDownloadingCantBeApproved() = test {
     val reservationId = reserve()
@@ -255,6 +298,21 @@ class ReviewProofViewModelTest {
 
     assertEquals(CompletionStatus.PENDING, stored().status)
     assertFalse(state.saving)
+  }
+
+  // The rules would refuse it on every try, with only a generic error
+  @Test
+  fun aReasonOverTheLimitRejectsNothing() = test {
+    sendProof(reserve())
+    watch()
+
+    viewModel.reject("x".repeat(MAX_REJECT_REASON_LENGTH + 1))
+
+    assertEquals(CompletionStatus.PENDING, stored().status)
+
+    viewModel.reject("x".repeat(MAX_REJECT_REASON_LENGTH))
+
+    assertEquals(CompletionStatus.REJECTED, stored().status)
   }
 
   @Test
@@ -386,12 +444,59 @@ class ReviewProofViewModelTest {
     assertEquals(ReviewProofStatus.LOADED, state.status)
   }
 
+  @Test
+  fun retryingShowsLoadingUntilTheListenersAnswer() = test {
+    sendProof(reserve())
+    val gate = CompletableDeferred<Unit>()
+    var listens = 0
+    reviewed =
+        object : CompletionRepository by completions {
+          override fun observeForVenue(venueId: String): Flow<List<Completion>> {
+            listens++
+            return if (listens == 1) flow { throw IOException("denied") }
+            else
+                flow {
+                  gate.await()
+                  emitAll(completions.observeForVenue(venueId))
+                }
+          }
+        }
+    watch()
+    assertEquals(ReviewProofStatus.FAILED, state.status)
+
+    viewModel.retry()
+
+    assertEquals(ReviewProofStatus.LOADING, state.status)
+
+    // A second tap doesn't restart the attempt in progress
+    viewModel.retry()
+
+    assertEquals(2, listens)
+
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(ReviewProofStatus.LOADED, state.status)
+  }
+
+  // E.g. the session ended while the proof was on screen: retrying can't help
+  @Test
+  fun noSignedInVenueFails() = test {
+    sendProof(reserve())
+    signedIn = null
+    watch()
+
+    assertEquals(ReviewProofStatus.FAILED, state.status)
+  }
+
   private companion object {
     const val VENUE_ID = "cafe"
     const val EXPLORER_UID = "yusuf"
     const val RESERVATION_ID_UNKNOWN = "gone"
     const val NOW = 1_800_000_000_000L
     const val SENT_AT = NOW + 60_000L
+    /** Longer than the ViewModel keeps its listeners once nobody watches. */
+    const val STOPPED_LONG_ENOUGH_MS = 6_000L
     val TEXT_PROOF = Proof.Text("The fox hides behind the bar")
     val REWARD = Reward.FreeItem("Croissant", specifics = null)
     val PHOTO_BYTES = byteArrayOf(1, 2, 3)
