@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
@@ -96,38 +97,38 @@ class CompletionViewModel(
     mutableUiState.update { it.copy(saveState = SaveState.Saving, locationError = null) }
     viewModelScope.launch {
       val locationError = locationError(venueId, questRadius)
-      if (locationError != null) {
-        mutableUiState.update {
-          if (it.saveState is SaveState.Saved) it
-          else it.copy(saveState = SaveState.Idle, locationError = locationError)
-        }
-        return@launch
+      val current = mutableUiState.value
+      when {
+        locationError != null -> finishSubmit(SaveState.Idle, locationError)
+        current.saveState is SaveState.Saved -> Unit
+        // Approval may be withdrawn while the device is finding its position.
+        current.status != CompletionFormStatus.READY -> finishSubmit(SaveState.Idle)
+        else -> finishSubmit(submitProof(form, venueId))
       }
-      // Approval may be withdrawn while the device is finding its position.
-      if (mutableUiState.value.saveState is SaveState.Saved) return@launch
-      if (mutableUiState.value.status != CompletionFormStatus.READY) {
-        mutableUiState.update {
-          if (it.saveState is SaveState.Saved) it else it.copy(saveState = SaveState.Idle)
-        }
-        return@launch
-      }
-      val proof = proofOf(form)
-      val saveState =
-          proof
-              ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
-              ?.fold(
-                  { SaveState.Saved(it) },
-                  {
-                    Log.w(TAG, "Submitting the completion of $reservationId failed", it)
-                    SaveState.Failed
-                  },
-              ) ?: SaveState.Failed
-      // The listener may have shown the completion as saved meanwhile, e.g. when the answer to an
-      // earlier submit was lost: this submit then fails as already stored, and a retry could only
-      // fail again, so what the listener showed stays
-      mutableUiState.update {
-        if (it.saveState is SaveState.Saved) it else it.copy(saveState = saveState)
-      }
+    }
+  }
+
+  /** Uploads the proof of [form] if needed and submits it; says where that left the form. */
+  private suspend fun submitProof(form: CompletionUiState, venueId: String): SaveState =
+      proofOf(form)
+          ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
+          ?.fold(
+              { SaveState.Saved(it) },
+              {
+                Log.w(TAG, "Submitting the completion of $reservationId failed", it)
+                SaveState.Failed
+              },
+          ) ?: SaveState.Failed
+
+  /**
+   * Ends a submit with [saveState] and [locationError]. The listener may have shown the completion
+   * as saved meanwhile, e.g. when the answer to an earlier submit was lost: this submit then fails
+   * as already stored, and a retry could only fail again, so what the listener showed stays.
+   */
+  private fun finishSubmit(saveState: SaveState, locationError: CompletionLocationError? = null) {
+    mutableUiState.update {
+      if (it.saveState is SaveState.Saved) it
+      else it.copy(saveState = saveState, locationError = locationError)
     }
   }
 
