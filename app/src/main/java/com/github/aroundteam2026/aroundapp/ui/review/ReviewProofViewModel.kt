@@ -52,9 +52,9 @@ import kotlinx.coroutines.flow.update
  * completion, and reads the reservation it belongs to (the explorer's name), the reservation's
  * party, the quest (title, requirements and reward) and, for a photo, the photo through
  * [proofPhotoRepository]. Once the proof is no longer pending, here or on another phone, the state
- * is [ReviewProofUiState.reviewed]. A proof that can't be found, or a failing listener, shows
- * [ReviewProofStatus.FAILED] until [retry]; a photo that can't be downloaded shows
- * [ProofPhoto.Failed], and [retry] downloads it again.
+ * is [ReviewProofUiState.reviewed]. A proof that can't be found, or its listener failing, shows
+ * [ReviewProofStatus.FAILED] until [retry]. The reservation, party or quest failing only leaves out
+ * what they tell, and a photo that can't be downloaded shows [ProofPhoto.Failed] until [retry].
  *
  * [approve] and [reject] save through an [AnswerSaver]: a double tap saves once, and a failure is
  * reported until [clearUpdateError].
@@ -103,7 +103,7 @@ class ReviewProofViewModel(
 
   /** Approves the proof, which gives the party the quest's reward. */
   fun approve() {
-    if (!uiState.value.canAnswer) return
+    if (!uiState.value.canApprove) return
     answers.answer(completionId, "proof $completionId with an approval") {
       completionRepository.approve(completionId)
     }
@@ -115,7 +115,7 @@ class ReviewProofViewModel(
    */
   fun reject(reason: String) {
     val trimmed = reason.trim()
-    if (trimmed.isEmpty() || !uiState.value.canAnswer) return
+    if (trimmed.isEmpty() || !uiState.value.canReject) return
     answers.answer(completionId, "proof $completionId with a rejection") {
       completionRepository.reject(completionId, trimmed)
     }
@@ -170,15 +170,19 @@ class ReviewProofViewModel(
 
   /**
    * What the screen shows about a proof of the reservation [reservationId] that is [proof], read
-   * from the venue [venueId]'s reservations and quests, the party, and the photo.
+   * from the venue [venueId]'s reservations and quests, the party, and the photo. The proof is fine
+   * when one of them fails, so the screen still shows it, without what that one tells.
    */
   private fun detailsOf(venueId: String, reservationId: String, proof: Proof): Flow<Details> =
       combine(
-          reservationRepository.observeForVenue(venueId).map { all ->
-            all.firstOrNull { it.id == reservationId }
-          },
-          partyRepository.observeJoinedCounts(listOf(reservationId)),
-          questRepository.observeQuestsByVenue(venueId),
+          reservationRepository
+              .observeForVenue(venueId)
+              .map { all -> all.firstOrNull { it.id == reservationId } }
+              .orOnFailure(null, "the reservation $reservationId"),
+          partyRepository
+              .observeJoinedCounts(listOf(reservationId))
+              .orOnFailure(emptyMap(), "the party of $reservationId"),
+          questRepository.observeQuestsByVenue(venueId).orOnFailure(emptyList(), "the quests"),
           photoOf(proof),
       ) { reservation, partySizes, quests, photo ->
         Details(
@@ -189,6 +193,12 @@ class ReviewProofViewModel(
             photo = photo,
         )
       }
+
+  /** This flow, then [fallback] if it fails, e.g. when the backend stops [what]'s listener. */
+  private fun <T> Flow<T>.orOnFailure(fallback: T, what: String): Flow<T> = catch {
+    Log.w(TAG, "Listening to $what of the proof $completionId failed", it)
+    emit(fallback)
+  }
 
   /**
    * The photo of [proof] once downloaded, after [ProofPhoto.Loading]; null for a written answer.

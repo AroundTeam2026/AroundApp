@@ -4,7 +4,11 @@ package com.github.aroundteam2026.aroundapp.ui.review
 import android.net.Uri
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
@@ -13,6 +17,9 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepos
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -64,8 +71,12 @@ class ReviewProofViewModelTest {
       )
   private val photos = FakeProofPhotoRepository { PHOTO_BYTES }
 
-  /** The completions the ViewModel uses: [completions] unless a test wraps them. */
+  // The repositories the ViewModel uses: the fakes above unless a test wraps them
   private var reviewed: CompletionRepository = completions
+  private var readReservations: ReservationRepository = reservations
+  private var readParty: PartyRepository = party
+  private var readQuests: QuestRepository = quests
+  private var downloaded: ProofPhotoRepository = photos
 
   /** The proof the ViewModel reviews; set by [sendProof] or by the test. */
   private var id = completionId(RESERVATION_ID_UNKNOWN, EXPLORER_UID)
@@ -75,10 +86,10 @@ class ReviewProofViewModelTest {
         id,
         FakeAuthRepository(VENUE_ID),
         reviewed,
-        reservations,
-        party,
-        quests,
-        photos,
+        readReservations,
+        readParty,
+        readQuests,
+        downloaded,
     )
   }
 
@@ -129,7 +140,7 @@ class ReviewProofViewModelTest {
     assertEquals(TEXT_PROOF, state.proof)
     assertNull(state.photo)
     assertFalse(state.reviewed)
-    assertTrue(state.canAnswer)
+    assertTrue(state.canApprove)
   }
 
   @Test
@@ -153,13 +164,44 @@ class ReviewProofViewModelTest {
     watch()
 
     assertEquals(ProofPhoto.Failed, state.photo)
-    // The proof itself still shows, and can be answered
-    assertTrue(state.canAnswer)
+    // The proof itself still shows and can be rejected, but not approved unseen
+    assertTrue(state.canReject)
+    assertFalse(state.canApprove)
 
     photos.forcedFailure = null
     viewModel.retry()
 
     assertTrue(state.photo is ProofPhoto.Loaded)
+    assertTrue(state.canApprove)
+  }
+
+  @Test
+  fun aPhotoStillDownloadingCantBeApproved() = test {
+    val reservationId = reserve()
+    val location = photos.upload(reservationId, PHOTO).getOrThrow()
+    sendProof(reservationId, Proof.Photo(location))
+    val gate = CompletableDeferred<Unit>()
+    downloaded =
+        object : ProofPhotoRepository by photos {
+          override suspend fun download(location: String): Result<ByteArray> {
+            gate.await()
+            return photos.download(location)
+          }
+        }
+    watch()
+
+    assertEquals(ProofPhoto.Loading, state.photo)
+    assertTrue(state.canReject)
+    assertFalse(state.canApprove)
+
+    viewModel.approve()
+
+    assertEquals(CompletionStatus.PENDING, stored().status)
+
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertTrue(state.canApprove)
   }
 
   @Test
@@ -182,7 +224,7 @@ class ReviewProofViewModelTest {
 
     assertEquals(1, approvals)
     assertTrue(state.saving)
-    assertFalse(state.canAnswer)
+    assertFalse(state.canReject)
 
     gate.complete(Unit)
     advanceUntilIdle()
@@ -225,7 +267,7 @@ class ReviewProofViewModelTest {
 
     assertTrue(state.updateFailed)
     assertFalse(state.saving)
-    assertTrue(state.canAnswer)
+    assertTrue(state.canApprove)
     assertEquals(CompletionStatus.PENDING, stored().status)
 
     viewModel.clearUpdateError()
@@ -241,7 +283,7 @@ class ReviewProofViewModelTest {
     completions.reject(id, "Not the right drink").getOrThrow()
 
     assertTrue(state.reviewed)
-    assertFalse(state.canAnswer)
+    assertFalse(state.canReject)
 
     viewModel.approve()
 
@@ -271,6 +313,57 @@ class ReviewProofViewModelTest {
     assertNull(state.questTitle)
     assertNull(state.reward)
     assertEquals(0, state.partySize)
+  }
+
+  @Test
+  fun aFailingReservationListenerStillShowsTheProof() = test {
+    sendProof(reserve())
+    readReservations =
+        object : ReservationRepository by reservations {
+          override fun observeForVenue(venueId: String): Flow<List<Reservation>> = flow {
+            throw IOException("denied")
+          }
+        }
+    watch()
+
+    assertEquals(ReviewProofStatus.LOADED, state.status)
+    assertEquals(TEXT_PROOF, state.proof)
+    assertNull(state.explorerName)
+    assertNull(state.questTitle)
+    assertTrue(state.canApprove)
+  }
+
+  @Test
+  fun aFailingPartyListenerStillShowsTheProof() = test {
+    sendProof(reserve(partySize = 3))
+    readParty =
+        object : PartyRepository by party {
+          override fun observeMembers(reservationId: String): Flow<List<PartyMember>> = flow {
+            throw IOException("denied")
+          }
+        }
+    watch()
+
+    assertEquals(ReviewProofStatus.LOADED, state.status)
+    assertEquals(0, state.partySize)
+    assertEquals("Yusuf S.", state.explorerName)
+  }
+
+  @Test
+  fun aFailingQuestListenerStillShowsTheProof() = test {
+    sendProof(reserve())
+    readQuests =
+        object : QuestRepository by quests {
+          override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> = flow {
+            throw IOException("denied")
+          }
+        }
+    watch()
+
+    assertEquals(ReviewProofStatus.LOADED, state.status)
+    assertNull(state.questTitle)
+    assertNull(state.reward)
+    assertEquals("Yusuf S.", state.explorerName)
   }
 
   @Test
