@@ -248,29 +248,31 @@ class VenuePageScreenTest {
   }
 
   @Test
-  fun theDetailQuestIsShownInASheet() {
+  fun theDetailQuestTakesThePlaceOfTheList() {
     show(LOADED.copy(detailQuestId = "b"))
 
     compose
         .onNodeWithTag(C.Tag.QUEST_DETAIL_TITLE, useUnmergedTree = true)
         .assertTextEquals("Quest b")
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
   }
 
   @Test
-  fun noDetailQuestShowsNoSheet() {
+  fun noDetailQuestShowsTheList() {
     show(LOADED)
 
-    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertDoesNotExist()
   }
 
   @Test
-  fun closingTheSheetSaysSo() {
+  fun theBackArrowOfTheDetailsClosesThemOnly() {
     show(LOADED.copy(detailQuestId = "a"))
 
-    compose.onNodeWithContentDescription("Close quest details").performClick()
-    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
 
     assertEquals(1, detailsClosed)
+    assertEquals(0, backCalls)
   }
 
   @Test
@@ -278,11 +280,13 @@ class VenuePageScreenTest {
     showScreen(activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
 
     compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
-    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertIsDisplayed()
 
-    compose.onNodeWithContentDescription("Close quest details").performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
     compose.waitForIdle()
-    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
   }
 
   @Test

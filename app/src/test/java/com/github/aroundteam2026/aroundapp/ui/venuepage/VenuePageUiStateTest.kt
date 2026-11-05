@@ -99,8 +99,8 @@ class VenuePageUiStateTest {
   }
 
   @Test
-  fun openingTheDetailsDoesNotPickTheQuest() {
-    assertNull(loaded.withQuestDetails("a").selectedQuestId)
+  fun openingTheDetailsPicksTheQuestSoThatItCanBeAccepted() {
+    assertEquals("a", loaded.withQuestDetails("a").selectedQuestId)
   }
 
   @Test

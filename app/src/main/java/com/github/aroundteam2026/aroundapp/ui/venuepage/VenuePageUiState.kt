@@ -22,7 +22,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property quests The venue's valid quests, in the order the page lists them.
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
- * @property detailQuestId Id of the quest whose details are open in a sheet, or null when none is.
+ * @property detailQuestId Id of the quest whose details are open, or null when none is.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
  *   its party has. A pending or approved reservation counts; a rejected or cancelled one does not.
  * @property acceptingQuestIds Ids of the quests being accepted right now.
@@ -90,11 +90,15 @@ data class VenuePageUiState(
       )
 
   /**
-   * This page with the details of the quest [questId] open; a quest it doesn't list changes
-   * nothing.
+   * This page with the details of the quest [questId] open, and that quest picked, since the
+   * details offer to accept it. A quest it doesn't list changes nothing.
    */
   fun withQuestDetails(questId: String): VenuePageUiState =
-      if (quests.any { it.questId == questId }) copy(detailQuestId = questId) else this
+      if (quests.any { it.questId == questId }) {
+        copy(detailQuestId = questId, selectedQuestId = questId)
+      } else {
+        this
+      }
 
   /**
    * This page once the explorer tapped the quest [questId]: picked, or unpicked if it was picked. A
@@ -121,7 +125,7 @@ enum class AcceptStatus {
 }
 
 /** The party of an explorer who has not formed one yet: themself. */
-private const val SOLO_PARTY = 1
+internal const val SOLO_PARTY = 1
 
 /** Where the venue page stands. */
 enum class VenuePageStatus {
