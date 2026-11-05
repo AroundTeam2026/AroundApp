@@ -52,7 +52,9 @@ class RoutesTest {
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+          venuePage = { venueId, onBack, onSubmitProof ->
+            VenuePageOnFakes(venueId, onBack, onSubmitProof)
+          },
           overview = { OverviewOnFakes(it) },
       )
     }

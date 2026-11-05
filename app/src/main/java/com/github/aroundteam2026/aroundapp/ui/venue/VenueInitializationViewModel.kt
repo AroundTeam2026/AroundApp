@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> (KDoc reformatting)
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import androidx.lifecycle.ViewModel
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Why the business name could not be saved. */
 enum class VenueInitializationError {
   EMPTY_NAME,
   NAME_TOO_LONG,
@@ -67,11 +69,16 @@ class VenueInitializationViewModel(
     mutableUiState.value = uiState.value.copy(venueId = null)
   }
 
+  /** Sets the typed business name and clears any error, unless the name is locked. */
   fun updateBusinessName(name: String) {
     if (!uiState.value.canEditName) return
     mutableUiState.value = uiState.value.copy(businessName = name, error = null)
   }
 
+  /**
+   * Validates the name and creates the venue if needed, then signals location setup through
+   * [uiState].
+   */
   fun submit() {
     val state = uiState.value
     if (!state.canContinue) return

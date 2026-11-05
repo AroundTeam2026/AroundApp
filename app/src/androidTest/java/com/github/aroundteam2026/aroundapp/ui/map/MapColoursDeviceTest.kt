@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -85,6 +86,8 @@ private val LAUSANNE = Location(46.5197, 6.6323)
 
 private class LocatedAt(private val location: Location) : LocationRepository {
   override suspend fun currentLocation() = location
+
+  override suspend fun currentPreciseLocation(): Location? = null
 }
 
 /** Turns the device's dark mode on or off; activities started afterwards follow it. */

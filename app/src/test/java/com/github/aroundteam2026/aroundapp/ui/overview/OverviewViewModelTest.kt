@@ -9,7 +9,11 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -46,6 +50,7 @@ class OverviewViewModelTest {
   private val party = FakePartyRepository { now }
   private val reservations = FakeReservationRepository({ now }, party)
   private val listener = BreakableReservations(reservations)
+  private val completions = FakeCompletionRepository { now }
 
   private val venues =
       FakeVenueRepository(
@@ -70,7 +75,7 @@ class OverviewViewModelTest {
   }
 
   private val viewModel by lazy {
-    OverviewViewModel(EXPLORER, listener, questRepository, venues, party)
+    OverviewViewModel(EXPLORER, listener, questRepository, venues, party, completions)
   }
 
   private val state
@@ -106,6 +111,14 @@ class OverviewViewModelTest {
   private suspend fun answer(id: String, status: ReservationStatus) {
     reservations.updateStatus(id, status).getOrThrow()
   }
+
+  /** Books [questId] at the café and has the venue approve it; returns its id. */
+  private suspend fun approvedReservation(questId: String = "fox"): String =
+      book(questId).also { answer(it, ReservationStatus.APPROVED) }
+
+  /** Sends the explorer's proof of the reservation [reservationId]; returns the completion's id. */
+  private suspend fun sendProof(reservationId: String): String =
+      completions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the window")).getOrThrow()
 
   private fun titles() = state.rows.map { it.questTitle }
 
@@ -196,7 +209,13 @@ class OverviewViewModelTest {
         newPendingReservation("fox", CAFE, TEST_EXPLORER_NAME, START).copy(id = "reservation-1")
     val quest = testQuest(id = "fox", venueId = CAFE)
 
-    val rows = overviewRows(listOf(reservation to quest), listOf(testVenue(id = CAFE)), emptyMap())
+    val rows =
+        overviewRows(
+            listOf(reservation to quest),
+            listOf(testVenue(id = CAFE)),
+            partySizes = emptyMap(),
+            proofs = emptyMap(),
+        )
 
     assertEquals(1, rows.single().partySize)
   }
@@ -351,7 +370,8 @@ class OverviewViewModelTest {
             throw IOException("denied")
           }
         }
-    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, broken, party)
+    val viewModel =
+        OverviewViewModel(EXPLORER, listener, questRepository, broken, party, completions)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
@@ -366,10 +386,65 @@ class OverviewViewModelTest {
             throw IOException("denied")
           }
         }
-    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, broken)
+    val viewModel =
+        OverviewViewModel(EXPLORER, listener, questRepository, venues, broken, completions)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
+  }
+
+  @Test
+  fun aFailingCompletionListenerShowsFailed() = test {
+    book("fox")
+    val broken =
+        object : CompletionRepository by completions {
+          override fun observeForExplorer(uid: String): Flow<List<Completion>> = flow {
+            throw IOException("denied")
+          }
+        }
+    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, party, broken)
+    runCurrent()
+
+    assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
+  }
+
+  // The venue answers the proof while the tab is open, and the row follows
+  @Test
+  fun aSentProofShowsAsSentThenCompleted() = test {
+    val id = approvedReservation()
+    viewModel
+    runCurrent()
+    assertEquals(OverviewRowStatus.APPROVED, state.rows.single().status)
+
+    val proof = sendProof(id)
+    runCurrent()
+    assertEquals(OverviewRowStatus.PROOF_SENT, state.rows.single().status)
+
+    completions.approve(proof).getOrThrow()
+    runCurrent()
+    assertEquals(OverviewRowStatus.COMPLETED, state.rows.single().status)
+  }
+
+  @Test
+  fun aRejectedProofShowsAsRejected() = test {
+    val proof = sendProof(approvedReservation())
+    completions.reject(proof, "The fox isn't in the photo").getOrThrow()
+    viewModel
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.PROOF_REJECTED, state.rows.single().status)
+  }
+
+  // A proof only changes the row of its own reservation
+  @Test
+  fun aProofOfAnotherReservationLeavesTheRowApproved() = test {
+    val id = approvedReservation()
+    val other = approvedReservation("cake")
+    sendProof(other)
+    viewModel
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.APPROVED, state.rows.single { it.reservationId == id }.status)
   }
 
   @Test

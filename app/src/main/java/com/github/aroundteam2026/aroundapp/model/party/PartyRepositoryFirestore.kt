@@ -17,15 +17,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [PartyRepository] backed by the Firestore `party_user` collection, one document per membership
  * under its [partyMemberId].
  *
- * Firestore types stay inside this class. Times are stored as `Timestamp`s and the status as its
- * enum name. Documents that cannot be mapped back to a [PartyMember] are logged and skipped:
- * [observeMembers] leaves them out, and [withdraw] treats them as missing.
+ * Documents that cannot be mapped back to a [PartyMember] are logged and skipped: [observeMembers]
+ * leaves them out, and [withdraw] treats them as missing.
  *
- * The security rules decide who may do what: an explorer joins a pending reservation as themselves,
- * while it has fewer than [MAX_PARTY_SIZE] joined members, only the member withdraws, and the
- * party's members, withdrawn ones too, and the reservation's venue read. Joining and withdrawing
- * also move the reservation's count of joined members, in the same write, which is how the rules
- * cap the party.
+ * The security rules let an explorer join a pending reservation as themselves while it has fewer
+ * than [MAX_PARTY_SIZE] joined members, and only the member withdraw. Joining and withdrawing move
+ * the reservation's joined count in the same write, which is how the rules cap the party.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [join] waits for the server to confirm the write, in

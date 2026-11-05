@@ -121,6 +121,13 @@ class VenueQuestRowTest {
   }
 
   @Test
+  fun anExactPartyShowsNoPlus() {
+    show(quest(minPartySize = 4).copy(exactPartySize = true))
+
+    node(C.Tag.QUEST_CHIP_PARTY).assertTextEquals("Groups of 4")
+  }
+
+  @Test
   fun aSoloQuestShowsNoPartyChip() {
     show(quest(minPartySize = 1))
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- The check of the quest details' requirements card, from Figma; tinted where it is drawn -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="14dp"
+    android:height="14dp"
+    android:viewportWidth="14"
+    android:viewportHeight="14">
+    <path
+        android:pathData="M12.8333 6.46333V7C12.8326 8.25791 12.4253 9.48189 11.6721 10.4894C10.9189 11.4969 9.86025 12.2339 8.65396 12.5906C7.44766 12.9473 6.1584 12.9044 4.97844 12.4685C3.79848 12.0326 2.79105 11.2269 2.10639 10.1716C1.42174 9.11635 1.09654 7.86804 1.17931 6.61285C1.26207 5.35766 1.74837 4.16286 2.56566 3.20663C3.38295 2.25039 4.48745 1.58397 5.71444 1.30675C6.94143 1.02953 8.22515 1.15636 9.37417 1.66833"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M5.25 6.41667L7 8.16667L12.8333 2.33333"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/black"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

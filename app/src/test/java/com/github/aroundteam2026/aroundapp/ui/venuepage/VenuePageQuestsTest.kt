@@ -77,7 +77,9 @@ class VenuePageQuestsTest {
   @Test
   fun aRowCarriesTheQuestsFields() {
     val reward = Reward.Discount(10.0, DiscountUnit.PERCENT, specifics = "Drinks")
-    val quest = testQuest(id = "q", title = "Find the fox", reward = reward, minPartySize = 3)
+    val quest =
+        testQuest(id = "q", title = "Find the fox", reward = reward, minPartySize = 3)
+            .copy(exactPartySize = true, radiusMeters = 80)
 
     assertEquals(
         listOf(
@@ -89,6 +91,8 @@ class VenuePageQuestsTest {
                 proofType = ProofType.PHOTO,
                 minPartySize = 3,
                 reward = reward,
+                exactPartySize = true,
+                radiusMeters = 80,
             )
         ),
         venuePageQuests(listOf(quest), null, now),

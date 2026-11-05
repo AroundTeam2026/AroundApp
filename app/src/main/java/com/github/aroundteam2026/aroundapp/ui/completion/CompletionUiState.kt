@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
@@ -17,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.ui.SaveState
  * @property photo The photo picked so far, for a [ProofType.PHOTO] quest, or null when none is.
  * @property saveState Where submitting stands: [SaveState.Saved] once the proof is submitted, also
  *   when it was submitted earlier.
+ * @property locationError Why the last location check blocked submission, or null otherwise.
  */
 data class CompletionUiState(
     val status: CompletionFormStatus = CompletionFormStatus.LOADING,
@@ -25,6 +27,8 @@ data class CompletionUiState(
     val answer: String = "",
     val photo: Uri? = null,
     val saveState: SaveState = SaveState.Idle,
+    val requirements: String = "",
+    val locationError: CompletionLocationError? = null,
 ) {
   /** Whether the form can still be changed: the quest is ready and nothing is saving or saved. */
   val isEditable: Boolean
@@ -41,6 +45,14 @@ data class CompletionUiState(
               ProofType.PHOTO -> photo != null
               null -> false
             }
+}
+
+/** Why a completion could not be submitted from the explorer's current location. */
+enum class CompletionLocationError {
+  /** The explorer is outside the quest's unlock radius. */
+  TOO_FAR,
+  /** A precise device or venue location could not be obtained. */
+  UNAVAILABLE,
 }
 
 /** Where the completion screen stands. */

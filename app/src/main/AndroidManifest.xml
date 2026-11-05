@@ -6,6 +6,14 @@
     <!-- The location repository needs one of these. Both are requested; the user may grant only the coarse one. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Proof photos. TakePicture opens the camera app, which works without this permission; once
+         it is declared, Android only opens the camera after the explorer allows it, which gives
+         the ask-first and refused states #330 asks for. Don't remove it as unused. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Phones without a camera can still install the app and pick a proof from the gallery -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -26,6 +34,16 @@
         <uses-library
             android:name="org.apache.http.legacy"
             android:required="false" />
+        <!-- Lets the camera app write a proof photo into the app's cache; see ProofPhotos -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.proofphotos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/proof_photo_paths" />
+        </provider>
 
         <activity
             android:name=".MainActivity"

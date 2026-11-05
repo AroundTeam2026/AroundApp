@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.animation.core.RepeatMode
@@ -10,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,21 +46,27 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
 /**
- * The bar under a venue's quests, once the explorer picked one: a full-width "Accept quest" button,
- * styled like the one in the quest popup of the Figma frame, and what [state] says about accepting.
+ * The bar under a venue's quests once the explorer picked one: a full-width "Accept quest" button
+ * and what [state] says about accepting.
  *
- * - Ready: the button calls [onAccept].
- * - Accepting: a pulsing skeleton takes the button's place, and can't be tapped.
- * - Accepted: the button is disabled and says the venue is yet to approve.
- * - Failed: an error shows above the button, which now says "Try again" and calls [onAccept].
- * - A quest that needs more people says how many, whatever the state: it can still be accepted.
- * - Accepting unavailable: the button is disabled and says why.
+ * - Ready: the button calls [onAccept]. Failed: an error shows above it, and it says "Try again".
+ * - Accepting: a pulsing skeleton that can't be tapped takes the button's place.
+ * - Accepted: disabled, saying the venue is yet to approve. Unavailable: disabled, saying why.
+ * - A quest that needs more people says how many, whatever the state.
  *
- * It draws nothing while no quest is picked. It only shows the state: [onAccept] is the
- * ViewModel's.
+ * It draws nothing while no quest is picked. [footer] sits under the button.
+ *
+ * @param onSubmitProof Given once the venue approved the reservation, as in the Figma frame "Quest
+ *   details · submit proof": the button then says "Submit proof" and calls it.
  */
 @Composable
-fun AcceptQuestBar(state: VenuePageUiState, onAccept: () -> Unit, modifier: Modifier = Modifier) {
+fun AcceptQuestBar(
+    state: VenuePageUiState,
+    onAccept: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSubmitProof: (() -> Unit)? = null,
+    footer: @Composable ColumnScope.() -> Unit = {},
+) {
   if (state.selectedQuest == null) return
   val status = state.acceptStatus
   Column(
@@ -88,11 +96,25 @@ fun AcceptQuestBar(state: VenuePageUiState, onAccept: () -> Unit, modifier: Modi
           C.Tag.ACCEPT_QUEST_NEEDS_MORE,
       )
     }
-    if (status == AcceptStatus.ACCEPTING) {
-      AcceptingSkeleton(stringResource(R.string.accept_quest_accepting))
-    } else {
-      AcceptButton(status, enabled = state.acceptAvailable, onAccept)
+    when {
+      onSubmitProof != null -> SubmitProofButton(onSubmitProof)
+      status == AcceptStatus.ACCEPTING ->
+          AcceptingSkeleton(stringResource(R.string.accept_quest_accepting))
+      else -> AcceptButton(status, enabled = state.acceptAvailable, onAccept)
     }
+    footer()
+  }
+}
+
+/** The button once the venue approved the reservation: "Submit proof". */
+@Composable
+private fun SubmitProofButton(onSubmitProof: () -> Unit) {
+  Button(
+      onClick = onSubmitProof,
+      shape = AroundPillShape,
+      modifier = Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.SUBMIT_PROOF_BUTTON),
+  ) {
+    Text(stringResource(R.string.submit_proof), style = AroundTextStyles.Button)
   }
 }
 
