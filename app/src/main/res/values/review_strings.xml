@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The sheet a venue rejects a proof from, over the Review proof screen -->
+    <string name="reject_proof_title">Why are you rejecting this proof?</string>
+    <!-- The argument is the explorer's name -->
+    <string name="reject_proof_body">%1$s will see your reason.</string>
+    <string name="reject_proof_body_unknown">The explorer will see your reason.</string>
+    <string name="reject_proof_reason_blurry">The photo is too blurry</string>
+    <string name="reject_proof_reason_not_at_venue">Not taken at the venue</string>
+    <string name="reject_proof_reason_no_match">Doesn\'t match the task</string>
+    <string name="reject_proof_reason_other">Other</string>
+    <string name="reject_proof_note_label">Add a note (optional)</string>
+    <string name="reject_proof_note_hint">What should they change?</string>
+    <!-- The reason the explorer sees: the picked reason, then the note, e.g. "Doesn't match the
+         task: the photo shows a tea" -->
+    <string name="reject_proof_reason_with_note">%1$s: %2$s</string>
+    <string name="reject_proof_back">Back</string>
+    <string name="reject_proof_confirm">Reject proof</string>
+    <string name="reject_proof_rejecting">Rejecting…</string>
+    <string name="reject_proof_needs_reason">Reject proof stays off until a reason is picked or written.</string>
+</resources>
