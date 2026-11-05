@@ -14,6 +14,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.completion.Completion
+import com.github.aroundteam2026.aroundapp.ui.completion.completionDestination
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
@@ -60,6 +62,9 @@ private val START_TAB = Tab.QUESTS
  *   page doesn't read Firestore.
  * @param overview draws the Quests tab's overview, given what opens a venue's page; tests pass
  *   their own so the overview doesn't read Firestore.
+ * @param completion draws the screen where the explorer completes a reservation's quest, given the
+ *   reservation's id, the venue's name and what closes it; tests pass their own so it doesn't read
+ *   Firestore.
  */
 @Composable
 fun AroundApp(
@@ -69,6 +74,10 @@ fun AroundApp(
     venuePage: @Composable (venueId: String, onBack: () -> Unit) -> Unit = { venueId, onBack ->
       VenuePage(venueId, explorerUid, onBack)
     },
+    completion: @Composable (reservationId: String, venueName: String, close: () -> Unit) -> Unit =
+        { reservationId, venueName, close ->
+          Completion(reservationId, venueName, explorerUid, close)
+        },
     overview: @Composable (onOpenVenue: (venueId: String) -> Unit) -> Unit = {
       OverviewScreen(explorerUid, it)
     },
@@ -84,6 +93,7 @@ fun AroundApp(
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
     venuePageDestination(onBack = { navController.popBackStack() }, page = venuePage)
+    completionDestination(navController, screen = completion)
   }
 }
 

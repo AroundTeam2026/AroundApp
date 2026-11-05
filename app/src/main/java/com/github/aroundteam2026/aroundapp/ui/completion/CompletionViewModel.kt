@@ -3,23 +3,34 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
+import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -244,8 +255,38 @@ class CompletionViewModel(
     }
   }
 
-  private companion object {
-    const val TAG = "CompletionViewModel"
+  companion object {
+    private const val TAG = "CompletionViewModel"
+
+    /**
+     * Builds the [CompletionViewModel] of the reservation [reservationId] for the explorer
+     * [explorerUid], with the app's repositories. The location and photo repositories are built
+     * from the application, so they never keep a screen in memory.
+     *
+     * @param locations Builds the location repository; the app's unless a test can't use Play
+     *   services.
+     * @param photos Builds the proof photo repository; the app's unless a test needs another.
+     */
+    fun factory(
+        reservationId: String,
+        explorerUid: String,
+        locations: (Context) -> LocationRepository = LocationRepositoryProvider::repository,
+        photos: (Context) -> ProofPhotoRepository = ProofPhotoRepositoryProvider::repository,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer {
+        val app = this[APPLICATION_KEY]!!
+        CompletionViewModel(
+            reservationId,
+            explorerUid,
+            ReservationRepositoryProvider.repository,
+            QuestRepositoryProvider.repository,
+            VenueRepositoryProvider.repository,
+            locations(app),
+            CompletionRepositoryProvider.repository,
+            photos(app),
+        )
+      }
+    }
   }
 }
 
