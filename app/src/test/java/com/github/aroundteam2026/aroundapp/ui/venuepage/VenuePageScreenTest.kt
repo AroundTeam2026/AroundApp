@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -26,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -263,6 +265,22 @@ class VenuePageScreenTest {
 
     compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertDoesNotExist()
+  }
+
+  @Test
+  fun theListIsBackWhereItWasWhenTheDetailsClose() {
+    var state by mutableStateOf(LOADED.copy(quests = ('a'..'z').map { quest(it.toString()) }))
+    compose.setContent {
+      AroundAppTheme { VenuePageContent(state, onBack = {}, onQuestTapped = {}, onRetry = {}) }
+    }
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUESTS).performScrollToNode(hasText("Quest z"))
+    compose.onNodeWithText("Quest z").assertIsDisplayed()
+
+    state = state.copy(detailQuestId = "z")
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertIsDisplayed()
+    state = state.copy(detailQuestId = null)
+
+    compose.onNodeWithText("Quest z").assertIsDisplayed()
   }
 
   @Test

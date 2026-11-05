@@ -22,9 +22,18 @@
     <!-- When the reward stops being valid; the argument is the date -->
     <string name="quest_detail_reward_expiry">Valid until %1$s</string>
     <string name="quest_detail_party">Party</string>
-    <string name="quest_detail_party_at_least">At least %1$d per visit</string>
-    <string name="quest_detail_party_exactly">Exactly %1$d per visit</string>
-    <string name="quest_detail_party_joined">%1$d of %2$d joined</string>
+    <plurals name="quest_detail_party_at_least">
+        <item quantity="one">At least %1$d per visit</item>
+        <item quantity="other">At least %1$d per visit</item>
+    </plurals>
+    <plurals name="quest_detail_party_exactly">
+        <item quantity="one">Exactly %1$d per visit</item>
+        <item quantity="other">Exactly %1$d per visit</item>
+    </plurals>
+    <plurals name="quest_detail_party_joined">
+        <item quantity="one">%1$d of %2$d joined</item>
+        <item quantity="other">%1$d of %2$d joined</item>
+    </plurals>
     <string name="quest_detail_party_bigger">Bigger groups welcome</string>
     <!-- The explorer's own seat in the party -->
     <string name="quest_detail_party_me">ME</string>

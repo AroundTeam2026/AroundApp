@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -199,12 +200,12 @@ private fun RewardCard(reward: Reward, clock: Clock) {
 private fun PartyCard(quest: VenuePageQuest, joined: Int) {
   val seats = maxOf(quest.minPartySize, joined)
   val rule =
-      if (quest.exactPartySize) R.string.quest_detail_party_exactly
-      else R.string.quest_detail_party_at_least
+      if (quest.exactPartySize) R.plurals.quest_detail_party_exactly
+      else R.plurals.quest_detail_party_at_least
   Card(
       R.drawable.ic_user,
       R.string.quest_detail_party,
-      trailing = stringResource(rule, quest.minPartySize),
+      trailing = pluralStringResource(rule, quest.minPartySize, quest.minPartySize),
       trailingTag = C.Tag.QUEST_DETAIL_PARTY_RULE,
   ) {
     FlowRow(
@@ -221,7 +222,7 @@ private fun PartyCard(quest: VenuePageQuest, joined: Int) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
       Text(
-          stringResource(R.string.quest_detail_party_joined, joined, seats),
+          pluralStringResource(R.plurals.quest_detail_party_joined, joined, joined, seats),
           Modifier.testTag(C.Tag.QUEST_DETAIL_PARTY_JOINED),
           color = MaterialTheme.colorScheme.onSurface,
           style = AroundTextStyles.FieldLabel,
@@ -469,7 +470,7 @@ private val PROOF_ICON_SIZE = 20.dp
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun QuestDetailsPreview() {
+internal fun QuestDetailsPreview() {
   val quest =
       VenuePageQuest(
           questId = "quest",
