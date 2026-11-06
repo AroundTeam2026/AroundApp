@@ -33,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.dashboard.AnswerSaver
 import com.github.aroundteam2026.aroundapp.ui.dashboard.savingAmong
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -78,7 +79,7 @@ class ReviewProofViewModel(
     private val partyRepository: PartyRepository,
     private val questRepository: QuestRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
-    private val decode: suspend (ByteArray) -> ImageBitmap? = ::decodePhoto,
+    private val decode: suspend (ByteArray) -> ImageBitmap? = { decodePhoto(it) },
 ) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listeners and the photo's download. */
   private val retries = MutableStateFlow(0)
@@ -342,8 +343,11 @@ class ReviewProofViewModel(
   }
 }
 
-/** [bytes] as an image, decoded off the main thread, or null if they aren't one. */
-internal suspend fun decodePhoto(bytes: ByteArray): ImageBitmap? =
-    withContext(Dispatchers.Default) {
-      BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-    }
+/**
+ * [bytes] as an image, decoded on [dispatcher], off the main thread, or null if they aren't one.
+ */
+internal suspend fun decodePhoto(
+    bytes: ByteArray,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+): ImageBitmap? =
+    withContext(dispatcher) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }
