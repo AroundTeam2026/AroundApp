@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
@@ -42,12 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
-import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
-import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
-import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
-import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
-import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -212,31 +208,28 @@ internal fun FieldLabel(text: String) {
   Text(text, style = AroundTextStyles.FieldLabel, color = MaterialTheme.colorScheme.onSurface)
 }
 
-/**
- * The real form on fakes, so it can be filled in when the preview runs on a device: a signed-in
- * venue with a location, which shows the radius map.
- */
+/** The empty form of a venue with a location, which shows the radius map. */
 // Tall enough for the whole form, as a preview can't scroll
-@Preview(widthDp = 413, heightDp = 1800)
+@Preview(name = "Light", widthDp = 413, heightDp = 1800)
+@Preview(
+    name = "Dark",
+    widthDp = 413,
+    heightDp = 1800,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
-private fun CreateQuestPreview() {
-  val viewModel = remember {
-    val venue =
-        Venue(
-            id = PREVIEW_VENUE_ID,
-            name = "Café Lumière",
-            location = Location(46.5220, 6.6330),
-            radiusMeters = QuestLimits.DEFAULT_RADIUS_METERS,
-            address = null,
-            createdAt = 0L,
-        )
-    CreateQuestViewModel(
-        FakeAuthRepository(PREVIEW_VENUE_ID),
-        FakeVenueRepository(listOf(venue)),
-        FakeQuestRepository(),
+internal fun CreateQuestPreview() {
+  AroundAppTheme {
+    CreateQuestContent(
+        state = CreateQuestUiState(venueLocation = Location(46.5220, 6.6330)),
+        onTitleChange = {},
+        onDescriptionChange = {},
+        onRequirementsChange = {},
+        completionActions = QuestCompletionActions(),
+        rewardActions = QuestRewardActions(),
+        onSubmit = {},
+        onClose = {},
+        onRetryVenue = {},
     )
   }
-  AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}, onCreated = {}) }
 }
-
-private const val PREVIEW_VENUE_ID = "preview-venue"
