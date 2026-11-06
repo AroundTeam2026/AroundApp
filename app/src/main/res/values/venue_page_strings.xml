@@ -41,6 +41,15 @@
     <string name="quest_detail_proof_photo">A photo</string>
     <string name="quest_detail_proof_text">A text answer</string>
     <string name="quest_detail_proof_checked">The venue checks it, usually within a few minutes.</string>
+    <!-- Where the explorer's proof stands, at the top of the quest's details -->
+    <string name="quest_detail_proof_pending_label">Pending</string>
+    <string name="quest_detail_proof_pending_title">Proof sent</string>
+    <string name="quest_detail_proof_pending_text">%1$s is checking it, usually within a few minutes.</string>
+    <string name="quest_detail_proof_approved_label">Accepted</string>
+    <string name="quest_detail_proof_approved_title">Quest complete!</string>
+    <string name="quest_detail_proof_approved_text">%1$s approved your proof. Your reward is ready.</string>
+    <string name="quest_detail_proof_rejected_label">Rejected</string>
+    <string name="quest_detail_proof_rejected_title">Proof not approved</string>
     <string name="quest_detail_radius">Unlock radius</string>
     <string name="quest_detail_radius_meters">%1$d m</string>
     <string name="quest_detail_radius_map">Map of the %1$d m unlock radius around %2$s</string>
@@ -55,6 +64,8 @@
     <string name="accept_quest_unavailable">Can\'t accept quests right now. Open this page again to try.</string>
     <!-- Once the venue approved the reservation, on the quest's details -->
     <string name="submit_proof">Submit proof</string>
+    <!-- Once the venue rejected the proof, on the quest's details -->
+    <string name="send_new_proof">Send new proof</string>
     <plurals name="accept_quest_needs_more">
         <item quantity="one">Needs %1$d more person to take this quest</item>
         <item quantity="other">Needs %1$d more people to take this quest</item>

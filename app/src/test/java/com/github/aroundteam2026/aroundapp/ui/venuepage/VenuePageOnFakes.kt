@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -68,6 +69,7 @@ fun VenuePageOnFakes(
             reservations,
             testUsers(FAKE_EXPLORER_UID),
             party,
+            FakeCompletionRepository(),
             FAKE_EXPLORER_UID,
         )
       }

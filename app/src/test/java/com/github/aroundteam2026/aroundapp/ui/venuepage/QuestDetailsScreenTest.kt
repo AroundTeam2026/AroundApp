@@ -15,6 +15,9 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -314,6 +317,120 @@ class QuestDetailsScreenTest {
     node(C.Tag.CANCEL_RESERVATION).assertIsDisplayed()
   }
 
+  /** The approved reservation of [quest], with its proof at [status]. */
+  private fun withProof(
+      quest: VenuePageQuest,
+      status: CompletionStatus,
+      rejectReason: String? = null,
+  ) =
+      accepted(quest)
+          .copy(
+              approvedIds = setOf("r"),
+              completions =
+                  mapOf(
+                      "r" to
+                          Completion(
+                              id = "proof",
+                              reservationId = "r",
+                              venueId = "venue",
+                              explorerUid = "explorer",
+                              proof = Proof.Photo("gs://proofs/fox"),
+                              status = status,
+                              rejectReason = rejectReason,
+                              submittedAt = 0L,
+                          )
+                  ),
+          )
+
+  private fun assertNoProofButtons() {
+    node(C.Tag.SUBMIT_PROOF_BUTTON).assertDoesNotExist()
+    node(C.Tag.ACCEPT_QUEST_BUTTON).assertDoesNotExist()
+  }
+
+  @Test
+  fun withoutAProofThereIsNoStatusCard() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(approvedIds = setOf("r")))
+
+    node(C.Tag.QUEST_DETAIL_PROOF_STATUS).assertDoesNotExist()
+  }
+
+  // Figma's "Quest details · state · pending", without its button: a new proof needs a rejection
+  @Test
+  fun aSentProofSaysTheVenueIsCheckingIt() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.PENDING))
+
+    node(C.Tag.QUEST_DETAIL_PROOF_STATUS).assertIsDisplayed()
+    compose.onNodeWithText("PENDING").assertIsDisplayed()
+    compose.onNodeWithText("Proof sent").assertIsDisplayed()
+    compose
+        .onNodeWithText("Café Lumen is checking it, usually within a few minutes.")
+        .assertIsDisplayed()
+    assertNoProofButtons()
+    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertDoesNotExist()
+  }
+
+  // Figma's "Quest details · state · accepted", without "Show my reward", which no issue asks for
+  @Test
+  fun anApprovedProofSaysTheQuestIsComplete() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.APPROVED))
+
+    compose.onNodeWithText("ACCEPTED").assertIsDisplayed()
+    compose.onNodeWithText("Quest complete!").assertIsDisplayed()
+    compose
+        .onNodeWithText("Café Lumen approved your proof. Your reward is ready.")
+        .assertIsDisplayed()
+    assertNoProofButtons()
+    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertDoesNotExist()
+  }
+
+  // Figma's "Quest details · state · rejected"; the button's action comes with #427
+  @Test
+  fun aRejectedProofShowsTheReasonAndADisabledNewProofButton() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.REJECTED, "Too dark to see the drink."))
+
+    compose.onNodeWithText("REJECTED").assertIsDisplayed()
+    compose.onNodeWithText("Proof not approved").assertIsDisplayed()
+    compose.onNodeWithText("Too dark to see the drink.").assertIsDisplayed()
+    assertNoProofButtons()
+    compose
+        .onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON)
+        .assertTextEquals("Send new proof")
+        .assertIsNotEnabled()
+  }
+
+  @Test
+  fun aSentProofHasNoBarOnceTheReservationCantBeCancelled() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.PENDING).copy(acceptAvailable = false))
+
+    node(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
+  }
+
+  @Test
+  fun aRejectedProofKeepsItsBarOnceTheReservationCantBeCancelled() {
+    val quest = quest()
+    show(
+        quest,
+        withProof(quest, CompletionStatus.REJECTED, "Too dark").copy(acceptAvailable = false),
+    )
+
+    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
+  }
+
+  // Until #426 stops it, a reservation with a proof can still be cancelled
+  @Test
+  fun aSentProofLeavesCancellingToItsOwnIssue() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.PENDING))
+
+    node(C.Tag.CANCEL_RESERVATION).assertIsDisplayed()
+  }
+
   @Test
   fun aReservationTheVenueHasntApprovedOffersNoProof() {
     val quest = quest()
@@ -379,6 +496,14 @@ class QuestDetailsScreenTest {
 
     node(C.Tag.QUEST_DETAIL_TITLE).assertTextEquals("Find the hidden fox")
     node(C.Tag.QUEST_DETAIL_PARTY_RULE).assertTextEquals("At least 4 per visit")
+  }
+
+  @Test
+  fun theRejectedPreviewShowsTheStatusCard() {
+    compose.setContent { QuestDetailsRejectedPreview() }
+
+    node(C.Tag.QUEST_DETAIL_PROOF_STATUS).assertIsDisplayed()
+    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsNotEnabled()
   }
 
   private companion object {
