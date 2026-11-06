@@ -42,6 +42,8 @@
     <!-- The arguments are the explorer's name and the reward, e.g. "Free croissant" -->
     <string name="review_proof_reward_party">Approving gives %1$s and their party the %2$s reward.</string>
     <string name="review_proof_reward_solo">Approving gives %1$s the %2$s reward.</string>
+    <!-- The party size couldn't be read, so the hint doesn't say who gets the reward -->
+    <string name="review_proof_reward_unknown_party">Approving gives the %1$s reward.</string>
     <string name="review_proof_sending">Sending your answer to %1$s…</string>
     <string name="review_proof_reject">Reject</string>
     <string name="review_proof_approve">Approve</string>

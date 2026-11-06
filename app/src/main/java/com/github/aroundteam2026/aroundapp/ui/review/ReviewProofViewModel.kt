@@ -2,7 +2,10 @@
 package com.github.aroundteam2026.aroundapp.ui.review
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -30,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.dashboard.AnswerSaver
 import com.github.aroundteam2026.aroundapp.ui.dashboard.savingAmong
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +52,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 
 /**
  * Holds the proof [completionId] that the signed-in venue reviews: who sent it, for which quest,
@@ -56,10 +61,11 @@ import kotlinx.coroutines.flow.update
  * It follows the venue's completions for this one, as the repository has no listener for a single
  * completion, and reads the reservation it belongs to (the explorer's name), the reservation's
  * party, the quest (title, requirements and reward) and, for a photo, the photo through
- * [proofPhotoRepository]. Once the proof is no longer pending, here or on another phone, the state
- * is [ReviewProofUiState.reviewed]. A proof that can't be found, or its listener failing, shows
- * [ReviewProofStatus.FAILED] until [retry]. The reservation, party or quest failing only leaves out
- * what they tell, and a photo that can't be downloaded shows [ProofPhoto.Failed] until [retry].
+ * [proofPhotoRepository], decoded by [decode]. Once the proof is no longer pending, here or on
+ * another phone, the state is [ReviewProofUiState.reviewed]. A proof that can't be found, or its
+ * listener failing, shows [ReviewProofStatus.FAILED] until [retry]. The reservation, party or quest
+ * failing only leaves out what they tell, and a photo that can't be downloaded or decoded shows
+ * [ProofPhoto.Failed] until [retry].
  *
  * [approve] and [reject] save through an [AnswerSaver]: a double tap saves once, and a failure is
  * reported until [clearUpdateError].
@@ -72,6 +78,7 @@ class ReviewProofViewModel(
     private val partyRepository: PartyRepository,
     private val questRepository: QuestRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
+    private val decode: suspend (ByteArray) -> ImageBitmap? = ::decodePhoto,
 ) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listeners and the photo's download. */
   private val retries = MutableStateFlow(0)
@@ -88,6 +95,9 @@ class ReviewProofViewModel(
   /** Saves the venue's answer to the proof. */
   private val answers = AnswerSaver(viewModelScope, TAG)
 
+  /** Whether the venue's answer is being written, until the repository returns. */
+  private val writing = MutableStateFlow(false)
+
   /** What the screen shows now; the screen observes it. */
   @OptIn(ExperimentalCoroutinesApi::class)
   val uiState: StateFlow<ReviewProofUiState> =
@@ -102,16 +112,16 @@ class ReviewProofViewModel(
                   .onEach { reloading.value = false },
               answers.state,
               reloading,
-          ) { listened, answers, reloading ->
-            if (reloading) return@combine ReviewProofUiState()
+              writing,
+          ) { listened, answers, reloading, writing ->
+            val shown = if (reloading) ReviewProofUiState() else listened
             val pending =
-                if (listened.status == ReviewProofStatus.LOADED && !listened.reviewed) {
-                  setOf(completionId)
-                } else {
-                  emptySet()
-                }
-            listened.copy(
-                saving = answers.savingAmong(pending).isNotEmpty(),
+                if (shown.status == ReviewProofStatus.LOADED && !shown.reviewed) setOf(completionId)
+                else emptySet()
+            // While the answer is being written, saving even if the proof fails to load meanwhile:
+            // the screen keeps Back disabled, as leaving would cancel the write
+            shown.copy(
+                saving = writing || answers.savingAmong(pending).isNotEmpty(),
                 updateFailed = answers.failed,
             )
           }
@@ -125,7 +135,7 @@ class ReviewProofViewModel(
   fun approve() {
     if (!uiState.value.canApprove) return
     answers.answer(completionId, "proof $completionId with an approval") {
-      completionRepository.approve(completionId)
+      whileWriting { completionRepository.approve(completionId) }
     }
   }
 
@@ -141,7 +151,17 @@ class ReviewProofViewModel(
       return
     }
     answers.answer(completionId, "proof $completionId with a rejection") {
-      completionRepository.reject(completionId, trimmed)
+      whileWriting { completionRepository.reject(completionId, trimmed) }
+    }
+  }
+
+  /** Runs [write], marking the answer as being written until it returns. */
+  private suspend fun whileWriting(write: suspend () -> Result<Unit>): Result<Unit> {
+    writing.value = true
+    try {
+      return write()
+    } finally {
+      writing.value = false
     }
   }
 
@@ -251,7 +271,14 @@ class ReviewProofViewModel(
                       .download(proof.location)
                       .fold<ProofPhoto, ByteArray>(
                           { bytes ->
-                            ProofPhoto.Loaded(bytes).also { downloaded = proof.location to it }
+                            // A photo that can't be shown can't be approved, so it fails like a
+                            // download and the screen offers to try again
+                            decode(bytes)?.let { image ->
+                              ProofPhoto.Loaded(image).also { downloaded = proof.location to it }
+                            }
+                                ?: ProofPhoto.Failed.also {
+                                  Log.w(TAG, "The photo of $completionId isn't an image")
+                                }
                           },
                           {
                             Log.w(TAG, "Downloading the photo of $completionId failed", it)
@@ -314,3 +341,9 @@ class ReviewProofViewModel(
     }
   }
 }
+
+/** [bytes] as an image, decoded off the main thread, or null if they aren't one. */
+internal suspend fun decodePhoto(bytes: ByteArray): ImageBitmap? =
+    withContext(Dispatchers.Default) {
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }

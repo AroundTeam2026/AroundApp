@@ -7,6 +7,7 @@ import android.text.format.DateUtils
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertContentDescriptionEquals
@@ -30,6 +31,8 @@ import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -111,20 +114,19 @@ class ReviewProofScreenTest {
 
   @Test
   fun aDownloadedPhotoIsShown() {
-    show(PHOTO.copy(photo = ProofPhoto.Loaded(pngBytes())))
+    show(PHOTO)
 
     node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE)
         .assertIsDisplayed()
         .assertContentDescriptionEquals(string(R.string.review_proof_photo_description, "yusuf.s"))
   }
 
+  // The ViewModel turns bytes that aren't an image into ProofPhoto.Failed, with a retry
   @Test
-  fun aPhotoThatIsNotAnImageShowsThePlaceholder() {
-    show(PHOTO.copy(photo = ProofPhoto.Loaded(ByteArray(0))))
-
-    node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE).assertDoesNotExist()
-    compose.onNodeWithText(string(R.string.review_proof_photo)).assertIsDisplayed()
-    node(C.Tag.REVIEW_PROOF_PHOTO_RETRY).assertDoesNotExist()
+  fun onlyAnImageDecodes() = runBlocking {
+    assertNotNull(decodePhoto(pngBytes()))
+    assertNull(decodePhoto(ByteArray(0)))
+    assertNull(decodePhoto(byteArrayOf(1, 2, 3)))
   }
 
   @Test
@@ -280,6 +282,39 @@ class ReviewProofScreenTest {
     compose.onNodeWithText(string(R.string.review_proof_approving)).assertDoesNotExist()
   }
 
+  // Otherwise the sheet would reopen empty once the proof loads again
+  @Test
+  fun aProofThatFailsToLoadClosesTheSheetForGood() {
+    show(PHOTO)
+    openTheSheet()
+
+    state = ReviewProofUiState(status = ReviewProofStatus.FAILED)
+    compose.waitForIdle()
+    state = PHOTO
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).assertDoesNotExist()
+  }
+
+  // Leaving would cancel the answer being saved, even while the proof can't be shown
+  @Test
+  fun backWaitsForAnAnswerAlsoWhileTheProofFailsToLoad() {
+    show(ReviewProofUiState(status = ReviewProofStatus.FAILED, saving = true))
+
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_BACK).assertIsNotEnabled()
+  }
+
+  // A party of 0 couldn't be read: it may be solo or a whole party
+  @Test
+  fun anUnknownPartyGetsTheRewardHintWithoutWho() {
+    show(PHOTO.copy(partySize = 0))
+
+    assertEquals(
+        string(R.string.review_proof_reward_unknown_party, "Free croissant"),
+        node(C.Tag.REVIEW_PROOF_HINT).text(),
+    )
+  }
+
   @Test
   fun closingTheSheetRejectsNothing() {
     show(PHOTO)
@@ -392,8 +427,7 @@ class ReviewProofScreenTest {
             requirements = "Order any drink.",
             reward = Reward.FreeItem("croissant", specifics = null),
             proof = Proof.Photo("gs://around/proofs/p.jpg"),
-            // Downloaded but not an image: the placeholder, without a retry
-            photo = ProofPhoto.Loaded(ByteArray(0)),
+            photo = ProofPhoto.Loaded(ImageBitmap(4, 4)),
         )
 
     val ANSWER =

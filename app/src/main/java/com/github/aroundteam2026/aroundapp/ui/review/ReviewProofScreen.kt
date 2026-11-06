@@ -2,7 +2,6 @@
 package com.github.aroundteam2026.aroundapp.ui.review
 
 import android.content.res.Configuration
-import android.graphics.BitmapFactory
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -47,12 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -67,6 +63,9 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.dashboard.partyLabel
+import com.github.aroundteam2026.aroundapp.ui.dashboard.rememberNow
+import com.github.aroundteam2026.aroundapp.ui.dashboard.timeAgo
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.quest.rewardText
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -135,6 +134,8 @@ internal fun ReviewProofContent(
 ) {
   var rejecting by rememberSaveable { mutableStateOf(false) }
   val loaded = state.status == ReviewProofStatus.LOADED
+  // The sheet closes while the proof can't be shown; once it loads again it starts closed
+  LaunchedEffect(loaded) { if (!loaded) rejecting = false }
   Scaffold(
       modifier = modifier.testTag(C.Tag.REVIEW_PROOF_SCREEN),
       containerColor = MaterialTheme.colorScheme.background,
@@ -248,7 +249,7 @@ private fun Explorer(state: ReviewProofUiState, clock: Clock) {
           overflow = TextOverflow.Ellipsis,
       )
       Text(
-          sentText(state.partySize, state.sentAt, clock.millis()),
+          sentText(state.partySize, state.sentAt, rememberNow(state.sentAt, clock)),
           Modifier.testTag(C.Tag.REVIEW_PROOF_SENT),
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           style = AroundTextStyles.Caption,
@@ -274,26 +275,15 @@ private fun Explorer(state: ReviewProofUiState, clock: Clock) {
  */
 @Composable
 private fun sentText(partySize: Int, sentAt: Long, now: Long): String {
-  val party =
-      when {
-        partySize <= 0 -> null
-        partySize == 1 -> stringResource(R.string.dashboard_proof_solo)
-        else -> pluralStringResource(R.plurals.dashboard_party_size, partySize, partySize)
-      }
-  if (now - sentAt < DateUtils.MINUTE_IN_MILLIS) {
-    return party?.let { stringResource(R.string.review_proof_party_and_sent_just_now, it) }
+  val party = partyLabel(partySize)
+  val ago = timeAgo(sentAt, now)
+  return if (ago == null) {
+    party?.let { stringResource(R.string.review_proof_party_and_sent_just_now, it) }
         ?: stringResource(R.string.review_proof_sent_just_now)
+  } else {
+    party?.let { stringResource(R.string.review_proof_party_and_sent, it, ago) }
+        ?: stringResource(R.string.review_proof_sent, ago)
   }
-  val ago =
-      DateUtils.getRelativeTimeSpanString(
-              sentAt,
-              now,
-              DateUtils.MINUTE_IN_MILLIS,
-              DateUtils.FORMAT_ABBREV_RELATIVE,
-          )
-          .toString()
-  return party?.let { stringResource(R.string.review_proof_party_and_sent, it, ago) }
-      ?: stringResource(R.string.review_proof_sent, ago)
 }
 
 /** The quest's title and what it asks for, in an inset panel. */
@@ -326,12 +316,11 @@ private fun Quest(title: String?, requirements: String?) {
 }
 
 /**
- * The photo sent by [explorer] once downloaded. Until then a spinner; if it can't be downloaded or
- * read, a placeholder, with a way to download it again after a failure.
+ * The photo sent by [explorer] once downloaded, whole, so nothing near its edges is cut off. Until
+ * then a spinner; if it can't be downloaded or read, a placeholder with a way to try again.
  */
 @Composable
 private fun PhotoProof(photo: ProofPhoto?, explorer: String, onRetry: () -> Unit) {
-  val image = (photo as? ProofPhoto.Loaded)?.let { remember(it) { decode(it.bytes) } }
   Box(
       Modifier.fillMaxWidth()
           .height(PHOTO_HEIGHT)
@@ -340,24 +329,20 @@ private fun PhotoProof(photo: ProofPhoto?, explorer: String, onRetry: () -> Unit
           .testTag(C.Tag.REVIEW_PROOF_PHOTO),
       contentAlignment = Alignment.Center,
   ) {
-    when {
-      image != null ->
+    when (photo) {
+      is ProofPhoto.Loaded ->
           Image(
-              image,
+              photo.image,
               stringResource(R.string.review_proof_photo_description, explorer),
               Modifier.fillMaxSize().testTag(C.Tag.REVIEW_PROOF_PHOTO_IMAGE),
-              contentScale = ContentScale.Crop,
+              contentScale = ContentScale.Fit,
           )
-      photo == ProofPhoto.Loading ->
-          CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
-      else -> PhotoPlaceholder(onRetry.takeIf { photo == ProofPhoto.Failed })
+      ProofPhoto.Loading -> CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
+      ProofPhoto.Failed -> PhotoPlaceholder(onRetry)
+      null -> PhotoPlaceholder(onRetry = null)
     }
   }
 }
-
-/** [bytes] as an image, or null if they aren't one. */
-private fun decode(bytes: ByteArray): ImageBitmap? =
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
 
 /** A camera and "Photo proof" where the photo can't be shown; [onRetry], if any, tries again. */
 @Composable
@@ -447,6 +432,9 @@ private fun Actions(
       when {
         state.saving -> stringResource(R.string.review_proof_sending, explorer)
         reward == null -> null
+        // A party of 0 couldn't be read: it may be solo or a whole party
+        state.partySize <= 0 ->
+            stringResource(R.string.review_proof_reward_unknown_party, rewardText(reward))
         else ->
             stringResource(
                 if (state.partySize > 1) R.string.review_proof_reward_party

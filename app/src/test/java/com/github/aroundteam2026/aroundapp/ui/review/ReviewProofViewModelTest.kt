@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.review
 
 import android.net.Uri
+import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
@@ -30,9 +31,12 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -52,9 +56,12 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.GraphicsMode
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
+// Native graphics, so the photos the fake decoder returns can be real ImageBitmaps
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ReviewProofViewModelTest {
   private val dispatcher = UnconfinedTestDispatcher()
 
@@ -82,6 +89,13 @@ class ReviewProofViewModelTest {
   private var readQuests: QuestRepository = quests
   private var downloaded: ProofPhotoRepository = photos
 
+  /** What the fake photo decodes to; the real decoder is tested with the screen, on images. */
+  private val image by lazy { ImageBitmap(1, 1) }
+  private val decoded = mutableListOf<ByteArray>()
+  private var decoding: suspend (ByteArray) -> ImageBitmap? = { bytes ->
+    image.also { decoded += bytes }
+  }
+
   /** The proof the ViewModel reviews; set by [sendProof] or by the test. */
   private var id = completionId(RESERVATION_ID_UNKNOWN, EXPLORER_UID)
 
@@ -97,6 +111,7 @@ class ReviewProofViewModelTest {
         readParty,
         readQuests,
         downloaded,
+        decoding,
     )
   }
 
@@ -159,7 +174,28 @@ class ReviewProofViewModelTest {
 
     val photo = state.photo
     assertTrue(photo is ProofPhoto.Loaded)
-    assertArrayEquals(PHOTO_BYTES, (photo as ProofPhoto.Loaded).bytes)
+    assertSame(image, (photo as ProofPhoto.Loaded).image)
+    assertArrayEquals(PHOTO_BYTES, decoded.single())
+  }
+
+  // An approval is final, so a photo nobody can see fails like a download, with a retry
+  @Test
+  fun aPhotoThatIsNotAnImageFailsUntilRetried() = test {
+    val reservationId = reserve()
+    val location = photos.upload(reservationId, PHOTO).getOrThrow()
+    sendProof(reservationId, Proof.Photo(location))
+    var readable = false
+    decoding = { if (readable) image else null }
+    watch()
+
+    assertEquals(ProofPhoto.Failed, state.photo)
+    assertTrue(state.canReject)
+    assertFalse(state.canApprove)
+
+    readable = true
+    viewModel.retry()
+
+    assertTrue(state.canApprove)
   }
 
   @Test
@@ -313,6 +349,39 @@ class ReviewProofViewModelTest {
     viewModel.reject("x".repeat(MAX_REJECT_REASON_LENGTH))
 
     assertEquals(CompletionStatus.REJECTED, stored().status)
+  }
+
+  // The screen keeps Back disabled while saving, as leaving would cancel the write
+  @Test
+  fun anAnswerInFlightKeepsSavingWhileTheProofFailsToLoad() = test {
+    sendProof(reserve())
+    val saved = CompletableDeferred<Unit>()
+    val breakListener = MutableSharedFlow<Unit>()
+    reviewed =
+        object : CompletionRepository by completions {
+          override fun observeForVenue(venueId: String): Flow<List<Completion>> =
+              merge(
+                  completions.observeForVenue(venueId),
+                  breakListener.map<Unit, List<Completion>> { throw IOException("denied") },
+              )
+
+          override suspend fun approve(id: String): Result<Unit> {
+            saved.await()
+            return completions.approve(id)
+          }
+        }
+    watch()
+    viewModel.approve()
+
+    breakListener.emit(Unit)
+
+    assertEquals(ReviewProofStatus.FAILED, state.status)
+    assertTrue(state.saving)
+
+    saved.complete(Unit)
+    advanceUntilIdle()
+
+    assertFalse(state.saving)
   }
 
   @Test

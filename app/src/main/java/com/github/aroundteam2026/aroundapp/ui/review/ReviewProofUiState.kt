@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.review
 
+import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 
@@ -19,7 +20,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
  * @property requirements What the quest asks the explorers to do, or null like [questTitle].
  * @property reward What approving gives the party, or null if the quest has no reward or is
  *   unknown.
- * @property proof What the explorer sent: a written answer, or a photo whose bytes are in [photo].
+ * @property proof What the explorer sent: a written answer, or a photo shown from [photo].
  * @property photo The photo of a [Proof.Photo], downloaded for the screen; null for a written
  *   answer.
  * @property reviewed Whether the proof was approved or rejected, here or on another phone: the
@@ -71,15 +72,17 @@ sealed interface ProofPhoto {
   data object Loading : ProofPhoto
 
   /**
-   * The photo was downloaded.
+   * The photo was downloaded and decoded, so the screen can show it.
    *
    * Compared by identity, not by content: a new download is a new photo for the screen, and
-   * comparing the bytes on every state change would be wasted work.
+   * comparing the pixels on every state change would be wasted work.
    *
-   * @property bytes The photo's encoded bytes, e.g. a JPEG, for the screen to decode.
+   * @property image The decoded photo.
    */
-  class Loaded(val bytes: ByteArray) : ProofPhoto
+  class Loaded(val image: ImageBitmap) : ProofPhoto
 
-  /** The photo couldn't be downloaded; [ReviewProofViewModel.retry] tries again. */
+  /**
+   * The photo couldn't be downloaded or isn't an image; [ReviewProofViewModel.retry] tries again.
+   */
   data object Failed : ProofPhoto
 }
