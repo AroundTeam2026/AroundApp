@@ -44,11 +44,19 @@ object Routes {
   /** The venue's dashboard. */
   const val DASHBOARD = "venue_dashboard"
 
+  /** Argument of [REVIEW_PROOF]: the id of the completion whose proof the venue reviews. */
+  const val COMPLETION_ID = "completionId"
+
+  private const val REVIEW_PROOF_PREFIX = "review_proof"
+
+  /** The screen where a venue reviews one proof. Build the route to one with [reviewProof]. */
+  const val REVIEW_PROOF = "$REVIEW_PROOF_PREFIX/{$COMPLETION_ID}"
+
   /** Routes of the explorer's screens, registered in [AroundApp]. */
   val EXPLORER = listOf(VENUE_PAGE, COMPLETE_QUEST)
 
   /** Routes of the venue's screens, for the venue's own NavHost. */
-  val VENUE = listOf(VENUE_HOME, CREATE_QUEST, DASHBOARD)
+  val VENUE = listOf(VENUE_HOME, CREATE_QUEST, DASHBOARD, REVIEW_PROOF)
 
   /** Every route above. */
   val ALL = EXPLORER + VENUE
@@ -62,6 +70,17 @@ object Routes {
   fun venuePage(venueId: String): String {
     require(venueId.isNotBlank()) { "A venue page needs a venue id" }
     return "$VENUE_PAGE_PREFIX/${Uri.encode(venueId)}"
+  }
+
+  /**
+   * The route to the Review proof screen of one completion.
+   *
+   * @param completionId id of the completion; it is encoded, so it may contain any character.
+   * @throws IllegalArgumentException if [completionId] is blank, which no route could match.
+   */
+  fun reviewProof(completionId: String): String {
+    require(completionId.isNotBlank()) { "A proof to review needs a completion id" }
+    return "$REVIEW_PROOF_PREFIX/${Uri.encode(completionId)}"
   }
 
   /**
