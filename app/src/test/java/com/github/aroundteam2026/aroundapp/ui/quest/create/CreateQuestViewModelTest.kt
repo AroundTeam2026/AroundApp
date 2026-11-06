@@ -2,7 +2,13 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepository
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchResult
+import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -17,6 +23,9 @@ import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchStatus
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchUiState
+import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant
@@ -27,6 +36,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -66,7 +77,8 @@ class CreateQuestViewModelTest {
       venues: VenueRepository = FakeVenueRepository(),
       questRepository: QuestRepository = quests,
       clock: Clock = Clock.systemUTC(),
-  ) = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues, questRepository, clock)
+      addresses: AddressSearchRepository = FakeAddressSearchRepository(),
+  ) = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues, questRepository, clock, addresses)
 
   /** A form whose signed-in venue is placed and loaded, saving to [questRepository]. */
   private fun newLoadedViewModel(
@@ -709,6 +721,140 @@ class CreateQuestViewModelTest {
         assertNull(quests.getQuest("quest-1"))
       }
 
+  @Test
+  fun theQuestHappensAtTheVenueOnceItIsLoaded() {
+    newLoadedViewModel()
+    assertTrue(state.atVenue)
+    assertEquals(VENUE_LOCATION, state.location)
+    assertEquals(testVenue().name, state.venueName)
+  }
+
+  @Test
+  fun aQuestPlacedElsewhereStartsAtTheVenueAndFollowsThePin() {
+    newLoadedViewModel()
+    viewModel.placeElsewhere()
+    assertFalse(state.atVenue)
+    assertEquals(VENUE_LOCATION, state.location)
+
+    viewModel.moveQuest(MONTBENON.location)
+    assertEquals(MONTBENON.location, state.location)
+    // Choosing "Somewhere else" again keeps the spot
+    viewModel.placeElsewhere()
+    assertEquals(MONTBENON.location, state.location)
+  }
+
+  @Test
+  fun thePinDoesNotMoveAQuestAtTheVenue() {
+    newLoadedViewModel()
+    viewModel.moveQuest(MONTBENON.location)
+    assertTrue(state.atVenue)
+    assertEquals(VENUE_LOCATION, state.location)
+  }
+
+  @Test
+  fun placingTheQuestBackAtTheVenueForgetsItsSpotAndItsSearch() {
+    newLoadedViewModel()
+    viewModel.placeElsewhere()
+    viewModel.pickAddress(MONTBENON)
+    viewModel.updateAddressQuery("Esplanade")
+
+    viewModel.placeAtVenue()
+
+    assertTrue(state.atVenue)
+    assertNull(state.questLocation)
+    assertEquals(VENUE_LOCATION, state.location)
+    assertEquals("", state.addressQuery)
+    assertEquals(AddressSearchUiState(), state.addressSearch)
+  }
+
+  @Test
+  fun anAddressIsSearchedAroundTheQuestOnceTypingPauses() =
+      runTest(dispatcher) {
+        val addresses = FakeAddressSearchRepository { AddressSearchResult.Found(listOf(MONTBENON)) }
+        viewModel = newViewModel(FakeVenueRepository(listOf(venue(50))), addresses = addresses)
+        loadVenue()
+        viewModel.placeElsewhere()
+
+        viewModel.updateAddressQuery("Esp")
+        assertEquals(AddressSearchStatus.SEARCHING, state.addressSearch.status)
+        advanceTimeBy(VenueAreaViewModel.SEARCH_DELAY_MILLIS - 1)
+        runCurrent()
+        assertTrue(addresses.searches.isEmpty())
+
+        advanceTimeBy(1)
+        runCurrent()
+        val near = VENUE_LOCATION.boundsWithin(VenueAreaViewModel.FRAMED_RADIUS_METERS)
+        assertEquals(listOf(FakeAddressSearchRepository.Search("Esp", near)), addresses.searches)
+        assertEquals(AddressSearchUiState(listOf(MONTBENON)), state.addressSearch)
+      }
+
+  @Test
+  fun aShortQueryIsOnlySearchedWithTheSearchKey() =
+      runTest(dispatcher) {
+        val addresses = FakeAddressSearchRepository()
+        viewModel = newViewModel(FakeVenueRepository(listOf(venue(50))), addresses = addresses)
+        loadVenue()
+        viewModel.placeElsewhere()
+
+        viewModel.updateAddressQuery("Es")
+        advanceUntilIdle()
+        assertTrue(addresses.searches.isEmpty())
+        assertEquals(AddressSearchUiState(), state.addressSearch)
+
+        viewModel.searchAddress()
+        runCurrent()
+        assertEquals(listOf("Es"), addresses.searches.map { it.query })
+        assertEquals(AddressSearchStatus.NO_RESULTS, state.addressSearch.status)
+      }
+
+  @Test
+  fun aBlankQueryIsNotSearched() =
+      runTest(dispatcher) {
+        val addresses = FakeAddressSearchRepository()
+        viewModel = newViewModel(FakeVenueRepository(listOf(venue(50))), addresses = addresses)
+        loadVenue()
+        viewModel.updateAddressQuery("  ")
+        viewModel.searchAddress()
+        advanceUntilIdle()
+        assertTrue(addresses.searches.isEmpty())
+      }
+
+  @Test
+  fun pickingAnAddressMovesTheQuestThereAndShowsIt() {
+    newLoadedViewModel()
+    viewModel.placeElsewhere()
+    viewModel.pickAddress(MONTBENON)
+    assertEquals(MONTBENON.location, state.location)
+    assertEquals(MONTBENON.address, state.addressQuery)
+    assertEquals(AddressSearchUiState(), state.addressSearch)
+  }
+
+  @Test
+  fun clearingTheAddressKeepsTheQuestWhereItIs() {
+    newLoadedViewModel()
+    viewModel.placeElsewhere()
+    viewModel.pickAddress(MONTBENON)
+    viewModel.clearAddress()
+    assertEquals("", state.addressQuery)
+    assertEquals(MONTBENON.location, state.location)
+  }
+
+  @Test
+  fun aFormBuiltWithoutASearchSaysItIsUnavailable() =
+      runTest(dispatcher) {
+        viewModel =
+            CreateQuestViewModel(
+                FakeAuthRepository(VENUE_ID),
+                FakeVenueRepository(listOf(venue(50))),
+                quests,
+            )
+        loadVenue()
+        viewModel.placeElsewhere()
+        viewModel.updateAddressQuery("Esplanade")
+        advanceUntilIdle()
+        assertEquals(AddressSearchStatus.UNAVAILABLE, state.addressSearch.status)
+      }
+
   /** A clock at [instant], which a test can move forward. */
   private class MovableClock(var instant: Instant) : Clock() {
     override fun getZone(): ZoneId = ZONE
@@ -724,5 +870,8 @@ class CreateQuestViewModelTest {
     /** A venue radius that is a preset, but not the default one. */
     val OFFLINE_VENUE_RADIUS = RadiusPreset.ON_THE_STREET.meters
     val ZONE: ZoneId = ZoneOffset.UTC
+    val VENUE_LOCATION = testVenue().location!!
+    val MONTBENON =
+        AddressSuggestion("Esplanade de Montbenon", "1003 Lausanne", Location(46.5208, 6.6267))
   }
 }

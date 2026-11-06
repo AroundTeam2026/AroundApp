@@ -150,7 +150,8 @@ object AddressSearchDefaults {
  * Nothing shows under the field while there is nothing to say, and the card scrolls when the bar is
  * short, as above the keyboard. Typing calls [onQueryChange], the search key [onSearch], and the
  * clear button [onClear]. Tapping a suggestion calls [onPick] and hides the keyboard. While a
- * search runs, the previous suggestions stay in view but can't be picked.
+ * search runs, the previous suggestions stay in view but can't be picked. [placeholder] says what
+ * to search while the field is empty.
  */
 @Composable
 fun AddressSearchBar(
@@ -161,11 +162,12 @@ fun AddressSearchBar(
     onClear: () -> Unit,
     onPick: (AddressSuggestion) -> Unit,
     modifier: Modifier = Modifier,
+    placeholder: String = stringResource(R.string.venue_address_placeholder),
     colors: AddressSearchColors = AddressSearchDefaults.colors(),
 ) {
   val focusManager = LocalFocusManager.current
   Column(modifier, verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-    SearchField(query, onQueryChange, onSearch, onClear, colors)
+    SearchField(query, placeholder, onQueryChange, onSearch, onClear, colors)
     val message = statusMessage(state)
     // Takes what height is left, without stretching, so a short space makes it scroll
     val cardModifier = Modifier.weight(1f, fill = false)
@@ -209,6 +211,7 @@ private fun statusMessage(state: AddressSearchUiState): String? =
 @Composable
 private fun SearchField(
     query: String,
+    placeholder: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     onClear: () -> Unit,
@@ -256,7 +259,7 @@ private fun SearchField(
           Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
               Text(
-                  stringResource(R.string.venue_address_placeholder),
+                  placeholder,
                   color = colors.muted,
                   style = QUERY_STYLE,
                   maxLines = 1,

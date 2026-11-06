@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchUiState
 import java.time.ZoneId
 import kotlin.math.ceil
 
@@ -72,8 +73,13 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
  * @property radiusMeters Distance within which a visit counts, always within [QuestLimits].
  * @property customRadius Whether the venue chose a custom radius rather than one of [RadiusPreset],
  *   which shows the radius slider.
+ * @property venueName The venue's name, to say where the quest happens; empty until it is loaded.
  * @property venueLocation Where the venue is, to centre the radius map; null until it is loaded, or
  *   if the venue has no location.
+ * @property questLocation Where the quest happens when the venue placed it away from its own
+ *   location, or null to keep it at the venue's.
+ * @property addressQuery What the venue typed to find the quest's address.
+ * @property addressSearch What that search found.
  * @property venueLoadFailed Whether reading the venue failed, so the form explains why it can't be
  *   saved and offers to read it again.
  * @property retryingVenue Whether the venue is being read again after it failed; the explanation
@@ -94,7 +100,11 @@ data class CreateQuestUiState(
     val proofType: ProofType = ProofType.PHOTO,
     val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
     val customRadius: Boolean = false,
+    val venueName: String = "",
     val venueLocation: Location? = null,
+    val questLocation: Location? = null,
+    val addressQuery: String = "",
+    val addressSearch: AddressSearchUiState = AddressSearchUiState(),
     val venueLoadFailed: Boolean = false,
     val retryingVenue: Boolean = false,
     val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
@@ -105,6 +115,14 @@ data class CreateQuestUiState(
   /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
   val selectedRadiusPreset: Int?
     get() = radiusMeters.takeIf { !customRadius && RadiusPreset.isPreset(it) }
+
+  /** Whether the quest happens at the venue's own location rather than at [questLocation]. */
+  val atVenue: Boolean
+    get() = questLocation == null
+
+  /** Where the quest happens: [questLocation], else the venue's; null until the venue is loaded. */
+  val location: Location?
+    get() = questLocation ?: venueLocation
 
   /** About how many minutes it takes to walk across [radiusMeters], never less than one. */
   val walkMinutes: Int

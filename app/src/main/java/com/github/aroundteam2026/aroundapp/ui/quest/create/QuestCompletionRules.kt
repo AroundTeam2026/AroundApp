@@ -60,8 +60,12 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import kotlin.math.roundToInt
 
-/** What the completion rules do when the venue changes them; each does nothing by default. */
+/**
+ * What the completion rules do when the venue changes them; each does nothing by default.
+ * [location] moves where the quest happens.
+ */
 class QuestCompletionActions(
+    val location: QuestLocationActions = QuestLocationActions(),
     val onProofTypeChange: (ProofType) -> Unit = {},
     val onRadiusPresetSelect: (Int) -> Unit = {},
     val onCustomRadiusSelect: () -> Unit = {},
@@ -71,7 +75,10 @@ class QuestCompletionActions(
     val onExactPartySizeChange: (Boolean) -> Unit = {},
 )
 
-/** How explorers complete the quest: the proof they submit, the unlock radius and the party. */
+/**
+ * How explorers complete the quest: the proof they submit, where the quest happens once the venue
+ * is loaded, the unlock radius and the party.
+ */
 @Composable
 fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActions) {
   Column {
@@ -83,6 +90,10 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
     Spacer(Modifier.height(AroundSpacing.Small))
     ExplorerPreview()
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
+    if (state.venueLocation != null) {
+      QuestLocationFields(state, actions.location)
+      Spacer(Modifier.height(AroundSpacing.ExtraLarge))
+    }
     UnlockRadius(state, actions)
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
     PartyCard(state, actions)
@@ -247,9 +258,16 @@ private fun UnlockRadius(state: CreateQuestUiState, actions: QuestCompletionActi
       style = AroundTextStyles.Caption,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
   )
-  state.venueLocation?.let {
+  state.location?.let {
     Spacer(Modifier.height(AroundSpacing.CompactGap))
-    QuestRadiusMap(it, state.radiusMeters, state.walkMinutes)
+    QuestRadiusMap(
+        it,
+        state.radiusMeters,
+        state.walkMinutes,
+        venue = state.venueLocation.takeUnless { state.atVenue },
+        venueName = state.venueName,
+        onMoved = actions.location.onMove,
+    )
   }
   Spacer(Modifier.height(AroundSpacing.CompactGap))
   Row(
