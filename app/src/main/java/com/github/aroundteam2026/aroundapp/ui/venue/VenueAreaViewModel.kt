@@ -400,7 +400,7 @@ private fun clampRadius(radiusMeters: Int): Int =
     radiusMeters.coerceIn(VenueLimits.MIN_RADIUS_METERS, VenueLimits.MAX_RADIUS_METERS)
 
 /** This search once [result] arrived: its suggestions, or why there are none. */
-private fun AddressSearchUiState.showing(result: AddressSearchResult): AddressSearchUiState =
+internal fun AddressSearchUiState.showing(result: AddressSearchResult): AddressSearchUiState =
     when (result) {
       is AddressSearchResult.Found ->
           copy(
