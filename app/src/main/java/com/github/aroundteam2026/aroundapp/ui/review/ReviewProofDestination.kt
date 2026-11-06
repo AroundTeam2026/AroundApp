@@ -21,7 +21,7 @@ private const val TAG = "ReviewProofDestination"
  */
 fun NavGraphBuilder.reviewProofDestination(
     onClose: () -> Unit,
-    factory: (String) -> ViewModelProvider.Factory = ::defaultReviewProofFactory,
+    factory: (String) -> ViewModelProvider.Factory,
 ) {
   composable(
       Routes.REVIEW_PROOF,
@@ -29,7 +29,12 @@ fun NavGraphBuilder.reviewProofDestination(
   ) { entry ->
     // The route only matches a non-blank id, so the argument is always there
     val completionId = requireNotNull(entry.arguments?.getString(Routes.COMPLETION_ID))
-    ReviewProofScreen(viewModel(factory = factory(completionId)), onBack = onClose)
+    // Keyed by the proof: single-top compares the route pattern, so two quick taps on different
+    // proofs could otherwise keep the first proof's ViewModel
+    ReviewProofScreen(
+        viewModel(key = completionId, factory = factory(completionId)),
+        onBack = onClose,
+    )
   }
 }
 
