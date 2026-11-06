@@ -57,10 +57,10 @@ import kotlinx.coroutines.launch
  * @property filters The filters the explorer chose for the list. They don't hide any pin.
  * @property showsNearby Whether the nearby quests are open over the map. They and a card are never
  *   open together.
- * @property venuesFailed Whether the venues failed to load, so the map has no pins even where there
- *   are quests. False again once they load.
- * @property retryingVenues Whether the venues are being listened to again after
- *   [MapViewModel.onRetryVenues], until they answer.
+ * @property loadFailed Whether the quests or their venues failed to load, so the map has no pins
+ *   even where there are quests. False again once they load.
+ * @property retrying Whether what failed is being listened to again after [MapViewModel.onRetry],
+ *   until it answers.
  */
 data class MapUiState(
     val areaToFrame: GeoBounds?,
@@ -71,8 +71,8 @@ data class MapUiState(
     val nearby: List<NearbyQuest> = emptyList(),
     val showsNearby: Boolean = false,
     val filters: NearbyFilters = NearbyFilters(),
-    val venuesFailed: Boolean = false,
-    val retryingVenues: Boolean = false,
+    val loadFailed: Boolean = false,
+    val retrying: Boolean = false,
 )
 
 /**
@@ -82,7 +82,7 @@ data class MapUiState(
  * It marks every venue on screen that has valid quests, keeping up as quests and venues change and
  * as rewards expire, by [clock]. At most one pin is open into its card at a time. It also lists the
  * valid quests near the explorer, from the same quests, venues and position as the pins. If the
- * venues fail to load, it says so until [onRetryVenues] loads them.
+ * quests or their venues fail to load, it says so until [onRetry] loads them.
  */
 class MapViewModel(
     private val locationRepository: LocationRepository,
@@ -112,10 +112,12 @@ class MapViewModel(
   private val selectedVenueId = MutableStateFlow<String?>(null)
   /** The filters of the nearby list. */
   private val filters = MutableStateFlow(NearbyFilters())
-  /** Bumped by [onRetryVenues]: each new value listens to the venues again. */
+  /** Bumped by [onRetry] when the quests failed: each new value listens to them again. */
+  private val questRetries = MutableStateFlow(0)
+  /** Bumped by [onRetry] when only the venues failed: each new value listens to them again. */
   private val venueRetries = MutableStateFlow(0)
-  /** Whether a retry of the venues waits for their answer, which a second tap must not restart. */
-  private val venuesRetrying = MutableStateFlow(false)
+  /** Whether a retry waits for its answer, which a second tap must not restart. */
+  private val retryWaiting = MutableStateFlow(false)
   /**
    * The pins of every venue with valid quests, on screen or not, and the nearby list, built
    * together from each snapshot of [mapData], so the screen never shows one newer than the other.
@@ -126,6 +128,7 @@ class MapViewModel(
             MapContent(
                 pins = buildVenuePins(it.quests, it.venues, it.now, from = it.here),
                 nearby = nearbyQuests(it.quests, it.venues, it.now, from = it.here),
+                questsFailed = it.questsFailed,
                 venuesFailed = it.venuesFailed,
             )
           }
@@ -135,8 +138,8 @@ class MapViewModel(
     viewModelScope.launch {
       // The venues on screen get a pin, and the open one keeps it wherever it is: the card is far
       // bigger than the pin, so it can still be on screen when its venue isn't
-      combine(content, visibleArea, selectedVenueId, filters, venuesRetrying) {
-              (pins, nearby, venuesFailed),
+      combine(content, visibleArea, selectedVenueId, filters, retryWaiting) {
+              (pins, nearby, questsFailed, venuesFailed),
               area,
               opened,
               chosen,
@@ -146,9 +149,11 @@ class MapViewModel(
               (area != null && it.location in area) || it.venueId == selected
             }
             val listed = nearby.filter(chosen::matches)
-            ShownMap(shown, opened, selected, listed, chosen, venuesFailed, retrying)
+            // One error for both: without quests there are no venues to load either
+            val failed = questsFailed || venuesFailed
+            ShownMap(shown, opened, selected, listed, chosen, failed, retrying)
           }
-          .collect { (shown, opened, selected, nearby, chosen, venuesFailed, retrying) ->
+          .collect { (shown, opened, selected, nearby, chosen, failed, retrying) ->
             // A venue left without valid quests closes its card for good
             if (selected == null && opened != null) selectedVenueId.compareAndSet(opened, null)
             // One update, so the pins and the list always come from the same snapshot
@@ -158,8 +163,8 @@ class MapViewModel(
                   selectedVenueId = selected,
                   nearby = nearby,
                   filters = chosen,
-                  venuesFailed = venuesFailed,
-                  retryingVenues = retrying,
+                  loadFailed = failed,
+                  retrying = retrying,
               )
             }
           }
@@ -227,14 +232,15 @@ class MapViewModel(
   }
 
   /**
-   * Called when the explorer taps "Try again" after the venues failed to load: listens to them
-   * again. Does nothing while they haven't failed or a retry waits for their answer, as each new
-   * listener costs Firestore reads.
+   * Called when the explorer taps "Try again" after the quests or their venues failed to load:
+   * listens again to the quests if they failed, otherwise to the venues. Does nothing while nothing
+   * failed or a retry waits for its answer, as each new listener costs Firestore reads.
    */
-  fun onRetryVenues() {
-    if (!content.value.venuesFailed || venuesRetrying.value) return
-    venuesRetrying.value = true
-    venueRetries.update { it + 1 }
+  fun onRetry() {
+    val (_, _, questsFailed, venuesFailed) = content.value
+    if (!(questsFailed || venuesFailed) || retryWaiting.value) return
+    retryWaiting.value = true
+    if (questsFailed) questRetries.update { it + 1 } else venueRetries.update { it + 1 }
   }
 
   /** Called when the explorer closes the nearby quests. */
@@ -262,10 +268,11 @@ class MapViewModel(
 
   /**
    * The active quests, their venues, the explorer's position and the time, again whenever quests or
-   * their venues change, when a reward expires, and once the explorer is located. Without quests,
-   * or when they fail, there are none; without venues there are none either, as each quest is shown
-   * at its venue's location, under its name. A failure to load the venues is logged and reported in
-   * [MapData.venuesFailed] until they load, on [onRetryVenues] or for a new set of venues.
+   * their venues change, when a reward expires, and once the explorer is located. Without quests
+   * there are none; without venues there are none either, as each quest is shown at its venue's
+   * location, under its name. A failure to load the quests or the venues is logged and reported in
+   * [MapData.questsFailed] or [MapData.venuesFailed] until they load, on [onRetry] or, for the
+   * venues, for a new set of venues.
    *
    * The quests are listened to once, for both the pins and the nearby list, and their venues again
    * only when the set of venues changes, as each new listener costs Firestore reads.
@@ -274,25 +281,33 @@ class MapViewModel(
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun mapData(): Flow<MapData> {
     val quests =
-        questRepository
-            .observeActiveQuests()
-            .catch { emit(emptyList()) } // NOSONAR
+        questRetries
+            .flatMapLatest {
+              questRepository
+                  .observeActiveQuests()
+                  .map { Loaded(it, failed = false) }
+                  .catch { // NOSONAR
+                    Log.w(TAG, "Listening to the active quests failed", it)
+                    emit(Loaded(emptyList(), failed = true))
+                  }
+                  // Answered, whether loaded or failed again: the explorer may try again
+                  .onEach { retryWaiting.value = false }
+            }
             .shareIn(viewModelScope, SharingStarted.WhileSubscribed(), replay = 1)
     val venues =
         quests
-            .map { it.mapTo(mutableSetOf()) { quest -> quest.venueId } }
+            .map { it.value.mapTo(mutableSetOf()) { quest -> quest.venueId } }
             .distinctUntilChanged()
             .combine(venueRetries) { venueIds, _ -> venueIds }
             .flatMapLatest { venueIds ->
               venueRepository
                   .observeVenues(venueIds)
-                  .map { LoadedVenues(it.associateBy { venue -> venue.id }, failed = false) }
+                  .map { Loaded(it.associateBy { venue -> venue.id }, failed = false) }
                   .catch { // NOSONAR
                     Log.w(TAG, "Listening to venues $venueIds failed", it)
-                    emit(LoadedVenues(emptyMap(), failed = true))
+                    emit(Loaded(emptyMap(), failed = true))
                   }
-                  // Answered, whether loaded or failed again: the explorer may try again
-                  .onEach { venuesRetrying.value = false }
+                  .onEach { retryWaiting.value = false }
             }
     return combine(quests, venues, explorer) { current, known, here ->
           Triple(current, known, here)
@@ -300,42 +315,45 @@ class MapViewModel(
         .transformLatest { (quests, venues, here) ->
           while (true) {
             val now = clock()
-            emit(MapData(quests, venues.byId, here, now, venues.failed))
-            val nextExpiry = quests.nextExpiryAfter(now) ?: break
+            emit(MapData(quests.value, venues.value, here, now, quests.failed, venues.failed))
+            val nextExpiry = quests.value.nextExpiryAfter(now) ?: break
             delay(nextExpiry - now)
           }
         }
   }
 
-  /** The venues of the quests [byId], or none when they [failed] to load. */
-  private data class LoadedVenues(val byId: Map<String, Venue>, val failed: Boolean)
+  /** What a listener answered: its [value], empty when it [failed]. */
+  private data class Loaded<T>(val value: T, val failed: Boolean)
 
   /**
    * What the map knows at [now]: the active [quests], their [venues] by id, the explorer, and
-   * whether the venues [venuesFailed] to load.
+   * whether the quests [questsFailed] or the venues [venuesFailed] to load.
    */
   private data class MapData(
       val quests: List<Quest>,
       val venues: Map<String, Venue>,
       val here: Location?,
       val now: Long,
+      val questsFailed: Boolean,
       val venuesFailed: Boolean,
   )
 
   /**
    * Every venue's pin and the nearby list, built from the same snapshot of [mapData], and whether
-   * the venues failed to load.
+   * the quests or the venues failed to load.
    */
   private data class MapContent(
       val pins: List<VenuePin>,
       val nearby: List<NearbyQuest>,
+      val questsFailed: Boolean = false,
       val venuesFailed: Boolean = false,
   )
 
   /**
    * What the screen shows: the [pins] on screen, the card the explorer [opened], the one still
    * [selected] (null once its venue has no valid quest left), the [nearby] list that passes the
-   * [filters], whether the venues failed to load, and whether a retry of them is [retrying].
+   * [filters], whether the quests or their venues [failed] to load, and whether a retry is
+   * [retrying].
    */
   private data class ShownMap(
       val pins: List<VenuePin>,
@@ -343,7 +361,7 @@ class MapViewModel(
       val selected: String?,
       val nearby: List<NearbyQuest>,
       val filters: NearbyFilters,
-      val venuesFailed: Boolean,
+      val failed: Boolean,
       val retrying: Boolean,
   )
 

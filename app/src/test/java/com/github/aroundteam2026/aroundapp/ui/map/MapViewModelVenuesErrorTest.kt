@@ -80,7 +80,7 @@ class MapViewModelVenuesErrorTest {
   fun loadedVenuesShowNoError() = test {
     showing()
 
-    assertFalse(state.venuesFailed)
+    assertFalse(state.loadFailed)
     assertEquals(setOf("cafe"), pinIds)
   }
 
@@ -90,7 +90,7 @@ class MapViewModelVenuesErrorTest {
     quests.value = emptyList()
     showing()
 
-    assertFalse(state.venuesFailed)
+    assertFalse(state.loadFailed)
     assertEquals(emptyList<VenuePin>(), state.pins)
   }
 
@@ -99,7 +99,7 @@ class MapViewModelVenuesErrorTest {
     venueRepository.failing = true
     showing()
 
-    assertTrue(state.venuesFailed)
+    assertTrue(state.loadFailed)
     assertEquals(emptyList<VenuePin>(), state.pins)
   }
 
@@ -109,10 +109,10 @@ class MapViewModelVenuesErrorTest {
     showing()
 
     venueRepository.failing = false
-    viewModel.onRetryVenues()
+    viewModel.onRetry()
     runCurrent()
 
-    assertFalse(state.venuesFailed)
+    assertFalse(state.loadFailed)
     assertEquals(setOf("cafe"), pinIds)
   }
 
@@ -121,11 +121,11 @@ class MapViewModelVenuesErrorTest {
     venueRepository.failing = true
     showing()
 
-    viewModel.onRetryVenues()
+    viewModel.onRetry()
     runCurrent()
 
-    assertTrue(state.venuesFailed)
-    assertFalse(state.retryingVenues)
+    assertTrue(state.loadFailed)
+    assertFalse(state.retrying)
     assertEquals(2, venueRepository.requests)
   }
 
@@ -135,11 +135,11 @@ class MapViewModelVenuesErrorTest {
     showing()
 
     venueRepository.answering = false
-    viewModel.onRetryVenues()
+    viewModel.onRetry()
     runCurrent()
 
-    assertTrue(state.retryingVenues)
-    assertTrue(state.venuesFailed)
+    assertTrue(state.retrying)
+    assertTrue(state.loadFailed)
   }
 
   @Test
@@ -148,9 +148,9 @@ class MapViewModelVenuesErrorTest {
     showing()
 
     venueRepository.answering = false
-    viewModel.onRetryVenues()
+    viewModel.onRetry()
     runCurrent()
-    viewModel.onRetryVenues()
+    viewModel.onRetry()
     runCurrent()
 
     assertEquals(2, venueRepository.requests)
@@ -161,7 +161,7 @@ class MapViewModelVenuesErrorTest {
     // Each new listener costs Firestore reads
     showing()
 
-    viewModel.onRetryVenues()
+    viewModel.onRetry()
     runCurrent()
 
     assertEquals(1, venueRepository.requests)
@@ -176,7 +176,7 @@ class MapViewModelVenuesErrorTest {
     quests.value = quests.value + testQuest(id = "bar-1", venueId = "bar")
     runCurrent()
 
-    assertFalse(state.venuesFailed)
+    assertFalse(state.loadFailed)
     assertEquals(setOf("cafe", "bar"), pinIds)
   }
 
