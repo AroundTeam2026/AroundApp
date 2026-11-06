@@ -2,12 +2,16 @@
 package com.github.aroundteam2026.aroundapp.model.connectivity
 
 import android.app.Application
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -49,11 +53,11 @@ class ConnectivityManagerRepositoryTest {
   /** The callback the repository registered, which Android calls on each change. */
   private fun callback() = shadowOf(manager).networkCallbacks.single()
 
-  /** Collects every state [repository] reports for the rest of the test. */
-  private fun TestScope.watch(): List<Boolean> {
+  /** Collects every state [watched] reports for the rest of the test. */
+  private fun TestScope.watch(watched: ConnectivityRepository = repository): List<Boolean> {
     val seen = mutableListOf<Boolean>()
     backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-      repository.isOnline.collect { seen += it }
+      watched.isOnline.collect { seen += it }
     }
     return seen
   }
@@ -76,6 +80,13 @@ class ConnectivityManagerRepositoryTest {
   fun startsOffline_behindACaptivePortal() = runTest {
     // Connected, but the system couldn't reach the internet through it yet
     defaultNetworkHas(capabilities(NET_CAPABILITY_INTERNET))
+
+    assertFalse(repository.isOnline.first())
+  }
+
+  @Test
+  fun startsOffline_whenValidatedWithoutInternet() = runTest {
+    defaultNetworkHas(capabilities(NET_CAPABILITY_VALIDATED))
 
     assertFalse(repository.isOnline.first())
   }
@@ -105,15 +116,26 @@ class ConnectivityManagerRepositoryTest {
   }
 
   @Test
-  fun staysOnline_whenTheOldNetworkIsLostAfterASwitch() = runTest {
-    noNetwork()
-    val seen = watch()
+  fun keepsACallbackThatComesBeforeTheFirstRead() = runTest {
+    // Android may call back on its own thread before the repository reads the state: here the
+    // network is lost while the callback registers, and the read still sees it
+    val losing =
+        mockk<ConnectivityManager>(relaxUnitFun = true) {
+          every { activeNetwork } returns wifi
+          every { getNetworkCapabilities(wifi) } returns validated()
+          every {
+            registerDefaultNetworkCallback(any<ConnectivityManager.NetworkCallback>())
+          } answers { firstArg<ConnectivityManager.NetworkCallback>().onLost(wifi) }
+        }
+    val context =
+        object : ContextWrapper(app) {
+          override fun getApplicationContext() = this
 
-    callback().onCapabilitiesChanged(wifi, validated())
-    callback().onCapabilitiesChanged(mobile, validated())
-    callback().onLost(wifi)
+          override fun getSystemService(name: String): Any? =
+              if (name == Context.CONNECTIVITY_SERVICE) losing else super.getSystemService(name)
+        }
 
-    assertEquals(listOf(false, true), seen)
+    assertEquals(listOf(false), watch(ConnectivityManagerRepository(context)))
   }
 
   @Test
