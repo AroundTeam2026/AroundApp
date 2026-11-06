@@ -7,7 +7,12 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -65,6 +70,8 @@ class VenuePageAcceptTest {
   private val users = ScriptedUserRepository(testUsers(EXPLORER))
   private var userRepository: UserRepository = users
   private var partyRepository: PartyRepository = party
+  private val completions = FakeCompletionRepository { START }
+  private var completionRepository: CompletionRepository = completions
 
   private val viewModel by lazy {
     VenuePageViewModel(
@@ -74,6 +81,7 @@ class VenuePageAcceptTest {
         reservationRepository,
         userRepository,
         partyRepository,
+        completionRepository,
         EXPLORER,
         clock,
     )
@@ -331,6 +339,104 @@ class VenuePageAcceptTest {
     runCurrent()
 
     assertEquals(id, state.completableReservationId)
+  }
+
+  /** Stores an approved reservation for [questId], with the proof its explorer sent for it. */
+  private suspend fun storeWithProof(questId: String): String {
+    val id = storeFor(questId)
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    return completions.submit(id, VENUE_ID, EXPLORER, Proof.Photo("gs://proofs/fox")).getOrThrow()
+  }
+
+  // The bug of #394: the details offered "Submit proof" again once the proof was sent
+  @Test
+  fun aSentProofShowsAndEndsCompleting() = test {
+    val id = storeFor("a")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    openAndPick("a")
+    assertNull(state.proof)
+    assertEquals(id, state.completableReservationId)
+
+    completions.submit(id, VENUE_ID, EXPLORER, Proof.Photo("gs://proofs/fox"))
+    runCurrent()
+
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun theVenuesApprovalOfTheProofShows() = test {
+    val proof = storeWithProof("a")
+    openAndPick("a")
+
+    completions.approve(proof)
+    runCurrent()
+
+    assertEquals(CompletionStatus.APPROVED, state.proof?.status)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun theVenuesRejectionOfTheProofShowsWithItsReason() = test {
+    val proof = storeWithProof("a")
+    openAndPick("a")
+
+    completions.reject(proof, "Too dark")
+    runCurrent()
+
+    assertEquals(CompletionStatus.REJECTED, state.proof?.status)
+    assertEquals("Too dark", state.proof?.rejectReason)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun aProofForAnotherQuestDoesntShowOnThePickedOne() = test {
+    storeWithProof("a")
+    openAndPick("b")
+
+    assertNull(state.proof)
+  }
+
+  @Test
+  fun anotherExplorersProofDoesntShow() = test {
+    val id = storeFor("a")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    completions.submit(id, VENUE_ID, "friend", Proof.Photo("gs://proofs/fox"))
+    openAndPick("a")
+
+    assertNull(state.proof)
+    assertEquals(id, state.completableReservationId)
+  }
+
+  // Failing to read the proofs mustn't take the page or accepting with it, nor offer a second proof
+  @Test
+  fun aBrokenProofsListenerOnlyStopsCompleting() = test {
+    val id = storeFor("a")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    completionRepository = FailingCompletionsRepository(completions, shownFirst = null)
+    openAndPick("a")
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertTrue(state.acceptAvailable)
+    assertFalse(state.proofsAvailable)
+    assertEquals(id, state.cancellableReservationId)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun aProofShownBeforeTheListenerBrokeStaysShown() = test {
+    val proof = storeWithProof("a")
+    val sent = completions.observeForExplorer(EXPLORER).first()
+    assertEquals(proof, sent.single().id)
+    completionRepository = FailingCompletionsRepository(completions, shownFirst = sent)
+    openAndPick("a")
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertTrue(state.proofsAvailable)
+
+    advanceTimeBy(FAILS_AFTER_MS + 1)
+
+    assertFalse(state.proofsAvailable)
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
   }
 
   @Test
@@ -885,18 +991,29 @@ private class ScriptedReservationRepository : ReservationRepository by FakeReser
 }
 
 /**
- * Delegates to [inner], but its explorer listener shows [shownFirst], if any, then fails
+ * The explorer listener of the failing repositories below: shows [shownFirst], if any, then fails
  * [FAILS_AFTER_MS] later, in virtual time.
  */
+private fun <T> failingAfter(shownFirst: List<T>?): Flow<List<T>> = flow {
+  shownFirst?.let {
+    emit(it)
+    delay(FAILS_AFTER_MS)
+  }
+  throw IOException("denied")
+}
+
+/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
+private class FailingCompletionsRepository(
+    private val inner: CompletionRepository,
+    private val shownFirst: List<Completion>?,
+) : CompletionRepository by inner {
+  override fun observeForExplorer(uid: String): Flow<List<Completion>> = failingAfter(shownFirst)
+}
+
+/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
 private class FailingListenerRepository(
     private val inner: ReservationRepository,
     private val shownFirst: List<Reservation>?,
 ) : ReservationRepository by inner {
-  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
-    shownFirst?.let {
-      emit(it)
-      delay(FAILS_AFTER_MS)
-    }
-    throw IOException("denied")
-  }
+  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = failingAfter(shownFirst)
 }

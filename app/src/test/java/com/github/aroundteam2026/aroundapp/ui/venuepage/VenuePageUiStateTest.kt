@@ -3,6 +3,9 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -11,6 +14,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VenuePageUiStateTest {
+  private fun completion(reservationId: String) =
+      Completion(
+          id = "proof of $reservationId",
+          reservationId = reservationId,
+          venueId = "venue",
+          explorerUid = "explorer",
+          proof = Proof.Photo("gs://proofs/fox"),
+          status = CompletionStatus.PENDING,
+          rejectReason = null,
+          submittedAt = 0L,
+      )
+
   private fun quest(id: String) =
       VenuePageQuest(
           questId = id,
@@ -171,6 +186,48 @@ class VenuePageUiStateTest {
     assertNull(
         booked.copy(approvedIds = setOf("r"), selectedQuestId = "b").completableReservationId
     )
+  }
+
+  @Test
+  fun aProofBelongsToThePickedQuestsReservationAndEndsCompleting() {
+    val sent =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            approvedIds = setOf("r"),
+            completions = mapOf("r" to completion("r")),
+        )
+
+    assertEquals("r", sent.proof?.reservationId)
+    assertNull(sent.completableReservationId)
+    assertNull(sent.copy(selectedQuestId = "b").proof)
+    assertNull(sent.copy(selectedQuestId = null).proof)
+  }
+
+  @Test
+  fun aProofOfAnotherReservationLeavesThePickedQuestCompletable() {
+    val approved =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            approvedIds = setOf("r"),
+            completions = mapOf("other" to completion("other")),
+        )
+
+    assertNull(approved.proof)
+    assertEquals("r", approved.completableReservationId)
+  }
+
+  @Test
+  fun nothingCanBeCompletedWhileTheProofsCantBeRead() {
+    val approved =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            approvedIds = setOf("r"),
+        )
+
+    assertNull(approved.copy(proofsAvailable = false).completableReservationId)
   }
 
   @Test
