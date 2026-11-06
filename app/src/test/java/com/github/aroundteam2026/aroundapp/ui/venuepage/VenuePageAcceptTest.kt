@@ -991,35 +991,29 @@ private class ScriptedReservationRepository : ReservationRepository by FakeReser
 }
 
 /**
- * Delegates to [inner], but its explorer listener shows [shownFirst], if any, then fails
+ * The explorer listener of the failing repositories below: shows [shownFirst], if any, then fails
  * [FAILS_AFTER_MS] later, in virtual time.
  */
+private fun <T> failingAfter(shownFirst: List<T>?): Flow<List<T>> = flow {
+  shownFirst?.let {
+    emit(it)
+    delay(FAILS_AFTER_MS)
+  }
+  throw IOException("denied")
+}
+
+/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
 private class FailingCompletionsRepository(
     private val inner: CompletionRepository,
     private val shownFirst: List<Completion>?,
 ) : CompletionRepository by inner {
-  override fun observeForExplorer(uid: String): Flow<List<Completion>> = flow {
-    shownFirst?.let {
-      emit(it)
-      delay(FAILS_AFTER_MS)
-    }
-    throw IOException("denied")
-  }
+  override fun observeForExplorer(uid: String): Flow<List<Completion>> = failingAfter(shownFirst)
 }
 
-/**
- * Delegates to [inner], but its explorer listener shows [shownFirst], if any, then fails
- * [FAILS_AFTER_MS] later, in virtual time.
- */
+/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
 private class FailingListenerRepository(
     private val inner: ReservationRepository,
     private val shownFirst: List<Reservation>?,
 ) : ReservationRepository by inner {
-  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
-    shownFirst?.let {
-      emit(it)
-      delay(FAILS_AFTER_MS)
-    }
-    throw IOException("denied")
-  }
+  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = failingAfter(shownFirst)
 }

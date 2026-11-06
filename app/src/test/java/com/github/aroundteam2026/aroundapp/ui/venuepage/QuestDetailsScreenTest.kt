@@ -377,7 +377,7 @@ class QuestDetailsScreenTest {
     val quest = quest()
     show(quest, withProof(quest, CompletionStatus.APPROVED))
 
-    compose.onNodeWithText("ACCEPTED").assertIsDisplayed()
+    compose.onNodeWithText("COMPLETED").assertIsDisplayed()
     compose.onNodeWithText("Quest complete!").assertIsDisplayed()
     compose
         .onNodeWithText("Café Lumen approved your proof. Your reward is ready.")

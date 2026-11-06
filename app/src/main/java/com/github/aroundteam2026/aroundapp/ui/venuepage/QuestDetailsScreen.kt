@@ -217,7 +217,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
                 R.string.quest_detail_proof_approved_title,
                 stringResource(R.string.quest_detail_proof_approved_text, venueName),
                 tile = theme.sage,
-                icon = colors.onSecondary,
+                icon = colors.surface,
                 dot = theme.sage,
                 label = colors.onSurfaceVariant,
                 border = null,
