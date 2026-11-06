@@ -11,23 +11,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetValue
@@ -46,7 +39,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -224,54 +216,21 @@ private fun RejectProofForm(
       )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap)) {
-      val primary = MaterialTheme.colorScheme.primary
-      val accent = AroundTheme.colors.accentText
-      OutlinedButton(
-          onClick = onBack,
+      SecondaryButton(
+          stringResource(R.string.reject_proof_back),
+          onBack,
           enabled = !saving,
-          modifier =
-              Modifier.weight(1f)
-                  .heightIn(min = BUTTON_MIN_HEIGHT)
-                  .testTag(C.Tag.REJECT_PROOF_BACK),
-          shape = MaterialTheme.shapes.medium,
-          border = BorderStroke(BUTTON_BORDER_WIDTH, if (saving) primary.disabled() else primary),
-          colors =
-              ButtonDefaults.outlinedButtonColors(
-                  contentColor = accent,
-                  disabledContentColor = accent.disabled(),
-              ),
-      ) {
-        Text(stringResource(R.string.reject_proof_back), style = AroundTextStyles.Button)
-      }
-      Button(
+          tag = C.Tag.REJECT_PROOF_BACK,
+      )
+      PrimaryButton(
+          stringResource(
+              if (saving) R.string.reject_proof_rejecting else R.string.reject_proof_confirm
+          ),
           onClick = { onReject(reason) },
           enabled = reason.isNotEmpty() && !saving,
-          modifier =
-              Modifier.weight(1f)
-                  .heightIn(min = BUTTON_MIN_HEIGHT)
-                  .testTag(C.Tag.REJECT_PROOF_CONFIRM),
-          shape = MaterialTheme.shapes.medium,
-          colors =
-              ButtonDefaults.buttonColors(
-                  disabledContainerColor = primary.disabled(),
-                  disabledContentColor = MaterialTheme.colorScheme.onPrimary.disabled(),
-              ),
-      ) {
-        if (saving) {
-          CircularProgressIndicator(
-              Modifier.size(PROGRESS_SIZE),
-              color = LocalContentColor.current,
-              strokeWidth = PROGRESS_STROKE,
-          )
-          Spacer(Modifier.width(AroundSpacing.Small))
-        }
-        Text(
-            stringResource(
-                if (saving) R.string.reject_proof_rejecting else R.string.reject_proof_confirm
-            ),
-            style = AroundTextStyles.Button,
-        )
-      }
+          tag = C.Tag.REJECT_PROOF_CONFIRM,
+          busy = saving,
+      )
     }
     if (reason.isEmpty()) {
       Text(
@@ -341,8 +300,6 @@ private fun Handle() {
   )
 }
 
-private fun Color.disabled() = copy(alpha = DISABLED_ALPHA)
-
 /**
  * The longest note. A reason is at most [MAX_REJECT_REASON_LENGTH] characters, and the longest
  * preset with its separator takes about 25 of them; if a preset gets much longer, compute this from
@@ -350,15 +307,10 @@ private fun Color.disabled() = copy(alpha = DISABLED_ALPHA)
  */
 internal const val NOTE_MAX_LENGTH = 250
 
-private const val DISABLED_ALPHA = 0.4f
 private val NOTE_MIN_HEIGHT = 76.dp
-private val BUTTON_MIN_HEIGHT = 54.dp
-private val BUTTON_BORDER_WIDTH = 1.5.dp
 private val CHIP_VERTICAL_PADDING = 9.dp
 private val HANDLE_WIDTH = 36.dp
 private val HANDLE_HEIGHT = 4.dp
-private val PROGRESS_SIZE = 20.dp
-private val PROGRESS_STROKE = 2.dp
 
 // Internal, not private, so a test can draw them: the previews are code too
 @Preview(name = "Picked - Light", widthDp = 413)
