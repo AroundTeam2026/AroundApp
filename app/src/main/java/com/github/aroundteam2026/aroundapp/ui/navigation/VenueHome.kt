@@ -54,16 +54,15 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * The venue's home, where a signed-in venue lands: the selected tab's screen above a bottom bar of
  * Dashboard, Quests and Profile (see [BottomTabScaffold]).
  *
- * The Dashboard tab shows the venue's reservations and the proofs to review (see
- * [VenueDashboardScreen]); tapping a proof calls [onOpenProof]. The Quests tab lists the venue's
- * quests (see [VenueQuestsScreen]); its "New quest" buttons call [onCreateQuest], so the venue's
- * NavHost opens the create-quest form full screen above the home (see [venueDestinations]).
+ * The Dashboard tab shows the venue's reservations (see [VenueDashboardScreen]). The Quests tab
+ * lists the venue's quests (see [VenueQuestsScreen]); its "New quest" buttons call [onCreateQuest],
+ * so the venue's NavHost opens the create-quest form full screen above the home (see
+ * [venueDestinations]).
  *
  * @param onCreateQuest opens the form where the venue creates a quest.
  * @param onSignOut signs the venue out, from the Profile tab.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
- * @param onOpenProof opens the Review proof screen of a completion's id.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  */
 @Composable
@@ -72,17 +71,9 @@ fun VenueHome(
     onSignOut: () -> Unit,
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
-    onOpenProof: (String) -> Unit = {},
     navController: NavHostController = rememberNavController(),
     screen: @Composable (VenueTab) -> Unit = {
-      VenueTabScreen(
-          it,
-          onCreateQuest,
-          onSignOut,
-          venueQuestsFactory,
-          dashboardFactory,
-          onOpenProof,
-      )
+      VenueTabScreen(it, onCreateQuest, onSignOut, venueQuestsFactory, dashboardFactory)
     },
 ) {
   BottomTabScaffold(
@@ -103,14 +94,12 @@ private fun VenueTabScreen(
     onSignOut: () -> Unit,
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
-    onOpenProof: (String) -> Unit,
 ) =
     when (tab) {
       VenueTab.DASHBOARD ->
           VenueDashboardScreen(
               viewModel(factory = dashboardFactory),
               Modifier.testTag(tab.screenTag),
-              onOpenProof = onOpenProof,
           )
       VenueTab.QUESTS ->
           VenueQuestsScreen(

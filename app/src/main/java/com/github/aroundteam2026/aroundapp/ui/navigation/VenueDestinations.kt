@@ -7,25 +7,19 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
 import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
-import com.github.aroundteam2026.aroundapp.ui.review.defaultReviewProofFactory
-import com.github.aroundteam2026.aroundapp.ui.review.navigateToReviewProof
-import com.github.aroundteam2026.aroundapp.ui.review.reviewProofDestination
 
 /**
  * Registers the venue home and the screens it opens, in the venue's NavHost. Those screens are
  * shown full screen above the home, so that their own bottom bars don't sit on the home's tabs.
  *
  * The home keeps its tabs' back stack while the form is open, so closing the form, or saving its
- * quest, returns to the Quests tab it was opened from. Likewise, tapping a proof on the dashboard
- * opens the Review proof screen, and leaving it returns to the dashboard.
+ * quest, returns to the Quests tab it was opened from.
  *
  * @param navController the venue's NavHost, between the home and the screens above it.
  * @param onSignOut signs the venue out, from the Profile tab.
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
- * @param reviewProofFactory builds the Review proof screen's ViewModel for a completion's id; tests
- *   pass one on fakes.
  */
 fun NavGraphBuilder.venueDestinations(
     navController: NavHostController,
@@ -33,7 +27,6 @@ fun NavGraphBuilder.venueDestinations(
     createQuestFactory: ViewModelProvider.Factory,
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
-    reviewProofFactory: (String) -> ViewModelProvider.Factory = ::defaultReviewProofFactory,
 ) {
   composable(Routes.VENUE_HOME) {
     VenueHome(
@@ -41,17 +34,11 @@ fun NavGraphBuilder.venueDestinations(
         onSignOut = onSignOut,
         venueQuestsFactory = venueQuestsFactory,
         dashboardFactory = dashboardFactory,
-        onOpenProof = navController::navigateToReviewProof,
     )
   }
   // By route: a second tap on X during the form's exit fade must not also pop the home
   createQuestDestination(
       onClose = { navController.popBackStack(Routes.CREATE_QUEST, inclusive = true) },
       factory = createQuestFactory,
-  )
-  // By route too: the screen also closes itself once the proof is reviewed
-  reviewProofDestination(
-      onClose = { navController.popBackStack(Routes.REVIEW_PROOF, inclusive = true) },
-      factory = reviewProofFactory,
   )
 }
