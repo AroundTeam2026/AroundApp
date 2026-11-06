@@ -161,7 +161,8 @@ jobs:
           rm -rf "$ANDROID_HOME/cmdline-tools"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
-      # Cache the Emulator, if the cache does not hit, create the emulator
+      # Cache the Emulator, if the cache does not hit, create the emulator. "booted" marks snapshots
+      # taken once the emulator finished booting; the earlier ones were taken at sys.boot_completed.
       - name: AVD cache
         uses: actions/cache@v4
         id: avd-cache
@@ -169,7 +170,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores
+          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores-booted
 
       # The AVD cache holds the AVD and its snapshot, not the system image it boots, which lives in the
       # SDK. Without this cache, both emulator steps download the image again (about a minute); with
@@ -180,6 +181,8 @@ jobs:
           path: ${{ env.ANDROID_HOME }}/system-images/android-${{ env.AVD_API_LEVEL }}/${{ env.AVD_TARGET }}/x86_64
           key: system-image-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-x86_64
 
+      # The snapshot is saved when the script ends, so it waits until the emulator finished booting:
+      # every test run resumes this snapshot, and one saved mid-boot resumes mid-boot.
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2.38.0
@@ -192,7 +195,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
+          script: sh .github/scripts/wait-for-emulator.sh
 
       # Builds the app before the emulator boots, so a build error fails here, on its own.
       - name: Assemble
