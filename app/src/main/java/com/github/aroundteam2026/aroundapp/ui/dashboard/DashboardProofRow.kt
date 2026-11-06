@@ -126,16 +126,22 @@ internal fun DashboardProofRow(
 @Composable
 private fun detailsText(proof: DashboardProof): String {
   val quest = proof.questTitle ?: stringResource(R.string.dashboard_unknown_quest)
-  val party =
-      when {
-        proof.partySize <= 0 -> null
-        proof.partySize == 1 -> stringResource(R.string.dashboard_proof_solo)
-        else ->
-            pluralStringResource(R.plurals.dashboard_party_size, proof.partySize, proof.partySize)
-      }
+  val party = partyLabel(proof.partySize)
   return if (party == null) quest
   else stringResource(R.string.dashboard_proof_quest_and_party, quest, party)
 }
+
+/**
+ * "Party of 4", or "Solo visit" for one explorer; null for a party of 0, as for a proof whose
+ * reservation can't be read.
+ */
+@Composable
+internal fun partyLabel(partySize: Int): String? =
+    when {
+      partySize <= 0 -> null
+      partySize == 1 -> stringResource(R.string.dashboard_proof_solo)
+      else -> pluralStringResource(R.plurals.dashboard_party_size, partySize, partySize)
+    }
 
 /**
  * "Photo · sent 2 min. ago", in the phone's language; "sent just now" under a minute, rather than
@@ -150,21 +156,8 @@ private fun sentText(proof: DashboardProof, now: Long): String {
             ProofType.TEXT -> R.string.dashboard_proof_answer
           }
       )
-  return if (now - proof.sentAt < DateUtils.MINUTE_IN_MILLIS) {
-    stringResource(R.string.dashboard_proof_sent_just_now, kind)
-  } else {
-    stringResource(
-        R.string.dashboard_proof_sent,
-        kind,
-        DateUtils.getRelativeTimeSpanString(
-                proof.sentAt,
-                now,
-                DateUtils.MINUTE_IN_MILLIS,
-                DateUtils.FORMAT_ABBREV_RELATIVE,
-            )
-            .toString(),
-    )
-  }
+  return timeAgo(proof.sentAt, now)?.let { stringResource(R.string.dashboard_proof_sent, kind, it) }
+      ?: stringResource(R.string.dashboard_proof_sent_just_now, kind)
 }
 
 /**

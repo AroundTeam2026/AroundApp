@@ -145,25 +145,25 @@ internal fun rememberNow(requestedAt: Long, clock: Clock): Long =
         .value
 
 /**
- * "Requested 12 min. ago", in the phone's language; "Requested just now" under a minute, rather
- * than "0 min. ago".
+ * How long before [now] [time] was, e.g. "12 min. ago" in the phone's language, or null under a
+ * minute, which reads better as "just now" than "0 min. ago".
  */
+internal fun timeAgo(time: Long, now: Long): String? =
+    if (now - time < DateUtils.MINUTE_IN_MILLIS) null
+    else
+        DateUtils.getRelativeTimeSpanString(
+                time,
+                now,
+                DateUtils.MINUTE_IN_MILLIS,
+                DateUtils.FORMAT_ABBREV_RELATIVE,
+            )
+            .toString()
+
+/** "Requested 12 min. ago", or "Requested just now" under a minute. */
 @Composable
 private fun requestedText(requestedAt: Long, now: Long): String =
-    if (now - requestedAt < DateUtils.MINUTE_IN_MILLIS) {
-      stringResource(R.string.dashboard_requested_just_now)
-    } else {
-      stringResource(
-          R.string.dashboard_requested,
-          DateUtils.getRelativeTimeSpanString(
-                  requestedAt,
-                  now,
-                  DateUtils.MINUTE_IN_MILLIS,
-                  DateUtils.FORMAT_ABBREV_RELATIVE,
-              )
-              .toString(),
-      )
-    }
+    timeAgo(requestedAt, now)?.let { stringResource(R.string.dashboard_requested, it) }
+        ?: stringResource(R.string.dashboard_requested_just_now)
 
 /**
  * The party: the avatars, the explorer who reserved with a "Leader" tag when others come along, and
