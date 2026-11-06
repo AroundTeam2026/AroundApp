@@ -6,6 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
@@ -38,6 +39,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   page can't tell what they accepted and so doesn't book anything.
  * @property approvedIds Ids of the explorer's reservations the venue approved, whose quest they can
  *   now complete.
+ * @property completions The proofs the explorer sent, by reservation id.
+ * @property proofsAvailable False once the explorer's proofs can't be read, since then the page
+ *   can't tell if one was sent and so doesn't offer to send one.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -57,6 +61,8 @@ data class VenuePageUiState(
     val failedCancelIds: Set<String> = emptySet(),
     val acceptAvailable: Boolean = true,
     val approvedIds: Set<String> = emptySet(),
+    val completions: Map<String, Completion> = emptyMap(),
+    val proofsAvailable: Boolean = true,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -87,10 +93,17 @@ data class VenuePageUiState(
 
   /**
    * The reservation whose quest the explorer can complete, for the picked quest: the one they can
-   * cancel, once the venue approved it. Null otherwise.
+   * cancel, once the venue approved it and until they send a proof. Null otherwise, and while the
+   * proofs can't be read.
    */
   val completableReservationId: String?
-    get() = cancellableReservationId?.takeIf { it in approvedIds }
+    get() = cancellableReservationId?.takeIf {
+      it in approvedIds && proofsAvailable && it !in completions
+    }
+
+  /** The proof the explorer sent for the picked quest, or null when there is none. */
+  val proof: Completion?
+    get() = selectedQuestId?.let(reservationIds::get)?.let(completions::get)
 
   /** How cancelling the picked quest's reservation stands; [CancelStatus.NONE] when none is. */
   val cancelStatus: CancelStatus

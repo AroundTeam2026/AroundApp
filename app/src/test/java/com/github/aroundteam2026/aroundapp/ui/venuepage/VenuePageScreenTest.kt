@@ -32,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -440,6 +441,7 @@ class VenuePageScreenTest {
             reservations,
             testUsers("explorer"),
             party,
+            FakeCompletionRepository(),
             "explorer",
         )
     compose.setContent {
