@@ -205,11 +205,13 @@ jobs:
       - name: Wait for the Firebase emulators
         run: npx wait-on -t 120000 tcp:9099 tcp:8080 tcp:9199 || { cat firebase-emulators.log; exit 1; }
 
-      # Run this shard of the connected (instrumented) tests on the emulator. When they fail, print
-      # the device's crash log and its process deaths before the emulator shuts down: Gradle can't
-      # fetch the logcat of a test whose process crashed, so this is the only trace of why. The log
-      # is cleared first, so it only holds this run, not the snapshot's boot. The action runs the
-      # script one line at a time, so the Gradle command stays on one line.
+      # Run this shard of the connected (instrumented) tests on the emulator, once it has finished
+      # booting: the action only waits for sys.boot_completed, minutes before the storage is ready
+      # (see the script). When they fail, print the device's crash log and its process deaths
+      # before the emulator shuts down: Gradle can't fetch the logcat of a test whose process
+      # crashed, so this is the only trace of why. The log is cleared first, so it only holds this
+      # run, not the snapshot's boot. The action runs the script one line at a time, so the Gradle
+      # command stays on one line.
       - name: Run instrumented tests
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
@@ -225,6 +227,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            sh .github/scripts/wait-for-emulator.sh
             adb logcat -c
             ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { adb logcat -d -b crash; adb logcat -d -b system | grep -E 'has died|Killing|lmkd|ANR in'; exit 1; }
 
