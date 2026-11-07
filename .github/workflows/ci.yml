@@ -181,8 +181,8 @@ jobs:
           path: ${{ env.ANDROID_HOME }}/system-images/android-${{ env.AVD_API_LEVEL }}/${{ env.AVD_TARGET }}/x86_64
           key: system-image-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-x86_64
 
-      # The snapshot is saved when the script ends, so it settles the emulator first: every test run
-      # resumes this snapshot, and one saved mid-boot resumes mid-boot.
+      # The snapshot is saved when the script ends, so it waits until the emulator finished booting:
+      # every test run resumes this snapshot, and one saved mid-boot resumes mid-boot.
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2.38.0
