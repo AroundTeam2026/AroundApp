@@ -23,13 +23,18 @@ import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.resources.C
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Tests the banner that says the venues failed to load, and its "Try again" button. */
+/**
+ * Tests the banner that says the quests or their venues failed to load, and its "Try again" button.
+ */
 @RunWith(AndroidJUnit4::class)
 class MapScreenVenuesErrorTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
@@ -39,11 +44,12 @@ class MapScreenVenuesErrorTest {
       testVenue(id = "cafe", name = "Café Lumen", location = Location(46.5220, 6.6330))
   private val quests =
       MutableStateFlow<List<Quest>>(listOf(testQuest(id = "cafe-1", venueId = "cafe")))
+  private val questRepository = ScriptedQuestRepository.of(quests)
   private val venueRepository = FlakyVenueRepository(listOf(cafe))
   private val viewModel by lazy {
     MapViewModel(
         FakeLocationRepository(cafe.location),
-        ScriptedQuestRepository.of(quests),
+        questRepository,
         venueRepository,
     )
   }
@@ -83,7 +89,7 @@ class MapScreenVenuesErrorTest {
     composeTestRule.waitForIdle()
 
     node(C.Tag.VENUES_ERROR_BANNER).assertDoesNotExist()
-    assertFalse(viewModel.uiState.value.venuesFailed)
+    assertFalse(viewModel.uiState.value.loadFailed)
   }
 
   @Test
@@ -96,6 +102,22 @@ class MapScreenVenuesErrorTest {
     composeTestRule.waitForIdle()
 
     node(C.Tag.VENUES_TRY_AGAIN).assertIsNotEnabled()
+  }
+
+  @Test
+  fun tryAgainLoadsTheQuestsThatFailedAndHidesTheBanner() {
+    // The banner says "Couldn't load quests", which fits a failure of the quests themselves
+    questRepository.activeQuests = flow { throw IOException("offline") }
+    show()
+    node(C.Tag.VENUES_ERROR_BANNER).assertIsDisplayed()
+
+    questRepository.activeQuests = quests
+    node(C.Tag.VENUES_TRY_AGAIN).performClick()
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.VENUES_ERROR_BANNER).assertDoesNotExist()
+    assertFalse(viewModel.uiState.value.loadFailed)
+    assertEquals(2, questRepository.activeQuestsCollections)
   }
 
   @Test

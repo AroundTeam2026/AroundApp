@@ -9,11 +9,11 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 
 /**
- * Says the venues failed to load, so the map has no pins although there may be quests around, with
- * a "Try again" button, as in Figma (frame 4484:9165).
+ * Says the quests or their venues failed to load, so the map has no pins although there may be
+ * quests around, with a "Try again" button, as in Figma (frame 4484:9165).
  *
- * @param onTryAgain Called when the explorer taps "Try again"; see [MapViewModel.onRetryVenues].
- * @param retrying Whether a retry waits for the venues, so "Try again" can't be tapped yet.
+ * @param onTryAgain Called when the explorer taps "Try again"; see [MapViewModel.onRetry].
+ * @param retrying Whether a retry waits for its answer, so "Try again" can't be tapped yet.
  */
 @Composable
 fun VenuesErrorBanner(onTryAgain: () -> Unit, retrying: Boolean, modifier: Modifier = Modifier) {
