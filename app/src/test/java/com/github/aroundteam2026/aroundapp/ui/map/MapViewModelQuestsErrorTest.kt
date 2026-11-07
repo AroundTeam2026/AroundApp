@@ -12,9 +12,11 @@ import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
@@ -81,6 +83,22 @@ class MapViewModelQuestsErrorTest {
   }
 
   @Test
+  fun questsThatFailAfterLoadingShowAnErrorAndNoPins() = test {
+    // A listener dropped while the pins show, as when the rules start refusing it
+    val answers = Channel<List<Quest>>(Channel.UNLIMITED)
+    questRepository.activeQuests = answers.receiveAsFlow()
+    answers.trySend(listOf(testQuest(id = "cafe-1", venueId = "cafe")))
+    showing()
+    assertEquals(listOf("cafe"), state.pins.map { it.venueId })
+
+    answers.close(IOException("dropped"))
+    runCurrent()
+
+    assertTrue(state.loadFailed)
+    assertEquals(emptyList<VenuePin>(), state.pins)
+  }
+
+  @Test
   fun tryingAgainLoadsTheQuestsAndClearsTheError() = test {
     showing()
 
@@ -122,6 +140,25 @@ class MapViewModelQuestsErrorTest {
     retry()
     retry()
 
+    assertEquals(2, questRepository.activeQuestsCollections)
+  }
+
+  @Test
+  fun venuesThatFailOnceTheQuestsRecoverShowTheErrorAgain() = test {
+    showing()
+
+    // The quests load, then their venues fail: the next retry is the venues'
+    questRepository.activeQuests = loaded
+    venueRepository.failing = true
+    retry()
+    assertTrue(state.loadFailed)
+    assertFalse(state.retrying)
+
+    venueRepository.failing = false
+    retry()
+
+    assertFalse(state.loadFailed)
+    assertEquals(listOf("cafe"), state.pins.map { it.venueId })
     assertEquals(2, questRepository.activeQuestsCollections)
   }
 

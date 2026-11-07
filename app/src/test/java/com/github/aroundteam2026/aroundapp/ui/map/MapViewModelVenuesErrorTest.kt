@@ -157,6 +157,24 @@ class MapViewModelVenuesErrorTest {
   }
 
   @Test
+  fun aQuestUpdateDoesNotEndAVenuesRetry() = test {
+    // The quests answer too while the venues are retried, with the same venues
+    venueRepository.failing = true
+    showing()
+
+    venueRepository.answering = false
+    viewModel.onRetry()
+    runCurrent()
+    quests.value = quests.value + testQuest(id = "cafe-2", venueId = "cafe")
+    runCurrent()
+    viewModel.onRetry()
+    runCurrent()
+
+    assertTrue(state.retrying)
+    assertEquals(2, venueRepository.requests)
+  }
+
+  @Test
   fun tryingAgainWithoutAFailureDoesNotListenAgain() = test {
     // Each new listener costs Firestore reads
     showing()
