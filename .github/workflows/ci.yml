@@ -161,8 +161,8 @@ jobs:
           rm -rf "$ANDROID_HOME/cmdline-tools"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
-      # Cache the Emulator, if the cache does not hit, create the emulator. "booted" marks snapshots
-      # taken once the emulator finished booting; the earlier ones were taken at sys.boot_completed.
+      # Cache the Emulator, if the cache does not hit, create the emulator. "settled" marks snapshots
+      # taken by settle-emulator.sh; the earlier ones were taken at sys.boot_completed.
       - name: AVD cache
         uses: actions/cache@v4
         id: avd-cache
@@ -170,7 +170,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores-booted
+          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores-settled
 
       # The AVD cache holds the AVD and its snapshot, not the system image it boots, which lives in the
       # SDK. Without this cache, both emulator steps download the image again (about a minute); with
@@ -181,8 +181,8 @@ jobs:
           path: ${{ env.ANDROID_HOME }}/system-images/android-${{ env.AVD_API_LEVEL }}/${{ env.AVD_TARGET }}/x86_64
           key: system-image-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-x86_64
 
-      # The snapshot is saved when the script ends, so it waits until the emulator finished booting:
-      # every test run resumes this snapshot, and one saved mid-boot resumes mid-boot.
+      # The snapshot is saved when the script ends, so it settles the emulator first: every test run
+      # resumes this snapshot, and one saved mid-boot resumes mid-boot.
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2.38.0
@@ -195,7 +195,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
-          script: sh .github/scripts/wait-for-emulator.sh
+          script: sh .github/scripts/settle-emulator.sh
 
       # Builds the app before the emulator boots, so a build error fails here, on its own.
       - name: Assemble
@@ -208,13 +208,13 @@ jobs:
       - name: Wait for the Firebase emulators
         run: npx wait-on -t 120000 tcp:9099 tcp:8080 tcp:9199 || { cat firebase-emulators.log; exit 1; }
 
-      # Run this shard of the connected (instrumented) tests on the emulator, once it has finished
-      # booting: the action only waits for sys.boot_completed, minutes before the storage is ready
-      # (see the script). When they fail, print the device's crash log and its process deaths
-      # before the emulator shuts down: Gradle can't fetch the logcat of a test whose process
-      # crashed, so this is the only trace of why. The log is cleared first, so it only holds this
-      # run, not the snapshot's boot. The action runs the script one line at a time, so the Gradle
-      # command stays on one line.
+      # Run this shard of the connected (instrumented) tests on the emulator, once settled: the
+      # action only waits for sys.boot_completed (see the script). When they fail, print the
+      # device's crash log and its process deaths, low-memory kills included, before the emulator
+      # shuts down: Gradle can't fetch the logcat of a test whose process crashed or was killed, so
+      # this is the only trace of why. The log is cleared first, so it only holds this run, not the
+      # snapshot's boot. The action runs the script one line at a time, so the Gradle command stays
+      # on one line.
       - name: Run instrumented tests
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
@@ -230,9 +230,9 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            sh .github/scripts/wait-for-emulator.sh
+            sh .github/scripts/settle-emulator.sh
             adb logcat -c
-            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { adb logcat -d -b crash; adb logcat -d -b system | grep -E 'has died|Killing|lmkd|ANR in'; exit 1; }
+            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { adb logcat -d -b crash; adb logcat -d -b main -b system | grep -E 'has died|Killing|lowmemorykiller|ANR in'; exit 1; }
 
       # When the instrumented tests fail, show what the Maps SDK saw. Google rejects a build whose key
       # or signing certificate isn't registered, and the map then never moves: the device log names
