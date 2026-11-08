@@ -70,6 +70,9 @@ jobs:
   instrumented:
     name: Instrumented tests (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
+    # A shard takes 5 to 7 minutes, and at worst about 35 with a new snapshot and both settle steps
+    # waiting their full 10 minutes. Without a limit, a hang runs to GitHub's 6 hours.
+    timeout-minutes: 40
 
     # One job per shard. AndroidJUnitRunner gives each test to one shard by a hash of its name, so
     # the shards hold about as many tests each; the test runner reads how many there are from the
@@ -213,8 +216,9 @@ jobs:
       # device's crash log and its process deaths, low-memory kills included, before the emulator
       # shuts down: Gradle can't fetch the logcat of a test whose process crashed or was killed, so
       # this is the only trace of why. The log is cleared first, so it only holds this run, not the
-      # snapshot's boot. The action runs the script one line at a time, so the Gradle command stays
-      # on one line.
+      # snapshot's boot. Each read gives up after 30 s: when the emulator itself died, adb waits for
+      # it forever. The action runs the script one line at a time, so the Gradle command stays on
+      # one line.
       - name: Run instrumented tests
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
@@ -232,7 +236,7 @@ jobs:
           script: |
             sh .github/scripts/settle-emulator.sh
             adb logcat -c
-            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { adb logcat -d -b crash; adb logcat -d -b main -b system | grep -E 'has died|Killing|lowmemorykiller|ANR in'; exit 1; }
+            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { timeout 30 adb logcat -d -b crash; timeout 30 adb logcat -d -b main -b system | grep -E 'has died|Killing|lowmemorykiller|ANR in'; exit 1; }
 
       # When the instrumented tests fail, show what the Maps SDK saw. Google rejects a build whose key
       # or signing certificate isn't registered, and the map then never moves: the device log names
@@ -281,10 +285,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fail when a job this depends on failed
-        if: ${{ contains(needs.*.result, 'failure') }}
+      # A job that ran out of time ends cancelled, not failed, while the run itself goes on
+      - name: Fail when a job this depends on failed or timed out
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo "::error::A job this report depends on failed; see the checks and instrumented jobs."
+          echo "::error::A job this report depends on failed or timed out; see the checks and instrumented jobs."
           exit 1
 
       - name: Checkout
