@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import androidx.activity.ComponentActivity
@@ -133,6 +134,24 @@ class CompletionDestinationTest {
 
     node(RESERVATION).assertTextEquals(APPROVED_RESERVATION_ID)
     node(VENUE).assertTextEquals(testVenue().name)
+  }
+
+  @Test
+  fun submitProofOnTheVenuePageOpensItsReservationAndReturnsToThePage() {
+    val quest = testQuest()
+    launch(approvedQuestId = quest.id)
+    open { navigateToVenuePage("venue-1") }
+
+    node(C.Tag.VENUE_QUEST_ROW).performClick()
+    node(C.Tag.SUBMIT_PROOF_BUTTON).performClick()
+    compose.waitForIdle()
+
+    node(RESERVATION).assertTextEquals(APPROVED_RESERVATION_ID)
+    node(VENUE).assertTextEquals(testVenue().name)
+    node(CLOSE).performClick()
+    compose.waitForIdle()
+    node(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    node(C.Tag.QUEST_DETAIL_SCREEN).assertDoesNotExist()
   }
 
   // "complete_quest/" matches no route: opening it would crash the app
