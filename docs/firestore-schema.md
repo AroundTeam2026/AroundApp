@@ -18,6 +18,7 @@ This doc describes what the code on `main` does. A change to a collection update
 | Field | Type | Notes |
 |---|---|---|
 | `displayName` | string | |
+| `pictureUrl` | string? | Cloud Storage location (`gs://...`) under `user-pictures/{uid}/`; omitted until set. |
 | `role` | `EXPLORER` or `VENUE`, null until chosen | Write-once: once set it cannot change. |
 | `createdAt` | timestamp | |
 
@@ -151,6 +152,7 @@ From `storage.rules`. Anything not listed is denied, including listing, overwrit
 | Path | Read | Write |
 |---|---|---|
 | `proofs/{reservationId}/{photoId}` | The reservation's party's `JOINED` members and its venue | A `JOINED` member of the reservation creates it while the reservation is `APPROVED`: an image (`image/*`) under 5 MB. Each photo gets a new `photoId`, so a retake never replaces an earlier one. |
+| `user-pictures/{uid}/{photoId}` | Signed-in users | Only `uid` creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
 
 The rules read the reservation and the membership from Firestore, so a proof follows the same party as `reservations`. A completion's `photoUrl` points to its photo here.
 

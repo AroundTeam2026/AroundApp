@@ -40,8 +40,9 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['displayName', 'createdAt'])
-          && data.keys().hasOnly(['displayName', 'role', 'createdAt'])
+          && data.keys().hasOnly(['displayName', 'pictureUrl', 'role', 'createdAt'])
           && data.displayName is string
+          && isOptionalText(data, 'pictureUrl', 2000)
           && data.get('role', null) in [null, 'EXPLORER', 'VENUE']
           && data.createdAt is timestamp;
     }
@@ -280,6 +281,7 @@ service cloud.firestore {
       allow create: if isUser(uid) && isValidUser(request.resource.data);
       allow update: if isUser(uid)
           && isValidUser(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
           && (resource.data.get('role', null) == null
               || request.resource.data.get('role', null) == resource.data.role);
     }

@@ -72,6 +72,29 @@ class FirestoreRulesTest {
   }
 
   @Test
+  fun profileOwnerEditsNameAndPictureWithoutChangingTheRoleOrCreatedAt() {
+    val alice = newUser()
+    val bob = newUser()
+    signInAs(alice)
+    assertSucceeds(user(alice).set(profile(role = "EXPLORER")))
+
+    assertSucceeds(
+        user(alice)
+            .update(
+                "displayName",
+                "Grace",
+                "pictureUrl",
+                "gs://bucket/user-pictures/${alice.uid}/1",
+            )
+    )
+    assertDenied(user(alice).update("role", "VENUE"))
+    assertDenied(user(alice).update("pictureUrl", 42))
+    assertDenied(user(alice).update("createdAt", Timestamp.now()))
+    assertDenied(user(bob).update("displayName", "Other"))
+    assertEquals("Grace", assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"))
+  }
+
+  @Test
   fun roleMustBeExplorerOrVenue() {
     val alice = newUser()
     signInAs(alice)

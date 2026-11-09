@@ -9,10 +9,12 @@ package com.github.aroundteam2026.aroundapp.model.user
  * It holds no email: Firebase Auth already has it, and only the owner can read this profile.
  *
  * @property createdAt the profile creation time in epoch milliseconds.
+ * @property pictureUrl the Cloud Storage location of the profile picture, or null when unset.
  */
 data class User(
     val uid: String,
     val displayName: String,
     val role: Role?,
     val createdAt: Long,
+    val pictureUrl: String? = null,
 )

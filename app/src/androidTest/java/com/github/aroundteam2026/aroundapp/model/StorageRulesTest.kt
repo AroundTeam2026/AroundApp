@@ -33,6 +33,39 @@ import org.junit.runner.RunWith
 class StorageRulesTest {
 
   @Test
+  fun onlyTheOwnerUploadsAUserPictureAndSignedInUsersCanReadIt() {
+    val owner = newAccount()
+    val other = newAccount()
+    val path = "user-pictures/${owner.uid}/${UUID.randomUUID()}"
+    val signedOut = emulatorStorage("storage-${UUID.randomUUID()}")
+
+    assertDenied(other.upload(path), "another user uploading a profile picture")
+    assertDenied(signedOut.upload(path), "a signed-out profile picture upload")
+    assertSucceeds(owner.upload(path))
+    assertSucceeds(other.read(path))
+    assertDenied(signedOut.read(path), "a signed-out profile picture read")
+  }
+
+  @Test
+  fun userPicturesCannotBeOverwrittenDeletedOrUploadedAsNonImages() {
+    val owner = newAccount()
+    val path = "user-pictures/${owner.uid}/${UUID.randomUUID()}"
+    assertDenied(owner.upload(path, contentType = "application/pdf"), "a non-image profile picture")
+    assertDenied(
+        owner.upload(path, bytes = ByteArray(MAX_PHOTO_BYTES)),
+        "an oversized profile picture",
+    )
+    assertSucceeds(owner.upload(path))
+
+    assertDenied(owner.upload(path), "overwriting a profile picture")
+    assertDenied(owner.storage.reference.child(path).delete(), "deleting a profile picture")
+    assertDenied(
+        owner.storage.reference.child("user-pictures/${owner.uid}").listAll(),
+        "listing profile pictures",
+    )
+  }
+
+  @Test
   fun aJoinedExplorerUploadsAProofThatTheirPartyAndTheVenueRead() {
     val venue = newAccount()
     val explorer = newAccount()

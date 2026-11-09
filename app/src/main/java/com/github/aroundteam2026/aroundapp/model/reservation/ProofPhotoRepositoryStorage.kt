@@ -40,6 +40,7 @@ class ProofPhotoRepositoryStorage(
     private val storage: FirebaseStorage = Firebase.storage,
     private val transferTimeoutMs: Long = TRANSFER_TIMEOUT_MS,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val folder: String = PROOFS,
 ) : ProofPhotoRepository {
   private val contentResolver = context.applicationContext.contentResolver
 
@@ -59,7 +60,7 @@ class ProofPhotoRepositoryStorage(
         }
         // The rules require an image/ content type; some camera files have none
         val type = contentResolver.getType(photo) ?: DEFAULT_CONTENT_TYPE
-        val reference = storage.reference.child("$PROOFS/$reservationId/${UUID.randomUUID()}")
+        val reference = storage.reference.child("$folder/$reservationId/${UUID.randomUUID()}")
         val task = reference.putBytes(bytes, StorageMetadata.Builder().setContentType(type).build())
         try {
           withTimeoutOrNull(transferTimeoutMs) { task.await() }

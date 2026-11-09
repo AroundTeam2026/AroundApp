@@ -69,11 +69,37 @@ class UserRepositoryFirestoreTest {
    */
   @Test
   fun createUser_thenGetUser_roundTripsEveryField() = withTimeoutBlocking {
-    val user = user().copy(role = Role.VENUE)
+    val user = user().copy(role = Role.VENUE, pictureUrl = "gs://bucket/user-pictures/$uid/1")
 
     repository.createUser(user).getOrThrow()
 
     assertEquals(user, repository.getUser(uid))
+  }
+
+  /** Bug: editing a profile replaces its role or timestamp, or cannot clear its old picture. */
+  @Test
+  fun updateProfile_changesOnlyEditableFields() = withTimeoutBlocking {
+    val original = user().copy(role = Role.EXPLORER)
+    repository.createUser(original).getOrThrow()
+
+    repository.updateProfile(uid, "Grace", "gs://bucket/user-pictures/$uid/1").getOrThrow()
+    assertEquals(
+        original.copy(displayName = "Grace", pictureUrl = "gs://bucket/user-pictures/$uid/1"),
+        repository.getUser(uid),
+    )
+
+    repository.updateProfile(uid, "Grace", null).getOrThrow()
+    assertEquals(original.copy(displayName = "Grace"), repository.getUser(uid))
+    assertFalse("pictureUrl" in storedProfile().data!!)
+  }
+
+  /** Bug: an edit to a missing profile creates a partial user document. */
+  @Test
+  fun updateProfile_missingUserFailsWithoutCreatingIt() = withTimeoutBlocking {
+    val result = repository.updateProfile(uid, "Grace", null)
+
+    assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    assertFalse(storedProfile().exists())
   }
 
   /**
