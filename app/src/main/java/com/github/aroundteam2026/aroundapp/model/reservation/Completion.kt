@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -51,7 +52,7 @@ sealed interface Proof {
    * @property location The photo's Cloud Storage location (`gs://...`), as returned by
    *   [ProofPhotoRepository.upload]. It is not a download URL, so an image loader can't open it:
    *   read the photo with [ProofPhotoRepository.download].
-   * @throws IllegalArgumentException if [location] is blank.
+   * @throws IllegalArgumentException if [location] is blank or exceeds [MAX_PHOTO_LOCATION_LENGTH].
    */
   data class Photo(val location: String) : Proof {
     override val type: ProofType
@@ -59,6 +60,9 @@ sealed interface Proof {
 
     init {
       require(location.isNotBlank()) { "A photo proof needs the photo's location" }
+      require(location.length <= MAX_PHOTO_LOCATION_LENGTH) {
+        "A photo location must be at most $MAX_PHOTO_LOCATION_LENGTH characters"
+      }
     }
   }
 
@@ -66,7 +70,7 @@ sealed interface Proof {
    * A written answer.
    *
    * @property answer What the explorer wrote.
-   * @throws IllegalArgumentException if [answer] is blank.
+   * @throws IllegalArgumentException if [answer] is blank or exceeds [MAX_TEXT_ANSWER_LENGTH].
    */
   data class Text(val answer: String) : Proof {
     override val type: ProofType
@@ -74,6 +78,9 @@ sealed interface Proof {
 
     init {
       require(answer.isNotBlank()) { "A text proof needs an answer" }
+      require(answer.length <= MAX_TEXT_ANSWER_LENGTH) {
+        "A text answer must be at most $MAX_TEXT_ANSWER_LENGTH characters"
+      }
     }
   }
 }
@@ -96,6 +103,12 @@ fun completionId(reservationId: String, explorerUid: String) = "${reservationId}
 
 /** The longest reason a venue can give for rejecting a proof: the security rules refuse longer. */
 const val MAX_REJECT_REASON_LENGTH = 300
+
+/** The longest stored text proof allowed by the security rules. */
+const val MAX_TEXT_ANSWER_LENGTH = 1000
+
+/** The longest stored photo location allowed by the security rules. */
+const val MAX_PHOTO_LOCATION_LENGTH = 2000
 
 /**
  * Whether a completion may change from [from] to [to]: a pending one can be answered, and a venue

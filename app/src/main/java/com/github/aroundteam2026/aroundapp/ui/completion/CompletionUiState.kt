@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 
 /**
@@ -36,12 +37,16 @@ data class CompletionUiState(
         status == CompletionFormStatus.READY &&
             (saveState == SaveState.Idle || saveState == SaveState.Failed)
 
+  /** Whether the answer exceeds the stored-answer limit after trimming, as on submission. */
+  val answerTooLong: Boolean
+    get() = answer.trim().length > MAX_TEXT_ANSWER_LENGTH
+
   /** Whether the proof the quest asks for is filled in and the form can be submitted. */
   val canSubmit: Boolean
     get() =
         isEditable &&
             when (proofType) {
-              ProofType.TEXT -> answer.isNotBlank()
+              ProofType.TEXT -> answer.isNotBlank() && !answerTooLong
               ProofType.PHOTO -> photo != null
               null -> false
             }
