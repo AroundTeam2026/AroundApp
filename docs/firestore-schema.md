@@ -23,7 +23,7 @@ This doc describes what the code on `main` does. A change to a collection update
 | `role` | `EXPLORER` or `VENUE`, null until chosen | Write-once: once set it cannot change. |
 | `createdAt` | timestamp | |
 
-No email: Firebase Auth already has it. Signed-in users can read profiles to display names and pictures; only the owner can write one.
+No email: Firebase Auth already has it. Signed-in users can get a profile by uid to display its name and picture, but cannot list the users collection; only the owner can write a profile.
 
 ### `venues/{ownerUid}`
 
@@ -78,7 +78,7 @@ The party isn't stored here: it is the reservation's memberships in `party_user`
 | `slotStart` | timestamp | Start of the booked slot. On creation it can't be more than 5 minutes in the past, to allow for a phone clock that is behind (enforced by the rules). |
 | `status` | `PENDING`, `APPROVED`, `REJECTED` or `CANCELLED` | Set to `PENDING` by the repository on creation. |
 | `createdAt` | timestamp | Set by the repository. |
-| `explorerName` | string | Display name of the explorer who made the reservation, copied from their `users` profile on creation so the venue sees who reserved (the venue can't read profiles). Must equal that profile's `displayName` (enforced by the rules). Not updated on a rename. Reservations made before this field existed lack it; the app reads them with an empty name. |
+| `explorerName` | string | Display name of the explorer who made the reservation, copied from their `users` profile on creation. Must equal that profile's `displayName` (enforced by the rules). Not updated on a rename. Reservations made before this field existed lack it; the app reads them with an empty name. |
 | `joinedCount` | int | Number of `JOINED` members in `party_user`, so the rules can cap the party at 10: rules can't count documents. 1 on creation, for the creator. Every join adds 1 and every withdrawal takes 1 off, in the same batch as the membership (enforced by the rules). The app shows the party size from the memberships, not from this field. |
 
 ### `party_user/{reservationId}_{uid}`

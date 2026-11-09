@@ -278,10 +278,10 @@ service cloud.firestore {
                   && isFilledText(after.rejectReason, 300)));
     }
 
-    // Signed-in users read names and picture locations; only the owner writes a profile.
+    // Signed-in users get profiles by uid for names and pictures, but cannot list all users.
     // The role is write-once: it can be chosen while null, then never changed.
     match /users/{uid} {
-      allow read: if signedIn();
+      allow get: if signedIn();
       allow create: if isUser(uid) && isValidUser(request.resource.data, uid);
       allow update: if isUser(uid)
           && isValidUser(request.resource.data, uid)

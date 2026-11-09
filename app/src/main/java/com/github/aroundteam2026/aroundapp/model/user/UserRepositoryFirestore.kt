@@ -29,8 +29,8 @@ import kotlinx.coroutines.tasks.await
  * as its enum name, omitted while null. The uid is the document id rather than a stored field.
  * Documents that cannot be mapped back to a [User] are logged and read as missing.
  *
- * Signed-in users can read profiles for names and pictures. Only the owner can write one, and the
- * role, once set, never changes.
+ * Signed-in users can get profiles by uid for names and pictures, but cannot list all users. Only
+ * the owner can write one, and the role, once set, never changes.
  *
  * @param db Firestore client to read from and write to.
  */

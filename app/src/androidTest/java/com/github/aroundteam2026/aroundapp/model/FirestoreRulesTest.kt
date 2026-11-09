@@ -65,6 +65,7 @@ class FirestoreRulesTest {
         DISPLAY_NAME,
         assertSucceeds(user(bob).get(Source.SERVER)).getString("displayName"),
     )
+    assertDenied(db.collection("users").get(Source.SERVER))
   }
 
   @Test
@@ -97,11 +98,14 @@ class FirestoreRulesTest {
     assertDenied(user(alice).update("pictureUrl", 42))
     assertDenied(user(alice).update("pictureUrl", "gs://bucket/user-pictures/${bob.uid}/1"))
     assertDenied(user(alice).update("pictureUrl", "gs://bucket/user-pictures/${alice.uid}/1/extra"))
-    assertDenied(user(alice).update("pictureUrl", "x".repeat(2001)))
-    assertDenied(user(alice).update("displayName", "x".repeat(101)))
+    val picturePrefix = "gs://bucket/user-pictures/${alice.uid}/"
+    assertDenied(
+        user(alice).update("pictureUrl", picturePrefix + "x".repeat(2001 - picturePrefix.length))
+    )
+    assertSucceeds(user(alice).update("displayName", "x".repeat(100)))
     assertDenied(user(alice).update("createdAt", Timestamp.now()))
     assertDenied(user(bob).update("displayName", "Other"))
-    assertEquals("Grace", assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"))
+    assertEquals("x".repeat(100), assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"))
     signOut()
     assertDenied(user(alice).get(Source.SERVER))
   }
