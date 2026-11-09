@@ -79,7 +79,8 @@ android {
 
   buildFeatures { compose = true }
 
-  // Registration page-object steps are exercised by Robolectric and reused by device journeys.
+  // Code both unit and device tests use: the fakes they share, which must stay out of src/main (see
+  // checkNoFakesInMain), and the registration page-object steps device journeys reuse.
   sourceSets {
     getByName("test").kotlin.directories.add("src/testSupport/java")
     getByName("androidTest").kotlin.directories.add("src/testSupport/java")
@@ -253,3 +254,24 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
       },
   )
 }
+
+// A fake in src/main ships in the APK (#418): fakes belong in src/testSupport/java or src/test
+val checkNoFakesInMain =
+    tasks.register("checkNoFakesInMain") {
+      group = "verification"
+      description = "Fails if app/src/main holds a fake (Fake*.kt), which would ship in the APK."
+      val fakes = fileTree("src/main") { include("**/Fake*.kt") }
+      val root = projectDir
+      inputs.files(fakes)
+      doLast {
+        val found = fakes.files.map { it.relativeTo(root).invariantSeparatorsPath }.sorted()
+        if (found.isNotEmpty()) {
+          throw GradleException(
+              "Fakes belong in src/testSupport/java (shared with device tests) or src/test, not " +
+                  "in src/main, where they ship in the APK: ${found.joinToString()}"
+          )
+        }
+      }
+    }
+
+tasks.named("check") { dependsOn(checkNoFakesInMain) }

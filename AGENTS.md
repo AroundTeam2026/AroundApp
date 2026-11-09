@@ -18,6 +18,7 @@ A Kotlin/Android Exploration/Social app (`com.github.aroundteam2026.aroundapp`),
 
 - The feature works and matches its acceptance criteria (the acceptance criteria of the user story).
 - **All new code comes with unit tests.**
+  - A fake goes next to the tests that use it: in `app/src/testSupport/java` if device tests (`androidTest`) use it too, since both test source sets compile that folder, or in `app/src/test` if only unit tests do. Never in `app/src/main`, where it would ship in the APK: `./gradlew check` fails if one is there.
 - `./gradlew check` is green (unit tests + lint) and `./gradlew ktfmtCheck` passes (formatting) before you submit.
 - Features covered by instrumented tests (under `androidTest/`, e.g. the Firestore repository) must also pass `./gradlew connectedDebugAndroidTest`, with an Android emulator and the Firebase emulator running.
   - Start the Firebase emulators from the repository root with `firebase emulators:start`; it loads `firestore.rules`. Tests that use Firebase call `FirebaseEmulator.connect()` (in `androidTest/.../testing/`) in their setup, never the real project.
