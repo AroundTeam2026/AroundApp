@@ -79,8 +79,8 @@ android {
 
   buildFeatures { compose = true }
 
-  // Code both unit and device tests use: the fakes they share, which must stay out of src/main (see
-  // checkNoFakesInMain), and the registration page-object steps device journeys reuse.
+  // Code both unit and device tests use: the fakes they share, which must stay out of what ships
+  // (see checkNoFakesInMain), and the registration page-object steps device journeys reuse.
   sourceSets {
     getByName("test").kotlin.directories.add("src/testSupport/java")
     getByName("androidTest").kotlin.directories.add("src/testSupport/java")
@@ -255,12 +255,19 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
   )
 }
 
-// A fake in src/main ships in the APK (#418): fakes belong in src/testSupport/java or src/test
+// A fake in a source set that ships ends up in the APK (#418): fakes belong in src/testSupport/java
+// or src/test
 val checkNoFakesInMain =
     tasks.register("checkNoFakesInMain") {
       group = "verification"
-      description = "Fails if app/src/main holds a fake (Fake*.kt), which would ship in the APK."
-      val fakes = fileTree("src/main") { include("**/Fake*.kt") }
+      description =
+          "Fails if a source set that ships holds a fake (Fake*.kt), as it would be in the APK."
+      // Every source set but the tests': main, and debug, as the released APK is a debug build
+      val fakes =
+          fileTree("src") {
+            include("**/Fake*.kt")
+            exclude("test*/**", "androidTest*/**")
+          }
       val root = projectDir
       inputs.files(fakes)
       doLast {
@@ -268,7 +275,8 @@ val checkNoFakesInMain =
         if (found.isNotEmpty()) {
           throw GradleException(
               "Fakes belong in src/testSupport/java (shared with device tests) or src/test, not " +
-                  "in src/main, where they ship in the APK: ${found.joinToString()}"
+                  "in a source set that ships, such as src/main or src/debug: " +
+                  found.joinToString()
           )
         }
       }
