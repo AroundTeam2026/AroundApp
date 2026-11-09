@@ -293,7 +293,7 @@ service cloud.firestore {
       allow delete: if isUser(ownerUid) && hasRole('VENUE');
     }
 
-    // venueId is the owning venue's uid and can't be reassigned.
+    // venueId is the owning venue's uid and can't be reassigned; createdAt can't change either.
     match /quests/{questId} {
       allow read: if signedIn();
       allow create: if isUser(request.resource.data.venueId)
@@ -301,6 +301,7 @@ service cloud.firestore {
           && isValidQuest(request.resource.data);
       allow update: if isUser(resource.data.venueId)
           && request.resource.data.venueId == resource.data.venueId
+          && request.resource.data.createdAt == resource.data.createdAt
           && hasRole('VENUE')
           && isValidQuest(request.resource.data);
       allow delete: if isUser(resource.data.venueId) && hasRole('VENUE');

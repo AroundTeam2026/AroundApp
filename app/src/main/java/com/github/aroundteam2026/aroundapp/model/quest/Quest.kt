@@ -5,7 +5,7 @@ package com.github.aroundteam2026.aroundapp.model.quest
  * A quest offered by a venue, which explorers complete by visiting it and submitting proof.
  *
  * The repository assigns [Quest.id], [Quest.createdAt] and [Quest.updatedAt]; any values the caller
- * sets for them are overwritten.
+ * sets for them are overwritten. An update also keeps the stored [Quest.venueId].
  *
  * @property venueId Id of the owning venue, equal to the venue owner's uid.
  * @property radiusMeters Distance from the venue's location within which a visit counts, between
@@ -23,7 +23,7 @@ package com.github.aroundteam2026.aroundapp.model.quest
  * @property status Lifecycle state; only [QuestStatus.ACTIVE] quests are visible to explorers.
  * @property createdAt Creation time, in epoch milliseconds. Set by [QuestRepository.createQuest].
  * @property updatedAt Last modification time, in epoch milliseconds. Set by
- *   [QuestRepository.createQuest].
+ *   [QuestRepository.createQuest] and [QuestRepository.updateQuest].
  */
 data class Quest(
     val id: String,

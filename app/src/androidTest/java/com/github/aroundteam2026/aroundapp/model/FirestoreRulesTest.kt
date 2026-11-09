@@ -199,9 +199,39 @@ class FirestoreRulesTest {
     assertDenied(quest.update("title", "x".repeat(61)), "an update that breaks the schema")
     assertDenied(quest.update("venueId", other.uid))
 
+    // Another venue's update is checked by
+    // onlyTheOwningVenueUpdatesAWholeQuestAndKeepsItsCreationTime
     signInAs(other)
-    assertDenied(quest.update("title", "Hijacked"))
     assertDenied(quest.delete())
+  }
+
+  @Test
+  fun onlyTheOwningVenueUpdatesAWholeQuestAndKeepsItsCreationTime() {
+    val venue = newUser(Role.VENUE)
+    val other = newUser(Role.VENUE)
+    signInAs(venue)
+    val quest = newQuest()
+    assertSucceeds(quest.set(questData(venue)))
+    // What QuestRepositoryFirestore.updateQuest sends: every editable field and updatedAt
+    val edit =
+        mapOf(
+            "radiusMeters" to 80,
+            "title" to "Find the hidden fox",
+            "description" to "A fox hides somewhere in the café.",
+            "requirements" to "Describe it.",
+            "proofType" to "TEXT",
+            "minPartySize" to 2,
+            "exactPartySize" to true,
+            "status" to "ARCHIVED",
+            "reward" to FieldValue.delete(),
+            "updatedAt" to Timestamp.now(),
+        )
+
+    assertSucceeds(quest.update(edit))
+    assertDenied(quest.update(edit + ("createdAt" to Timestamp.now())), "a changed createdAt")
+
+    signInAs(other)
+    assertDenied(quest.update(edit), "another venue")
   }
 
   @Test
