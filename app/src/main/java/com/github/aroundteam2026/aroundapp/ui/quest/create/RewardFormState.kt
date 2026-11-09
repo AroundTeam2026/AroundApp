@@ -5,6 +5,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -176,6 +177,41 @@ data class RewardFormState(
           )
       RewardType.FREE_ITEM -> Reward.FreeItem(itemName.trim(), details, expiresAt)
       RewardType.OTHER -> Reward.Other(description.trim(), expiresAt)
+    }
+  }
+
+  companion object {
+    /**
+     * The form showing [reward], the reverse of [toReward]: its expiry is the last day it can be
+     * used in [zone], and [expiryInPast] is set if that day is before [today]. No reward gives the
+     * empty form.
+     */
+    fun fromReward(reward: Reward?, zone: ZoneId, today: LocalDate): RewardFormState {
+      // toReward expires at the midnight that ends the expiry date
+      val expiry =
+          reward?.expiresAt?.let {
+            Instant.ofEpochMilli(it).atZone(zone).toLocalDate().minusDays(1)
+          }
+      val form =
+          RewardFormState(expiryDate = expiry, expiryInPast = expiry?.isBefore(today) == true)
+      return when (reward) {
+        null -> RewardFormState()
+        is Reward.Discount ->
+            form.copy(
+                type = RewardType.DISCOUNT,
+                // Plain, so 15.0 shows as "15" and never in scientific notation
+                discountAmount = reward.amount.toBigDecimal().stripTrailingZeros().toPlainString(),
+                discountUnit = reward.unit,
+                discountSpecifics = reward.specifics.orEmpty(),
+            )
+        is Reward.FreeItem ->
+            form.copy(
+                type = RewardType.FREE_ITEM,
+                itemName = reward.name,
+                itemSpecifics = reward.specifics.orEmpty(),
+            )
+        is Reward.Other -> form.copy(type = RewardType.OTHER, description = reward.description)
+      }
     }
   }
 }

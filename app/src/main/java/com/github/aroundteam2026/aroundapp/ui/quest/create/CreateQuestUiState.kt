@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.ceil
 
@@ -83,6 +84,10 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
  *   least that many.
  * @property reward The reward explorers get, if any.
  * @property saveState Where saving the quest stands.
+ * @property editing Whether the form edits an existing quest rather than creating one; it then says
+ *   "Edit quest" and "Save changes", and shows saving and failure above its button.
+ * @property questUnavailable Whether the quest being edited couldn't be read or no longer exists,
+ *   so the form has nothing to edit and closes.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -101,7 +106,30 @@ data class CreateQuestUiState(
     val exactPartySize: Boolean = false,
     val reward: RewardFormState = RewardFormState(),
     val saveState: SaveState = SaveState.Idle,
+    val editing: Boolean = false,
+    val questUnavailable: Boolean = false,
 ) {
+  /**
+   * This form filled in with [quest], its fields untouched, so it opens without errors. The reward
+   * expiry is read in [zone], and is flagged if it is before [today].
+   */
+  fun filledWith(quest: Quest, zone: ZoneId, today: LocalDate): CreateQuestUiState {
+    // Clamped like every other radius, so a quest saved under other limits is saved within these
+    val radius =
+        quest.radiusMeters.coerceIn(QuestLimits.MIN_RADIUS_METERS, QuestLimits.MAX_RADIUS_METERS)
+    return copy(
+        title = quest.title,
+        description = quest.description,
+        requirements = quest.requirements,
+        proofType = quest.proofType,
+        radiusMeters = radius,
+        customRadius = !RadiusPreset.isPreset(radius),
+        minPartySize = quest.minPartySize,
+        exactPartySize = quest.exactPartySize,
+        reward = RewardFormState.fromReward(quest.reward, zone, today),
+    )
+  }
+
   /** The preset shown as selected: [radiusMeters] if it is one and not [customRadius], or null. */
   val selectedRadiusPreset: Int?
     get() = radiusMeters.takeIf { !customRadius && RadiusPreset.isPreset(it) }

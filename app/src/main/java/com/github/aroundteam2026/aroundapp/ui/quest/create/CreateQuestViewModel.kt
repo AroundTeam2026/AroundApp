@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
@@ -29,21 +30,26 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the quest form of the signed-in venue.
+ * Holds the quest form of the signed-in venue, to create a quest, or to edit the quest [questId].
  *
  * Values are kept as typed and trimmed on save, so editing never moves the cursor; edits are
  * ignored while saving. The radius starts at the venue's own once loaded, unless already chosen,
  * and is [QuestLimits.DEFAULT_RADIUS_METERS] until then. The venue's location centres the radius
  * map and places the saved quest; if the venue can't be read, the form says so and [retryVenue]
  * reads it again. [clock] rejects a reward expiry that has passed.
+ *
+ * To edit, the form reads the quest and fills itself in with it, keeping its radius over the
+ * venue's. Saving then updates that quest, keeping its id and status. If the quest can't be read or
+ * no longer exists, [CreateQuestUiState.questUnavailable] tells the screen to close.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
     private val venueRepository: VenueRepository,
     private val questRepository: QuestRepository,
     private val clock: Clock = Clock.systemDefaultZone(),
+    private val questId: String? = null,
 ) : ViewModel() {
-  private val mutableUiState = MutableStateFlow(CreateQuestUiState())
+  private val mutableUiState = MutableStateFlow(CreateQuestUiState(editing = questId != null))
   /** The form as the venue has filled it in so far. */
   val uiState: StateFlow<CreateQuestUiState> = mutableUiState.asStateFlow()
 
@@ -53,7 +59,12 @@ class CreateQuestViewModel(
   /** The signed-in venue, once loaded; the saved quest copies its id, name and location. */
   private var venue: Venue? = null
 
+  /** The quest being edited, once read; its id and status are kept when it is saved. */
+  private var editedQuest: Quest? = null
+
   init {
+    // In parallel: the quest's radius wins whichever comes first, as it sets radiusChosen
+    if (questId != null) viewModelScope.launch { loadQuest(questId) }
     viewModelScope.launch { loadVenue() }
   }
 
@@ -146,25 +157,30 @@ class CreateQuestViewModel(
   }
 
   /**
-   * Saves the form as a new active quest of the venue, if it [CreateQuestUiState.canSave]. A reward
-   * expiry that has passed since it was picked shows its error instead. The form keeps its values
-   * whether the save succeeds or fails.
+   * Saves the form as a new active quest of the venue, or over the quest being edited, if it
+   * [CreateQuestUiState.canSave]. A reward expiry that has passed since it was picked shows its
+   * error instead. The form keeps its values whether the save succeeds or fails.
    */
   fun submit() {
     val form = mutableUiState.value
     val venue = venue
-    if (!form.canSave || venue == null) return
+    val edited = editedQuest
+    if (!form.canSave || venue == null || (form.editing && edited == null)) return
     if (form.reward.type != null && isPast(form.reward.expiryDate)) {
       updateReward { it.copy(expiryInPast = true) }
       return
     }
     // Built outside the try, so a quest that can't be built is a bug, not a failed save
-    val quest = form.toQuest(venue, clock.zone)
+    val quest =
+        form.toQuest(venue, clock.zone).let {
+          if (edited == null) it else it.copy(id = edited.id, status = edited.status)
+        }
     mutableUiState.update { it.copy(saveState = SaveState.Saving) }
     viewModelScope.launch {
       val result =
           try {
-            questRepository.createQuest(quest)
+            if (edited == null) questRepository.createQuest(quest)
+            else questRepository.updateQuest(quest).map { edited.id }
           } catch (cancelled: CancellationException) {
             throw cancelled
           } catch (e: Exception) {
@@ -193,6 +209,29 @@ class CreateQuestViewModel(
     viewModelScope.launch { loadVenue() }
   }
 
+  /**
+   * Reads the quest [id] and fills the form in with it, or flags it as unavailable if it can't be
+   * read or doesn't exist.
+   */
+  private suspend fun loadQuest(id: String) {
+    val quest =
+        try {
+          questRepository.getQuest(id)
+        } catch (cancelled: CancellationException) {
+          throw cancelled
+        } catch (e: Exception) {
+          Log.w(TAG, "Reading quest $id failed", e)
+          null
+        }
+    if (quest == null) {
+      mutableUiState.update { it.copy(questUnavailable = true) }
+      return
+    }
+    editedQuest = quest
+    radiusChosen = true
+    mutableUiState.update { it.filledWith(quest, clock.zone, LocalDate.now(clock)) }
+  }
+
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
 
   private fun updateReward(transform: (RewardFormState) -> RewardFormState) {
@@ -201,9 +240,11 @@ class CreateQuestViewModel(
 
   /**
    * Applies [transform] to the form, unless it is being saved: the quest being saved is the one
-   * submitted, so later edits would be lost.
+   * submitted, so later edits would be lost. Edits are also ignored until the quest to edit is
+   * read, as its values would then overwrite them.
    */
   private fun edit(transform: (CreateQuestUiState) -> CreateQuestUiState) {
+    if (questId != null && editedQuest == null) return
     mutableUiState.update { if (it.saveState == SaveState.Saving) it else transform(it) }
   }
 
@@ -246,13 +287,17 @@ class CreateQuestViewModel(
   companion object {
     private const val TAG = "CreateQuestViewModel"
 
-    /** Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories. */
-    fun factory(): ViewModelProvider.Factory = viewModelFactory {
+    /**
+     * Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories, to edit
+     * the quest [questId], or to create one if it is null.
+     */
+    fun factory(questId: String? = null): ViewModelProvider.Factory = viewModelFactory {
       initializer {
         CreateQuestViewModel(
             AuthRepositoryProvider.repository,
             VenueRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
+            questId = questId,
         )
       }
     }
