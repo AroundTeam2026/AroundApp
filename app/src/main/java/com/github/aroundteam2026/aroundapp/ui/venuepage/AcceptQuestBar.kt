@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.animation.core.RepeatMode
@@ -45,6 +46,35 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+
+/**
+ * The shared actions for the picked quest on its venue page and details screen. Before a proof is
+ * sent, offers acceptance or proof submission; afterwards uses [ProofBar]. A pending or approved
+ * proof needs no bar unless [footer] supplies another action, such as cancellation in the details.
+ */
+@Composable
+internal fun QuestActionBar(
+    state: VenuePageUiState,
+    onAccept: () -> Unit,
+    onSubmitProof: (reservationId: String) -> Unit,
+    modifier: Modifier = Modifier,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+  if (state.selectedQuest == null) return
+  val proofStatus = state.proof?.status
+  when {
+    proofStatus == null ->
+        AcceptQuestBar(
+            state,
+            onAccept,
+            modifier,
+            onSubmitProof = state.completableReservationId?.let { id -> { onSubmitProof(id) } },
+            footer = footer ?: {},
+        )
+    proofStatus == CompletionStatus.REJECTED || footer != null ->
+        ProofBar(proofStatus, modifier, footer = footer ?: {})
+  }
+}
 
 /**
  * The bar under a venue's quests once the explorer picked one: a full-width "Accept quest" button

@@ -78,7 +78,7 @@ typealias VenuePageQuestRow =
  *   venue's name, from the page's bar or the quest's details.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
- *   [AcceptQuestBar] that accepts through [viewModel] unless replaced.
+ *   [QuestActionBar] that accepts through [viewModel] unless replaced.
  */
 @Composable
 fun VenuePageScreen(
@@ -108,7 +108,7 @@ fun VenuePageScreen(
 
 /**
  * Stateless page: the top bar, then what [state] says the page can show. Under the list sits
- * [bottomBar], or by default an [AcceptQuestBar] whose button calls [onAccept] or, for an approved
+ * [bottomBar], or by default a [QuestActionBar] whose button calls [onAccept] or, for an approved
  * reservation, [onSubmitProof]. While [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen]
  * takes the page's place, and [onCancel] cancels the reservation from there, or [onSubmitProof]
  * opens the proof form of an approved one, given its id.
@@ -182,11 +182,7 @@ fun VenuePageContent(
         if (bottomBar != null) {
           bottomBar(state.selectedQuest)
         } else {
-          AcceptQuestBar(
-              state,
-              onAccept,
-              onSubmitProof = state.completableReservationId?.let { id -> { onSubmitProof(id) } },
-          )
+          QuestActionBar(state, onAccept, onSubmitProof)
         }
       }
     }

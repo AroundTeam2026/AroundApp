@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
@@ -79,7 +80,10 @@ class VenuePageSubmitProofTest {
     show(pending)
 
     compose.onNodeWithTag(C.Tag.SUBMIT_PROOF_BUTTON).assertDoesNotExist()
-    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertIsNotEnabled()
+    compose
+        .onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON)
+        .assertIsNotEnabled()
+        .assertTextEquals("Accepted, waiting for the venue")
 
     compose.runOnIdle { state.value = approved }
 
@@ -141,6 +145,18 @@ class VenuePageSubmitProofTest {
       compose.runOnIdle { state.value = approved.copy(completions = mapOf("reservation" to proof)) }
 
       compose.onNodeWithTag(C.Tag.SUBMIT_PROOF_BUTTON).assertDoesNotExist()
+      compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertDoesNotExist()
+      compose.onNodeWithText("Accepted, waiting for the venue").assertDoesNotExist()
+      if (status == CompletionStatus.REJECTED) {
+        compose
+            .onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON)
+            .assertIsDisplayed()
+            .assertTextEquals("Send new proof")
+            .assertIsNotEnabled()
+      } else {
+        compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
+        compose.onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON).assertDoesNotExist()
+      }
     }
   }
 

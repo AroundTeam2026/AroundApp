@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.res.Configuration
@@ -122,28 +123,19 @@ fun QuestDetailsScreen(
       RadiusCard(state, quest)
     }
     val cancelAction: @Composable ColumnScope.() -> Unit = {
-      if (state.cancellableReservationId != null) {
-        CancelReservationAction(
-            state.cancelStatus,
-            state.venueName,
-            onCancel,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        )
-      }
+      CancelReservationAction(
+          state.cancelStatus,
+          state.venueName,
+          onCancel,
+          horizontalAlignment = Alignment.CenterHorizontally,
+      )
     }
-    val proofStatus = state.proof?.status
-    when {
-      proofStatus == null ->
-          AcceptQuestBar(
-              state,
-              onAccept,
-              onSubmitProof = state.completableReservationId?.let { id -> { onSubmitProof(id) } },
-              footer = cancelAction,
-          )
-      // Without a button or a reservation to cancel, the bar would be empty
-      proofStatus == CompletionStatus.REJECTED || state.cancellableReservationId != null ->
-          ProofBar(proofStatus, footer = cancelAction)
-    }
+    QuestActionBar(
+        state,
+        onAccept,
+        onSubmitProof,
+        footer = cancelAction.takeIf { state.cancellableReservationId != null },
+    )
   }
 }
 
