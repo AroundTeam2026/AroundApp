@@ -1,10 +1,12 @@
 // Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
@@ -25,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.DarkColorScheme
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
@@ -70,6 +73,24 @@ class VenueInitializationScreenTest {
     launch(darkTheme = true)
     val image = compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).captureToImage()
     assertEquals(DarkColorScheme.background, image.toPixelMap()[0, 0])
+  }
+
+  @Test
+  fun focusedNameFieldUsesTheLightAccent() =
+      assertFocusedBorder(darkTheme = false, AroundColors.Purple)
+
+  @Test
+  fun focusedNameFieldUsesTheDarkAccent() =
+      assertFocusedBorder(darkTheme = true, AroundColors.Cream)
+
+  private fun assertFocusedBorder(darkTheme: Boolean, expected: Color) {
+    launch(darkTheme)
+    val field = compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME)
+    field.performClick()
+    compose.waitForIdle()
+    val image = field.captureToImage()
+    // Inside the left border, halfway down
+    assertEquals(expected, image.toPixelMap()[1, image.height / 2])
   }
 
   @Test

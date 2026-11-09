@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 
 /**
@@ -206,8 +207,9 @@ fun VenueInitializationContent(
             colors =
                 aroundFieldColors(
                     disabledContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedBorderColor = MaterialTheme.colorScheme.onSurface,
-                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                    // Purple on cream, cream in dark mode, where purple barely shows
+                    focusedBorderColor = AroundTheme.colors.accentText,
+                    cursorColor = AroundTheme.colors.accentText,
                 ),
             keyboardOptions =
                 KeyboardOptions(
