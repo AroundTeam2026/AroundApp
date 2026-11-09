@@ -30,7 +30,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
@@ -67,6 +66,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 
 /**
  * Entry point for the venue sign-up flow. The navigation owner supplies the existing ViewModel and
@@ -205,14 +205,11 @@ fun VenueInitializationContent(
             shape = RoundedCornerShape(14.dp),
             textStyle = MaterialTheme.typography.bodyLarge,
             colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                aroundFieldColors(
                     disabledContainerColor = MaterialTheme.colorScheme.surface,
                     // Purple on cream, cream in dark mode, where purple barely shows
                     focusedBorderColor = AroundTheme.colors.accentText,
                     cursorColor = AroundTheme.colors.accentText,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 ),
             keyboardOptions =
                 KeyboardOptions(
