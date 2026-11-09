@@ -14,6 +14,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * A [LocationRepository] backed by Google Play services' fused location provider.
@@ -63,9 +64,11 @@ class FusedLocationRepository(
             .setMaxUpdateAgeMillis(0)
             .build()
     return try {
-      client.getCurrentLocation(request, cancellation.token).await(cancellation)?.let {
-        Location(it.latitude, it.longitude)
-      }
+      // Without a fix, e.g. indoors, Play services keeps looking; giving up cancels the request
+      withTimeoutOrNull(PRECISE_FIX_TIMEOUT_MS) {
+            client.getCurrentLocation(request, cancellation.token).await(cancellation)
+          }
+          ?.let { Location(it.latitude, it.longitude) }
     } catch (e: ApiException) {
       null
     } catch (e: SecurityException) {
@@ -73,3 +76,9 @@ class FusedLocationRepository(
     }
   }
 }
+
+/**
+ * How long [FusedLocationRepository.currentPreciseLocation] waits for a fresh fix before it gives
+ * up: long enough for GPS to get one outdoors, short enough that the explorer isn't left waiting.
+ */
+internal const val PRECISE_FIX_TIMEOUT_MS = 15_000L
