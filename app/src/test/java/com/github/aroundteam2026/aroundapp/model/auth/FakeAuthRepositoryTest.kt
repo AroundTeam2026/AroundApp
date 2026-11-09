@@ -83,6 +83,18 @@ class FakeAuthRepositoryTest {
   }
 
   @Test
+  fun googleSignupCannotReplaceASignedInSession() = runBlocking {
+    val uid = repo.signInWithGoogle("first-token").getOrThrow()
+    assertEquals(
+        AuthError.InvalidCredentials,
+        repo.signUpWithGoogle("second-token").exceptionOrNull(),
+    )
+    assertEquals(uid, repo.currentUserId.value)
+    repo.signOut()
+    assertTrue(repo.signUpWithGoogle("second-token").isSuccess)
+  }
+
+  @Test
   fun signOutClearsTheCurrentUser() = runBlocking {
     repo.signUpWithEmail("ada@around.test", PASSWORD)
     repo.signOut()

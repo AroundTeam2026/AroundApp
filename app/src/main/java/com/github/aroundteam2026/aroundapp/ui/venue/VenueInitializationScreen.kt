@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -65,7 +66,6 @@ import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
 /**
  * Entry point for the venue sign-up flow. The navigation owner supplies the existing ViewModel and
@@ -108,7 +108,11 @@ fun VenueInitializationContent(
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-  AroundAppTheme(typography = VenueSetupTypography) {
+  MaterialTheme(
+      colorScheme = MaterialTheme.colorScheme,
+      shapes = MaterialTheme.shapes,
+      typography = VenueSetupTypography,
+  ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val nameLabel = stringResource(R.string.venue_initialization_name)
     BoxWithConstraints(
@@ -143,6 +147,7 @@ fun VenueInitializationContent(
                     painterResource(R.drawable.venue_setup_back),
                     stringResource(R.string.back),
                     Modifier.size(22.dp),
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
                 )
               }
             }
@@ -203,7 +208,8 @@ fun VenueInitializationContent(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     disabledContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    focusedBorderColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = MaterialTheme.colorScheme.onSurface,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 ),
             keyboardOptions =

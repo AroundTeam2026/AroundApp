@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -40,7 +41,7 @@ import org.robolectric.annotation.Config
 class OverviewScreenTest {
   @get:Rule val compose = createComposeRule()
 
-  private val opened = mutableListOf<String>()
+  private val opened = mutableListOf<Pair<String, String>>()
   private var retries = 0
   private val cancelled = mutableListOf<String>()
 
@@ -49,7 +50,7 @@ class OverviewScreenTest {
       AroundAppTheme {
         OverviewContent(
             state,
-            onOpenVenue = { opened += it },
+            onOpenQuest = { venueId, questId -> opened += venueId to questId },
             onRetry = { retries++ },
             onCancel = { cancelled += it },
             clock = CLOCK,
@@ -104,12 +105,28 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun tappingARowOpensItsVenue() {
-    show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
+  fun tappingARowOpensItsQuestAtItsVenue() {
+    show(loaded(row(), row(id = "reservation-2", venueId = "bakery", questId = "croissant")))
 
     compose.onNodeWithTag("${C.Tag.OVERVIEW_ROW}_reservation-2").performClick()
 
-    assertEquals(listOf("bakery"), opened)
+    assertEquals(listOf("bakery" to "croissant"), opened)
+  }
+
+  // Once the proof is sent, the quest is done on the explorer's side
+  @Test
+  fun onlyCardsWithoutAProofCanBeCancelled() {
+    show(
+        loaded(
+            row(id = "approved", status = OverviewRowStatus.APPROVED),
+            row(id = "sent", status = OverviewRowStatus.PROOF_SENT),
+            row(id = "completed", status = OverviewRowStatus.COMPLETED),
+            row(id = "rejected", status = OverviewRowStatus.PROOF_REJECTED),
+        )
+    )
+
+    cancelButtonOf("approved").assertExists()
+    listOf("sent", "completed", "rejected").forEach { cancelButtonOf(it).assertDoesNotExist() }
   }
 
   @Test
@@ -117,10 +134,10 @@ class OverviewScreenTest {
     show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
 
     cancelButtonOf("reservation-2").performClick()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     assertEquals(listOf("reservation-2"), cancelled)
-    assertEquals(emptyList<String>(), opened)
+    assertEquals(emptyList<Pair<String, String>>(), opened)
   }
 
   @Test
@@ -148,11 +165,12 @@ class OverviewScreenTest {
             FakeQuestRepository(initialQuests = listOf(testQuest(id = "fox", venueId = CAFE))),
             FakeVenueRepository(listOf(testVenue(id = CAFE))),
             party,
+            FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
+    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
 
-    compose.onNode(hasTestTag(C.Tag.OVERVIEW_ROW_CANCEL), useUnmergedTree = true).performClick()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+    compose.onNode(hasTestTag(C.Tag.CANCEL_RESERVATION), useUnmergedTree = true).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     compose.onNodeWithTag(C.Tag.OVERVIEW_EMPTY).assertIsDisplayed()
   }
@@ -174,8 +192,9 @@ class OverviewScreenTest {
             FakeQuestRepository(initialQuests = listOf(testQuest(id = "fox", venueId = CAFE))),
             FakeVenueRepository(listOf(testVenue(id = CAFE))),
             party,
+            FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
+    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
 
     compose.onNodeWithTag(C.Tag.OVERVIEW_LIST).assertIsDisplayed()
     compose
@@ -186,7 +205,7 @@ class OverviewScreenTest {
   /** The cancel button is a clickable of its own, so the card's merged node leaves it out. */
   private fun cancelButtonOf(reservationId: String) =
       compose.onNode(
-          hasTestTag(C.Tag.OVERVIEW_ROW_CANCEL) and
+          hasTestTag(C.Tag.CANCEL_RESERVATION) and
               hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
           useUnmergedTree = true,
       )
@@ -194,6 +213,7 @@ class OverviewScreenTest {
   private fun row(
       id: String = ID,
       venueId: String = CAFE,
+      questId: String = "fox",
       status: OverviewRowStatus = OverviewRowStatus.WAITING,
       partySize: Int = 1,
       address: String? = "Rue du Pont 1",
@@ -202,7 +222,7 @@ class OverviewScreenTest {
   ) =
       OverviewRow(
           reservationId = id,
-          questId = "fox",
+          questId = questId,
           venueId = venueId,
           questTitle = "Find the hidden fox",
           reward = reward,

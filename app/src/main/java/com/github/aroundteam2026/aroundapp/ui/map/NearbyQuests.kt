@@ -22,6 +22,7 @@ import java.util.Locale
  * @property title The quest's title.
  * @property reward The quest's reward, or null when it has none.
  * @property minPartySize How many people the quest needs at least.
+ * @property exactPartySize Whether the party must have exactly [minPartySize] people.
  * @property distanceMeters How far the venue is from the explorer, or null when their position is
  *   unknown.
  */
@@ -33,21 +34,17 @@ data class NearbyQuest(
     val title: String,
     val reward: Reward?,
     val minPartySize: Int,
+    val exactPartySize: Boolean,
     val distanceMeters: Double?,
 )
 
 /**
  * One row per quest valid at [now], by the same rule as the map's pins.
  *
- * Each row shows its venue as the venue's pin does (see [shownVenue]): its name and location from
- * [venues], so every quest of a venue gets the same name, avatar and distance. A venue missing from
- * [venues], or without a location yet, has no rows.
- *
- * With the explorer's position [from], it lists the quests within [NEARBY_RADIUS_METERS] of it,
- * nearest first. Without it, there is nothing to measure from: it lists every valid quest, by venue
- * name as [locale] sorts them, with no distance. Either way, a venue's quests stay together, even
- * beside another venue at the same distance or with the same name, newest first, then by smallest
- * id.
+ * Each row shows its venue as its pin does (see [shownVenue]); a venue missing from [venues] or
+ * without a location has no rows. With the explorer's position [from], it lists the quests within
+ * [NEARBY_RADIUS_METERS], nearest first; without it, every valid quest by venue name as [locale]
+ * sorts them. A venue's quests stay together, newest first, then by smallest id.
  *
  * @param venues The known venues, by id.
  * @param from The explorer's position, or null when unknown.
@@ -82,6 +79,7 @@ fun nearbyQuests(
                   title = quest.title,
                   reward = quest.reward,
                   minPartySize = quest.minPartySize,
+                  exactPartySize = quest.exactPartySize,
                   distanceMeters = distance,
               )
             }

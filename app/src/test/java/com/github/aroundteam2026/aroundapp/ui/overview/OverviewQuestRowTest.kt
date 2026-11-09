@@ -1,7 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
-import android.text.format.DateFormat
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -17,14 +19,20 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Date
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,30 +90,58 @@ class OverviewQuestRowTest {
     part(C.Tag.OVERVIEW_ROW_PARTY).assertTextEquals("3 people")
   }
 
+  // The Figma frames "Quests tab · proof sent and rejected" and "Quests tab · completed"
+  @Test
+  fun eachProofStatusSaysWhereTheProofStands() {
+    var current by mutableStateOf(OverviewRowStatus.PROOF_SENT)
+    compose.setContent {
+      AroundAppTheme { OverviewQuestRow(row(status = current), onClick = {}, clock = CLOCK) }
+    }
+
+    mapOf(
+            OverviewRowStatus.PROOF_SENT to "PROOF SENT",
+            OverviewRowStatus.COMPLETED to "COMPLETED",
+            OverviewRowStatus.PROOF_REJECTED to "PROOF REJECTED",
+        )
+        .forEach { (shown, text) ->
+          current = shown
+          status(text).assertIsDisplayed()
+          status("APPROVED").assertDoesNotExist()
+        }
+  }
+
   @Test
   fun aSlotOnAnotherDayShowsItsWeekdayAndDate() {
     val later = SLOT + 2 * DAY
     ShadowSettings.set24HourTimeFormat(true)
     show(row(slotStart = later))
 
-    // In English, e.g. "Sun, Jan 17 · 08:00"
-    val day =
-        DateTimeFormatter.ofPattern(
-                DateFormat.getBestDateTimePattern(Locale.ENGLISH, "EEEdMMM"),
-                Locale.ENGLISH,
-            )
-            .format(Instant.ofEpochMilli(later).atZone(UTC))
-    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("$day · 08:00")
+    part(C.Tag.OVERVIEW_ROW_SLOT).assertTextEquals("Sun, Jan 17 · 08:00")
   }
 
-  // The app passes no clock, so the card reads the device's: a quest booked now is today
+  // The day and time follow the phone's language, here German on the 24-hour clock
+  @Test
+  @Config(qualifiers = "de")
+  fun inGermanTheSlotShowsTheGermanDay() {
+    ShadowSettings.set24HourTimeFormat(true)
+    show(row(slotStart = SLOT + 2 * DAY))
+
+    part(C.Tag.OVERVIEW_ROW_SLOT)
+        .assert(hasText("17. Jan", substring = true) and hasText("08:00", substring = true))
+  }
+
+  // The app passes no clock, so the card reads the device's: a quest booked now is today. Skipped
+  // on the rare run where midnight passes while the card is drawn, as then "now" is yesterday.
   @Test
   fun withoutAClockTheCardUsesTheDevicesDay() {
+    val dayBefore = LocalDate.now()
     compose.setContent {
       AroundAppTheme {
         OverviewQuestRow(row(slotStart = System.currentTimeMillis()), onClick = { clicks++ })
       }
     }
+    compose.waitForIdle()
+    assumeTrue(LocalDate.now() == dayBefore)
 
     part(C.Tag.OVERVIEW_ROW_SLOT).assert(hasText("Today · ", substring = true))
   }
@@ -140,6 +176,29 @@ class OverviewQuestRowTest {
         )
   }
 
+  // Android can pick pattern letters java.time can't read: on some Android versions the day period
+  // "B" of Traditional Chinese, here the "b" (AM, PM, noon or midnight) that even the test JDK's
+  // java.time rejects with "Unknown pattern letter: b". The slot's formats must still read them.
+  @Test
+  fun aSlotFormatReadsPatternLettersJavaTimeDoesNot() {
+    // The premise: if java.time ever learns "b", this test no longer proves anything
+    assertThrows(IllegalArgumentException::class.java) { DateTimeFormatter.ofPattern("h:mm b") }
+    val time = slotFormat("hmb", Locale.ENGLISH, UTC).format(Date(SLOT))
+
+    // Checked in parts, as the space before AM varies
+    assertTrue(time, time.startsWith("8:00") && time.endsWith("AM"))
+  }
+
+  // Traditional Chinese on the 12-hour clock puts the day period before the time
+  @Test
+  @Config(qualifiers = "zh-rTW")
+  fun inTraditionalChineseOnThe12HourClockTheSlotShowsItsTime() {
+    ShadowSettings.set24HourTimeFormat(false)
+    show(row(slotStart = SLOT + 2 * DAY))
+
+    part(C.Tag.OVERVIEW_ROW_SLOT).assert(hasText("8:00", substring = true))
+  }
+
   // The phone's 12-hour setting adds AM or PM; checked in parts, as the space before it varies
   @Test
   fun onThe12HourClockTheSlotSaysAmOrPm() {
@@ -162,17 +221,17 @@ class OverviewQuestRowTest {
     showCancellable()
 
     cancelButton().assert(hasText("Cancel reservation")).performClick()
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertIsDisplayed()
     compose
         .onNode(hasText("Café Lumen will see it cancelled", substring = true))
         .assertIsDisplayed()
     assertEquals(0, cancels)
 
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_CONFIRM).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     assertEquals(1, cancels)
     assertEquals(0, clicks)
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
   }
 
   @Test
@@ -180,10 +239,10 @@ class OverviewQuestRowTest {
     showCancellable()
     cancelButton().performClick()
 
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_KEEP).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_KEEP).performClick()
 
     assertEquals(0, cancels)
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
   }
 
   @Test
@@ -191,19 +250,19 @@ class OverviewQuestRowTest {
     showCancellable(CancelStatus.CANCELLING)
 
     cancelButton().assertIsNotEnabled().assert(hasText("Cancelling…"))
-    part(C.Tag.OVERVIEW_ROW_CANCEL_FAILED).assertDoesNotExist()
+    part(C.Tag.CANCEL_RESERVATION_FAILED).assertDoesNotExist()
   }
 
   @Test
   fun afterAFailureTheCardSaysSoAndTryAgainCancelsAtOnce() {
     showCancellable(CancelStatus.FAILED)
-    part(C.Tag.OVERVIEW_ROW_CANCEL_FAILED).assertTextEquals("Couldn't cancel this reservation.")
+    part(C.Tag.CANCEL_RESERVATION_FAILED).assertTextEquals("Couldn't cancel this reservation.")
 
     cancelButton().assert(hasText("Try again")).performClick()
 
     // The explorer confirmed the cancel that failed, so the retry doesn't ask again
     assertEquals(1, cancels)
-    compose.onNodeWithTag(C.Tag.OVERVIEW_CANCEL_DIALOG).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
   }
 
   private var cancels = 0
@@ -224,7 +283,7 @@ class OverviewQuestRowTest {
   }
 
   /** The cancel button is a clickable of its own, so the card's merged node leaves it out. */
-  private fun cancelButton() = compose.onNodeWithTag(C.Tag.OVERVIEW_ROW_CANCEL)
+  private fun cancelButton() = compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION)
 
   private fun row(
       status: OverviewRowStatus = OverviewRowStatus.WAITING,

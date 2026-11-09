@@ -3,9 +3,15 @@ package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -60,8 +66,22 @@ class VenueDashboardViewModelTest {
   private var venues: VenueRepository =
       FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumière")))
 
+  private val completions = FakeCompletionRepository { createdAt }
+
+  /** How many party listeners the dashboard opened, per reservation id. */
+  private val partyReads = mutableMapOf<String, Int>()
+
+  /** The parties the dashboard reads: [party], counting each listener it opens. */
+  private val parties =
+      object : PartyRepository by party {
+        override fun observeMembers(reservationId: String) =
+            party.observeMembers(reservationId).also {
+              partyReads[reservationId] = (partyReads[reservationId] ?: 0) + 1
+            }
+      }
+
   private val viewModel by lazy {
-    VenueDashboardViewModel(auth, reservations, quests, venues, party)
+    VenueDashboardViewModel(auth, reservations, quests, venues, parties, completions)
   }
 
   private val state
@@ -100,6 +120,23 @@ class VenueDashboardViewModelTest {
   }
 
   private fun ids(rows: List<DashboardReservation>) = rows.map { it.reservationId }
+
+  /**
+   * Stores a pending proof of the reservation [reservationId] by [explorerUid], sent at [sentAt].
+   * Returns the id of its completion.
+   */
+  private suspend fun sendProof(
+      reservationId: String,
+      explorerUid: String = "explorer",
+      proof: Proof = TEXT_PROOF,
+      sentAt: Long = NOW,
+      venueId: String = VENUE_ID,
+  ): String {
+    createdAt = sentAt
+    return completions.submit(reservationId, venueId, explorerUid, proof).getOrThrow()
+  }
+
+  private fun proofIds(rows: List<DashboardProof>) = rows.map { it.completionId }
 
   @Test
   fun loadsAnEmptyDashboard() = test {
@@ -350,11 +387,147 @@ class VenueDashboardViewModelTest {
     assertEquals(listOf(id), ids(state.needsAnswer))
   }
 
+  @Test
+  fun proofsToReviewAreListedOldestFirstWithTheirReservation() = test {
+    val reservation =
+        reserve(
+            questId = "menu",
+            name = "Grace",
+            partySize = 3,
+            status = ReservationStatus.APPROVED,
+        )
+    val newer = sendProof(reservation, explorerUid = "grace", sentAt = NOW - HOUR)
+    val older =
+        sendProof(
+            reservation,
+            explorerUid = "friend",
+            proof = Proof.Photo("gs://proofs/friend.jpg"),
+            sentAt = NOW - 2 * HOUR,
+        )
+    watch()
+
+    assertEquals(listOf(older, newer), proofIds(state.proofsToReview))
+    assertEquals(
+        DashboardProof(
+            completionId = older,
+            explorerName = "Grace",
+            questTitle = "Order the secret menu",
+            partySize = 3,
+            proofType = ProofType.PHOTO,
+            sentAt = NOW - 2 * HOUR,
+        ),
+        state.proofsToReview.first(),
+    )
+    assertEquals(ProofType.TEXT, state.proofsToReview.last().proofType)
+  }
+
+  @Test
+  fun proofsSentAtTheSameTimeGoSmallestIdFirst() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED)
+    // Stored first, but its id ("<reservation>_zoe") is the larger one
+    val larger = sendProof(reservation, explorerUid = "zoe")
+    val smaller = sendProof(reservation, explorerUid = "amy")
+    watch()
+
+    assertTrue(smaller < larger)
+    assertEquals(listOf(smaller, larger), proofIds(state.proofsToReview))
+  }
+
+  @Test
+  fun aProofOfACancelledReservationKeepsItsPartySize() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED, partySize = 3)
+    sendProof(reservation)
+    fake.updateStatus(reservation, ReservationStatus.CANCELLED).getOrThrow()
+    watch()
+
+    assertEquals(3, state.proofsToReview.single().partySize)
+  }
+
+  @Test
+  fun reviewedProofsAndOtherVenuesProofsAreLeftOut() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED)
+    completions.approve(sendProof(reservation, explorerUid = "a")).getOrThrow()
+    completions.reject(sendProof(reservation, explorerUid = "b"), "Blurry").getOrThrow()
+    sendProof("elsewhere", venueId = "other-venue")
+    watch()
+
+    assertTrue(state.proofsToReview.isEmpty())
+  }
+
+  @Test
+  fun aProofOfAnUnknownReservationShowsNoNameOrTitle() = test {
+    sendProof("missing")
+    watch()
+
+    val row = state.proofsToReview.single()
+    assertNull(row.explorerName)
+    assertNull(row.questTitle)
+    assertEquals(0, row.partySize)
+    // Only the proof is listed, and it's enough for the dashboard not to be empty
+    assertFalse(state.isEmpty)
+  }
+
+  @Test
+  fun aNewProofShowsUpLiveAndLeavesOnceReviewed() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED)
+    watch()
+    assertTrue(state.proofsToReview.isEmpty())
+
+    val id = sendProof(reservation)
+    assertEquals(listOf(id), proofIds(state.proofsToReview))
+
+    completions.approve(id).getOrThrow()
+    assertTrue(state.proofsToReview.isEmpty())
+  }
+
+  @Test
+  fun aFailingProofListenerShowsFailed() = test {
+    val failing =
+        object : CompletionRepository by completions {
+          override fun observeForVenue(venueId: String) =
+              flow<List<Completion>> { throw IOException("denied") }
+        }
+    val failingViewModel =
+        VenueDashboardViewModel(auth, reservations, quests, venues, party, failing)
+    backgroundScope.launch { failingViewModel.uiState.collect {} }
+
+    assertEquals(VenueDashboardStatus.FAILED, failingViewModel.uiState.value.status)
+  }
+
+  @Test
+  fun newAndReviewedProofsOfShownReservationsDontReadThePartiesAgain() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED, partySize = 2)
+    watch()
+    val readsBefore = partyReads.toMap()
+
+    val proof = sendProof(reservation)
+    assertEquals(listOf(proof), proofIds(state.proofsToReview))
+    completions.approve(proof).getOrThrow()
+    assertTrue(state.proofsToReview.isEmpty())
+
+    assertEquals(readsBefore, partyReads)
+    assertEquals(2, state.upcoming.single().partySize)
+  }
+
+  @Test
+  fun aNewReservationIsNeverShownBeforeItsPartyIsRead() = test {
+    reserve(status = ReservationStatus.APPROVED)
+    val shown = mutableListOf<VenueDashboardUiState>()
+    backgroundScope.launch { viewModel.uiState.collect { shown += it } }
+
+    reserve(questId = "menu")
+
+    assertEquals(1, state.needsAnswer.single().partySize)
+    // Its party of 1 is read before the dashboard shows it, never as an empty party
+    assertTrue(shown.flatMap { it.needsAnswer + it.upcoming }.none { it.partySize == 0 })
+  }
+
   private companion object {
     const val VENUE_ID = "cafe"
     const val HOUR = 3_600_000L
     const val DAY = 24 * HOUR
     const val NOW = 1_800_000_000_000L
+    val TEXT_PROOF = Proof.Text("The owl hides behind the bar")
   }
 }
 

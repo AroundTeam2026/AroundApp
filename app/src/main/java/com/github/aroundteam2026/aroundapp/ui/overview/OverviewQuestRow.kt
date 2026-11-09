@@ -2,6 +2,8 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.content.res.Configuration
+import android.icu.text.DateFormat as IcuDateFormat
+import android.icu.util.TimeZone as IcuTimeZone
 import android.text.format.DateFormat
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
@@ -14,17 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +40,8 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine
@@ -54,12 +52,16 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venueAvatarStyle
 import com.github.aroundteam2026.aroundapp.ui.venuepage.venueQuestChipStyle
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.ZoneId
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * One accepted quest in the overview, as the Figma card `Overview/Quest card` (after the active
@@ -140,6 +142,7 @@ fun OverviewQuestRow(
             minPartySize = QuestLimits.MIN_PARTY_SIZE,
             distanceMeters = null,
             venueQuestChipStyle(),
+            exactPartySize = false,
             Modifier.padding(top = REWARD_TOP),
         )
       }
@@ -150,84 +153,15 @@ fun OverviewQuestRow(
           tint = colors.onSurfaceVariant,
       )
     }
-    if (onCancel != null) CancelAction(cancelStatus, row.venueName, onCancel)
+    if (onCancel != null) CancelReservationAction(cancelStatus, row.venueName, onCancel)
   }
 }
 
 /**
- * The card's cancel button, under its content: "Cancel reservation", which asks first since a
- * cancelled reservation can't be undone; "Cancelling…", disabled, while the cancel is written; or
- * after a failure an error and "Try again", which retries at once.
- */
-@Composable
-private fun CancelAction(status: CancelStatus, venueName: String, onCancel: () -> Unit) {
-  val colors = MaterialTheme.colorScheme
-  var asking by rememberSaveable { mutableStateOf(false) }
-  Column(
-      Modifier.fillMaxWidth(),
-      verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall),
-      horizontalAlignment = Alignment.End,
-  ) {
-    if (status == CancelStatus.FAILED) {
-      Text(
-          stringResource(R.string.overview_cancel_failed),
-          Modifier.testTag(C.Tag.OVERVIEW_ROW_CANCEL_FAILED),
-          color = colors.error,
-          style = AroundTextStyles.Caption,
-      )
-    }
-    TextButton(
-        // The explorer already confirmed the cancel that failed
-        onClick = { if (status == CancelStatus.FAILED) onCancel() else asking = true },
-        enabled = status != CancelStatus.CANCELLING,
-        colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
-        modifier = Modifier.testTag(C.Tag.OVERVIEW_ROW_CANCEL),
-    ) {
-      Text(
-          stringResource(
-              when (status) {
-                CancelStatus.NONE -> R.string.overview_cancel
-                CancelStatus.CANCELLING -> R.string.overview_cancelling
-                CancelStatus.FAILED -> R.string.overview_cancel_retry
-              }
-          ),
-          style = AroundTextStyles.Button,
-      )
-    }
-  }
-  if (asking) {
-    AlertDialog(
-        onDismissRequest = { asking = false },
-        confirmButton = {
-          TextButton(
-              onClick = {
-                asking = false
-                onCancel()
-              },
-              colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
-              modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_CONFIRM),
-          ) {
-            Text(stringResource(R.string.overview_cancel_confirm))
-          }
-        },
-        dismissButton = {
-          TextButton(
-              onClick = { asking = false },
-              modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_KEEP),
-          ) {
-            Text(stringResource(R.string.overview_cancel_keep))
-          }
-        },
-        title = { Text(stringResource(R.string.overview_cancel_title)) },
-        text = { Text(stringResource(R.string.overview_cancel_text, venueName)) },
-        modifier = Modifier.testTag(C.Tag.OVERVIEW_CANCEL_DIALOG),
-    )
-  }
-}
-
-/**
- * Where the reservation stands, in small capitals: a muted dot and "Waiting for the venue", or a
- * check on the tertiary colour and "Approved".
+ * Where the reservation stands, in small capitals, as in the Figma frames of the Quests tab: a
+ * muted dot and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then,
+ * for the proof, an accent dot and "Proof sent", a check and "Completed", or a red dot and "Proof
+ * rejected".
  */
 @Composable
 private fun Status(status: OverviewRowStatus, modifier: Modifier) {
@@ -240,17 +174,24 @@ private fun Status(status: OverviewRowStatus, modifier: Modifier) {
     val (text, color) =
         when (status) {
           OverviewRowStatus.WAITING -> {
-            Box(Modifier.size(DOT_SIZE).background(colors.onSurfaceVariant, AroundPillShape))
+            Dot(colors.onSurfaceVariant)
             R.string.overview_status_waiting to colors.onSurfaceVariant
           }
           OverviewRowStatus.APPROVED -> {
-            Icon(
-                painterResource(R.drawable.ic_check),
-                contentDescription = null,
-                Modifier.size(CHECK_SIZE),
-                tint = colors.tertiary,
-            )
+            Check()
             R.string.overview_status_approved to colors.onSurface
+          }
+          OverviewRowStatus.PROOF_SENT -> {
+            Dot(AroundTheme.colors.accentText)
+            R.string.overview_status_proof_sent to colors.onSurfaceVariant
+          }
+          OverviewRowStatus.COMPLETED -> {
+            Check()
+            R.string.overview_status_completed to colors.onSurface
+          }
+          OverviewRowStatus.PROOF_REJECTED -> {
+            Dot(colors.error)
+            R.string.overview_status_proof_rejected to colors.error
           }
         }
     Text(
@@ -263,27 +204,38 @@ private fun Status(status: OverviewRowStatus, modifier: Modifier) {
   }
 }
 
-/** The slot in a pill on the background colour: "Today · 15:30", or the day, e.g. "Sun 2 Nov". */
+/** The status's dot, in [color]. */
+@Composable
+private fun Dot(color: Color) {
+  Box(Modifier.size(DOT_SIZE).background(color, AroundPillShape))
+}
+
+/** The status's check, on the tertiary colour. */
+@Composable
+private fun Check() {
+  Icon(
+      painterResource(R.drawable.ic_check),
+      contentDescription = null,
+      Modifier.size(CHECK_SIZE),
+      tint = MaterialTheme.colorScheme.tertiary,
+  )
+}
+
+/**
+ * The slot in a pill on the background colour: the day, "Today" or a date such as "Fri, Jan 15",
+ * always followed by the time, e.g. "Today · 15:30" or "Fri, Jan 15 · 8:00 AM".
+ */
 @Composable
 private fun Slot(slotStart: Long, clock: Clock) {
   val colors = MaterialTheme.colorScheme
   val locale = currentLocale()
-  val slot = Instant.ofEpochMilli(slotStart).atZone(clock.zone)
-  val day =
-      if (slot.toLocalDate() == LocalDate.now(clock)) stringResource(R.string.overview_slot_today)
-      else
-          DateTimeFormatter.ofPattern(
-                  DateFormat.getBestDateTimePattern(locale, DAY_SKELETON),
-                  locale,
-              )
-              .format(slot)
   val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
-  val time =
-      DateTimeFormatter.ofPattern(
-              DateFormat.getBestDateTimePattern(locale, if (is24Hour) HOURS_24 else HOURS_12),
-              locale,
-          )
-          .format(slot)
+  val formats = remember(locale, is24Hour, clock.zone) { SlotFormats(locale, is24Hour, clock.zone) }
+  val day =
+      if (Instant.ofEpochMilli(slotStart).atZone(clock.zone).toLocalDate() == LocalDate.now(clock))
+          stringResource(R.string.overview_slot_today)
+      else formats.day.format(Date(slotStart))
+  val time = formats.time.format(Date(slotStart))
   Row(
       Modifier.background(colors.background, AroundPillShape)
           .padding(horizontal = AroundSpacing.CompactGap, vertical = SLOT_VERTICAL_PADDING),
@@ -304,6 +256,23 @@ private fun Slot(slotStart: Long, clock: Clock) {
     )
   }
 }
+
+/** The day and time formats of a slot, for the phone's [locale] and clock setting, in [zone]. */
+private class SlotFormats(locale: Locale, is24Hour: Boolean, zone: ZoneId) {
+  val day: IcuDateFormat = slotFormat(DAY_SKELETON, locale, zone)
+  val time: IcuDateFormat = slotFormat(if (is24Hour) HOURS_24 else HOURS_12, locale, zone)
+}
+
+/**
+ * The format Android picks for [skeleton] in [locale], writing times in [zone]. It uses Android's
+ * ICU formatter, which reads every pattern letter Android returns; java.time does not, e.g. the day
+ * period of Traditional Chinese on the 12-hour clock on some Android versions.
+ */
+internal fun slotFormat(skeleton: String, locale: Locale, zone: ZoneId): IcuDateFormat =
+    IcuDateFormat.getInstanceForSkeleton(skeleton, locale).also {
+      // Through java.util first, so that java.time's "Z" becomes ICU's "UTC"
+      it.timeZone = IcuTimeZone.getTimeZone(TimeZone.getTimeZone(zone).id)
+    }
 
 /** A muted line of [text] after a small [icon], cut off with an ellipsis. */
 @Composable

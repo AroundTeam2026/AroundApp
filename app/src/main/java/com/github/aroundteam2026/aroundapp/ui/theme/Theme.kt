@@ -4,7 +4,6 @@ package com.github.aroundteam2026.aroundapp.ui.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography as MaterialTypography
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -22,7 +21,6 @@ fun AroundAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Opt in to wallpaper colors on Android 12+; defaults follow the Figma palette.
     dynamicColor: Boolean = false,
-    typography: MaterialTypography = Typography,
     content: @Composable () -> Unit,
 ) {
   val colorScheme =
@@ -40,7 +38,7 @@ fun AroundAppTheme(
   ) {
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = typography,
+        typography = Typography,
         shapes = AroundShapes,
         content = content,
     )

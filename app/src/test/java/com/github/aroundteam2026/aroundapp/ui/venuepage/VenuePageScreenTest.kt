@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -26,11 +27,15 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -61,6 +66,7 @@ class VenuePageScreenTest {
   private var retries = 0
   private val detailsOpened = mutableListOf<String>()
   private var detailsClosed = 0
+  private var cancels = 0
 
   private fun show(
       state: VenuePageUiState,
@@ -76,6 +82,7 @@ class VenuePageScreenTest {
             onRetry = { retries++ },
             onQuestDetails = { detailsOpened += it },
             onQuestDetailsClosed = { detailsClosed++ },
+            onCancel = { cancels++ },
             questRow = questRow,
             bottomBar = bottomBar,
         )
@@ -92,6 +99,23 @@ class VenuePageScreenTest {
     listOf(C.Tag.VENUE_PAGE_HEADER, C.Tag.VENUE_PAGE_NOT_FOUND, C.Tag.VENUE_PAGE_FAILED).forEach {
       compose.onNodeWithTag(it).assertDoesNotExist()
     }
+  }
+
+  @Test
+  fun aQuestTheVenueNoLongerListsSaysSo() {
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageOnFakes(
+            "venue-1",
+            onBack = {},
+            onSubmitProof = { _, _ -> },
+            arrivalQuestId = "gone",
+        )
+      }
+    }
+
+    compose.onNodeWithText("This quest is no longer available.").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
   }
 
   @Test
@@ -248,29 +272,64 @@ class VenuePageScreenTest {
   }
 
   @Test
-  fun theDetailQuestIsShownInASheet() {
+  fun theDetailQuestTakesThePlaceOfTheList() {
     show(LOADED.copy(detailQuestId = "b"))
 
     compose
         .onNodeWithTag(C.Tag.QUEST_DETAIL_TITLE, useUnmergedTree = true)
         .assertTextEquals("Quest b")
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
   }
 
   @Test
-  fun noDetailQuestShowsNoSheet() {
+  fun noDetailQuestShowsTheList() {
     show(LOADED)
 
-    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertDoesNotExist()
   }
 
   @Test
-  fun closingTheSheetSaysSo() {
+  fun theListIsBackWhereItWasWhenTheDetailsClose() {
+    var state by mutableStateOf(LOADED.copy(quests = ('a'..'z').map { quest(it.toString()) }))
+    compose.setContent {
+      AroundAppTheme { VenuePageContent(state, onBack = {}, onQuestTapped = {}, onRetry = {}) }
+    }
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_QUESTS).performScrollToNode(hasText("Quest z"))
+    compose.onNodeWithText("Quest z").assertIsDisplayed()
+
+    state = state.copy(detailQuestId = "z")
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertIsDisplayed()
+    state = state.copy(detailQuestId = null)
+
+    compose.onNodeWithText("Quest z").assertIsDisplayed()
+  }
+
+  @Test
+  fun theBackArrowOfTheDetailsClosesThemOnly() {
     show(LOADED.copy(detailQuestId = "a"))
 
-    compose.onNodeWithContentDescription("Close quest details").performClick()
-    compose.waitForIdle()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
 
     assertEquals(1, detailsClosed)
+    assertEquals(0, backCalls)
+  }
+
+  @Test
+  fun cancellingFromTheDetailsReachesThePage() {
+    show(
+        LOADED.copy(
+            detailQuestId = "a",
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1),
+            reservationIds = mapOf("a" to "r"),
+        )
+    )
+
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
+
+    assertEquals(1, cancels)
   }
 
   @Test
@@ -278,11 +337,13 @@ class VenuePageScreenTest {
     showScreen(activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) })
 
     compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
-    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertIsDisplayed()
 
-    compose.onNodeWithContentDescription("Close quest details").performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
     compose.waitForIdle()
-    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SHEET).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
   }
 
   @Test
@@ -356,10 +417,38 @@ class VenuePageScreenTest {
     compose.onNodeWithText("Order the secret menu").assertIsDisplayed()
   }
 
+  // The proof form needs the venue's name, which only the page knows
+  @Test
+  fun submittingTheProofOfAnApprovedQuestPassesItsReservationAndTheVenue() {
+    val party = FakePartyRepository()
+    val reservations = FakeReservationRepository(party = party)
+    val id = runBlocking {
+      val id =
+          reservations
+              .createReservation(newPendingReservation("a", VENUE_ID, "Ece", 0L), "explorer")
+              .getOrThrow()
+      reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+      id
+    }
+    val opened = mutableListOf<Pair<String, String>>()
+    showScreen(
+        activeQuestsByVenue = { flowOf(listOf(testQuest(id = "a", venueId = VENUE_ID))) },
+        party = party,
+        reservations = reservations,
+        onSubmitProof = { reservation, venue -> opened += reservation to venue },
+    )
+
+    compose.onNodeWithContentDescription("Details of Order the secret menu").performClick()
+    compose.onNodeWithTag(C.Tag.SUBMIT_PROOF_BUTTON).performClick()
+
+    assertEquals(listOf(id to "Café Lumen"), opened)
+  }
+
   private fun showScreen(
       activeQuestsByVenue: (String) -> Flow<List<Quest>>,
       party: FakePartyRepository = FakePartyRepository(),
       reservations: FakeReservationRepository = FakeReservationRepository(party = party),
+      onSubmitProof: (String, String) -> Unit = { _, _ -> },
   ) {
     val viewModel =
         VenuePageViewModel(
@@ -369,9 +458,12 @@ class VenuePageScreenTest {
             reservations,
             testUsers("explorer"),
             party,
+            FakeCompletionRepository(),
             "explorer",
         )
-    compose.setContent { AroundAppTheme { VenuePageScreen(viewModel, onBack = {}) } }
+    compose.setContent {
+      AroundAppTheme { VenuePageScreen(viewModel, onBack = {}, onSubmitProof = onSubmitProof) }
+    }
   }
 
   private fun <T> failing(): Flow<T> = flow { throw IOException("offline") }

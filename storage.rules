@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Cloud Storage holds the proof photos of quest completions, under proofs/{reservationId}/. The
+// reservation and its party are read from Firestore, where docs/firestore-schema.md describes them.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function reservation(reservationId) {
+      return firestore.get(/databases/(default)/documents/reservations/$(reservationId)).data;
+    }
+
+    // The signed-in user is a JOINED member of the party of [reservationId]. A missing membership
+    // makes this an error, which denies.
+    function isJoinedMember(reservationId) {
+      return firestore.get(/databases/(default)/documents/party_user/$(reservationId + '_' + request.auth.uid))
+          .data.status == 'JOINED';
+    }
+
+    // The most a proof photo may weigh.
+    function maxPhotoBytes() {
+      return 5 * 1024 * 1024;
+    }
+
+    // A joined member of an approved reservation uploads a new image as its proof; each photo gets
+    // a new id, so a retake never replaces an earlier one. The party's joined members and the
+    // reservation's venue read it. Nobody lists, overwrites or deletes a proof.
+    match /proofs/{reservationId}/{photoId} {
+      allow get: if request.auth != null
+          && (isJoinedMember(reservationId)
+              || request.auth.uid == reservation(reservationId).venueId);
+      // resource is the stored file: it must not exist yet, so no write ever replaces a proof
+      allow create: if request.auth != null
+          && resource == null
+          && isJoinedMember(reservationId)
+          && reservation(reservationId).status == 'APPROVED'
+          && request.resource.size < maxPhotoBytes()
+          && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

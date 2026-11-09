@@ -75,7 +75,9 @@ class AroundAppTest {
         onSignOut = {},
         navController = navController,
         screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
-        venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
+        venuePage = { venueId, questId, onBack, onSubmitProof ->
+          VenuePageOnFakes(venueId, onBack, onSubmitProof, arrivalQuestId = questId)
+        },
     )
   }
 
@@ -157,20 +159,30 @@ class AroundAppTest {
     composeTestRule.onNodeWithTag(C.Tag.OVERVIEW_TITLE).assertIsDisplayed()
   }
 
-  // The row passes its venue's id, and Back returns to the overview in the Quests tab
-  @Test
-  fun aRowOfTheOverviewOpensItsVenuesPage() {
+  /**
+   * Shows the app with the overview listing [overviewRow], whose quest the venue page on fakes
+   * offers, then taps that row.
+   */
+  private fun openQuestFromOverview() {
     launch {
       navController = rememberNavController()
       AroundApp(
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, onBack -> VenuePageOnFakes(venueId, onBack) },
-          overview = { onOpenVenue ->
+          venuePage = { venueId, questId, onBack, onSubmitProof ->
+            VenuePageOnFakes(
+                venueId,
+                onBack,
+                onSubmitProof,
+                approvedQuestId = "fox",
+                arrivalQuestId = questId,
+            )
+          },
+          overview = { onOpenQuest ->
             OverviewContent(
                 OverviewUiState(OverviewStatus.LOADED, listOf(overviewRow())),
-                onOpenVenue,
+                onOpenQuest,
                 onRetry = {},
                 onCancel = {},
             )
@@ -178,16 +190,49 @@ class AroundAppTest {
       )
     }
     composeTestRule.onNodeWithTag("${C.Tag.OVERVIEW_ROW}_reservation-1").performClick()
+    composeTestRule.waitForIdle()
+  }
 
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
-    val venueId = composeTestRule.runOnUiThread {
-      navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
-    }
-    assertEquals("venue-1", venueId)
-
-    composeTestRule.pressBack()
+  /** The overview shows again in the Quests tab, with no venue page left behind it. */
+  private fun assertBackOnTheOverview() {
     assertShowing(Tab.QUESTS)
     composeTestRule.onNodeWithTag(C.Tag.OVERVIEW_TITLE).assertIsDisplayed()
+    composeTestRule.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertDoesNotExist()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
+  }
+
+  // The row passes its venue's and its quest's ids, and its quest's details open at once
+  @Test
+  fun aRowOfTheOverviewOpensItsQuestsDetails() {
+    openQuestFromOverview()
+
+    composeTestRule.onNodeWithTag(C.Tag.QUEST_DETAIL_SCREEN).assertIsDisplayed()
+    val arguments = composeTestRule.runOnUiThread {
+      navController.currentBackStackEntry?.arguments?.let {
+        it.getString(Routes.VENUE_ID) to it.getString(Routes.QUEST_ID)
+      }
+    }
+    assertEquals("venue-1" to "fox", arguments)
+  }
+
+  // The explorer never saw the venue's list, so Back skips it
+  @Test
+  fun backFromTheDetailsOfARowReturnsToTheOverview() {
+    openQuestFromOverview()
+
+    composeTestRule.pressBack()
+
+    assertBackOnTheOverview()
+  }
+
+  @Test
+  fun theBackArrowOfTheDetailsOfARowReturnsToTheOverview() {
+    openQuestFromOverview()
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
+    composeTestRule.waitForIdle()
+
+    assertBackOnTheOverview()
   }
 
   // Otherwise no tab is selected while a screen opened from a tab is shown

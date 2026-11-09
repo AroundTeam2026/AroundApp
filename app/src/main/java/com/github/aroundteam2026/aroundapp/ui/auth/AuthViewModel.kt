@@ -12,11 +12,13 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthInputValidation
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.user.RegistrationChoice
 import com.github.aroundteam2026.aroundapp.model.user.Role
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Why the form can't go ahead. The screen turns each into a string resource. */
 enum class AuthFormError {
@@ -192,7 +194,11 @@ class AuthViewModel(
                   else -> registration.choose(role)
                 }
               },
-              call = { repository.signInWithGoogle(result.idToken) },
+              call = {
+                if (role == null) repository.signInWithGoogle(result.idToken)
+                else repository.signUpWithGoogle(result.idToken)
+              },
+              onFailure = { if (role != null) registration?.discardChoice() },
           )
       GoogleCredentialResult.Cancelled -> _uiState.update { it.copy(isLoading = false) }
       GoogleCredentialResult.Unavailable -> fail(AuthFormError.GOOGLE_UNAVAILABLE)
@@ -248,14 +254,26 @@ class AuthViewModel(
 
   private fun authenticate(
       prepare: suspend () -> Result<Unit>,
+      onFailure: suspend () -> Unit = {},
       call: suspend () -> Result<String>,
   ) {
     viewModelScope.launch {
-      if (prepare().isFailure) {
-        _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
-        return@launch
-      }
-      val result = call()
+      var prepared = false
+      var succeeded = false
+      val result =
+          try {
+            if (prepare().isFailure) {
+              _uiState.update { it.copy(isLoading = false, error = AuthFormError.ACCOUNT_SETUP) }
+              return@launch
+            }
+            prepared = true
+            call().also { succeeded = it.isSuccess }
+          } finally {
+            if (prepared && !succeeded) {
+              // The caller may already be cancelled; the saved signup choice must still be removed.
+              withContext(NonCancellable) { onFailure() }
+            }
+          }
       _uiState.update {
         if (result.isSuccess) AuthUiState()
         else it.copy(isLoading = false, error = result.exceptionOrNull()?.let(::toFormError))

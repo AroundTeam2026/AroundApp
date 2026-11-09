@@ -4,8 +4,9 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.resources
 
-// Like R, but C
+/** App-wide constants, named like `R`. */
 object C {
+  /** Test tags that UI tests use to find composables. */
   object Tag {
     const val ROLE_PROFILE_ERROR = "role_profile_error"
     const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
@@ -121,6 +122,8 @@ object C {
     const val VENUE_PAGE_QUEST_COUNT = "venue_page_quest_count"
     const val ACCEPT_QUEST_BAR = "accept_quest_bar"
     const val ACCEPT_QUEST_BUTTON = "accept_quest_button"
+    const val SUBMIT_PROOF_BUTTON = "submit_proof_button"
+    const val SEND_NEW_PROOF_BUTTON = "send_new_proof_button"
     const val ACCEPT_QUEST_NEEDS_MORE = "accept_quest_needs_more"
     const val ACCEPT_QUEST_FAILED = "accept_quest_failed"
     const val ACCEPT_QUEST_UNAVAILABLE = "accept_quest_unavailable"
@@ -128,13 +131,23 @@ object C {
     const val VENUE_QUEST_ROW_TITLE = "venue_quest_row_title"
     const val VENUE_QUEST_ROW_DESCRIPTION = "venue_quest_row_description"
     const val VENUE_QUEST_ROW_DETAILS = "venue_quest_row_details"
-    const val QUEST_DETAIL_SHEET = "quest_detail_sheet"
+    const val QUEST_DETAIL_SCREEN = "quest_detail_screen"
     const val QUEST_DETAIL_TITLE = "quest_detail_title"
-    const val QUEST_DETAIL_CLOSE = "quest_detail_close"
+    const val QUEST_DETAIL_VENUE_NAME = "quest_detail_venue_name"
+    const val QUEST_DETAIL_VENUE_ADDRESS = "quest_detail_venue_address"
     const val QUEST_DETAIL_DESCRIPTION = "quest_detail_description"
     const val QUEST_DETAIL_REQUIREMENTS = "quest_detail_requirements"
     const val QUEST_DETAIL_PROOF = "quest_detail_proof"
+    const val QUEST_DETAIL_PROOF_STATUS = "quest_detail_proof_status"
     const val QUEST_DETAIL_REWARD_DETAILS = "quest_detail_reward_details"
+    const val QUEST_DETAIL_REWARD_EXPIRY = "quest_detail_reward_expiry"
+    const val QUEST_DETAIL_PARTY_RULE = "quest_detail_party_rule"
+    const val QUEST_DETAIL_PARTY_JOINED = "quest_detail_party_joined"
+    const val QUEST_DETAIL_PARTY_BIGGER = "quest_detail_party_bigger"
+    const val QUEST_DETAIL_SEAT_EMPTY = "quest_detail_seat_empty"
+    const val QUEST_DETAIL_RADIUS = "quest_detail_radius"
+    const val QUEST_DETAIL_RADIUS_MAP = "quest_detail_radius_map"
+    const val QUEST_DETAIL_RADIUS_NOTE = "quest_detail_radius_note"
 
     const val NEARBY_COUNTER = "nearby_counter"
     const val NEARBY_LOCATION_HINT = "nearby_location_hint"
@@ -152,6 +165,8 @@ object C {
     const val NEARBY_FILTERS = "nearby_filters"
     const val LOCATION_BANNER = "location_banner"
     const val LOCATION_TURN_ON = "location_turn_on"
+    const val VENUES_ERROR_BANNER = "venues_error_banner"
+    const val VENUES_TRY_AGAIN = "venues_try_again"
 
     const val CREATE_QUEST_SCREEN = "create_quest_screen"
     const val CREATE_QUEST_CLOSE = "create_quest_close"
@@ -207,6 +222,13 @@ object C {
     const val DASHBOARD_ROW_APPROVED = "dashboard_row_approved"
     const val DASHBOARD_ROW_DECLINE = "dashboard_row_decline"
     const val DASHBOARD_ROW_APPROVE = "dashboard_row_approve"
+    const val DASHBOARD_PROOFS = "dashboard_proofs"
+    /** Followed by `_` and the completion's id, e.g. `dashboard_proof_row_r1_explorer`. */
+    const val DASHBOARD_PROOF_ROW = "dashboard_proof_row"
+    const val DASHBOARD_PROOF_EXPLORER = "dashboard_proof_explorer"
+    const val DASHBOARD_PROOF_DETAILS = "dashboard_proof_details"
+    const val DASHBOARD_PROOF_SENT = "dashboard_proof_sent"
+    const val DASHBOARD_PROOF_ICON = "dashboard_proof_icon"
     const val AROUND_HEADER = "around_header"
     const val OVERVIEW_TITLE = "overview_title"
     const val OVERVIEW_COUNT = "overview_count"
@@ -222,11 +244,11 @@ object C {
     const val OVERVIEW_ROW_SLOT = "overview_row_slot"
     const val OVERVIEW_ROW_PARTY = "overview_row_party"
     const val OVERVIEW_ROW_STATUS = "overview_row_status"
-    const val OVERVIEW_ROW_CANCEL = "overview_row_cancel"
-    const val OVERVIEW_ROW_CANCEL_FAILED = "overview_row_cancel_failed"
-    const val OVERVIEW_CANCEL_DIALOG = "overview_cancel_dialog"
-    const val OVERVIEW_CANCEL_CONFIRM = "overview_cancel_confirm"
-    const val OVERVIEW_CANCEL_KEEP = "overview_cancel_keep"
+    const val CANCEL_RESERVATION = "cancel_reservation"
+    const val CANCEL_RESERVATION_FAILED = "cancel_reservation_failed"
+    const val CANCEL_RESERVATION_DIALOG = "cancel_reservation_dialog"
+    const val CANCEL_RESERVATION_CONFIRM = "cancel_reservation_confirm"
+    const val CANCEL_RESERVATION_KEEP = "cancel_reservation_keep"
     const val CREATE_QUEST_REWARD_NONE = "create_quest_reward_none"
     const val CREATE_QUEST_REWARD_DISCOUNT = "create_quest_reward_discount"
     const val CREATE_QUEST_REWARD_AMOUNT = "create_quest_reward_amount"
@@ -248,5 +270,47 @@ object C {
     const val CREATE_QUEST_REWARD_EXPIRY_CLEAR = "create_quest_reward_expiry_clear"
     const val CREATE_QUEST_REWARD_EXPIRY_ERROR = "create_quest_reward_expiry_error"
     const val CREATE_QUEST_REWARD_EXPIRY_CONFIRM = "create_quest_reward_expiry_confirm"
+
+    // Quest completion screen
+    const val COMPLETION_SCREEN = "completion_screen"
+    const val COMPLETION_SUBMIT = "completion_submit"
+    const val COMPLETION_ANSWER = "completion_answer"
+    const val COMPLETION_SAVE_ERROR = "completion_save_error"
+
+    // Proof photo picker
+    const val PROOF_PHOTO = "proof_photo"
+    const val PROOF_PHOTO_IMAGE = "proof_photo_image"
+    const val PROOF_PHOTO_TAKE = "proof_photo_take"
+    const val PROOF_PHOTO_GALLERY = "proof_photo_gallery"
+    const val PROOF_PHOTO_RETAKE = "proof_photo_retake"
+    const val PROOF_PHOTO_OPEN_SETTINGS = "proof_photo_open_settings"
+    const val PROOF_PHOTO_ERROR = "proof_photo_error"
+
+    // Reject proof sheet
+    const val REJECT_PROOF_SHEET = "reject_proof_sheet"
+    /** Followed by `_` and the `RejectReason`'s name, e.g. `reject_proof_reason_OTHER`. */
+    const val REJECT_PROOF_REASON = "reject_proof_reason"
+    const val REJECT_PROOF_NOTE = "reject_proof_note"
+    const val REJECT_PROOF_BACK = "reject_proof_back"
+    const val REJECT_PROOF_CONFIRM = "reject_proof_confirm"
+    const val REJECT_PROOF_NEEDS_REASON = "reject_proof_needs_reason"
+
+    // Review proof screen
+    const val REVIEW_PROOF_SCREEN = "review_proof_screen"
+    const val REVIEW_PROOF_BACK = "review_proof_back"
+    const val REVIEW_PROOF_LOADING = "review_proof_loading"
+    const val REVIEW_PROOF_LOAD_FAILED = "review_proof_load_failed"
+    const val REVIEW_PROOF_RETRY = "review_proof_retry"
+    const val REVIEW_PROOF_EXPLORER = "review_proof_explorer"
+    const val REVIEW_PROOF_SENT = "review_proof_sent"
+    const val REVIEW_PROOF_QUEST = "review_proof_quest"
+    const val REVIEW_PROOF_REQUIREMENTS = "review_proof_requirements"
+    const val REVIEW_PROOF_PHOTO = "review_proof_photo"
+    const val REVIEW_PROOF_PHOTO_IMAGE = "review_proof_photo_image"
+    const val REVIEW_PROOF_PHOTO_RETRY = "review_proof_photo_retry"
+    const val REVIEW_PROOF_ANSWER = "review_proof_answer"
+    const val REVIEW_PROOF_HINT = "review_proof_hint"
+    const val REVIEW_PROOF_REJECT = "review_proof_reject"
+    const val REVIEW_PROOF_APPROVE = "review_proof_approve"
   }
 }

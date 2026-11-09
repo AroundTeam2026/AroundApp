@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import java.util.UUID
@@ -41,6 +42,47 @@ fun ComposeTestRule.createVenueAccount(email: String = "e2e-${UUID.randomUUID()}
     )
 
 /**
+ * Signs in to the existing account [email] through the app's "Sign in" form, from the auth screen,
+ * and waits for the screen tagged [landsOn], e.g. a set-up venue's dashboard.
+ */
+fun ComposeTestRule.signIn(email: String, landsOn: String) {
+  onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
+  onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()
+  onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
+  onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
+  submitAuthForm()
+  leaveAuthFor(landsOn)
+}
+
+/**
+ * Signs out from the Profile tab, tagged [profileTab] in the explorer's and the venue's bars, and
+ * waits for the auth screen.
+ */
+fun ComposeTestRule.signOut(profileTab: String = C.Tag.PROFILE_TAB) {
+  onNodeWithTag(profileTab).performClick()
+  onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
+  waitUntil(SETUP_TIMEOUT_MS) {
+    onAllNodes(hasTestTag(C.Tag.AUTH_SCREEN)).fetchSemanticsNodes().isNotEmpty()
+  }
+}
+
+/** Closes the soft keyboard, then taps the auth form's submit button, scrolled into view. */
+fun ComposeTestRule.submitAuthForm() {
+  closeKeyboard()
+  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
+}
+
+/**
+ * Closes the soft keyboard and waits until it is hidden. Call it before every tap that follows
+ * typing: while the keyboard slides in, a screen with imePadding is still catching up, so a button
+ * can still be under the keyboard or moving when the tap lands, and the tap is lost (the auth form
+ * in CI run 41899891610, the venue name's Continue in 41918593997).
+ */
+fun ComposeTestRule.closeKeyboard() {
+  Espresso.closeSoftKeyboard()
+}
+
+/**
  * Chooses [accountType], fills credentials, submits, and waits for the screen tagged [landsOn] in
  * place of the auth screen.
  */
@@ -60,8 +102,13 @@ private fun ComposeTestRule.register(
   onNodeWithTag(C.Tag.AUTH_EMAIL).performTextInput(email)
   onNodeWithTag(C.Tag.AUTH_PASSWORD).performTextInput(E2E_PASSWORD)
   onNodeWithTag(C.Tag.AUTH_CONFIRMATION).performTextInput(E2E_PASSWORD)
-  onNodeWithTag(C.Tag.AUTH_SUBMIT).performScrollTo().performClick()
-  // Signing up creates the Auth account and writes the profile, which is slow on a cold emulator
+  submitAuthForm()
+  leaveAuthFor(landsOn)
+}
+
+/** Waits for the screen tagged [landsOn] to replace the auth screen after submitting its form. */
+private fun ComposeTestRule.leaveAuthFor(landsOn: String) {
+  // Signing up or in reads or writes the profile, which is slow on a cold emulator
   waitUntil(SETUP_TIMEOUT_MS) { onAllNodes(hasTestTag(landsOn)).fetchSemanticsNodes().isNotEmpty() }
   onNodeWithTag(landsOn).assertIsDisplayed()
   onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()

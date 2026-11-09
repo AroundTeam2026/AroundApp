@@ -89,6 +89,7 @@ class AuthInputValidationTest {
     for (repo in repositories) {
       for (token in listOf("", " ", "\t\n")) {
         assertEquals(AuthError.InvalidCredentials, repo.signInWithGoogle(token).exceptionOrNull())
+        assertEquals(AuthError.InvalidCredentials, repo.signUpWithGoogle(token).exceptionOrNull())
         assertNull(repo.currentUserId.value)
       }
     }

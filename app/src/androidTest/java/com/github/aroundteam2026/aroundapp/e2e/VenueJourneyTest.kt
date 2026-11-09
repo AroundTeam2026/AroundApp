@@ -59,6 +59,7 @@ class VenueJourneyTest : TestCase() {
     step("Register through the venue link") { composeTestRule.createVenueAccount() }
     step("Name the venue") {
       composeTestRule.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput(venueName)
+      composeTestRule.closeKeyboard()
       composeTestRule
           .onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE)
           .performScrollTo()
@@ -94,6 +95,8 @@ class VenueJourneyTest : TestCase() {
           }
       // Enabled once the form has read the venue's location, where the quest goes
       waitFor(hasTestTag(C.Tag.CREATE_QUEST_SUBMIT) and isEnabled())
+      // The button is in the screen's bottom bar, outside the form's scrolling column
+      composeTestRule.closeKeyboard()
       composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
       // Saving closes the form, back to the Quests tab it was opened from
       composeTestRule.waitUntil(TIMEOUT_MS) { !exists(hasTestTag(C.Tag.CREATE_QUEST_SCREEN)) }

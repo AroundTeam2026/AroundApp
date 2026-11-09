@@ -14,6 +14,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.completion.Completion
+import com.github.aroundteam2026.aroundapp.ui.completion.CompletionViewModel
+import com.github.aroundteam2026.aroundapp.ui.completion.completionDestination
+import com.github.aroundteam2026.aroundapp.ui.completion.navigateToCompletion
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
@@ -56,20 +60,36 @@ private val START_TAB = Tab.QUESTS
  * @param onSignOut supplies the Profile sign-out action.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  * @param explorerUid the signed-in explorer, who accepts quests on a venue's page.
- * @param venuePage draws a venue's page, given its id and back action; tests pass their own so the
- *   page doesn't read Firestore.
- * @param overview draws the Quests tab's overview, given what opens a venue's page; tests pass
- *   their own so the overview doesn't read Firestore.
+ * @param venuePage draws a venue's page, given its id, the quest whose details it opens at once if
+ *   any, its back action and what its "Submit proof" button opens; tests pass their own so the page
+ *   doesn't read Firestore.
+ * @param overview draws the Quests tab's overview, given what opens a quest's details on its
+ *   venue's page; tests pass their own so the overview doesn't read Firestore.
+ * @param completion draws the screen where the explorer completes a reservation's quest, given the
+ *   reservation's id, the venue's name and what closes it; tests pass their own so it doesn't read
+ *   Firestore.
  */
 @Composable
 fun AroundApp(
     explorerUid: String,
     navController: NavHostController = rememberNavController(),
     onSignOut: () -> Unit,
-    venuePage: @Composable (venueId: String, onBack: () -> Unit) -> Unit = { venueId, onBack ->
-      VenuePage(venueId, explorerUid, onBack)
-    },
-    overview: @Composable (onOpenVenue: (venueId: String) -> Unit) -> Unit = {
+    venuePage:
+        @Composable
+        (
+            venueId: String,
+            questId: String?,
+            onBack: () -> Unit,
+            onSubmitProof: (reservationId: String, venueName: String) -> Unit,
+        ) -> Unit =
+        { venueId, questId, onBack, onSubmitProof ->
+          VenuePage(venueId, questId, explorerUid, onBack, onSubmitProof)
+        },
+    completion: @Composable (reservationId: String, venueName: String, close: () -> Unit) -> Unit =
+        { reservationId, venueName, close ->
+          Completion(venueName, close, CompletionViewModel.factory(reservationId, explorerUid))
+        },
+    overview: @Composable (onOpenQuest: (venueId: String, questId: String) -> Unit) -> Unit = {
       OverviewScreen(explorerUid, it)
     },
     screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, onSignOut) },
@@ -83,7 +103,12 @@ fun AroundApp(
       modifier = Modifier.testTag(C.Tag.APP),
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
-    venuePageDestination(onBack = { navController.popBackStack() }, page = venuePage)
+    venuePageDestination(
+        onBack = { navController.popBackStack() },
+        onSubmitProof = navController::navigateToCompletion,
+        page = venuePage,
+    )
+    completionDestination(navController, screen = completion)
   }
 }
 
@@ -96,27 +121,28 @@ internal fun NavHostController.openVenueFromMap(venueId: String, venueName: Stri
     openVenue(venueId)
 
 /**
- * Opens the page of the venue with [venueId] from a tab. A tap that arrives once a venue's page is
- * open, such as the second of a fast double tap, opens nothing.
+ * Opens the page of the venue with [venueId] from a tab, with the details of its quest [questId]
+ * open if given. A tap that arrives once a venue's page is open, such as the second of a fast
+ * double tap, opens nothing.
  */
-internal fun NavHostController.openVenue(venueId: String) {
+internal fun NavHostController.openVenue(venueId: String, questId: String? = null) {
   if (currentDestination?.route == Routes.VENUE_PAGE) return
-  navigateToVenuePage(venueId)
+  navigateToVenuePage(venueId, questId)
 }
 
 /**
  * The screen of [tab].
  *
- * @param navController opens a venue's page, when its card on the map or its row in the overview is
- *   tapped.
- * @param overview draws the Quests tab's overview, given what opens a venue's page.
+ * @param navController opens a venue's page when its card on the map is tapped, and a quest's
+ *   details on it when its row in the overview is.
+ * @param overview draws the Quests tab's overview, given what opens a quest's details.
  * @param onSignOut signs the user out from the Profile tab.
  */
 @Composable
 private fun TabScreen(
     tab: Tab,
     navController: NavHostController,
-    overview: @Composable (onOpenVenue: (venueId: String) -> Unit) -> Unit,
+    overview: @Composable (onOpenQuest: (venueId: String, questId: String) -> Unit) -> Unit,
     onSignOut: () -> Unit,
 ) =
     when (tab) {

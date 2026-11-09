@@ -1,0 +1,78 @@
+# Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com>
+name: Set up the Gradle build
+description: >
+  What every job that runs Gradle starts with: the JDKs, the gitignored google-services.json and
+  the CI debug keystore restored from the repository secrets, and Gradle with its cache.
+
+inputs:
+  google-services:
+    description: The GOOGLE_SERVICES secret, app/google-services.json in base64.
+    required: true
+  debug-keystore:
+    description: The DEBUG_KEYSTORE secret, the CI debug keystore in base64.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup JDK
+      uses: actions/setup-java@v6
+      with:
+        distribution: "temurin"
+        java-version: |
+          21
+          17
+
+    # google-services.json is required to build the app but is gitignored (it is
+    # per-project Firebase config). It is restored here from the GOOGLE_SERVICES
+    # repo secret so the build can run on CI.
+    - name: Decode google-services.json
+      shell: bash
+      env:
+        GOOGLE_SERVICES: ${{ inputs.google-services }}
+      run: |
+        if [ -n "$GOOGLE_SERVICES" ]; then
+          echo "$GOOGLE_SERVICES" | base64 --decode > ./app/google-services.json
+        else
+          echo "::error::GOOGLE_SERVICES secret is not set. Add it in the repo settings (Settings > Secrets and variables > Actions)."
+          exit 1
+        fi
+
+    # Without a keystore of its own, every CI run would sign debug builds with a new random one.
+    # The Maps API key only accepts registered certificates, so the CI restores the team's CI
+    # keystore from the DEBUG_KEYSTORE secret, whose SHA-1 is registered, and points Gradle at it
+    # with DEBUG_KEYSTORE_FILE for every later step. The keystore must stay out of the repository.
+    - name: Decode debug keystore
+      shell: bash
+      env:
+        DEBUG_KEYSTORE: ${{ inputs.debug-keystore }}
+        # The CI keystore's SHA-1, registered on the Maps API key; see the README
+        REGISTERED_SHA1: BA:28:CF:28:FF:37:5A:A9:85:5D:7A:43:84:38:26:0A:1D:14:99:4D
+      run: |
+        keystore="$RUNNER_TEMP/ci-debug.keystore"
+        if [ -n "$DEBUG_KEYSTORE" ]; then
+          echo "$DEBUG_KEYSTORE" | base64 --decode > "$keystore"
+        else
+          echo "::error::DEBUG_KEYSTORE secret is not set. See \"Google Maps API key\" in the README."
+          exit 1
+        fi
+        # Any other keystore builds fine but gets an empty map, so check it here, where it's clear
+        sha1=$(keytool -list -v -keystore "$keystore" -storepass android \
+          -alias androiddebugkey | sed -n 's/^[[:space:]]*SHA1: //p')
+        echo "Restored debug keystore SHA-1: $sha1"
+        if [ "$sha1" != "$REGISTERED_SHA1" ]; then
+          echo "::error::DEBUG_KEYSTORE holds a keystore with SHA-1 $sha1, not the registered $REGISTERED_SHA1. See \"Google Maps API key\" in the README."
+          exit 1
+        fi
+        echo "DEBUG_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+
+    # Caching is a very useful part of a CI, as a workflow is executed in a clean environment every time,
+    # this means that one would need to re-download and re-process gradle files for every run. Which is very time consuming.
+    #
+    # To avoid that, we cache the gradle folder to reuse it later.
+    - name: Gradle cache
+      uses: gradle/actions/setup-gradle@v6
+
+    - name: Grant execute permission for gradlew
+      shell: bash
+      run: chmod +x ./gradlew

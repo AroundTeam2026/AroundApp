@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The sheet a venue rejects a proof from, over the Review proof screen -->
+    <string name="reject_proof_title">Why are you rejecting this proof?</string>
+    <!-- The argument is the explorer's name -->
+    <string name="reject_proof_body">%1$s will see your reason.</string>
+    <string name="reject_proof_body_unknown">The explorer will see your reason.</string>
+    <string name="reject_proof_reason_blurry">The photo is too blurry</string>
+    <string name="reject_proof_reason_not_at_venue">Not taken at the venue</string>
+    <string name="reject_proof_reason_no_match">Doesn\'t match the task</string>
+    <string name="reject_proof_reason_other">Other</string>
+    <string name="reject_proof_note_label">Add a note (optional)</string>
+    <string name="reject_proof_note_hint">What should they change?</string>
+    <!-- The reason the explorer sees: the picked reason, then the note, e.g. "Doesn't match the
+         task: the photo shows a tea" -->
+    <string name="reject_proof_reason_with_note">%1$s: %2$s</string>
+    <string name="reject_proof_back">Back</string>
+    <string name="reject_proof_confirm">Reject proof</string>
+    <string name="reject_proof_rejecting">Rejecting…</string>
+    <string name="reject_proof_needs_reason">Reject proof stays off until a reason is picked or written.</string>
+    <!-- The Review proof screen, where a venue approves or rejects a proof -->
+    <string name="review_proof_title">Review proof</string>
+    <string name="review_proof_back">Back to the dashboard</string>
+    <string name="review_proof_pending">Pending</string>
+    <!-- The explorer's party, then when the proof was sent, e.g. "Party of 4 · sent 2 min. ago" -->
+    <string name="review_proof_party_and_sent">%1$s · sent %2$s</string>
+    <string name="review_proof_party_and_sent_just_now">%1$s · sent just now</string>
+    <!-- When the party isn't known -->
+    <string name="review_proof_sent">Sent %1$s</string>
+    <string name="review_proof_sent_just_now">Sent just now</string>
+    <!-- Before the quest's requirements, e.g. "What to do: Order any drink." -->
+    <string name="review_proof_requirements">What to do: %1$s</string>
+    <string name="review_proof_answer_label">Their answer</string>
+    <!-- Where the photo goes when it can't be shown -->
+    <string name="review_proof_photo">Photo proof</string>
+    <!-- Read by screen readers on the photo; the argument is the explorer's name -->
+    <string name="review_proof_photo_description">Photo sent by %1$s</string>
+    <string name="review_proof_photo_retry">Load the photo again</string>
+    <!-- In sentences, for an explorer whose name isn't known -->
+    <string name="review_proof_the_explorer">the explorer</string>
+    <!-- The arguments are the explorer's name and the reward, e.g. "Free croissant" -->
+    <string name="review_proof_reward_party">Approving gives %1$s and their party the %2$s reward.</string>
+    <string name="review_proof_reward_solo">Approving gives %1$s the %2$s reward.</string>
+    <!-- The party size couldn't be read, so the hint doesn't say who gets the reward -->
+    <string name="review_proof_reward_unknown_party">Approving gives the %1$s reward.</string>
+    <string name="review_proof_sending">Sending your answer to %1$s…</string>
+    <string name="review_proof_reject">Reject</string>
+    <string name="review_proof_approve">Approve</string>
+    <string name="review_proof_approving">Approving…</string>
+    <string name="review_proof_answer_failed">Couldn\'t send your answer. Check your connection and try again.</string>
+    <string name="review_proof_load_failed">Couldn\'t load this proof.</string>
+    <string name="review_proof_retry">Try again</string>
+</resources>

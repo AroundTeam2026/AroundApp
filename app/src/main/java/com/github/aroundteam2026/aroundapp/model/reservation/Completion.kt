@@ -48,15 +48,17 @@ sealed interface Proof {
   /**
    * A photo taken at the venue.
    *
-   * @property url Cloud Storage URL of the uploaded photo.
-   * @throws IllegalArgumentException if [url] is blank.
+   * @property location The photo's Cloud Storage location (`gs://...`), as returned by
+   *   [ProofPhotoRepository.upload]. It is not a download URL, so an image loader can't open it:
+   *   read the photo with [ProofPhotoRepository.download].
+   * @throws IllegalArgumentException if [location] is blank.
    */
-  data class Photo(val url: String) : Proof {
+  data class Photo(val location: String) : Proof {
     override val type: ProofType
       get() = ProofType.PHOTO
 
     init {
-      require(url.isNotBlank()) { "A photo proof needs the photo's URL" }
+      require(location.isNotBlank()) { "A photo proof needs the photo's location" }
     }
   }
 
@@ -82,11 +84,24 @@ enum class CompletionStatus {
   PENDING,
   /** Accepted by the venue. Final. */
   APPROVED,
-  /** Declined by the venue. Final. */
+  /** Declined by the venue, which can still approve it. The explorer can't submit again. */
   REJECTED,
 }
 
-/** Whether a completion may change from [from] to [to]: only pending ones can be answered. */
+/**
+ * The id of [explorerUid]'s completion of the reservation [reservationId]. Built from both, so a
+ * retried submission writes the same document and an explorer can't complete a reservation twice.
+ */
+fun completionId(reservationId: String, explorerUid: String) = "${reservationId}_$explorerUid"
+
+/** The longest reason a venue can give for rejecting a proof: the security rules refuse longer. */
+const val MAX_REJECT_REASON_LENGTH = 300
+
+/**
+ * Whether a completion may change from [from] to [to]: a pending one can be answered, and a venue
+ * that changes its mind can approve one it rejected.
+ */
 fun canTransition(from: CompletionStatus, to: CompletionStatus): Boolean =
-    from == CompletionStatus.PENDING &&
-        (to == CompletionStatus.APPROVED || to == CompletionStatus.REJECTED)
+    (from == CompletionStatus.PENDING &&
+        (to == CompletionStatus.APPROVED || to == CompletionStatus.REJECTED)) ||
+        (from == CompletionStatus.REJECTED && to == CompletionStatus.APPROVED)

@@ -6,6 +6,7 @@ import android.util.Log
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyUserFirestore
 import com.github.aroundteam2026.aroundapp.model.party.partyMemberId
+import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -27,18 +28,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [ReservationRepository] backed by the Firestore `reservations` collection, with each party in the
  * `party_user` collection.
  *
- * Firestore types stay inside this class. Epoch-millisecond times are stored as `Timestamp`s and
- * the status as its enum name. A document without `explorerName`, written before it was stored, is
- * read with an empty one. The reservation id is the document id rather than a stored field.
  * Documents that cannot be mapped back to a [Reservation] are logged and skipped: the `observe*`
  * flows leave them out, and [updateStatus] treats them as missing.
  *
- * The security rules decide who may do what: an explorer may only create a pending reservation
- * together with their own joined membership, only the venue and the party's joined members read it,
- * and only the venue may change a reservation's status, along an allowed transition, apart from a
- * joined member cancelling it. A creation the rules refuse within [confirmTimeoutMs] comes back as
- * a failure, and one they refuse later is only logged; a refused [updateStatus] comes back as a
- * failure.
+ * The security rules let an explorer create only a pending reservation with their own joined
+ * membership, and only the venue change its status, apart from a joined member cancelling it. A
+ * creation refused within [confirmTimeoutMs] comes back as a failure, and one refused later is only
+ * logged.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [createReservation] waits for the server to confirm a write, in
@@ -54,14 +50,13 @@ class ReservationRepositoryFirestore(
     get() = db.collection(RESERVATIONS)
 
   /**
-   * Writes the reservation and [creatorUid]'s membership, under [partyMemberId], in one batch,
-   * which the server applies whole or not at all, and waits up to [confirmTimeoutMs] for its
-   * answer. Both share the creation time. A refusal in that time, e.g. because [creatorUid] is not
-   * the signed-in user, is returned as the Firestore exception (`PERMISSION_DENIED`), and Firestore
-   * drops its local copy of both. Without an answer in time, e.g. while offline, it returns
-   * success: Firestore sends the batch once the device is back online, and a refusal then is only
-   * logged. Exceptions thrown while issuing the write (e.g. on a terminated client) are returned as
-   * a failure too.
+   * Writes the reservation and [creatorUid]'s membership in one batch, applied whole or not at all,
+   * and waits up to [confirmTimeoutMs] for the server's answer.
+   *
+   * A refusal in that time, e.g. because [creatorUid] is not the signed-in user, is returned as the
+   * Firestore exception, and Firestore drops its local copy of both. Without an answer in time,
+   * e.g. while offline, it returns success and a later refusal is only logged. Errors while issuing
+   * the write are returned as a failure too.
    */
   override suspend fun createReservation(
       reservation: Reservation,
@@ -223,10 +218,6 @@ class ReservationRepositoryFirestore(
       null
     }
   }
-
-  /** Reads [field] with [read], throwing if it is absent. */
-  private fun <T : Any> required(field: String, read: (String) -> T?): T =
-      read(field) ?: throw IllegalArgumentException("Missing field $field")
 
   private companion object {
     const val TAG = "ReservationRepositoryFirestore"

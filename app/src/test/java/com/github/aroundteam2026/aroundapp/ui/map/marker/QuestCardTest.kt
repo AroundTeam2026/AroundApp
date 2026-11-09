@@ -44,16 +44,18 @@ class QuestCardTest {
       title: String = "Order the secret menu",
       reward: Reward? = Reward.Other("Free coffee"),
       minPartySize: Int = 1,
+      exactPartySize: Boolean = false,
       otherQuestCount: Int = 0,
       distanceMeters: Double? = null,
       avatar: VenueAvatar = TestAvatar("cafe"),
   ): VenuePin {
     val quest =
         testQuest(
-            title = title,
-            reward = reward,
-            minPartySize = minPartySize,
-        )
+                title = title,
+                reward = reward,
+                minPartySize = minPartySize,
+            )
+            .copy(exactPartySize = exactPartySize)
     return VenuePin(
         venueId = quest.venueId,
         venueName = venueName,
@@ -175,6 +177,14 @@ class QuestCardTest {
 
     node(C.Tag.QUEST_CHIP_PARTY)
         .assertTextEquals(context.getString(R.string.map_card_party_size, 2))
+  }
+
+  @Test
+  fun anExactPartyHasNoPlus() {
+    show(pin(minPartySize = 2, exactPartySize = true))
+
+    node(C.Tag.QUEST_CHIP_PARTY)
+        .assertTextEquals(context.getString(R.string.map_card_exact_party_size, 2))
   }
 
   @Test

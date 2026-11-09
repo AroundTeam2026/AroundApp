@@ -1,8 +1,10 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.venue
 
 import android.util.Log
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -24,18 +26,14 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 
 /**
- * [VenueRepository] backed by the Firestore `venues` collection.
+ * [VenueRepository] backed by the Firestore `venues` collection, one document per venue under its
+ * owner's uid.
  *
- * Firestore types stay inside this class. [Location] is stored as a `GeoPoint` and
- * [Venue.createdAt] as a `Timestamp`. Null fields are omitted, and the venue id, its owner's uid,
- * is the document id rather than a stored field. Documents that cannot be mapped back to a [Venue]
- * are logged and read as missing, so one bad venue does not end a list of them. Such a document
- * still exists, so [createVenue] refuses its id and [setArea] does not repair it: its owner cannot
- * finish onboarding until it is fixed or deleted in the console. Only a write outside the app can
- * make one, since the app always writes every required field.
+ * Documents that cannot be mapped back to a [Venue] are logged and read as missing, so one bad
+ * venue does not end a list of them. Such a document still blocks [createVenue] and [setArea]
+ * doesn't repair it, so its owner can't finish onboarding until it is fixed in the console.
  *
- * The security rules let any signed-in user read a venue and only its owner write it, so writing a
- * venue whose id is not the signed-in uid fails with the Firestore exception.
+ * The security rules let any signed-in user read a venue and only its owner write it.
  *
  * @param db Firestore client to read from and write to.
  */
@@ -176,10 +174,6 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
       null
     }
   }
-
-  /** Reads [field] with [read], throwing if it is absent. */
-  private fun <T : Any> required(field: String, read: (String) -> T?): T =
-      read(field) ?: throw IllegalArgumentException("Missing field $field")
 
   private companion object {
     const val TAG = "VenueRepositoryFirestore"

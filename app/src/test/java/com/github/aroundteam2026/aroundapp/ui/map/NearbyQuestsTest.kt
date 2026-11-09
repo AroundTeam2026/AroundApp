@@ -71,12 +71,13 @@ class NearbyQuestsTest {
   fun aRowCarriesItsQuestAndVenue() {
     val quest =
         testQuest(
-            id = "fox",
-            venueId = "lumen",
-            title = "Find the hidden fox",
-            reward = Reward.Other("Free coffee"),
-            minPartySize = 3,
-        )
+                id = "fox",
+                venueId = "lumen",
+                title = "Find the hidden fox",
+                reward = Reward.Other("Free coffee"),
+                minPartySize = 3,
+            )
+            .copy(exactPartySize = true)
 
     val venue = testVenue(id = "lumen", name = "Café Lumen", location = north(300.0))
 
@@ -88,6 +89,7 @@ class NearbyQuestsTest {
     assertEquals("Find the hidden fox", row.title)
     assertEquals(Reward.Other("Free coffee"), row.reward)
     assertEquals(3, row.minPartySize)
+    assertTrue(row.exactPartySize)
     assertEquals(300.0, row.distanceMeters!!, 0.01)
   }
 

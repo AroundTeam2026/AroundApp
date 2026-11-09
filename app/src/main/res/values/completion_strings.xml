@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
+<resources>
+    <!-- The proof photo picker, on the completion screen -->
+    <string name="proof_photo_title">Add a photo of your proof</string>
+    <!-- The argument is the venue's name -->
+    <string name="proof_photo_body">Take it here at %1$s, or pick one you just took.</string>
+    <string name="proof_photo_take">Take photo</string>
+    <string name="proof_photo_gallery">Choose from gallery</string>
+    <string name="proof_photo_retake">Retake</string>
+    <!-- Read by screen readers on the picked photo -->
+    <string name="proof_photo_description">Your proof photo</string>
+    <!-- After the explorer refused the camera permission -->
+    <string name="proof_photo_camera_refused_title">Around can\'t use the camera</string>
+    <string name="proof_photo_camera_refused_body">Allow the camera in your phone\'s settings to take a photo here, or pick one from your gallery.</string>
+    <string name="proof_photo_open_settings">Open settings</string>
+    <!-- When taking or using a photo fails -->
+    <string name="proof_photo_no_camera">No camera app found. Pick a photo from your gallery instead.</string>
+    <string name="proof_photo_unreadable">Couldn\'t use this photo. Try another one.</string>
+    <string name="proof_photo_too_big">This photo is too big to send. Try another one.</string>
+    <string name="completion_heading">Submit proof</string>
+    <string name="completion_back">Back</string>
+    <string name="completion_send">Send proof</string>
+    <string name="completion_sending">Sending…</string>
+    <string name="completion_sent">Proof sent</string>
+    <string name="completion_review_hint">%1$s checks your proof, usually within a few minutes.</string>
+    <string name="completion_requirements">WHAT TO DO</string>
+    <string name="completion_answer">Your answer</string>
+    <string name="completion_answer_hint">Write your answer here</string>
+    <string name="completion_retry">Try again</string>
+    <string name="completion_load_failed">Could not load this quest. Please try again.</string>
+    <string name="completion_unavailable">This reservation is no longer available to complete.</string>
+    <string name="completion_save_failed">Couldn\'t send your proof. Check your connection and try again.</string>
+    <string name="completion_too_far">You’re outside this quest’s unlock radius. Move closer to the venue, then try sending your proof again.</string>
+    <string name="completion_location_unavailable">Around cannot get a precise device or venue location, so it cannot check that you’re at the venue. Check location access and try again.</string>
+    <string name="completion_precise_required">Precise location is needed to complete a quest. Approximate location works for the map, but cannot verify that you’re at the venue.</string>
+    <string name="completion_enable_location">Enable precise location</string>
+    <string name="completion_location_settings">Open location settings</string>
+    <string name="completion_check_location">Check location access</string>
+</resources>

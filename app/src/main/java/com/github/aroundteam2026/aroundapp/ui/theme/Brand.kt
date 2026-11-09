@@ -47,7 +47,7 @@ object AroundColors {
   val DarkBabyBlue = Color(0xFF2F4744)
   val DarkMapLabel = Color(0xFFC9B8A4)
   val DarkError = Color(0xFFE5736B)
-  /** Elevation tints from the map, header, overview, and address search designs. */
+  /** Figma keeps these elevation tints the same in light and dark mode. */
   val AddressShadow = Color(0x266B5947)
   val BannerShadow = Color(0x296B5947)
   val OverlayShadow = Color(0x2E1F142E)

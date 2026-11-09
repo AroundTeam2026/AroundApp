@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import android.util.Log
@@ -17,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
+import com.github.aroundteam2026.aroundapp.ui.SaveState
 import java.time.Clock
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
@@ -27,15 +29,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the quest form of the signed-in venue. Values are kept as typed, untrimmed, so editing
- * never moves the cursor; they are trimmed when the quest is saved. Edits are ignored while the
- * quest is being saved.
+ * Holds the quest form of the signed-in venue.
  *
- * The radius starts at the venue's own radius once it is loaded, unless the venue has already
- * chosen one; until then, or if the venue can't be read, it is [QuestLimits.DEFAULT_RADIUS_METERS].
- * The venue's location, once loaded, centres the radius map and is where the saved quest takes
- * place. If the venue can't be read, the form says so and [retryVenue] reads it again. [clock]
- * tells which day it is, to reject a reward expiry that has already passed.
+ * Values are kept as typed and trimmed on save, so editing never moves the cursor; edits are
+ * ignored while saving. The radius starts at the venue's own once loaded, unless already chosen,
+ * and is [QuestLimits.DEFAULT_RADIUS_METERS] until then. The venue's location centres the radius
+ * map and places the saved quest; if the venue can't be read, the form says so and [retryVenue]
+ * reads it again. [clock] rejects a reward expiry that has passed.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,

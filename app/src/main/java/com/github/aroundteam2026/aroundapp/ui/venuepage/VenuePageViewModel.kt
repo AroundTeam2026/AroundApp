@@ -16,6 +16,9 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
 import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -29,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -47,13 +51,13 @@ import kotlinx.coroutines.launch
 /**
  * Holds the page of the venue [venueId]: its header and the quests explorers can take there.
  *
- * It listens to the venue, its active quests, the only ones the repository sends, and the
- * reservations of the explorer [explorerUid] with their parties, read from [partyRepository], and
- * keeps up as they change and as rewards expire, by [clock]. If listening to the venue or its
- * quests fails, the page shows [VenuePageStatus.FAILED] until [onRetry]. If listening to the
- * reservations or their parties fails, the page stays and accepting is unavailable
- * ([VenuePageUiState.acceptAvailable]) until the page is opened again. Accepting names the explorer
- * by the display name in their profile, read from [userRepository].
+ * It keeps up with the venue, its active quests, the reservations of [explorerUid] with their
+ * parties and the proofs they sent, and with rewards expiring by [clock]. If the venue or its
+ * quests fail to load, the page is [VenuePageStatus.FAILED] until [onRetry]; if the reservations
+ * fail, accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and
+ * if the proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the
+ * explorer as in their profile. Given [arrivalQuestId], the page opens that quest's details the
+ * first time it shows the venue; see [VenuePageUiState.arrivingAt].
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -62,14 +66,23 @@ class VenuePageViewModel(
     private val reservationRepository: ReservationRepository,
     private val userRepository: UserRepository,
     private val partyRepository: PartyRepository,
+    private val completionRepository: CompletionRepository,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
+    arrivalQuestId: String? = null,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(VenuePageUiState())
   /** What the page shows now; the page observes it. */
   val uiState: StateFlow<VenuePageUiState> = mutableUiState.asStateFlow()
 
   private var listening: Job? = null
+
+  /**
+   * The quest whose details the page opens the first time it shows the venue; null afterwards. Kept
+   * out of the state, which only learns of it once it has been opened, as
+   * [VenuePageUiState.arrivalQuestId], or missed, as [VenuePageUiState.arrivalMissed].
+   */
+  private var arriving: String? = arrivalQuestId
 
   /**
    * The reservations this page created, by reservation id. One that was shown as pending and then
@@ -101,7 +114,15 @@ class VenuePageViewModel(
   private val refusing = mutableSetOf<String>()
 
   /** What the page last heard from its listeners, so it can be shown again; null when failed. */
-  private var latest: Triple<Venue?, List<VenuePageQuest>, Booked?>? = null
+  private var latest: Heard<VenuePageQuest>? = null
+
+  /** What the listeners sent; [booked] or [completions] is null once its listener failed. */
+  private data class Heard<Q>(
+      val venue: Venue?,
+      val quests: List<Q>,
+      val booked: Booked?,
+      val completions: List<Completion>?,
+  )
 
   init {
     listen()
@@ -117,20 +138,25 @@ class VenuePageViewModel(
     mutableUiState.update { it.withQuestDetails(questId) }
   }
 
+  /** Called once the page has said that the quest it was to arrive at is no longer listed. */
+  fun onArrivalMissedShown() {
+    mutableUiState.update { it.copy(arrivalMissed = false) }
+  }
+
   /** Called when the explorer closes the quest details, however they close them. */
   fun onQuestDetailsClosed() {
-    mutableUiState.update { it.copy(detailQuestId = null) }
+    mutableUiState.update { it.withoutQuestDetails() }
   }
 
   /**
-   * Called when the explorer accepts the picked quest: books it as a pending reservation with
-   * themself as the party's first member, named as in their profile, for a slot starting now. Does
-   * nothing when no quest is picked, when accepting is unavailable, or when that quest is already
+   * Books the picked quest as a pending reservation, with the explorer as its party's first member,
+   * for a slot starting now.
+   *
+   * Does nothing when no quest is picked, accepting is unavailable, or that quest is already
    * accepted or being accepted, so a double tap books once; other quests can still be accepted
-   * meanwhile. The quest shows as accepted only once the backend has answered, never while the
-   * write waits for it. A failure keeps the quest picked and shows [AcceptStatus.FAILED], and so
-   * does the server refusing the write later, after the quest showed as accepted, or the explorer's
-   * profile not being readable; calling this again retries.
+   * meanwhile. The quest shows as accepted only once the backend answered. A failure, a later
+   * server refusal or an unreadable profile keeps it picked and shows [AcceptStatus.FAILED];
+   * calling this again retries. A quest accepted from its details stays picked once they close.
    */
   fun accept() {
     val current = mutableUiState.value
@@ -145,6 +171,7 @@ class VenuePageViewModel(
       it.copy(
           acceptingQuestIds = it.acceptingQuestIds + id,
           failedQuestIds = it.failedQuestIds - id,
+          pickBeforeDetails = if (it.detailQuestId == id) id else it.pickBeforeDetails,
       )
     }
     unconfirmed += id
@@ -182,6 +209,38 @@ class VenuePageViewModel(
   }
 
   /**
+   * Called when the explorer cancels their reservation for the picked quest, once they confirmed.
+   * Does nothing without such a reservation, or while it is being cancelled, so a double tap
+   * cancels once. It shows as cancelling until the reservations no longer list it. A failure, such
+   * as being offline, shows [CancelStatus.FAILED]; calling this again retries.
+   */
+  fun cancel() {
+    val current = mutableUiState.value
+    val reservationId = current.cancellableReservationId ?: return
+    if (reservationId in current.cancellingIds) return
+    mutableUiState.update {
+      it.copy(
+          cancellingIds = it.cancellingIds + reservationId,
+          failedCancelIds = it.failedCancelIds - reservationId,
+      )
+    }
+    viewModelScope.launch {
+      reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED).onFailure {
+        Log.w(TAG, "Cancelling reservation $reservationId failed", it)
+        mutableUiState.update { state ->
+          // A reservation that left meanwhile, e.g. rejected by the venue, has nothing to mark
+          val shown = reservationId in state.reservationIds.values
+          state.copy(
+              cancellingIds = state.cancellingIds - reservationId,
+              failedCancelIds =
+                  if (shown) state.failedCancelIds + reservationId else state.failedCancelIds,
+          )
+        }
+      }
+    }
+  }
+
+  /**
    * The display name in the explorer's profile, which the venue sees on their reservation, or a
    * failure if the profile is missing or can't be read.
    */
@@ -208,10 +267,11 @@ class VenuePageViewModel(
   }
 
   /**
-   * Listens to the venue, its quests and the explorer's reservations and their parties until the
-   * ViewModel is cleared or listening fails. The quests are checked again each time a reward
-   * expires, even when nothing else changes. A failure of the reservations or parties only is not
-   * the page's: it goes on without them, with accepting unavailable.
+   * Listens to the venue, its quests, the explorer's reservations and their parties, and the proofs
+   * they sent until the ViewModel is cleared or listening fails. The quests are checked again each
+   * time a reward expires, even when nothing else changes. A failure of the reservations or parties
+   * only is not the page's: it goes on without them, with accepting unavailable. Nor is a failure
+   * of the proofs, with sending one unavailable.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen() {
@@ -233,15 +293,20 @@ class VenuePageViewModel(
                     Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
                     emit(null)
                   },
-          ) { venue, quests, reservations ->
-            Triple(venue, quests, reservations)
-          }
-          .transformLatest { (venue, quests, reservations) ->
+              completionRepository
+                  .observeForExplorer(explorerUid)
+                  .map<List<Completion>, List<Completion>?> { it }
+                  .catch {
+                    Log.w(TAG, "Listening to the proofs of $explorerUid failed", it)
+                    emit(null)
+                  },
+              ::Heard,
+          )
+          .transformLatest { (venue, quests, booked, completions) ->
             while (true) {
               val now = clock()
-              emit(
-                  Triple(venue, venuePageQuests(quests, venue?.featuredQuestId, now), reservations)
-              )
+              val valid = venuePageQuests(quests, venue?.featuredQuestId, now)
+              emit(Heard(venue, valid, booked, completions))
               val nextExpiry = quests.nextExpiryAfter(now) ?: break
               delay(nextExpiry - now)
             }
@@ -254,7 +319,7 @@ class VenuePageViewModel(
           .collect { page ->
             latest = page
             // A refused write is over once Firestore no longer lists anything for its quest
-            page.third?.reservations?.let { listed ->
+            page.booked?.reservations?.let { listed ->
               refusing.retainAll { quest ->
                 listed.any { it.questId == quest && it.venueId == venueId }
               }
@@ -269,12 +334,22 @@ class VenuePageViewModel(
    * doesn't count as accepted: it stays "accepting", or "failed", whatever Firestore lists.
    */
   private fun show() {
-    val (venue, quests, booked) = latest ?: return
+    val (venue, quests, booked, completions) = latest ?: return
     val accepted = booked?.let {
       acceptedPartiesOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
     }
+    val reservationIds = booked?.let {
+      acceptedReservationsOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
+    }
+    val approved = booked?.reservations?.approvedIds()
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
-    mutableUiState.update { it.showing(venue, quests, accepted, refused) }
+    mutableUiState.update {
+      it.showing(venue, quests, accepted, reservationIds, approved, refused, completions)
+    }
+    arriving?.let { questId ->
+      arriving = null
+      mutableUiState.update { it.arrivingAt(questId) }
+    }
   }
 
   /**
@@ -308,22 +383,27 @@ class VenuePageViewModel(
 
     /**
      * Builds the [VenuePageViewModel] of the venue [venueId] for the explorer [explorerUid], with
-     * the app's repositories.
+     * the app's repositories, opening the details of [arrivalQuestId] if given.
      */
-    fun factory(venueId: String, explorerUid: String): ViewModelProvider.Factory =
-        viewModelFactory {
-          initializer {
-            VenuePageViewModel(
-                venueId,
-                VenueRepositoryProvider.repository,
-                QuestRepositoryProvider.repository,
-                ReservationRepositoryProvider.repository,
-                UserRepositoryProvider.repository,
-                PartyRepositoryProvider.repository,
-                explorerUid,
-            )
-          }
-        }
+    fun factory(
+        venueId: String,
+        explorerUid: String,
+        arrivalQuestId: String? = null,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer {
+        VenuePageViewModel(
+            venueId,
+            VenueRepositoryProvider.repository,
+            QuestRepositoryProvider.repository,
+            ReservationRepositoryProvider.repository,
+            UserRepositoryProvider.repository,
+            PartyRepositoryProvider.repository,
+            CompletionRepositoryProvider.repository,
+            explorerUid,
+            arrivalQuestId = arrivalQuestId,
+        )
+      }
+    }
   }
 }
 
@@ -358,21 +438,48 @@ internal fun acceptedPartiesOf(
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxOf { partySizes[it.id] ?: 1 } }
 
+/**
+ * The explorer's reservation for each quest of the venue [venueId] they accepted, keyed by quest
+ * id: the one [acceptedPartiesOf] counts, so of several for one quest, the one with the biggest
+ * party.
+ */
+internal fun acceptedReservationsOf(
+    reservations: List<Reservation>,
+    partySizes: Map<String, Int>,
+    venueId: String,
+): Map<String, String> =
+    reservations
+        .filter { it.acceptsAQuestOf(venueId) }
+        .groupBy { it.questId }
+        .mapValues { (_, same) -> same.maxBy { partySizes[it.id] ?: 1 }.id }
+
+/** The ids of the reservations among these that the venue approved. */
+private fun List<Reservation>.approvedIds(): Set<String> = filter {
+  it.status == ReservationStatus.APPROVED
+}
+    .mapTo(HashSet()) { it.id }
+
 /** This reservation is an active one at the venue [venueId], so its quest is accepted. */
 private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
     this.venueId == venueId && status.isActive
 
 /**
- * This page showing [venue], its valid [quests] and the parties of the [accepted] ones, or "not
- * found" when [venue] is null. A quest being accepted that is now accepted is done accepting, and a
- * quest in [refused] failed. A null [accepted] means the reservations can't be read: the page keeps
- * what it knew and stops offering to accept.
+ * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
+ * [accepted] ones, with the explorer's [approved] reservations and the proofs in [completions], or
+ * "not found" when [venue] is null. A quest being accepted that is now accepted is done accepting,
+ * a reservation no longer listed is done cancelling, and a quest in [refused] failed. A null
+ * [accepted] means the reservations can't be read: the page keeps what it knew and stops offering
+ * to accept, cancel or complete. Null [completions] likewise mean the proofs can't be read, so it
+ * stops offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
     quests: List<VenuePageQuest>,
     accepted: Map<String, Int>?,
+    reservationIds: Map<String, String>?,
+    approved: Set<String>?,
     refused: Set<String>,
+    completions: List<Completion>?,
 ): VenuePageUiState =
     if (venue == null) {
       VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
@@ -382,11 +489,18 @@ private fun VenuePageUiState.showing(
               venueName = venue.name,
               avatar = INITIALS_AVATAR(venue, venue.name),
               address = venue.address,
+              venueLocation = venue.location,
               acceptedParties = accepted ?: acceptedParties,
+              reservationIds = reservationIds ?: this.reservationIds,
               acceptingQuestIds =
                   if (accepted == null) emptySet() else acceptingQuestIds - accepted.keys,
               failedQuestIds = failedQuestIds - (accepted?.keys ?: emptySet()) + refused,
+              cancellingIds = cancellingIds.intersect(reservationIds?.values.orEmpty()),
+              failedCancelIds = failedCancelIds.intersect(reservationIds?.values.orEmpty()),
               acceptAvailable = accepted != null,
+              approvedIds = approved ?: approvedIds,
+              completions = completions?.associateBy { it.reservationId } ?: this.completions,
+              proofsAvailable = completions != null,
           )
           .withQuests(quests)
     }
@@ -400,4 +514,6 @@ private fun Quest.toVenuePageQuest() =
         proofType = proofType,
         minPartySize = minPartySize,
         reward = reward,
+        exactPartySize = exactPartySize,
+        radiusMeters = radiusMeters,
     )

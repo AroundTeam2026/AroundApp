@@ -7,7 +7,12 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -19,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +46,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -63,6 +70,8 @@ class VenuePageAcceptTest {
   private val users = ScriptedUserRepository(testUsers(EXPLORER))
   private var userRepository: UserRepository = users
   private var partyRepository: PartyRepository = party
+  private val completions = FakeCompletionRepository { START }
+  private var completionRepository: CompletionRepository = completions
 
   private val viewModel by lazy {
     VenuePageViewModel(
@@ -72,6 +81,7 @@ class VenuePageAcceptTest {
         reservationRepository,
         userRepository,
         partyRepository,
+        completionRepository,
         EXPLORER,
         clock,
     )
@@ -103,6 +113,18 @@ class VenuePageAcceptTest {
             .getOrThrow()
     friends.forEach { party.join(id, it).getOrThrow() }
     return id
+  }
+
+  @Test
+  fun aQuestAcceptedFromItsDetailsStaysPickedOnceTheyClose() = test {
+    openAndPick("a")
+    viewModel.onQuestDetailsOpened("b")
+
+    viewModel.accept()
+    runCurrent()
+    viewModel.onQuestDetailsClosed()
+
+    assertEquals("b", state.selectedQuestId)
   }
 
   @Test
@@ -297,6 +319,259 @@ class VenuePageAcceptTest {
 
     assertEquals(AcceptStatus.NONE, state.acceptStatus)
   }
+
+  @Test
+  fun anAcceptedQuestKnowsItsReservation() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+
+    assertEquals(id, state.cancellableReservationId)
+  }
+
+  // The venue answers while the page is open: its approval makes the quest completable
+  @Test
+  fun aQuestCanBeCompletedOnceTheVenueApprovesItsReservation() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+    assertNull(state.completableReservationId)
+
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    runCurrent()
+
+    assertEquals(id, state.completableReservationId)
+  }
+
+  /** Stores an approved reservation for [questId], with the proof its explorer sent for it. */
+  private suspend fun storeWithProof(questId: String): String {
+    val id = storeFor(questId)
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    return completions.submit(id, VENUE_ID, EXPLORER, Proof.Photo("gs://proofs/fox")).getOrThrow()
+  }
+
+  // The bug of #394: the details offered "Submit proof" again once the proof was sent
+  @Test
+  fun aSentProofShowsAndEndsCompleting() = test {
+    val id = storeFor("a")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    openAndPick("a")
+    assertNull(state.proof)
+    assertEquals(id, state.completableReservationId)
+
+    completions.submit(id, VENUE_ID, EXPLORER, Proof.Photo("gs://proofs/fox"))
+    runCurrent()
+
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun theVenuesApprovalOfTheProofShows() = test {
+    val proof = storeWithProof("a")
+    openAndPick("a")
+
+    completions.approve(proof)
+    runCurrent()
+
+    assertEquals(CompletionStatus.APPROVED, state.proof?.status)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun theVenuesRejectionOfTheProofShowsWithItsReason() = test {
+    val proof = storeWithProof("a")
+    openAndPick("a")
+
+    completions.reject(proof, "Too dark")
+    runCurrent()
+
+    assertEquals(CompletionStatus.REJECTED, state.proof?.status)
+    assertEquals("Too dark", state.proof?.rejectReason)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun aProofForAnotherQuestDoesntShowOnThePickedOne() = test {
+    storeWithProof("a")
+    openAndPick("b")
+
+    assertNull(state.proof)
+  }
+
+  @Test
+  fun anotherExplorersProofDoesntShow() = test {
+    val id = storeFor("a")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    completions.submit(id, VENUE_ID, "friend", Proof.Photo("gs://proofs/fox"))
+    openAndPick("a")
+
+    assertNull(state.proof)
+    assertEquals(id, state.completableReservationId)
+  }
+
+  // Failing to read the proofs mustn't take the page or accepting with it, nor offer a second proof
+  @Test
+  fun aBrokenProofsListenerOnlyStopsCompleting() = test {
+    val id = storeFor("a")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    completionRepository = FailingCompletionsRepository(completions, shownFirst = null)
+    openAndPick("a")
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertTrue(state.acceptAvailable)
+    assertFalse(state.proofsAvailable)
+    assertEquals(id, state.cancellableReservationId)
+    assertNull(state.completableReservationId)
+  }
+
+  @Test
+  fun aProofShownBeforeTheListenerBrokeStaysShown() = test {
+    val proof = storeWithProof("a")
+    val sent = completions.observeForExplorer(EXPLORER).first()
+    assertEquals(proof, sent.single().id)
+    completionRepository = FailingCompletionsRepository(completions, shownFirst = sent)
+    openAndPick("a")
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertTrue(state.proofsAvailable)
+
+    advanceTimeBy(FAILS_AFTER_MS + 1)
+
+    assertFalse(state.proofsAvailable)
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+  }
+
+  @Test
+  fun cancelEndsTheReservationAndReopensTheQuest() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    assertEquals(CancelStatus.CANCELLING, state.cancelStatus)
+    runCurrent()
+
+    assertEquals(ReservationStatus.CANCELLED, stored().single { it.id == id }.status)
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertNull(state.cancellableReservationId)
+    assertTrue(state.failedQuestIds.isEmpty())
+  }
+
+  @Test
+  fun aQuestAcceptedOnThisPageCanBeCancelledWithoutCountingAsRefused() = test {
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.acceptStatus)
+  }
+
+  @Test
+  fun aDoubleTapCancelsOnce() = test {
+    val gated = CancelFailingRepository(fake)
+    reservationRepository = gated
+    storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(1, gated.cancels)
+  }
+
+  @Test
+  fun aFailedCancelKeepsTheReservationAndCanBeRetried() = test {
+    val failing = CancelFailingRepository(fake, failures = 1)
+    reservationRepository = failing
+    val id = storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+    assertEquals(CancelStatus.FAILED, state.cancelStatus)
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    assertEquals(ReservationStatus.PENDING, stored().single { it.id == id }.status)
+
+    viewModel.cancel()
+    assertEquals(CancelStatus.CANCELLING, state.cancelStatus)
+    runCurrent()
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertEquals(ReservationStatus.CANCELLED, stored().single { it.id == id }.status)
+  }
+
+  @Test
+  fun cancellingOneOfTwoReservationsLetsTheOtherBeCancelled() = test {
+    storeFor("a", friends = listOf("f1"))
+    storeFor("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(
+        listOf(ReservationStatus.CANCELLED, ReservationStatus.CANCELLED),
+        stored().map { it.status },
+    )
+  }
+
+  @Test
+  fun aFailedCancelOfAReservationThatLeftMeanwhileMarksNothing() = test {
+    val failing = CancelFailingRepository(fake, failures = 1)
+    reservationRepository = failing
+    val id = storeFor("a")
+    openAndPick("a")
+    failing.beforeAnswering = { fake.updateStatus(id, ReservationStatus.REJECTED) }
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertTrue(state.cancellingIds.isEmpty())
+  }
+
+  @Test
+  fun cancelWithoutAReservationDoesNothing() = test {
+    val counting = CancelFailingRepository(fake)
+    reservationRepository = counting
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(0, counting.cancels)
+  }
+
+  @Test
+  fun ofSeveralReservationsTheOneWithTheBiggestPartyIsCancelled() {
+    val small = reservation("small")
+    val big = reservation("big")
+
+    assertEquals(
+        mapOf("a" to "big"),
+        acceptedReservationsOf(listOf(small, big), mapOf("small" to 1, "big" to 3), VENUE_ID),
+    )
+  }
+
+  @Test
+  fun onlyActiveReservationsAtTheVenueCanBeCancelled() {
+    val rejected = reservation("r").copy(status = ReservationStatus.REJECTED)
+    val elsewhere = reservation("e").copy(venueId = "other")
+
+    assertEquals(
+        emptyMap<String, String>(),
+        acceptedReservationsOf(listOf(rejected, elsewhere), emptyMap(), VENUE_ID),
+    )
+  }
+
+  private fun reservation(id: String) =
+      newPendingReservation("a", VENUE_ID, NAME, START).copy(id = id)
 
   @Test
   fun acceptingOneQuestDoesNotMarkTheOthersAccepted() = test {
@@ -666,6 +941,25 @@ private class GatedReservationRepository(private val inner: ReservationRepositor
 }
 
 /**
+ * Delegates to [inner], counting the status changes as [cancels] and failing the first [failures]
+ * of them, after running [beforeAnswering].
+ */
+private class CancelFailingRepository(
+    private val inner: ReservationRepository,
+    private var failures: Int = 0,
+) : ReservationRepository by inner {
+  var cancels = 0
+  var beforeAnswering: suspend () -> Unit = {}
+
+  override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> {
+    cancels++
+    beforeAnswering()
+    if (failures-- > 0) return Result.failure(IOException("offline"))
+    return inner.updateStatus(id, status)
+  }
+}
+
+/**
  * A repository whose reservations are [list], which a test sets to play what the server does after
  * a write: [createReservation] adds a pending copy at once, as Firestore's local copy does, unless
  * [showsWrites] is off, then returns at once or, while [answer] is set, once the server answers.
@@ -697,18 +991,29 @@ private class ScriptedReservationRepository : ReservationRepository by FakeReser
 }
 
 /**
- * Delegates to [inner], but its explorer listener shows [shownFirst], if any, then fails
+ * The explorer listener of the failing repositories below: shows [shownFirst], if any, then fails
  * [FAILS_AFTER_MS] later, in virtual time.
  */
+private fun <T> failingAfter(shownFirst: List<T>?): Flow<List<T>> = flow {
+  shownFirst?.let {
+    emit(it)
+    delay(FAILS_AFTER_MS)
+  }
+  throw IOException("denied")
+}
+
+/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
+private class FailingCompletionsRepository(
+    private val inner: CompletionRepository,
+    private val shownFirst: List<Completion>?,
+) : CompletionRepository by inner {
+  override fun observeForExplorer(uid: String): Flow<List<Completion>> = failingAfter(shownFirst)
+}
+
+/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
 private class FailingListenerRepository(
     private val inner: ReservationRepository,
     private val shownFirst: List<Reservation>?,
 ) : ReservationRepository by inner {
-  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = flow {
-    shownFirst?.let {
-      emit(it)
-      delay(FAILS_AFTER_MS)
-    }
-    throw IOException("denied")
-  }
+  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = failingAfter(shownFirst)
 }

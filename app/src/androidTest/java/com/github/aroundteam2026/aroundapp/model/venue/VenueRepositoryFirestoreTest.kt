@@ -25,7 +25,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -43,14 +42,14 @@ import org.junit.runner.RunWith
  * Two fresh venue accounts take part, since the rules only let venue accounts write venues, each on
  * their own [FirebaseApp] from [emulatorClient], never the default app: the owner and a reader. The
  * rules make a venue's id its owner's uid, so each user has at most one venue and tests never see
- * each other's. Each client has its own empty cache, so what one user reads of the other's venue
- * has been accepted by the server. Each test's KDoc names the production bug it catches.
+ * each other's. Each client has its own cache, so what one user reads of the other's venue has been
+ * accepted by the server. Each test's KDoc names the production bug it catches.
  */
 @RunWith(AndroidJUnit4::class)
 class VenueRepositoryFirestoreTest {
   /**
-   * Fails any test that runs longer than its setUp, body and tearDown timeouts added together, so
-   * one of those reports where the test was stuck before this rule cuts it off.
+   * Fails any test that runs longer than its setUp and body timeouts added together, so one of
+   * those reports where the test was stuck before this rule cuts it off.
    */
   @get:Rule val timeout: Timeout = Timeout.millis(RULE_TIMEOUT_MS)
 
@@ -76,16 +75,6 @@ class VenueRepositoryFirestoreTest {
         readerDb = emulatorClient(READER_APP)
         ownerRepository = VenueRepositoryFirestore(ownerDb)
         readerRepository = VenueRepositoryFirestore(readerDb)
-      }
-
-  /** Terminates both clients, so no listener or cached data leaks between tests. */
-  @After
-  fun tearDown() =
-      runBlocking<Unit> {
-        withTimeout(SETUP_TIMEOUT_MS) {
-          ownerDb.terminate().await()
-          readerDb.terminate().await()
-        }
       }
 
   /**
@@ -334,8 +323,8 @@ class VenueRepositoryFirestoreTest {
     const val OWNER_APP = "venue-test-owner"
     const val READER_APP = "venue-test-reader"
 
-    /** Bounds a whole test: setUp, the test body and tearDown, plus a margin. */
-    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + SETUP_TIMEOUT_MS + 5_000L
+    /** Bounds a whole test: setUp and the test body, plus a margin. */
+    const val RULE_TIMEOUT_MS = SETUP_TIMEOUT_MS + TIMEOUT_MS + 5_000L
 
     /** Creation time of every venue, in epoch ms; the non-zero ms catch precision loss. */
     const val CREATED_AT = 1_700_000_000_123L

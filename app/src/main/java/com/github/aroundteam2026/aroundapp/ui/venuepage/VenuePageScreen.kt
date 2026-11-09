@@ -1,8 +1,10 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.res.Configuration
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -22,11 +25,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +60,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import kotlinx.coroutines.launch
 
 /**
  * Draws one of the venue's quests. The page calls it for each listed quest, in order.
@@ -59,7 +68,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
  * @param quest The quest to draw.
  * @param selected Whether the explorer picked it to accept.
  * @param onClick Picks the quest, or unpicks it if it was picked.
- * @param onDetails Opens the quest's details in a [QuestDetailSheet].
+ * @param onDetails Opens the quest's [QuestDetailsScreen].
  */
 typealias VenuePageQuestRow =
     @Composable
@@ -70,22 +79,36 @@ typealias VenuePageQuestRow =
  * keeps it clear of the system bars.
  *
  * @param viewModel Loads the venue and its quests, and keeps the picked one.
- * @param onBack Called when the explorer taps the back arrow.
+ * @param onBack Called when the explorer taps the back arrow, and when they close the details the
+ *   page arrived at ([VenuePageUiState.detailsLeaveThePage]). A quest it was to arrive at that it
+ *   no longer lists shows a snackbar once ([VenuePageUiState.arrivalMissed]).
+ * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
+ *   venue's name, from the page's bar or the quest's details.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
- *   [AcceptQuestBar] that accepts through [viewModel] unless replaced.
+ *   [QuestActionBar] that accepts through [viewModel] unless replaced.
  */
 @Composable
 fun VenuePageScreen(
     viewModel: VenuePageViewModel,
     onBack: () -> Unit,
+    onSubmitProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val acceptBar: @Composable (VenuePageQuest?) -> Unit = {
-    AcceptQuestBar(state, viewModel::accept)
+  val snackbarHostState = remember { SnackbarHostState() }
+  val scope = rememberCoroutineScope()
+  val questGone = stringResource(R.string.venue_page_quest_gone)
+  LaunchedEffect(state.arrivalMissed) {
+    if (state.arrivalMissed) {
+      // Launched in the screen's scope, not in this effect: clearing the flag changes the effect's
+      // key, which would cancel a snackbar shown from inside it
+      scope.launch { snackbarHostState.showSnackbar(questGone) }
+      // Cleared at once, so the snackbar doesn't show again when the screen is recreated
+      viewModel.onArrivalMissedShown()
+    }
   }
   VenuePageContent(
       state = state,
@@ -93,18 +116,26 @@ fun VenuePageScreen(
       onQuestTapped = viewModel::onQuestSelected,
       onRetry = viewModel::onRetry,
       onQuestDetails = viewModel::onQuestDetailsOpened,
-      onQuestDetailsClosed = viewModel::onQuestDetailsClosed,
+      onQuestDetailsClosed = {
+        if (state.detailsLeaveThePage) onBack() else viewModel.onQuestDetailsClosed()
+      },
       onAccept = viewModel::accept,
+      onCancel = viewModel::cancel,
       modifier = modifier,
       questRow = questRow,
-      bottomBar = bottomBar ?: acceptBar,
+      bottomBar = bottomBar,
+      onSubmitProof = { onSubmitProof(it, state.venueName) },
+      snackbarHostState = snackbarHostState,
   )
 }
 
 /**
- * Stateless page: the top bar, then what [state] says the page can show, with the details of
- * [VenuePageUiState.detailQuest] in a sheet on top. Under the list sits [bottomBar], or by default
- * an [AcceptQuestBar] whose button calls [onAccept].
+ * Stateless page: the top bar, then what [state] says the page can show. Under the list sits
+ * [bottomBar], or by default a [QuestActionBar] whose button calls [onAccept] or, for an approved
+ * reservation, [onSubmitProof]. While [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen]
+ * takes the page's place, and [onCancel] cancels the reservation from there, or [onSubmitProof]
+ * opens the proof form of an approved one, given its id. [snackbarHostState] shows its messages
+ * above the bar.
  */
 @Composable
 fun VenuePageContent(
@@ -116,18 +147,34 @@ fun VenuePageContent(
     onQuestDetails: (questId: String) -> Unit = {},
     onQuestDetailsClosed: () -> Unit = {},
     onAccept: () -> Unit = {},
+    onCancel: () -> Unit = {},
     questRow: VenuePageQuestRow = DefaultQuestRow,
-    bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {
-      AcceptQuestBar(state, onAccept)
-    },
+    bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
+    onSubmitProof: (reservationId: String) -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+  // Out here, so that the list is back where it was when the details close
+  val listState = rememberLazyListState()
+  val detailQuest = state.detailQuest?.takeIf { state.status == VenuePageStatus.LOADED }
+  if (detailQuest != null) {
+    QuestDetailsScreen(
+        state,
+        detailQuest,
+        onQuestDetailsClosed,
+        onAccept,
+        onCancel,
+        modifier,
+        onSubmitProof = onSubmitProof,
+    )
+    return
+  }
   Column(
       modifier
           .fillMaxSize()
           .background(MaterialTheme.colorScheme.background)
           .testTag(C.Tag.VENUE_PAGE_SCREEN)
   ) {
-    TopBar(onBack)
+    VenuePageTopBar(onBack)
     when (state.status) {
       VenuePageStatus.LOADING ->
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_PAGE_LOADING)) }
@@ -139,6 +186,7 @@ fun VenuePageContent(
       VenuePageStatus.LOADED -> {
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth().testTag(C.Tag.VENUE_PAGE_QUESTS),
+            state = listState,
             contentPadding = PaddingValues(AroundSpacing.ScreenHorizontal),
             verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
         ) {
@@ -156,28 +204,32 @@ fun VenuePageContent(
             }
           }
         }
-        bottomBar(state.selectedQuest)
-        state.detailQuest?.let { quest ->
-          key(quest.questId) { QuestDetailSheet(quest, onQuestDetailsClosed) }
+        SnackbarHost(snackbarHostState)
+        if (bottomBar != null) {
+          bottomBar(state.selectedQuest)
+        } else {
+          QuestActionBar(state, onAccept, onSubmitProof)
         }
       }
     }
   }
 }
 
-/** The round back button, on the start side. */
+/** The round back button, on the start side, with the centred [title] when there is one. */
 @Composable
-private fun TopBar(onBack: () -> Unit) {
+internal fun VenuePageTopBar(onBack: () -> Unit, @StringRes title: Int? = null) {
   Box(
       Modifier.fillMaxWidth()
-          .padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.Medium)
+          .padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.Medium),
+      contentAlignment = Alignment.Center,
   ) {
     Surface(
         onClick = onBack,
         shape = AroundPillShape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.size(BACK_SIZE).testTag(C.Tag.VENUE_PAGE_BACK),
+        modifier =
+            Modifier.align(Alignment.CenterStart).size(BACK_SIZE).testTag(C.Tag.VENUE_PAGE_BACK),
     ) {
       Box(contentAlignment = Alignment.Center) {
         Icon(
@@ -186,6 +238,14 @@ private fun TopBar(onBack: () -> Unit) {
             tint = MaterialTheme.colorScheme.onSurface,
         )
       }
+    }
+    title?.let {
+      Text(
+          stringResource(it),
+          Modifier.semantics { heading() },
+          color = MaterialTheme.colorScheme.onSurface,
+          style = AroundTextStyles.CardTitle,
+      )
     }
   }
 }

@@ -1,4 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.animation.core.RepeatMode
@@ -10,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -44,32 +48,59 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
 /**
- * The bar under a venue's quests, once the explorer picked one: a full-width "Accept quest" button,
- * styled like the one in the quest popup of the Figma frame, and what [state] says about accepting.
- *
- * - Ready: the button calls [onAccept].
- * - Accepting: a pulsing skeleton takes the button's place, and can't be tapped.
- * - Accepted: the button is disabled and says the venue is yet to approve.
- * - Failed: an error shows above the button, which now says "Try again" and calls [onAccept].
- * - A quest that needs more people says how many, whatever the state: it can still be accepted.
- * - Accepting unavailable: the button is disabled and says why.
- *
- * It draws nothing while no quest is picked. It only shows the state: [onAccept] is the
- * ViewModel's.
+ * The shared actions for the picked quest on its venue page and details screen. Before a proof is
+ * sent, offers acceptance or proof submission; afterwards uses [ProofBar]. A pending or approved
+ * proof needs no bar unless [footer] supplies another action, such as cancellation in the details.
  */
 @Composable
-fun AcceptQuestBar(state: VenuePageUiState, onAccept: () -> Unit, modifier: Modifier = Modifier) {
+internal fun QuestActionBar(
+    state: VenuePageUiState,
+    onAccept: () -> Unit,
+    onSubmitProof: (reservationId: String) -> Unit,
+    modifier: Modifier = Modifier,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+  if (state.selectedQuest == null) return
+  val proofStatus = state.proof?.status
+  when {
+    proofStatus == null ->
+        AcceptQuestBar(
+            state,
+            onAccept,
+            modifier,
+            onSubmitProof = state.completableReservationId?.let { id -> { onSubmitProof(id) } },
+            footer = footer ?: {},
+        )
+    proofStatus == CompletionStatus.REJECTED || footer != null ->
+        ProofBar(proofStatus, modifier, footer = footer ?: {})
+  }
+}
+
+/**
+ * The bar under a venue's quests once the explorer picked one: a full-width "Accept quest" button
+ * and what [state] says about accepting.
+ *
+ * - Ready: the button calls [onAccept]. Failed: an error shows above it, and it says "Try again".
+ * - Accepting: a pulsing skeleton that can't be tapped takes the button's place.
+ * - Accepted: disabled, saying the venue is yet to approve. Unavailable: disabled, saying why.
+ * - A quest that needs more people says how many, whatever the state.
+ *
+ * It draws nothing while no quest is picked. [footer] sits under the button.
+ *
+ * @param onSubmitProof Given once the venue approved the reservation, as in the Figma frame "Quest
+ *   details · submit proof": the button then says "Submit proof" and calls it.
+ */
+@Composable
+fun AcceptQuestBar(
+    state: VenuePageUiState,
+    onAccept: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSubmitProof: (() -> Unit)? = null,
+    footer: @Composable ColumnScope.() -> Unit = {},
+) {
   if (state.selectedQuest == null) return
   val status = state.acceptStatus
-  Column(
-      modifier
-          .fillMaxWidth()
-          .background(MaterialTheme.colorScheme.surface, AroundCorners.BottomSheet)
-          .padding(AroundSpacing.CardPadding)
-          .testTag(C.Tag.ACCEPT_QUEST_BAR),
-      verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
-      horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
+  QuestBar(modifier) {
     // One explanation of the button: an accepted quest is done whatever the listener does, and a
     // failure can't be retried while accepting is unavailable
     if (!state.acceptAvailable && status != AcceptStatus.ACCEPTED) {
@@ -88,11 +119,70 @@ fun AcceptQuestBar(state: VenuePageUiState, onAccept: () -> Unit, modifier: Modi
           C.Tag.ACCEPT_QUEST_NEEDS_MORE,
       )
     }
-    if (status == AcceptStatus.ACCEPTING) {
-      AcceptingSkeleton(stringResource(R.string.accept_quest_accepting))
-    } else {
-      AcceptButton(status, enabled = state.acceptAvailable, onAccept)
+    when {
+      onSubmitProof != null -> SubmitProofButton(onSubmitProof)
+      status == AcceptStatus.ACCEPTING ->
+          AcceptingSkeleton(stringResource(R.string.accept_quest_accepting))
+      else -> AcceptButton(status, enabled = state.acceptAvailable, onAccept)
     }
+    footer()
+  }
+}
+
+/**
+ * The bar of the quest details once a proof is sent. A rejected proof gets "Send new proof", which
+ * stays disabled without [onSendNewProof]; a proof sent or approved has no button. [footer] sits
+ * under it.
+ *
+ * @param status Where the proof stands.
+ */
+@Composable
+fun ProofBar(
+    status: CompletionStatus,
+    modifier: Modifier = Modifier,
+    onSendNewProof: (() -> Unit)? = null,
+    footer: @Composable ColumnScope.() -> Unit = {},
+) {
+  QuestBar(modifier) {
+    if (status == CompletionStatus.REJECTED) {
+      Button(
+          onClick = { onSendNewProof?.invoke() },
+          enabled = onSendNewProof != null,
+          shape = AroundPillShape,
+          modifier =
+              Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.SEND_NEW_PROOF_BUTTON),
+      ) {
+        Text(stringResource(R.string.send_new_proof), style = AroundTextStyles.Button)
+      }
+    }
+    footer()
+  }
+}
+
+/** The surface a quest's bar draws on, holding [content]. */
+@Composable
+private fun QuestBar(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+  Column(
+      modifier
+          .fillMaxWidth()
+          .background(MaterialTheme.colorScheme.surface, AroundCorners.BottomSheet)
+          .padding(AroundSpacing.CardPadding)
+          .testTag(C.Tag.ACCEPT_QUEST_BAR),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      content = content,
+  )
+}
+
+/** The button once the venue approved the reservation: "Submit proof". */
+@Composable
+private fun SubmitProofButton(onSubmitProof: () -> Unit) {
+  Button(
+      onClick = onSubmitProof,
+      shape = AroundPillShape,
+      modifier = Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.SUBMIT_PROOF_BUTTON),
+  ) {
+    Text(stringResource(R.string.submit_proof), style = AroundTextStyles.Button)
   }
 }
 

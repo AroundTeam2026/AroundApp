@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
 /**
@@ -28,22 +29,12 @@ data class OverviewUiState(
       }
 }
 
-/** How cancelling a row's reservation stands. */
-enum class CancelStatus {
-  /** Not cancelled, and not being cancelled. */
-  NONE,
-  /** The cancel is being written. */
-  CANCELLING,
-  /** The last try failed; cancelling again retries. */
-  FAILED,
-}
-
 /**
  * One accepted quest in the overview: the reservation, with its quest and venue.
  *
  * @property reservationId Id of the reservation the row shows.
  * @property questId Id of the accepted quest.
- * @property venueId Id of the quest's venue, whose page a tap opens.
+ * @property venueId Id of the quest's venue, whose page a tap opens with the quest's details.
  * @property questTitle The quest's title.
  * @property reward The quest's reward, or null if it has none.
  * @property venueName The venue's name.
@@ -51,7 +42,7 @@ enum class CancelStatus {
  * @property avatar What the row shows for the venue.
  * @property slotStart Start of the booked slot, in epoch milliseconds.
  * @property partySize How many explorers the party has, the explorer included.
- * @property status Whether the venue has approved the reservation yet.
+ * @property status Whether the venue has approved the reservation yet, and then the proof.
  */
 data class OverviewRow(
     val reservationId: String,
@@ -77,10 +68,22 @@ enum class OverviewStatus {
   FAILED,
 }
 
-/** Where a row's reservation stands with its venue. */
-enum class OverviewRowStatus {
+/**
+ * Where a row's reservation stands with its venue, then, once approved, where the explorer's proof
+ * stands.
+ *
+ * @property cancellable Whether the explorer can still cancel the reservation: not once they sent
+ *   their proof.
+ */
+enum class OverviewRowStatus(val cancellable: Boolean) {
   /** Pending: the venue hasn't answered yet. */
-  WAITING,
-  /** The venue approved it. */
-  APPROVED,
+  WAITING(cancellable = true),
+  /** The venue approved it, and the explorer hasn't sent a proof yet. */
+  APPROVED(cancellable = true),
+  /** The explorer sent the proof; the venue hasn't answered it yet. */
+  PROOF_SENT(cancellable = false),
+  /** The venue approved the proof: the quest is done. */
+  COMPLETED(cancellable = false),
+  /** The venue rejected the proof. */
+  PROOF_REJECTED(cancellable = false),
 }
