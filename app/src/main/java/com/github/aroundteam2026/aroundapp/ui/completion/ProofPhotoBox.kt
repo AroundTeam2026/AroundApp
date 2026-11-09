@@ -51,6 +51,8 @@ internal enum class ProofPhotoError {
   UNREADABLE,
   /** Even shrunk, the photo is too big to upload. */
   TOO_BIG,
+  /** The phone has no screen for the app's settings, where the camera could be allowed. */
+  NO_SETTINGS,
 }
 
 /**
@@ -217,6 +219,7 @@ private fun Choices(
                 ProofPhotoError.NO_CAMERA -> R.string.proof_photo_no_camera
                 ProofPhotoError.UNREADABLE -> R.string.proof_photo_unreadable
                 ProofPhotoError.TOO_BIG -> R.string.proof_photo_too_big
+                ProofPhotoError.NO_SETTINGS -> R.string.proof_photo_no_settings
               }
           ),
           Modifier.testTag(C.Tag.PROOF_PHOTO_ERROR),

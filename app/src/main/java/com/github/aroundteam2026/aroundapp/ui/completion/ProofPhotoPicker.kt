@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -38,7 +39,8 @@ import kotlinx.coroutines.launch
  * "Take photo" asks for the camera permission first; after a refusal, the box offers the phone's
  * settings, and "Take photo" returns once the camera is allowed there. The gallery needs no
  * permission and always works. Every photo goes through [ProofPhotos.shrink] before [onPhotoPicked]
- * gets it, and the camera's original and a retaken copy are deleted from the cache.
+ * gets it, and the camera's original and a retaken copy are deleted from the cache, off the main
+ * thread. A picked photo that can't be shown is dropped through [onRetake], and the box says why.
  *
  * @param venueName The venue the proof is for, named in the box's text.
  * @param photo The picked photo, as [onPhotoPicked] gave it, or null while there is none.
@@ -77,7 +79,9 @@ fun ProofPhotoPicker(
       } catch (_: Exception) {
         error = ProofPhotoError.UNREADABLE
       } finally {
-        // The camera's original, once copied; a photo from the gallery is not ours to delete
+        // The camera's original, whether or not the copy worked; a photo from the gallery is not
+        // ours
+        // to delete
         photos.discard(source)
         shrinking = false
       }
@@ -88,7 +92,7 @@ fun ProofPhotoPicker(
         val target = cameraTarget?.toUri()
         cameraTarget = null
         if (target != null) {
-          if (taken) usePhoto(target) else photos.discard(target)
+          if (taken) usePhoto(target) else scope.launch { photos.discard(target) }
         }
       }
   val gallery =
@@ -100,7 +104,7 @@ fun ProofPhotoPicker(
       camera.launch(target)
     } catch (_: ActivityNotFoundException) {
       cameraTarget = null
-      photos.discard(target)
+      scope.launch { photos.discard(target) }
       error = ProofPhotoError.NO_CAMERA
     }
   }
@@ -113,6 +117,7 @@ fun ProofPhotoPicker(
     if (cameraRefused && cameraAllowed(context)) cameraRefused = false
     onPauseOrDispose {}
   }
+  val currentOnRetake by rememberUpdatedState(onRetake)
   val preview by
       produceState<ImageBitmap?>(null, photo) {
         value =
@@ -121,7 +126,11 @@ fun ProofPhotoPicker(
             } catch (cancelled: CancellationException) {
               throw cancelled
             } catch (_: Exception) {
-              // The box still shows a photo is picked, without drawing it
+              // A copy that can't even be shown isn't sent: it's dropped, and the box says why,
+              // instead of staying empty as if it were still loading
+              photo?.let { photos.discard(it) }
+              error = ProofPhotoError.UNREADABLE
+              currentOnRetake()
               null
             }
       }
@@ -143,15 +152,20 @@ fun ProofPhotoPicker(
         gallery.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
       },
       onOpenSettings = {
-        context.startActivity(
-            Intent(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.fromParts("package", context.packageName, null),
-            )
-        )
+        try {
+          context.startActivity(
+              Intent(
+                  Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                  Uri.fromParts("package", context.packageName, null),
+              )
+          )
+        } catch (_: ActivityNotFoundException) {
+          // As for a missing camera app, the gallery stays the way out
+          error = ProofPhotoError.NO_SETTINGS
+        }
       },
       onRetake = {
-        photo?.let(photos::discard)
+        photo?.let { scope.launch { photos.discard(it) } }
         onRetake()
       },
       modifier = modifier,

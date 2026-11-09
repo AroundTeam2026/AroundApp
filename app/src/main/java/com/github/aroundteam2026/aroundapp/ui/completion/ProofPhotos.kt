@@ -13,6 +13,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.PROOF_PHOTO_LIMIT_B
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.util.UUID
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineDispatcher
@@ -34,6 +35,8 @@ class ProofPhotoTooBigException : IOException("The proof photo is still too big 
  * @param limitBytes A copy of this many bytes or more fails with [ProofPhotoTooBigException].
  * @param share Turns a file of the cache folder into the [Uri] the camera app writes to; the app's
  *   FileProvider unless a test needs a plain file.
+ * @param compress Writes a bitmap as a JPEG and tells whether it could; [Bitmap.compress] unless a
+ *   test needs it to fail.
  */
 class ProofPhotos(
     private val context: Context,
@@ -41,6 +44,9 @@ class ProofPhotos(
     private val limitBytes: Int = PROOF_PHOTO_LIMIT_BYTES,
     private val share: (File) -> Uri = {
       FileProvider.getUriForFile(context, authority(context), it)
+    },
+    private val compress: (Bitmap, OutputStream) -> Boolean = { bitmap, out ->
+      bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
     },
 ) {
   private val folder: File
@@ -58,18 +64,22 @@ class ProofPhotos(
    *
    * @return the copy, a `file://` [Uri] in the cache.
    * @throws ProofPhotoTooBigException if the copy is still too big to upload; nothing is written.
-   * @throws IOException if [source] can't be read or isn't an image.
+   * @throws IOException if [source] can't be read or isn't an image, or the copy can't be
+   *   compressed; nothing is written.
    */
   suspend fun shrink(source: Uri): Uri =
       withContext(io) {
         val bitmap = decode(source, MAX_EDGE)
         // Compressed in memory first, so a copy too big is never written
         val jpeg = ByteArrayOutputStream()
-        try {
-          bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, jpeg)
-        } finally {
-          bitmap.recycle()
-        }
+        val compressed =
+            try {
+              compress(bitmap, jpeg)
+            } finally {
+              bitmap.recycle()
+            }
+        // A failed compression leaves the buffer empty or cut short, which must never be the proof
+        if (!compressed) throw IOException("The proof photo couldn't be compressed")
         if (jpeg.size() >= limitBytes) throw ProofPhotoTooBigException()
         val copy = File(folder, "proof-${UUID.randomUUID()}.jpg")
         copy.outputStream().use(jpeg::writeTo)
@@ -86,20 +96,23 @@ class ProofPhotos(
 
   /**
    * Deletes [photo] if it is one of this cache's files: a camera target or a shrunk copy. Anything
-   * else, such as a photo from the gallery, is left alone.
+   * else, such as a photo from the gallery, is left alone. Runs on [io], off the main thread, as
+   * deleting touches the disk.
    *
    * @return whether a file was deleted.
    */
-  fun discard(photo: Uri): Boolean {
-    val file =
-        when {
-          photo.scheme == ContentResolver.SCHEME_FILE -> photo.path?.let(::File)
-          photo.scheme == ContentResolver.SCHEME_CONTENT && photo.authority == authority(context) ->
-              photo.lastPathSegment?.let { File(folder, it) }
-          else -> null
-        }
-    return file != null && file.canonicalFile.parentFile == folder.canonicalFile && file.delete()
-  }
+  suspend fun discard(photo: Uri): Boolean =
+      withContext(io) {
+        val file =
+            when {
+              photo.scheme == ContentResolver.SCHEME_FILE -> photo.path?.let(::File)
+              photo.scheme == ContentResolver.SCHEME_CONTENT &&
+                  photo.authority == authority(context) ->
+                  photo.lastPathSegment?.let { File(folder, it) }
+              else -> null
+            }
+        file != null && file.canonicalFile.parentFile == folder.canonicalFile && file.delete()
+      }
 
   /** Decodes [uri], scaled down so that its longer side is at most [maxEdge] pixels. */
   private fun decode(uri: Uri, maxEdge: Int): Bitmap =

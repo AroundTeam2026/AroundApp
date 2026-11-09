@@ -19,6 +19,7 @@
     <string name="proof_photo_no_camera">No camera app found. Pick a photo from your gallery instead.</string>
     <string name="proof_photo_unreadable">Couldn\'t use this photo. Try another one.</string>
     <string name="proof_photo_too_big">This photo is too big to send. Try another one.</string>
+    <string name="proof_photo_no_settings">Can\'t open settings. Pick a photo from your gallery instead.</string>
     <string name="completion_heading">Submit proof</string>
     <string name="completion_back">Back</string>
     <string name="completion_send">Send proof</string>
