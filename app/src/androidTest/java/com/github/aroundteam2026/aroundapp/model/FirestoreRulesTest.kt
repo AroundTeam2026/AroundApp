@@ -484,6 +484,28 @@ class FirestoreRulesTest {
     assertSucceeds(approved.update("status", "CANCELLED"))
   }
 
+  // The bug of #426: cancelling hid the sent proof, since the Quests tab only lists active quests
+  @Test
+  fun memberCannotCancelOnceTheirProofIsSentWhateverItsStatus() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = approvedReservationOf(explorer, venue)
+    val completion = completionOf(reservation, explorer)
+    assertSucceeds(completion.set(completion(reservation.id, explorer, venue)))
+
+    assertDenied(reservation.update("status", "CANCELLED"), "a pending proof")
+    signInAs(venue)
+    assertSucceeds(completion.update(rejection()))
+    signInAs(explorer)
+    assertDenied(reservation.update("status", "CANCELLED"), "a rejected proof")
+    signInAs(venue)
+    assertSucceeds(
+        completion.update(mapOf("status" to "APPROVED", "rejectReason" to FieldValue.delete()))
+    )
+    signInAs(explorer)
+    assertDenied(reservation.update("status", "CANCELLED"), "an approved proof")
+  }
+
   // ---- party_user ----
 
   @Test
