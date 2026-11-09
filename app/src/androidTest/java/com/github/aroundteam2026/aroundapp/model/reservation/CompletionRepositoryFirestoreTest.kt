@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -414,6 +415,21 @@ class CompletionRepositoryFirestoreTest {
 
     assertTrue(result.exceptionOrNull() is IllegalArgumentException)
     assertEquals("PENDING", stored(id).getString("status"))
+  }
+
+  @Test
+  fun rejectAccepts300CharactersButRefuses301WithoutChangingTheProof() = withTimeoutBlocking {
+    val id = submit(approvedReservation())
+    val before = stored(id).data
+
+    assertTrue(
+        venueRepository.reject(id, "x".repeat(301)).exceptionOrNull() is IllegalArgumentException
+    )
+    assertEquals(before, stored(id).data)
+
+    val reason = "x".repeat(300)
+    venueRepository.reject(id, reason).getOrThrow()
+    assertEquals(reason, fetchAsVenue(id) { it.status == CompletionStatus.REJECTED }.rejectReason)
   }
 
   /**

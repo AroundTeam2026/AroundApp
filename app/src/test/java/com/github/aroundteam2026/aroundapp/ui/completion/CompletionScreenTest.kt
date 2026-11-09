@@ -14,7 +14,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
@@ -101,6 +103,34 @@ class CompletionScreenTest {
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_RETAKE).performClick()
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
+  }
+
+  @Test
+  fun answerLimitExplainsWhy1001CharactersCannotBeSentAndClearsAfterEditing() {
+    show()
+    val answer = compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER)
+    answer.performTextInput("x".repeat(1000))
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
+
+    answer.performTextInput("x")
+    compose
+        .onNodeWithText("Use 1000 characters or fewer in your answer.")
+        .performScrollTo()
+        .assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled().performClick()
+    assertEquals(0, submits)
+
+    answer.performTextReplacement("x".repeat(1000))
+    compose.onNodeWithText("Use 1000 characters or fewer in your answer.").assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
+  }
+
+  @Test
+  fun answerLimitUsesTheTrimmedValueThatWillBeStored() {
+    show()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("  " + "x".repeat(1000) + "  ")
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
+    compose.onNodeWithText("Use 1000 characters or fewer in your answer.").assertDoesNotExist()
   }
 
   @Test

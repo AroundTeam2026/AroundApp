@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepos
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -83,6 +84,7 @@ class CompletionViewModelTest {
   private val fakeCompletions = FakeCompletionRepository { NOW }
   private val completions = GatedCompletions(fakeCompletions)
   private val photos = FakeProofPhotoRepository()
+  private var photoRepository: ProofPhotoRepository = photos
   private var venues = FakeVenueRepository(listOf(testVenue(id = CAFE)))
   private val locations = FakeLocationRepository(VENUE_LOCATION)
 
@@ -95,7 +97,7 @@ class CompletionViewModelTest {
         venues,
         locations,
         completions,
-        photos,
+        photoRepository,
     )
   }
 
@@ -763,6 +765,50 @@ class CompletionViewModelTest {
     runCurrent()
 
     assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+  }
+
+  @Test
+  fun oversizedAnswerCannotSubmitOrCrashAndCanBeCorrected() = test {
+    open("fox")
+    viewModel.updateAnswer("x".repeat(1001))
+    assertTrue(state.answerTooLong)
+    assertFalse(state.canSubmit)
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(0, completions.calls)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertTrue(stored().isEmpty())
+
+    val answer = "x".repeat(1000)
+    viewModel.updateAnswer("  $answer  ")
+    assertFalse(state.answerTooLong)
+    assertTrue(state.canSubmit)
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(Proof.Text(answer), stored().single().proof)
+    assertTrue(state.saveState is SaveState.Saved)
+  }
+
+  @Test
+  fun oversizedUploadedLocationFailsWithoutCrashingOrSubmitting() = test {
+    photoRepository =
+        object : ProofPhotoRepository by photos {
+          override suspend fun upload(reservationId: String, photo: Uri) =
+              Result.success("x".repeat(2001))
+        }
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(SaveState.Failed, state.saveState)
+    assertEquals(PHOTO, state.photo)
+    assertTrue(state.isEditable)
+    assertEquals(0, completions.calls)
+    assertTrue(stored().isEmpty())
   }
 
   private companion object {

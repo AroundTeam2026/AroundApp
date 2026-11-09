@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
@@ -262,6 +263,18 @@ fun CompletionContent(
                   value = state.answer,
                   onValueChange = onAnswerChange,
                   enabled = state.isEditable,
+                  isError = state.answerTooLong,
+                  supportingText =
+                      if (state.answerTooLong) {
+                        {
+                          CompletionMessage(
+                              stringResource(
+                                  R.string.completion_answer_too_long,
+                                  MAX_TEXT_ANSWER_LENGTH,
+                              )
+                          )
+                        }
+                      } else null,
                   placeholder = { Text(stringResource(R.string.completion_answer_hint)) },
                   modifier =
                       Modifier.fillMaxWidth()

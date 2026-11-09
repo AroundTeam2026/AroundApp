@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -8,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus.PE
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus.REJECTED
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /** Tests [canTransition] and the construction rules of [Completion] and its [Proof]. */
@@ -84,6 +86,20 @@ class CompletionStatusTest {
   @Test(expected = IllegalArgumentException::class)
   fun textProof_withBlankAnswer_isRejected() {
     Proof.Text("  ")
+  }
+
+  @Test
+  fun textProofAccepts1000CharactersButRefuses1001() {
+    val answer = "x".repeat(1000)
+    assertEquals(answer, Proof.Text(answer).answer)
+    assertThrows(IllegalArgumentException::class.java) { Proof.Text(answer + "x") }
+  }
+
+  @Test
+  fun photoProofAccepts2000CharactersButRefuses2001() {
+    val location = "gs://" + "x".repeat(1995)
+    assertEquals(location, Proof.Photo(location).location)
+    assertThrows(IllegalArgumentException::class.java) { Proof.Photo(location + "x") }
   }
 
   private companion object {

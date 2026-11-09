@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import kotlinx.coroutines.CoroutineStart
@@ -190,6 +191,26 @@ class FakeCompletionRepositoryTest {
         assertTrue(result.exceptionOrNull() is IllegalStateException)
         assertEquals(approved, stored())
       }
+
+  @Test
+  fun rejectAccepts300CharactersButRefuses301WithoutChangingTheProof() = runBlocking {
+    val id = submit()
+    val before = stored()
+    assertTrue(repository.reject(id, "x".repeat(301)).exceptionOrNull() is IllegalArgumentException)
+    assertEquals(before, stored())
+
+    val reason = "x".repeat(300)
+    repository.reject(id, reason).getOrThrow()
+    assertEquals(reason, stored().rejectReason)
+  }
+
+  @Test
+  fun oversizedReasonFailsBeforeTheBackendAndTheLookup() = runBlocking {
+    repository.forcedFailure = IllegalStateException(OFFLINE)
+    assertTrue(
+        repository.reject(OTHER_ID, "x".repeat(301)).exceptionOrNull() is IllegalArgumentException
+    )
+  }
 
   @Test
   fun answer_unknownId_fails() =
