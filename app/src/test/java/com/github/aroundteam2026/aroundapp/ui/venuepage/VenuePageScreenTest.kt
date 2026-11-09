@@ -102,6 +102,23 @@ class VenuePageScreenTest {
   }
 
   @Test
+  fun aQuestTheVenueNoLongerListsSaysSo() {
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageOnFakes(
+            "venue-1",
+            onBack = {},
+            onSubmitProof = { _, _ -> },
+            arrivalQuestId = "gone",
+        )
+      }
+    }
+
+    compose.onNodeWithText("This quest is no longer available.").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+  }
+
+  @Test
   fun notFoundSaysSo() {
     show(VenuePageUiState(status = VenuePageStatus.NOT_FOUND))
 

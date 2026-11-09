@@ -4,6 +4,8 @@
 <resources>
     <!-- A venue's page, where explorers see its quests -->
     <string name="venue_page_not_found">This venue isn\'t on Around anymore.</string>
+    <!-- When a card on the Quests tab opens a quest the venue no longer lists, e.g. its reward expired -->
+    <string name="venue_page_quest_gone">This quest is no longer available.</string>
     <string name="venue_page_failed">Couldn\'t load this venue. Check your connection and try again.</string>
     <string name="venue_page_retry">Try again</string>
     <string name="venue_page_no_quests">No quests here right now. Check back soon.</string>
