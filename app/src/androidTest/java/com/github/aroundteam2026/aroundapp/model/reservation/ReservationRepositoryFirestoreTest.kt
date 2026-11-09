@@ -368,11 +368,13 @@ class ReservationRepositoryFirestoreTest {
         try {
           val friendRepository = ReservationRepositoryFirestore(friendDb) { FIXED_NOW }
           val own = createAndSync()
-          val left = createAndSync()
           val joined = friendRepository.createReservation(reservation(), friendUid).getOrThrow()
+          // The creator can't leave their own party, so the explorer leaves the friend's
+          val left = friendRepository.createReservation(reservation(), friendUid).getOrThrow()
           friendRepository.createReservation(reservation(), friendUid).getOrThrow()
           val party = PartyRepositoryFirestore(explorerDb)
           party.join(joined, explorerUid).getOrThrow()
+          party.join(left, explorerUid).getOrThrow()
           party.withdraw(left, explorerUid).getOrThrow()
 
           val reservations =
@@ -392,7 +394,15 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun observeForExplorer_followsTheVenuesAnswerAndAWithdrawal() = withTimeoutBlocking {
-    val id = createAndSync()
+    val friendUid = signInNewUser(FRIEND_APP, Role.EXPLORER)
+    val friendDb = emulatorClient(FRIEND_APP)
+    val party = PartyRepositoryFirestore(explorerDb)
+    // The creator can't leave their own party, so the explorer joins and leaves the friend's
+    val id =
+        ReservationRepositoryFirestore(friendDb) { FIXED_NOW }
+            .createReservation(reservation(), friendUid)
+            .getOrThrow()
+    party.join(id, explorerUid).getOrThrow()
     val emissions = Channel<List<Reservation>>(Channel.UNLIMITED)
     val collector =
         launch(start = CoroutineStart.UNDISPATCHED) {
@@ -408,7 +418,7 @@ class ReservationRepositoryFirestoreTest {
         val latest = emissions.receive()
       } while (latest.none { it.id == id && it.status == ReservationStatus.APPROVED })
 
-      PartyRepositoryFirestore(explorerDb).withdraw(id, explorerUid).getOrThrow()
+      party.withdraw(id, explorerUid).getOrThrow()
       do {
         val latest = emissions.receive()
       } while (latest.any { it.id == id })
