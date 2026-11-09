@@ -161,7 +161,9 @@ class VenueDestinationsTest {
     composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
 
     assertBackOnTheQuestsTab()
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_TITLE).assertTextEquals(QUEST_TITLE)
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_QUEST_TITLE, useUnmergedTree = true)
+        .assertTextEquals(QUEST_TITLE)
   }
 
   @Test
@@ -177,7 +179,9 @@ class VenueDestinationsTest {
     composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
 
     assertBackOnTheQuestsTab()
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_TITLE).assertTextEquals(NEW_TITLE)
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_QUEST_TITLE, useUnmergedTree = true)
+        .assertTextEquals(NEW_TITLE)
   }
 
   @Test
@@ -189,7 +193,9 @@ class VenueDestinationsTest {
     composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
 
     assertBackOnTheQuestsTab()
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_TITLE).assertTextEquals(QUEST_TITLE)
+    composeTestRule
+        .onNodeWithTag(C.Tag.VENUE_QUEST_TITLE, useUnmergedTree = true)
+        .assertTextEquals(QUEST_TITLE)
   }
 
   @Test

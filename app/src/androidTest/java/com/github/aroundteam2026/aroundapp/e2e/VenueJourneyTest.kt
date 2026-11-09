@@ -101,7 +101,8 @@ class VenueJourneyTest : TestCase() {
       // Saving closes the form, back to the Quests tab it was opened from
       composeTestRule.waitUntil(TIMEOUT_MS) { !exists(hasTestTag(C.Tag.CREATE_QUEST_SCREEN)) }
       composeTestRule.onNodeWithTag(C.Tag.VENUE_QUESTS_SCREEN).assertIsDisplayed()
-      waitFor(hasTestTag(C.Tag.VENUE_QUEST_TITLE) and hasText(questTitle))
+      // The card is one button, so its title is merged into it
+      waitFor(hasTestTag(C.Tag.VENUE_QUEST_CARD) and hasText(questTitle))
     }
     step("Firestore holds the venue's role, its venue and the quest") {
       runBlocking {

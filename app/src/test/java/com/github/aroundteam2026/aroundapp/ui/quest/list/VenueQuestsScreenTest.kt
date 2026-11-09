@@ -53,7 +53,7 @@ class VenueQuestsScreenTest {
 
   /** The text of every node tagged [tag], top to bottom. */
   private fun texts(tag: String) =
-      compose.onAllNodesWithTag(tag).fetchSemanticsNodes().map {
+      compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().map {
         it.config[SemanticsProperties.Text].joinToString()
       }
 
