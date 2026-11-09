@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
  *
  * @param disabledContainerColor The inside of a disabled field; Material's default unless given.
  * @param errorContainerColor The inside of a field with an error; the surface, like the others.
- * @param focusedBorderColor The border while the field is focused; venue setup uses its text
+ * @param focusedBorderColor The border while the field is focused; venue setup uses the accent text
  *   colour.
  * @param cursorColor The cursor; Material's default unless given. Venue setup matches it to its
  *   focused border.

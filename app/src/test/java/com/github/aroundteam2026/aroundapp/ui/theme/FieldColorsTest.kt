@@ -6,6 +6,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldColors
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -38,8 +39,8 @@ class FieldColorsTest {
                 venueField =
                     aroundFieldColors(
                         disabledContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedBorderColor = MaterialTheme.colorScheme.onSurface,
-                        cursorColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = AroundTheme.colors.accentText,
+                        cursorColor = AroundTheme.colors.accentText,
                     ),
             )
       }
@@ -47,11 +48,15 @@ class FieldColorsTest {
     return result
   }
 
-  @Test fun lightFieldsUseTheLightPalette() = assertPalette(palette(darkTheme = false))
+  @Test
+  fun lightFieldsUseTheLightPalette() =
+      assertPalette(palette(darkTheme = false), venueAccent = AroundColors.Purple)
 
-  @Test fun darkFieldsUseTheDarkPalette() = assertPalette(palette(darkTheme = true))
+  @Test
+  fun darkFieldsUseTheDarkPalette() =
+      assertPalette(palette(darkTheme = true), venueAccent = AroundColors.Cream)
 
-  private fun assertPalette(palette: Palette) {
+  private fun assertPalette(palette: Palette, venueAccent: Color) {
     val (scheme, field, defaults, venueField) = palette
     assertEquals(scheme.surface, field.focusedContainerColor)
     assertEquals(scheme.surface, field.unfocusedContainerColor)
@@ -65,8 +70,8 @@ class FieldColorsTest {
     assertEquals(field.errorContainerColor, venueField.errorContainerColor)
     assertEquals(field.unfocusedIndicatorColor, venueField.unfocusedIndicatorColor)
     assertEquals(scheme.surface, venueField.disabledContainerColor)
-    // Venue setup keeps its focused border and cursor in its text colour
-    assertEquals(scheme.onSurface, venueField.focusedIndicatorColor)
-    assertEquals(scheme.onSurface, venueField.cursorColor)
+    // Venue setup's focused border and cursor: purple in light mode, cream in dark mode
+    assertEquals(venueAccent, venueField.focusedIndicatorColor)
+    assertEquals(venueAccent, venueField.cursorColor)
   }
 }
