@@ -105,7 +105,10 @@ class FirestoreRulesTest {
     assertSucceeds(user(alice).update("displayName", "x".repeat(100)))
     assertDenied(user(alice).update("createdAt", Timestamp.now()))
     assertDenied(user(bob).update("displayName", "Other"))
-    assertEquals("x".repeat(100), assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"))
+    assertEquals(
+        "x".repeat(100),
+        assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"),
+    )
     signOut()
     assertDenied(user(alice).get(Source.SERVER))
   }
