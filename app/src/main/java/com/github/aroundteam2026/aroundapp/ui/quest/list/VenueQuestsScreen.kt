@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -49,16 +52,18 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
  * status. The heading's + button calls [onCreateQuest]; while the venue has no quests, the empty
- * state's button does instead.
+ * state's button does instead. Tapping a quest, or its edit button, calls [onEditQuest] with its
+ * id.
  */
 @Composable
 fun VenueQuestsScreen(
     viewModel: VenueQuestsViewModel,
     onCreateQuest: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditQuest: (String) -> Unit = {},
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  VenueQuestsContent(state, onCreateQuest, viewModel::retry, modifier)
+  VenueQuestsContent(state, onCreateQuest, viewModel::retry, modifier, onEditQuest)
 }
 
 /** Stateless Quests tab showing [state]; [onRetry] listens to the quests again after a failure. */
@@ -68,6 +73,7 @@ internal fun VenueQuestsContent(
     onCreateQuest: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditQuest: (String) -> Unit = {},
 ) {
   val empty = state is VenueQuestsUiState.Loaded && state.quests.isEmpty()
   Column(modifier.fillMaxSize().padding(AroundSpacing.ScreenHorizontal)) {
@@ -95,34 +101,43 @@ internal fun VenueQuestsContent(
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_QUESTS_LOADING)) }
       VenueQuestsUiState.Failed -> Centered { LoadFailed(onRetry) }
       is VenueQuestsUiState.Loaded ->
-          if (empty) Centered { NoQuests(onCreateQuest) } else QuestList(state.quests)
+          if (empty) Centered { NoQuests(onCreateQuest) } else QuestList(state.quests, onEditQuest)
     }
   }
 }
 
-/** The quests as cards, below the heading. */
+/** The quests as cards, below the heading; tapping one calls [onEditQuest] with its id. */
 @Composable
-private fun QuestList(quests: List<Quest>) {
+private fun QuestList(quests: List<Quest>, onEditQuest: (String) -> Unit) {
   LazyColumn(
       Modifier.fillMaxSize().testTag(C.Tag.VENUE_QUESTS_LIST),
       contentPadding = PaddingValues(vertical = AroundSpacing.ExtraLarge),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
-    items(quests, key = Quest::id) { QuestCard(it) }
+    items(quests, key = Quest::id) { quest -> QuestCard(quest) { onEditQuest(quest.id) } }
   }
 }
 
-/** A quest's title and status; a quest that isn't active is muted. */
+/**
+ * A quest's title, status and edit pencil; a quest that isn't active is muted. Tapping anywhere on
+ * the card, the pencil included, calls [onEdit]: one target, so TalkBack stops once per card.
+ */
 @Composable
-private fun QuestCard(quest: Quest) {
+private fun QuestCard(quest: Quest, onEdit: () -> Unit) {
   val active = quest.status == QuestStatus.ACTIVE
   val colors = MaterialTheme.colorScheme
   val shape = MaterialTheme.shapes.large
   Row(
       Modifier.fillMaxWidth()
-          .background(colors.surface, shape)
+          .clip(shape)
+          .background(colors.surface)
           .border(BorderStroke(CARD_BORDER, colors.outline), shape)
-          .padding(AroundSpacing.CardPadding),
+          .clickable(
+              onClickLabel = stringResource(R.string.venue_quests_edit, quest.title),
+              onClick = onEdit,
+          )
+          .padding(AroundSpacing.CardPadding)
+          .testTag(C.Tag.VENUE_QUEST_CARD),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
   ) {
@@ -138,6 +153,27 @@ private fun QuestCard(quest: Quest) {
         statusLabel(quest.status),
         background = if (active) colors.tertiary else colors.outline,
         content = if (active) colors.onTertiary else colors.onSurfaceVariant,
+    )
+    EditMark()
+  }
+}
+
+/**
+ * The round pencil of Figma's edit button. Not a button itself: the card around it is, so a tap on
+ * it edits the quest, and the card's click label says so to TalkBack.
+ */
+@Composable
+private fun EditMark() {
+  Box(
+      Modifier.size(EDIT_BUTTON_SIZE)
+          .background(MaterialTheme.colorScheme.primaryContainer, AroundPillShape),
+      contentAlignment = Alignment.Center,
+  ) {
+    Icon(
+        painterResource(R.drawable.ic_edit),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.size(EDIT_ICON_SIZE),
     )
   }
 }
@@ -227,6 +263,8 @@ private fun ColumnScope.Centered(content: @Composable () -> Unit) {
 }
 
 private val CARD_BORDER = 1.dp
+private val EDIT_BUTTON_SIZE = 28.dp
+private val EDIT_ICON_SIZE = 16.dp
 private val BUTTON_HEIGHT = 52.dp
 /** The width of the empty state's text and button in Figma. */
 private val EMPTY_STATE_WIDTH = 260.dp

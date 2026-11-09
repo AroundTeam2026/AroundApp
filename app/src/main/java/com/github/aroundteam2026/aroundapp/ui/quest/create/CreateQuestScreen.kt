@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -53,10 +54,11 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import kotlinx.coroutines.launch
 
 /**
- * The form a venue fills in to create a quest. [onClose] leaves it without saving, but neither it
- * nor Back can leave once the quest is being saved, and [onCreated] gets the id of the quest once
- * it is saved. A failed save shows a snackbar once and keeps the form. A venue that couldn't be
- * read can be read again from the form.
+ * The form a venue fills in to create or edit a quest. [onClose] leaves it without saving, but
+ * neither it nor Back can leave once the quest is being saved, and [onCreated] gets the id of the
+ * quest once it is saved. A failed save keeps the form: creating shows a snackbar once, editing
+ * shows a message above the button until the next save. A venue that couldn't be read can be read
+ * again from the form. A quest to edit that can't be read closes the form through [onClose].
  */
 @Composable
 fun CreateQuestScreen(
@@ -70,16 +72,20 @@ fun CreateQuestScreen(
   val scope = rememberCoroutineScope()
   val saveFailed = stringResource(R.string.create_quest_save_failed)
   val currentOnCreated by rememberUpdatedState(onCreated)
+  val currentOnClose by rememberUpdatedState(onClose)
+  LaunchedEffect(state.questUnavailable) { if (state.questUnavailable) currentOnClose() }
   LaunchedEffect(state.saveState) {
     when (val save = state.saveState) {
       is SaveState.Saved -> currentOnCreated(save.id)
-      SaveState.Failed -> {
-        // Launched in the screen's scope, not in this effect: clearing the error changes the
-        // effect's key, which would cancel a snackbar shown from inside it
-        scope.launch { snackbarHostState.showSnackbar(saveFailed) }
-        // Cleared at once, so the snackbar doesn't show again when the screen is recreated
-        viewModel.clearSaveError()
-      }
+      // Editing shows the failure above its button, as long as it lasts
+      SaveState.Failed ->
+          if (!state.editing) {
+            // Launched in the screen's scope, not in this effect: clearing the error changes the
+            // effect's key, which would cancel a snackbar shown from inside it
+            scope.launch { snackbarHostState.showSnackbar(saveFailed) }
+            // Cleared at once, so the snackbar doesn't show again when the screen is recreated
+            viewModel.clearSaveError()
+          }
       SaveState.Idle,
       SaveState.Saving -> Unit
     }
@@ -155,12 +161,15 @@ fun CreateQuestContent(
                 horizontal = AroundSpacing.ScreenHorizontal,
                 vertical = AroundSpacing.ExtraLarge,
             )
+            // While its changes are saved, the form fades, as it can't be edited
+            .alpha(if (state.editing && state.saveState == SaveState.Saving) SAVING_ALPHA else 1f)
             .testTag(C.Tag.CREATE_QUEST_SCREEN)
     ) {
       // Also disabled once saved, as the screen is closing and a second close would pop its caller
       CreateQuestHeader(
           onClose,
           closeEnabled = state.saveState == SaveState.Idle || state.saveState == SaveState.Failed,
+          editing = state.editing,
       )
       Spacer(Modifier.height(AroundSpacing.ExtraLarge))
       QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
@@ -172,9 +181,12 @@ fun CreateQuestContent(
   }
 }
 
-/** The round close button, and the screen title centred on the full width. */
+/**
+ * The round close button, and the screen title centred on the full width: "Edit quest" when
+ * [editing].
+ */
 @Composable
-private fun CreateQuestHeader(onClose: () -> Unit, closeEnabled: Boolean) {
+private fun CreateQuestHeader(onClose: () -> Unit, closeEnabled: Boolean, editing: Boolean) {
   Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
     Surface(
         onClick = onClose,
@@ -194,7 +206,7 @@ private fun CreateQuestHeader(onClose: () -> Unit, closeEnabled: Boolean) {
       }
     }
     Text(
-        stringResource(R.string.create_quest_heading),
+        stringResource(if (editing) R.string.edit_quest_heading else R.string.create_quest_heading),
         style = AroundTextStyles.CardTitle,
         color = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.semantics { heading() },
@@ -207,6 +219,9 @@ private fun CreateQuestHeader(onClose: () -> Unit, closeEnabled: Boolean) {
 internal fun FieldLabel(text: String) {
   Text(text, style = AroundTextStyles.FieldLabel, color = MaterialTheme.colorScheme.onSurface)
 }
+
+/** The form fades to this while the changes to a quest are saved, as in Figma. */
+private const val SAVING_ALPHA = 0.6f
 
 /** The empty form of a venue with a location, which shows the radius map. */
 // Tall enough for the whole form, as a preview can't scroll
@@ -222,6 +237,40 @@ internal fun CreateQuestPreview() {
   AroundAppTheme {
     CreateQuestContent(
         state = CreateQuestUiState(venueLocation = Location(46.5220, 6.6330)),
+        onTitleChange = {},
+        onDescriptionChange = {},
+        onRequirementsChange = {},
+        completionActions = QuestCompletionActions(),
+        rewardActions = QuestRewardActions(),
+        onSubmit = {},
+        onClose = {},
+        onRetryVenue = {},
+    )
+  }
+}
+
+/** A quest being edited, whose changes failed to save, as in Figma's "couldn't save" state. */
+@Preview(name = "Light", widthDp = 413, heightDp = 1800)
+@Preview(
+    name = "Dark",
+    widthDp = 413,
+    heightDp = 1800,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+internal fun EditQuestPreview() {
+  AroundAppTheme {
+    CreateQuestContent(
+        state =
+            CreateQuestUiState(
+                title = "Find the hidden fox",
+                description =
+                    "A tiny ceramic fox hides somewhere in the café. Spot it and snap a photo.",
+                requirements = "Order any drink. One photo per party.",
+                venueLocation = Location(46.5220, 6.6330),
+                editing = true,
+                saveState = SaveState.Failed,
+            ),
         onTitleChange = {},
         onDescriptionChange = {},
         onRequirementsChange = {},

@@ -49,6 +49,10 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
  * quest" button, enabled when the quest [CreateQuestUiState.canSave], which shows progress while it
  * is saved. If the venue couldn't be read, it says why the button is disabled and offers
  * [onRetryVenue]. The keyboard covers it.
+ *
+ * When [CreateQuestUiState.editing], the button says "Save changes", and "Saving…" while saving.
+ * The summary then gives way to "Saving your changes…" while saving, or to why the last save
+ * failed.
  */
 @Composable
 internal fun CreateQuestBar(
@@ -70,36 +74,74 @@ internal fun CreateQuestBar(
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
   ) {
     if (state.venueLoadFailed) VenueLoadFailed(onRetryVenue, retrying = state.retryingVenue)
-    Text(
-        questSummary(state),
-        style = AroundTextStyles.Small,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.testTag(C.Tag.CREATE_QUEST_SUMMARY),
-    )
     val saving = state.saveState == SaveState.Saving
+    when {
+      state.editing && saving ->
+          Text(
+              stringResource(R.string.edit_quest_saving_line),
+              style = AroundTextStyles.Small,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.testTag(C.Tag.EDIT_QUEST_SAVING),
+          )
+      state.editing && state.saveState == SaveState.Failed ->
+          Text(
+              stringResource(R.string.edit_quest_save_failed),
+              style = AroundTextStyles.Small,
+              color = MaterialTheme.colorScheme.error,
+              textAlign = TextAlign.Center,
+              // TalkBack reads it out as it appears
+              modifier =
+                  Modifier.testTag(C.Tag.EDIT_QUEST_SAVE_ERROR).semantics {
+                    liveRegion = LiveRegionMode.Polite
+                  },
+          )
+      else ->
+          Text(
+              questSummary(state),
+              style = AroundTextStyles.Small,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.testTag(C.Tag.CREATE_QUEST_SUMMARY),
+          )
+    }
     val savingLabel = stringResource(R.string.create_quest_saving)
     Button(
         onClick = onSubmit,
         enabled = state.canSave,
         shape = MaterialTheme.shapes.medium,
+        // While changes are saved, the button stays purple, faded, as in Figma
+        colors =
+            if (saving && state.editing) {
+              ButtonDefaults.buttonColors(
+                  disabledContainerColor =
+                      MaterialTheme.colorScheme.primary.copy(alpha = SAVING_BUTTON_ALPHA),
+                  disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+              )
+            } else ButtonDefaults.buttonColors(),
         modifier =
             Modifier.fillMaxWidth()
                 .height(BUTTON_HEIGHT)
                 .testTag(C.Tag.CREATE_QUEST_SUBMIT)
                 // On the button, not the spinner: the spinner's semantics aren't merged into the
                 // button, so TalkBack would read an unlabelled button while it has no text
-                .semantics { if (saving) contentDescription = savingLabel },
+                .semantics { if (saving && !state.editing) contentDescription = savingLabel },
     ) {
-      if (saving) {
+      if (saving && state.editing) {
+        Text(stringResource(R.string.edit_quest_saving), style = AroundTextStyles.Button)
+      } else if (saving) {
         CircularProgressIndicator(
             color = LocalContentColor.current,
             strokeWidth = PROGRESS_STROKE,
             modifier = Modifier.size(PROGRESS_SIZE),
         )
       } else {
-        Text(stringResource(R.string.create_quest_submit), style = AroundTextStyles.Button)
+        Text(
+            stringResource(
+                if (state.editing) R.string.edit_quest_submit else R.string.create_quest_submit
+            ),
+            style = AroundTextStyles.Button,
+        )
       }
     }
   }
@@ -168,5 +210,7 @@ private fun questSummary(state: CreateQuestUiState): String {
 private const val SUMMARY_SEPARATOR = " · "
 
 private val BUTTON_HEIGHT = 54.dp
+/** How opaque the button is while a quest's changes are saved, from Figma. */
+private const val SAVING_BUTTON_ALPHA = 0.6f
 private val PROGRESS_SIZE = 22.dp
 private val PROGRESS_STROKE = 2.dp
