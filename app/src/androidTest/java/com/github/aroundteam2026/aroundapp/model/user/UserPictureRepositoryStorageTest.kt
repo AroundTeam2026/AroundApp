@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorStorage
 import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
+import com.google.firebase.storage.FirebaseStorage
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -47,7 +48,10 @@ class UserPictureRepositoryStorageTest {
   /** Invalid ids fail locally, before a Storage write can start. */
   @Test
   fun invalidUserIdDoesNotUpload() = withTimeoutBlocking {
-    assertTrue(repository.upload("other/user", photo(byteArrayOf(1))).isFailure)
+    assertTrue(
+        repository.upload("other/user", photo(byteArrayOf(1))).exceptionOrNull()
+            is IllegalArgumentException
+    )
   }
 
   private fun photo(bytes: ByteArray): Uri {
@@ -60,7 +64,7 @@ class UserPictureRepositoryStorageTest {
   companion object {
     private const val APP = "user-picture-test"
     private lateinit var uid: String
-    private lateinit var storage: com.google.firebase.storage.FirebaseStorage
+    private lateinit var storage: FirebaseStorage
 
     @BeforeClass
     @JvmStatic

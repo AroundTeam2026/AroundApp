@@ -16,16 +16,14 @@ import kotlinx.coroutines.Dispatchers
 class UserPictureRepositoryStorage(
     context: Context,
     storage: FirebaseStorage = Firebase.storage,
-    transferTimeoutMs: Long = 60_000L,
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : UserPictureRepository {
   private val transfer =
       ProofPhotoRepositoryStorage(
           context,
           storage,
-          transferTimeoutMs,
-          ioDispatcher,
-          "user-pictures",
+          ioDispatcher = ioDispatcher,
+          folder = "user-pictures",
       )
 
   override suspend fun upload(uid: String, photo: Uri): Result<String> = transfer.upload(uid, photo)

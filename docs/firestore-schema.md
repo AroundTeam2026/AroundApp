@@ -1,3 +1,4 @@
+<!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 # Firestore schema v1
 
@@ -17,12 +18,12 @@ This doc describes what the code on `main` does. A change to a collection update
 
 | Field | Type | Notes |
 |---|---|---|
-| `displayName` | string | |
-| `pictureUrl` | string? | Cloud Storage location (`gs://...`) under `user-pictures/{uid}/`; omitted until set. |
+| `displayName` | string | At most 100 characters; initially empty until profile setup. |
+| `pictureUrl` | string? | Cloud Storage location (`gs://...`) under this user's `user-pictures/{uid}/`; omitted until set. At most 2,000 characters. |
 | `role` | `EXPLORER` or `VENUE`, null until chosen | Write-once: once set it cannot change. |
 | `createdAt` | timestamp | |
 
-No email: Firebase Auth already has it, and only the owner can read this document.
+No email: Firebase Auth already has it. Signed-in users can read profiles to display names and pictures; only the owner can write one.
 
 ### `venues/{ownerUid}`
 

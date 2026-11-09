@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model
 
@@ -46,14 +47,20 @@ class FirestoreRulesTest {
   // ---- users ----
 
   @Test
-  fun userCreatesAndReadsOnlyTheirOwnProfile() {
+  fun signedInUsersReadProfilesButOnlyOwnersWriteThem() {
     val alice = newUser()
     val bob = newUser()
 
     signInAs(bob)
     assertSucceeds(user(bob).set(profile(role = null)))
     assertDenied(user(alice).set(profile(role = null)))
-    assertDenied(user(alice).get(Source.SERVER))
+    signInAs(alice)
+    assertSucceeds(user(alice).set(profile(role = null)))
+    signInAs(bob)
+    assertEquals(
+        DISPLAY_NAME,
+        assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"),
+    )
     assertEquals(
         DISPLAY_NAME,
         assertSucceeds(user(bob).get(Source.SERVER)).getString("displayName"),
@@ -87,11 +94,16 @@ class FirestoreRulesTest {
                 "gs://bucket/user-pictures/${alice.uid}/1",
             )
     )
-    assertDenied(user(alice).update("role", "VENUE"))
     assertDenied(user(alice).update("pictureUrl", 42))
+    assertDenied(user(alice).update("pictureUrl", "gs://bucket/user-pictures/${bob.uid}/1"))
+    assertDenied(user(alice).update("pictureUrl", "gs://bucket/user-pictures/${alice.uid}/1/extra"))
+    assertDenied(user(alice).update("pictureUrl", "x".repeat(2001)))
+    assertDenied(user(alice).update("displayName", "x".repeat(101)))
     assertDenied(user(alice).update("createdAt", Timestamp.now()))
     assertDenied(user(bob).update("displayName", "Other"))
     assertEquals("Grace", assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"))
+    signOut()
+    assertDenied(user(alice).get(Source.SERVER))
   }
 
   @Test
@@ -113,6 +125,7 @@ class FirestoreRulesTest {
             "an unknown field" to valid + ("email" to alice.email),
             "no createdAt" to valid - "createdAt",
             "a displayName that is not a string" to valid + ("displayName" to 42),
+            "a displayName over the limit" to valid + ("displayName" to "x".repeat(101)),
         ),
     )
   }

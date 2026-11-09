@@ -1,5 +1,6 @@
 rules_version = '2';
 
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Cloud Storage holds the proof photos of quest completions, under proofs/{reservationId}/. The
 // reservation and its party are read from Firestore, where docs/firestore-schema.md describes them.

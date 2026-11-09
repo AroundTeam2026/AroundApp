@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.user
@@ -28,8 +29,8 @@ import kotlinx.coroutines.tasks.await
  * as its enum name, omitted while null. The uid is the document id rather than a stored field.
  * Documents that cannot be mapped back to a [User] are logged and read as missing.
  *
- * The security rules let a user read and write only their own profile, so reading or writing
- * another uid's fails with the Firestore exception, and the role, once set, never changes.
+ * Signed-in users can read profiles for names and pictures. Only the owner can write one, and the
+ * role, once set, never changes.
  *
  * @param db Firestore client to read from and write to.
  */
