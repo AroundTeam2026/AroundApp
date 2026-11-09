@@ -6,6 +6,7 @@ import android.util.Log
 import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import java.util.Date
@@ -63,6 +64,29 @@ class QuestRepositoryFirestore(
       }
 
   /**
+   * Sends only the editable fields and the new `updatedAt`, never `venueId` or `createdAt`, so the
+   * stored ones are kept. A dropped reward is deleted from the document. Like [createQuest], it
+   * doesn't wait for the server: a later rejection (e.g. no quest with this id) is only logged, and
+   * exceptions thrown while issuing the write are returned as a failure.
+   */
+  override suspend fun updateQuest(quest: Quest): Result<Unit> =
+      try {
+        val document = quests.document(quest.id)
+        val fields =
+            quest.editableFields() +
+                mapOf(
+                    REWARD to (quest.reward?.toFirestore() ?: FieldValue.delete()),
+                    UPDATED_AT to Timestamp(Date(now())),
+                )
+        document.update(fields).addOnFailureListener {
+          Log.w(TAG, "Update of quest ${document.id} was rejected", it)
+        }
+        Result.success(Unit)
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
+
+  /**
    * Turns Firestore's callback-style listener into a Kotlin Flow<List<Quest>>, which ViewModels can
    * collect. Every observe* method uses it.
    */
@@ -80,6 +104,14 @@ class QuestRepositoryFirestore(
   /** The document fields for this quest, with [time] as both creation and update time. */
   private fun Quest.toFirestore(time: Timestamp): Map<String, Any> = buildMap {
     put(VENUE_ID, venueId)
+    putAll(editableFields())
+    reward?.let { put(REWARD, it.toFirestore()) }
+    put(CREATED_AT, time)
+    put(UPDATED_AT, time)
+  }
+
+  /** The fields a venue may change after creation, except the reward, which may be absent. */
+  private fun Quest.editableFields(): Map<String, Any> = buildMap {
     put(RADIUS_METERS, radiusMeters)
     put(TITLE, title)
     put(DESCRIPTION, description)
@@ -87,10 +119,7 @@ class QuestRepositoryFirestore(
     put(PROOF_TYPE, proofType.name)
     put(MIN_PARTY_SIZE, minPartySize)
     put(EXACT_PARTY_SIZE, exactPartySize)
-    reward?.let { put(REWARD, it.toFirestore()) }
     put(STATUS, status.name)
-    put(CREATED_AT, time)
-    put(UPDATED_AT, time)
   }
 
   private fun Reward.toFirestore(): Map<String, Any> = buildMap {
