@@ -6,7 +6,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,13 +25,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -52,8 +51,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
  * status. The heading's + button calls [onCreateQuest]; while the venue has no quests, the empty
- * state's button does instead. Tapping a quest, or its edit button, calls [onEditQuest] with its
- * id.
+ * state's button does instead. A quest's pencil calls [onEditQuest] with its id.
  */
 @Composable
 fun VenueQuestsScreen(
@@ -106,7 +104,7 @@ internal fun VenueQuestsContent(
   }
 }
 
-/** The quests as cards, below the heading; tapping one calls [onEditQuest] with its id. */
+/** The quests as cards, below the heading; a card's pencil calls [onEditQuest] with its id. */
 @Composable
 private fun QuestList(quests: List<Quest>, onEditQuest: (String) -> Unit) {
   LazyColumn(
@@ -118,10 +116,7 @@ private fun QuestList(quests: List<Quest>, onEditQuest: (String) -> Unit) {
   }
 }
 
-/**
- * A quest's title, status and edit pencil; a quest that isn't active is muted. Tapping anywhere on
- * the card, the pencil included, calls [onEdit]: one target, so TalkBack stops once per card.
- */
+/** A quest's title, status and a pencil that calls [onEdit]; a quest that isn't active is muted. */
 @Composable
 private fun QuestCard(quest: Quest, onEdit: () -> Unit) {
   val active = quest.status == QuestStatus.ACTIVE
@@ -129,15 +124,9 @@ private fun QuestCard(quest: Quest, onEdit: () -> Unit) {
   val shape = MaterialTheme.shapes.large
   Row(
       Modifier.fillMaxWidth()
-          .clip(shape)
-          .background(colors.surface)
+          .background(colors.surface, shape)
           .border(BorderStroke(CARD_BORDER, colors.outline), shape)
-          .clickable(
-              onClickLabel = stringResource(R.string.venue_quests_edit, quest.title),
-              onClick = onEdit,
-          )
-          .padding(AroundSpacing.CardPadding)
-          .testTag(C.Tag.VENUE_QUEST_CARD),
+          .padding(AroundSpacing.CardPadding),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
   ) {
@@ -154,25 +143,26 @@ private fun QuestCard(quest: Quest, onEdit: () -> Unit) {
         background = if (active) colors.tertiary else colors.outline,
         content = if (active) colors.onTertiary else colors.onSurfaceVariant,
     )
-    EditMark()
+    EditButton(quest.title, onEdit)
   }
 }
 
-/**
- * The round pencil of Figma's edit button. Not a button itself: the card around it is, so a tap on
- * it edits the quest, and the card's click label says so to TalkBack.
- */
+/** Figma's round pencil button; TalkBack reads "Edit <title>". */
 @Composable
-private fun EditMark() {
-  Box(
-      Modifier.size(EDIT_BUTTON_SIZE)
-          .background(MaterialTheme.colorScheme.primaryContainer, AroundPillShape),
-      contentAlignment = Alignment.Center,
+private fun EditButton(title: String, onEdit: () -> Unit) {
+  FilledIconButton(
+      onClick = onEdit,
+      shape = AroundPillShape,
+      colors =
+          IconButtonDefaults.filledIconButtonColors(
+              containerColor = MaterialTheme.colorScheme.primaryContainer,
+              contentColor = MaterialTheme.colorScheme.onSurface,
+          ),
+      modifier = Modifier.size(EDIT_BUTTON_SIZE).testTag(C.Tag.VENUE_QUEST_EDIT),
   ) {
     Icon(
         painterResource(R.drawable.ic_edit),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurface,
+        contentDescription = stringResource(R.string.venue_quests_edit, title),
         modifier = Modifier.size(EDIT_ICON_SIZE),
     )
   }

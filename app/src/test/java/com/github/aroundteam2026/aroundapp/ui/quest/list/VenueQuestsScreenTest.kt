@@ -2,14 +2,10 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import android.content.Context
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -53,7 +49,7 @@ class VenueQuestsScreenTest {
 
   /** The text of every node tagged [tag], top to bottom. */
   private fun texts(tag: String) =
-      compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().map {
+      compose.onAllNodesWithTag(tag).fetchSemanticsNodes().map {
         it.config[SemanticsProperties.Text].joinToString()
       }
 
@@ -80,30 +76,25 @@ class VenueQuestsScreenTest {
     assertEquals(1, formsOpened)
   }
 
-  // The whole card, its pencil included, is one button
   @Test
-  fun tappingACardEditsItsQuest() {
+  fun aQuestsPencilEditsIt() {
     show(VenueQuestsUiState.Loaded(listOf(testQuest(id = "a"), testQuest(id = "b"))))
 
-    compose.onAllNodesWithTag(C.Tag.VENUE_QUEST_CARD)[0].performClick()
+    compose.onAllNodesWithTag(C.Tag.VENUE_QUEST_EDIT)[1].performClick()
 
-    assertEquals(listOf("a"), questsEdited)
+    assertEquals(listOf("b"), questsEdited)
   }
 
-  // One stop per card for TalkBack, which names the quest it edits
+  // TalkBack names the quest each pencil edits
   @Test
-  fun eachCardIsOneTargetNamingItsQuest() {
+  fun thePencilNamesItsQuest() {
     show(VenueQuestsUiState.Loaded(listOf(testQuest(title = "Fox"))))
 
-    compose.onAllNodes(hasClickAction()).assertCountEquals(2) // the card and the + button
     compose
-        .onNodeWithTag(C.Tag.VENUE_QUEST_CARD)
-        .assert(
-            SemanticsMatcher("click label names the quest") {
-              it.config[SemanticsActions.OnClick].label ==
-                  ApplicationProvider.getApplicationContext<Context>()
-                      .getString(R.string.venue_quests_edit, "Fox")
-            }
+        .onNodeWithTag(C.Tag.VENUE_QUEST_EDIT)
+        .assertContentDescriptionEquals(
+            ApplicationProvider.getApplicationContext<Context>()
+                .getString(R.string.venue_quests_edit, "Fox")
         )
   }
 
