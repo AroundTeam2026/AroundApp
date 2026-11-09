@@ -56,7 +56,8 @@ import kotlinx.coroutines.launch
  * quests fail to load, the page is [VenuePageStatus.FAILED] until [onRetry]; if the reservations
  * fail, accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and
  * if the proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the
- * explorer as in their profile.
+ * explorer as in their profile. Given [arrivalQuestId], the page opens that quest's details the
+ * first time it shows the venue; see [VenuePageUiState.arrivingAt].
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -68,12 +69,16 @@ class VenuePageViewModel(
     private val completionRepository: CompletionRepository,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
+    arrivalQuestId: String? = null,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(VenuePageUiState())
   /** What the page shows now; the page observes it. */
   val uiState: StateFlow<VenuePageUiState> = mutableUiState.asStateFlow()
 
   private var listening: Job? = null
+
+  /** The quest whose details the page opens the first time it shows the venue; null afterwards. */
+  private var arriving: String? = arrivalQuestId
 
   /**
    * The reservations this page created, by reservation id. One that was shown as pending and then
@@ -332,6 +337,10 @@ class VenuePageViewModel(
     mutableUiState.update {
       it.showing(venue, quests, accepted, reservationIds, approved, refused, completions)
     }
+    arriving?.let { questId ->
+      arriving = null
+      mutableUiState.update { it.arrivingAt(questId) }
+    }
   }
 
   /**
@@ -365,23 +374,27 @@ class VenuePageViewModel(
 
     /**
      * Builds the [VenuePageViewModel] of the venue [venueId] for the explorer [explorerUid], with
-     * the app's repositories.
+     * the app's repositories, opening the details of [arrivalQuestId] if given.
      */
-    fun factory(venueId: String, explorerUid: String): ViewModelProvider.Factory =
-        viewModelFactory {
-          initializer {
-            VenuePageViewModel(
-                venueId,
-                VenueRepositoryProvider.repository,
-                QuestRepositoryProvider.repository,
-                ReservationRepositoryProvider.repository,
-                UserRepositoryProvider.repository,
-                PartyRepositoryProvider.repository,
-                CompletionRepositoryProvider.repository,
-                explorerUid,
-            )
-          }
-        }
+    fun factory(
+        venueId: String,
+        explorerUid: String,
+        arrivalQuestId: String? = null,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer {
+        VenuePageViewModel(
+            venueId,
+            VenueRepositoryProvider.repository,
+            QuestRepositoryProvider.repository,
+            ReservationRepositoryProvider.repository,
+            UserRepositoryProvider.repository,
+            PartyRepositoryProvider.repository,
+            CompletionRepositoryProvider.repository,
+            explorerUid,
+            arrivalQuestId = arrivalQuestId,
+        )
+      }
+    }
   }
 }
 

@@ -41,7 +41,7 @@ import org.robolectric.annotation.Config
 class OverviewScreenTest {
   @get:Rule val compose = createComposeRule()
 
-  private val opened = mutableListOf<String>()
+  private val opened = mutableListOf<Pair<String, String>>()
   private var retries = 0
   private val cancelled = mutableListOf<String>()
 
@@ -50,7 +50,7 @@ class OverviewScreenTest {
       AroundAppTheme {
         OverviewContent(
             state,
-            onOpenVenue = { opened += it },
+            onOpenQuest = { venueId, questId -> opened += venueId to questId },
             onRetry = { retries++ },
             onCancel = { cancelled += it },
             clock = CLOCK,
@@ -105,12 +105,12 @@ class OverviewScreenTest {
   }
 
   @Test
-  fun tappingARowOpensItsVenue() {
-    show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
+  fun tappingARowOpensItsQuestAtItsVenue() {
+    show(loaded(row(), row(id = "reservation-2", venueId = "bakery", questId = "croissant")))
 
     compose.onNodeWithTag("${C.Tag.OVERVIEW_ROW}_reservation-2").performClick()
 
-    assertEquals(listOf("bakery"), opened)
+    assertEquals(listOf("bakery" to "croissant"), opened)
   }
 
   // Once the proof is sent, the quest is done on the explorer's side
@@ -137,7 +137,7 @@ class OverviewScreenTest {
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     assertEquals(listOf("reservation-2"), cancelled)
-    assertEquals(emptyList<String>(), opened)
+    assertEquals(emptyList<Pair<String, String>>(), opened)
   }
 
   @Test
@@ -167,7 +167,7 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
+    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
 
     compose.onNode(hasTestTag(C.Tag.CANCEL_RESERVATION), useUnmergedTree = true).performClick()
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
@@ -194,7 +194,7 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenVenue = {}) } }
+    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
 
     compose.onNodeWithTag(C.Tag.OVERVIEW_LIST).assertIsDisplayed()
     compose
@@ -213,6 +213,7 @@ class OverviewScreenTest {
   private fun row(
       id: String = ID,
       venueId: String = CAFE,
+      questId: String = "fox",
       status: OverviewRowStatus = OverviewRowStatus.WAITING,
       partySize: Int = 1,
       address: String? = "Rue du Pont 1",
@@ -221,7 +222,7 @@ class OverviewScreenTest {
   ) =
       OverviewRow(
           reservationId = id,
-          questId = "fox",
+          questId = questId,
           venueId = venueId,
           questTitle = "Find the hidden fox",
           reward = reward,

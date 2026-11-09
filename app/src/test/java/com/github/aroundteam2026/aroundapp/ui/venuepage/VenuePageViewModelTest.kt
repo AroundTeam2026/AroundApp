@@ -51,6 +51,9 @@ class VenuePageViewModelTest {
 
   private val party = FakePartyRepository()
 
+  /** The quest whose details the page opens as it arrives, as the route asks; none if null. */
+  private var arrival: String? = null
+
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE_ID,
@@ -62,6 +65,7 @@ class VenuePageViewModelTest {
         FakeCompletionRepository(),
         "explorer",
         clock,
+        arrival,
     )
   }
 
@@ -88,6 +92,49 @@ class VenuePageViewModelTest {
     assertEquals(VenueAvatar.Initials("CL"), state.avatar)
     assertEquals("Rue du Pont 1", state.address)
     assertEquals(listOf("a"), ids())
+  }
+
+  // As when the explorer taps the quest's card on the Quests tab
+  @Test
+  fun opensTheDetailsOfTheQuestItArrivesAtOnceLoaded() = test {
+    arrival = "a"
+    viewModel
+    runCurrent()
+
+    assertEquals("a", state.detailQuestId)
+    assertTrue(state.detailsLeaveThePage)
+  }
+
+  @Test
+  fun arrivingAtAQuestItDoesNotListShowsTheList() = test {
+    arrival = "gone"
+    viewModel
+    runCurrent()
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertNull(state.detailQuestId)
+  }
+
+  // Coming back, e.g. when its venue extends an expired reward, doesn't open it again
+  @Test
+  fun opensTheDetailsItArrivesAtOnlyOnce() = test {
+    arrival = "a"
+    viewModel
+    runCurrent()
+    quests.value = emptyList()
+    runCurrent()
+    quests.value = listOf(testQuest(id = "a", venueId = VENUE_ID))
+    runCurrent()
+
+    assertNull(state.detailQuestId)
+  }
+
+  @Test
+  fun withoutAQuestToArriveAtNoDetailsOpen() = test {
+    viewModel
+    runCurrent()
+
+    assertNull(state.detailQuestId)
   }
 
   @Test

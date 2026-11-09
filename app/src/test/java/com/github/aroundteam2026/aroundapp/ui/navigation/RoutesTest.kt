@@ -29,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
@@ -52,8 +53,8 @@ class RoutesTest {
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, onBack, onSubmitProof ->
-            VenuePageOnFakes(venueId, onBack, onSubmitProof)
+          venuePage = { venueId, questId, onBack, onSubmitProof ->
+            VenuePageOnFakes(venueId, onBack, onSubmitProof, arrivalQuestId = questId)
           },
           overview = { OverviewOnFakes(it) },
       )
@@ -146,6 +147,30 @@ class RoutesTest {
 
     composeTestRule.onNodeWithTag(Tab.QUESTS.screenTag).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertDoesNotExist()
+  }
+
+  // A quest id with a slash would otherwise end the query and reach the page cut short
+  @Test
+  fun venuePageReceivesTheQuestToOpen() {
+    launchApp()
+    open { navigateToVenuePage("venue-1", "a b/c?d") }
+
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
+    val questId = composeTestRule.runOnUiThread {
+      navController.currentBackStackEntry?.arguments?.getString(Routes.QUEST_ID)
+    }
+    assertEquals("a b/c?d", questId)
+  }
+
+  @Test
+  fun aVenuePageOpenedWithoutAQuestHasNone() {
+    launchApp()
+    open { navigateToVenuePage("venue-1") }
+
+    val questId = composeTestRule.runOnUiThread {
+      navController.currentBackStackEntry?.arguments?.getString(Routes.QUEST_ID)
+    }
+    assertNull(questId)
   }
 
   @Test

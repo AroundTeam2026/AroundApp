@@ -15,13 +15,15 @@ import com.github.aroundteam2026.aroundapp.ui.navigation.Routes
 private const val TAG = "VenuePageDestination"
 
 /**
- * Registers a venue's page, which takes the venue's id as [Routes.VENUE_ID].
+ * Registers a venue's page, which takes the venue's id as [Routes.VENUE_ID] and, optionally, the
+ * quest whose details it opens at once as [Routes.QUEST_ID].
  *
  * @param onBack Called when the explorer taps the page's back arrow.
  * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
  *   venue's name.
- * @param page Draws the page of the venue with the given id, with [onBack] as its back action and
- *   [onSubmitProof] as what its "Submit proof" button opens.
+ * @param page Draws the page of the venue with the given id, opening the details of the given quest
+ *   if any, with [onBack] as its back action and [onSubmitProof] as what its "Submit proof" button
+ *   opens.
  */
 fun NavGraphBuilder.venuePageDestination(
     onBack: () -> Unit,
@@ -30,49 +32,61 @@ fun NavGraphBuilder.venuePageDestination(
         @Composable
         (
             venueId: String,
+            questId: String?,
             onBack: () -> Unit,
             onSubmitProof: (reservationId: String, venueName: String) -> Unit,
         ) -> Unit,
 ) {
   composable(
       Routes.VENUE_PAGE,
-      arguments = listOf(navArgument(Routes.VENUE_ID) { type = NavType.StringType }),
+      arguments =
+          listOf(
+              navArgument(Routes.VENUE_ID) { type = NavType.StringType },
+              navArgument(Routes.QUEST_ID) {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+              },
+          ),
   ) { entry ->
     // The route only matches a non-blank id, so the argument is always there
     val venueId = requireNotNull(entry.arguments?.getString(Routes.VENUE_ID))
-    page(venueId, onBack, onSubmitProof)
+    page(venueId, entry.arguments?.getString(Routes.QUEST_ID), onBack, onSubmitProof)
   }
 }
 
 /**
  * A venue's page as the app shows it to the explorer [explorerUid], with the app's repositories.
  *
+ * @param questId A quest of the venue whose details the page opens at once, or null.
  * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
  *   venue's name.
  */
 @Composable
 fun VenuePage(
     venueId: String,
+    questId: String?,
     explorerUid: String,
     onBack: () -> Unit,
     onSubmitProof: (reservationId: String, venueName: String) -> Unit,
 ) =
     VenuePageScreen(
-        viewModel(factory = VenuePageViewModel.factory(venueId, explorerUid)),
+        viewModel(factory = VenuePageViewModel.factory(venueId, explorerUid, questId)),
         onBack,
         onSubmitProof,
     )
 
 /**
- * Opens the page of the venue with [venueId]. Not single-top, so opening another venue's page from
- * a venue's page stacks it, and Back returns to the first venue.
+ * Opens the page of the venue with [venueId], with the details of its quest [questId] open if
+ * given. Not single-top, so opening another venue's page from a venue's page stacks it, and Back
+ * returns to the first venue.
  *
  * A blank [venueId] matches no page, so it opens nothing and is logged instead of crashing.
  */
-fun NavController.navigateToVenuePage(venueId: String) {
+fun NavController.navigateToVenuePage(venueId: String, questId: String? = null) {
   if (venueId.isBlank()) {
     Log.w(TAG, "Not opening a venue page: the venue id is blank")
     return
   }
-  navigate(Routes.venuePage(venueId))
+  navigate(Routes.venuePage(venueId, questId))
 }

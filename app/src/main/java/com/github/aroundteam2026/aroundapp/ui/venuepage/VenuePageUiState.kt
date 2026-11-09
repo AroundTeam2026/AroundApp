@@ -25,6 +25,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
  * @property detailQuestId Id of the quest whose details are open, or null when none is.
+ * @property arrivalQuestId Id of the quest whose details the page opened as it arrived, as from a
+ *   card on the Quests tab, while they are open: closing them leaves the page instead of showing
+ *   its list, since the explorer never saw that list. Null otherwise.
  * @property pickBeforeDetails What closing the details picks: the pick from before they opened, or
  *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
@@ -52,6 +55,7 @@ data class VenuePageUiState(
     val quests: List<VenuePageQuest> = emptyList(),
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
+    val arrivalQuestId: String? = null,
     val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
     val reservationIds: Map<String, String> = emptyMap(),
@@ -129,7 +133,8 @@ data class VenuePageUiState(
   /**
    * This page listing [quests] instead. A picked quest that isn't among them is unpicked, so it
    * isn't picked again if it comes back, as when its venue extends an expired reward; likewise, its
-   * details close, which gives back the pick from before they opened.
+   * details close, which gives back the pick from before they opened, and they no longer count as
+   * the details the page arrived at.
    */
   fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState {
     fun String?.ifListed() = this?.takeIf { id -> quests.any { it.questId == id } }
@@ -139,9 +144,25 @@ data class VenuePageUiState(
         quests = quests,
         selectedQuestId = pick.ifListed(),
         detailQuestId = detailQuestId.ifListed(),
+        arrivalQuestId = arrivalQuestId.takeIf { !detailsClosed },
         pickBeforeDetails = pickBeforeDetails.ifListed().takeIf { !detailsClosed },
     )
   }
+
+  /**
+   * This page arriving at the details of the quest [questId], as from a card on the Quests tab:
+   * they open as with [withQuestDetails], and count as the [arrivalQuestId]. A quest it doesn't
+   * list, such as one whose reward has expired, changes nothing, so the page shows its list
+   * instead.
+   */
+  fun arrivingAt(questId: String): VenuePageUiState =
+      withQuestDetails(questId).let {
+        if (it.detailQuestId == questId) it.copy(arrivalQuestId = questId) else it
+      }
+
+  /** Whether closing the open details leaves the page, since it arrived at them. */
+  val detailsLeaveThePage: Boolean
+    get() = detailQuestId != null && detailQuestId == arrivalQuestId
 
   /**
    * This page with the details of the quest [questId] open, and that quest picked, since the
@@ -164,7 +185,12 @@ data class VenuePageUiState(
       if (detailQuestId == null) {
         this
       } else {
-        copy(detailQuestId = null, selectedQuestId = pickBeforeDetails, pickBeforeDetails = null)
+        copy(
+            detailQuestId = null,
+            arrivalQuestId = null,
+            selectedQuestId = pickBeforeDetails,
+            pickBeforeDetails = null,
+        )
       }
 
   /**

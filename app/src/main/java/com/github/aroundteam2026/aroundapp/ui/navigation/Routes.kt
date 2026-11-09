@@ -16,10 +16,19 @@ object Routes {
   /** Argument of [VENUE_PAGE]: the venue's id, equal to its owner's uid. */
   const val VENUE_ID = "venueId"
 
+  /**
+   * Optional argument of [VENUE_PAGE]: a quest of the venue whose details the page opens at once,
+   * as when the explorer taps its card on the Quests tab.
+   */
+  const val QUEST_ID = "questId"
+
   private const val VENUE_PAGE_PREFIX = "venue_page"
 
-  /** A venue's page, with its quests. Build the route to one venue with [venuePage]. */
-  const val VENUE_PAGE = "$VENUE_PAGE_PREFIX/{$VENUE_ID}"
+  /**
+   * A venue's page, with its quests, or with the details of [QUEST_ID] open when given. Build the
+   * route to one venue with [venuePage].
+   */
+  const val VENUE_PAGE = "$VENUE_PAGE_PREFIX/{$VENUE_ID}?$QUEST_ID={$QUEST_ID}"
 
   /** Argument of [COMPLETE_QUEST]: the id of the reservation whose quest the explorer completes. */
   const val RESERVATION_ID = "reservationId"
@@ -65,11 +74,14 @@ object Routes {
    * The route to one venue's page.
    *
    * @param venueId id of the venue; it is encoded, so it may contain any character.
+   * @param questId id of a quest of the venue whose details the page opens at once, or null for the
+   *   page's list of quests; encoded too.
    * @throws IllegalArgumentException if [venueId] is blank, which no route could match.
    */
-  fun venuePage(venueId: String): String {
+  fun venuePage(venueId: String, questId: String? = null): String {
     require(venueId.isNotBlank()) { "A venue page needs a venue id" }
-    return "$VENUE_PAGE_PREFIX/${Uri.encode(venueId)}"
+    val page = "$VENUE_PAGE_PREFIX/${Uri.encode(venueId)}"
+    return if (questId == null) page else "$page?$QUEST_ID=${Uri.encode(questId)}"
   }
 
   /**

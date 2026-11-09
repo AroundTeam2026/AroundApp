@@ -72,7 +72,8 @@ typealias VenuePageQuestRow =
  * keeps it clear of the system bars.
  *
  * @param viewModel Loads the venue and its quests, and keeps the picked one.
- * @param onBack Called when the explorer taps the back arrow.
+ * @param onBack Called when the explorer taps the back arrow, and when they close the details the
+ *   page arrived at ([VenuePageUiState.detailsLeaveThePage]).
  * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
  *   venue's name, from the quest's details.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
@@ -98,7 +99,9 @@ fun VenuePageScreen(
       onQuestTapped = viewModel::onQuestSelected,
       onRetry = viewModel::onRetry,
       onQuestDetails = viewModel::onQuestDetailsOpened,
-      onQuestDetailsClosed = viewModel::onQuestDetailsClosed,
+      onQuestDetailsClosed = {
+        if (state.detailsLeaveThePage) onBack() else viewModel.onQuestDetailsClosed()
+      },
       onAccept = viewModel::accept,
       onCancel = viewModel::cancel,
       modifier = modifier,

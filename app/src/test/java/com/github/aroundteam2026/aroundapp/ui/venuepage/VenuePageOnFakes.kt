@@ -32,6 +32,8 @@ const val APPROVED_RESERVATION_ID = "reservation-1"
  *
  * @param approvedQuestId A quest the venue offers, whose reservation [APPROVED_RESERVATION_ID] by
  *   [FAKE_EXPLORER_UID] the venue approved, so its details show "Submit proof"; none if null.
+ * @param arrivalQuestId A quest whose details the page opens at once, as the route asks; none if
+ *   null.
  */
 @Composable
 fun VenuePageOnFakes(
@@ -39,9 +41,10 @@ fun VenuePageOnFakes(
     onBack: () -> Unit,
     onSubmitProof: (reservationId: String, venueName: String) -> Unit,
     approvedQuestId: String? = null,
+    arrivalQuestId: String? = null,
 ) {
   val viewModel =
-      remember(venueId) {
+      remember(venueId, arrivalQuestId) {
         val party = FakePartyRepository()
         val reservations = FakeReservationRepository(party = party)
         val quests = listOfNotNull(approvedQuestId?.let { testQuest(id = it, venueId = venueId) })
@@ -71,6 +74,7 @@ fun VenuePageOnFakes(
             party,
             FakeCompletionRepository(),
             FAKE_EXPLORER_UID,
+            arrivalQuestId = arrivalQuestId,
         )
       }
   VenuePageScreen(viewModel, onBack, onSubmitProof)
