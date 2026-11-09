@@ -40,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -207,7 +206,6 @@ fun VenueInitializationContent(
             colors =
                 aroundFieldColors(
                     disabledContainerColor = MaterialTheme.colorScheme.surface,
-                    errorContainerColor = Color.Unspecified,
                     focusedBorderColor = MaterialTheme.colorScheme.onSurface,
                     cursorColor = MaterialTheme.colorScheme.onSurface,
                 ),

@@ -6,7 +6,6 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldColors
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -22,9 +21,7 @@ class FieldColorsTest {
   private data class Palette(
       val scheme: ColorScheme,
       val field: TextFieldColors,
-      val defaultDisabledContainer: Color,
-      val defaultErrorContainer: Color,
-      val defaultCursor: Color,
+      val defaults: TextFieldColors,
       val venueField: TextFieldColors,
   )
 
@@ -36,15 +33,11 @@ class FieldColorsTest {
             Palette(
                 scheme = MaterialTheme.colorScheme,
                 field = aroundFieldColors(),
-                defaultDisabledContainer =
-                    OutlinedTextFieldDefaults.colors().disabledContainerColor,
-                defaultErrorContainer = OutlinedTextFieldDefaults.colors().errorContainerColor,
-                defaultCursor = OutlinedTextFieldDefaults.colors().cursorColor,
+                defaults = OutlinedTextFieldDefaults.colors(),
                 // As VenueInitializationScreen passes them
                 venueField =
                     aroundFieldColors(
                         disabledContainerColor = MaterialTheme.colorScheme.surface,
-                        errorContainerColor = Color.Unspecified,
                         focusedBorderColor = MaterialTheme.colorScheme.onSurface,
                         cursorColor = MaterialTheme.colorScheme.onSurface,
                     ),
@@ -59,19 +52,19 @@ class FieldColorsTest {
   @Test fun darkFieldsUseTheDarkPalette() = assertPalette(palette(darkTheme = true))
 
   private fun assertPalette(palette: Palette) {
-    val (scheme, field, defaultDisabled, defaultError, defaultCursor, venueField) = palette
+    val (scheme, field, defaults, venueField) = palette
     assertEquals(scheme.surface, field.focusedContainerColor)
     assertEquals(scheme.surface, field.unfocusedContainerColor)
     assertEquals(scheme.surface, field.errorContainerColor)
     assertEquals(scheme.primary, field.focusedIndicatorColor)
     assertEquals(scheme.outline, field.unfocusedIndicatorColor)
-    assertEquals(defaultDisabled, field.disabledContainerColor)
-    assertEquals(defaultCursor, field.cursorColor)
+    assertEquals(defaults.disabledContainerColor, field.disabledContainerColor)
+    assertEquals(defaults.cursorColor, field.cursorColor)
     assertEquals(field.focusedContainerColor, venueField.focusedContainerColor)
     assertEquals(field.unfocusedContainerColor, venueField.unfocusedContainerColor)
+    assertEquals(field.errorContainerColor, venueField.errorContainerColor)
     assertEquals(field.unfocusedIndicatorColor, venueField.unfocusedIndicatorColor)
     assertEquals(scheme.surface, venueField.disabledContainerColor)
-    assertEquals(defaultError, venueField.errorContainerColor)
     // Venue setup keeps its focused border and cursor in its text colour
     assertEquals(scheme.onSurface, venueField.focusedIndicatorColor)
     assertEquals(scheme.onSurface, venueField.cursorColor)
