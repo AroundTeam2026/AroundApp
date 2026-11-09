@@ -1,3 +1,4 @@
+<!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 # Firestore schema v1
 
@@ -17,11 +18,12 @@ This doc describes what the code on `main` does. A change to a collection update
 
 | Field | Type | Notes |
 |---|---|---|
-| `displayName` | string | |
+| `displayName` | string | At most 100 characters; initially empty until profile setup. |
+| `pictureUrl` | string? | Cloud Storage location (`gs://...`) under this user's `user-pictures/{uid}/`; omitted until set. At most 2,000 characters. |
 | `role` | `EXPLORER` or `VENUE`, null until chosen | Write-once: once set it cannot change. |
 | `createdAt` | timestamp | |
 
-No email: Firebase Auth already has it, and only the owner can read this document.
+No email: Firebase Auth already has it. Signed-in users can get a profile by uid to display its name and picture, but cannot list the users collection; only the owner can write a profile.
 
 ### `venues/{ownerUid}`
 
@@ -76,7 +78,7 @@ The party isn't stored here: it is the reservation's memberships in `party_user`
 | `slotStart` | timestamp | Start of the booked slot. On creation it can't be more than 5 minutes in the past, to allow for a phone clock that is behind (enforced by the rules). |
 | `status` | `PENDING`, `APPROVED`, `REJECTED` or `CANCELLED` | Set to `PENDING` by the repository on creation. |
 | `createdAt` | timestamp | Set by the repository. |
-| `explorerName` | string | Display name of the explorer who made the reservation, copied from their `users` profile on creation so the venue sees who reserved (the venue can't read profiles). Must equal that profile's `displayName` (enforced by the rules). Not updated on a rename. Reservations made before this field existed lack it; the app reads them with an empty name. |
+| `explorerName` | string | Display name of the explorer who made the reservation, copied from their `users` profile on creation. Must equal that profile's `displayName` (enforced by the rules). Not updated on a rename. Reservations made before this field existed lack it; the app reads them with an empty name. |
 | `joinedCount` | int | Number of `JOINED` members in `party_user`, so the rules can cap the party at 10: rules can't count documents. 1 on creation, for the creator. Every join adds 1 and every withdrawal takes 1 off, in the same batch as the membership (enforced by the rules). The app shows the party size from the memberships, not from this field. |
 
 ### `party_user/{reservationId}_{uid}`
@@ -151,6 +153,7 @@ From `storage.rules`. Anything not listed is denied, including listing, overwrit
 | Path | Read | Write |
 |---|---|---|
 | `proofs/{reservationId}/{photoId}` | The reservation's party's `JOINED` members and its venue | A `JOINED` member of the reservation creates it while the reservation is `APPROVED`: an image (`image/*`) under 5 MB. Each photo gets a new `photoId`, so a retake never replaces an earlier one. |
+| `user-pictures/{uid}/{photoId}` | Signed-in users | Only `uid` creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
 
 The rules read the reservation and the membership from Firestore, so a proof follows the same party as `reservations`. A completion's `photoUrl` points to its photo here.
 
