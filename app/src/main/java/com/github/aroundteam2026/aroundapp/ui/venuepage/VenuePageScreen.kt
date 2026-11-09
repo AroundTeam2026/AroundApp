@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.res.Configuration
@@ -82,10 +83,10 @@ typealias VenuePageQuestRow =
  *   page arrived at ([VenuePageUiState.detailsLeaveThePage]). A quest it was to arrive at that it
  *   no longer lists shows a snackbar once ([VenuePageUiState.arrivalMissed]).
  * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
- *   venue's name, from the quest's details.
+ *   venue's name, from the page's bar or the quest's details.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
- *   [AcceptQuestBar] that accepts through [viewModel] unless replaced.
+ *   [QuestActionBar] that accepts through [viewModel] unless replaced.
  */
 @Composable
 fun VenuePageScreen(
@@ -109,9 +110,6 @@ fun VenuePageScreen(
       viewModel.onArrivalMissedShown()
     }
   }
-  val acceptBar: @Composable (VenuePageQuest?) -> Unit = {
-    AcceptQuestBar(state, viewModel::accept)
-  }
   VenuePageContent(
       state = state,
       onBack = onBack,
@@ -125,7 +123,7 @@ fun VenuePageScreen(
       onCancel = viewModel::cancel,
       modifier = modifier,
       questRow = questRow,
-      bottomBar = bottomBar ?: acceptBar,
+      bottomBar = bottomBar,
       onSubmitProof = { onSubmitProof(it, state.venueName) },
       snackbarHostState = snackbarHostState,
   )
@@ -133,10 +131,11 @@ fun VenuePageScreen(
 
 /**
  * Stateless page: the top bar, then what [state] says the page can show. Under the list sits
- * [bottomBar], or by default an [AcceptQuestBar] whose button calls [onAccept]. While
- * [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen] takes the page's place, and
- * [onCancel] cancels the reservation from there, or [onSubmitProof] opens the proof form of an
- * approved one, given its id. [snackbarHostState] shows its messages above the bar.
+ * [bottomBar], or by default a [QuestActionBar] whose button calls [onAccept] or, for an approved
+ * reservation, [onSubmitProof]. While [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen]
+ * takes the page's place, and [onCancel] cancels the reservation from there, or [onSubmitProof]
+ * opens the proof form of an approved one, given its id. [snackbarHostState] shows its messages
+ * above the bar.
  */
 @Composable
 fun VenuePageContent(
@@ -150,9 +149,7 @@ fun VenuePageContent(
     onAccept: () -> Unit = {},
     onCancel: () -> Unit = {},
     questRow: VenuePageQuestRow = DefaultQuestRow,
-    bottomBar: @Composable (selectedQuest: VenuePageQuest?) -> Unit = {
-      AcceptQuestBar(state, onAccept)
-    },
+    bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
     onSubmitProof: (reservationId: String) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -208,7 +205,11 @@ fun VenuePageContent(
           }
         }
         SnackbarHost(snackbarHostState)
-        bottomBar(state.selectedQuest)
+        if (bottomBar != null) {
+          bottomBar(state.selectedQuest)
+        } else {
+          QuestActionBar(state, onAccept, onSubmitProof)
+        }
       }
     }
   }
