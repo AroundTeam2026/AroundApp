@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
@@ -42,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -268,8 +270,9 @@ fun CompletionContent(
                       if (state.answerTooLong) {
                         {
                           CompletionMessage(
-                              stringResource(
-                                  R.string.completion_answer_too_long,
+                              pluralStringResource(
+                                  R.plurals.completion_answer_too_long,
+                                  MAX_TEXT_ANSWER_LENGTH,
                                   MAX_TEXT_ANSWER_LENGTH,
                               )
                           )

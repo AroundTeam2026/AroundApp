@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
 <!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
 <resources>
     <!-- The proof photo picker, on the completion screen -->
@@ -28,7 +29,10 @@
     <string name="completion_requirements">WHAT TO DO</string>
     <string name="completion_answer">Your answer</string>
     <string name="completion_answer_hint">Write your answer here</string>
-    <string name="completion_answer_too_long">Use %1$d characters or fewer in your answer.</string>
+    <plurals name="completion_answer_too_long">
+        <item quantity="one">Use %1$d character or fewer in your answer.</item>
+        <item quantity="other">Use %1$d characters or fewer in your answer.</item>
+    </plurals>
     <string name="completion_retry">Try again</string>
     <string name="completion_load_failed">Could not load this quest. Please try again.</string>
     <string name="completion_unavailable">This reservation is no longer available to complete.</string>

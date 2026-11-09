@@ -89,15 +89,15 @@ class CompletionStatusTest {
   }
 
   @Test
-  fun textProofAccepts1000CharactersButRefuses1001() {
-    val answer = "x".repeat(1000)
+  fun textProof_atAndOverTheLimit_refusesOnlyTheLongOne() {
+    val answer = "x".repeat(MAX_TEXT_ANSWER_LENGTH)
     assertEquals(answer, Proof.Text(answer).answer)
     assertThrows(IllegalArgumentException::class.java) { Proof.Text(answer + "x") }
   }
 
   @Test
-  fun photoProofAccepts2000CharactersButRefuses2001() {
-    val location = "gs://" + "x".repeat(1995)
+  fun photoProof_atAndOverTheLimit_refusesOnlyTheLongOne() {
+    val location = "gs://" + "x".repeat(MAX_PHOTO_LOCATION_LENGTH - "gs://".length)
     assertEquals(location, Proof.Photo(location).location)
     assertThrows(IllegalArgumentException::class.java) { Proof.Photo(location + "x") }
   }

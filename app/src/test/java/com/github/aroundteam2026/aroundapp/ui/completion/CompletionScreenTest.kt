@@ -1,10 +1,15 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
+import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -17,7 +22,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -32,6 +40,15 @@ import org.robolectric.annotation.Config
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class CompletionScreenTest {
   @get:Rule val compose = createComposeRule()
+
+  private val tooLongMessage =
+      ApplicationProvider.getApplicationContext<Application>()
+          .resources
+          .getQuantityString(
+              R.plurals.completion_answer_too_long,
+              MAX_TEXT_ANSWER_LENGTH,
+              MAX_TEXT_ANSWER_LENGTH,
+          )
   private var state by
       mutableStateOf(
           CompletionUiState(
@@ -106,31 +123,33 @@ class CompletionScreenTest {
   }
 
   @Test
-  fun answerLimitExplainsWhy1001CharactersCannotBeSentAndClearsAfterEditing() {
+  fun answerLimitExplainsWhyOneCharacterOverCannotBeSentAndClearsAfterEditing() {
     show()
     val answer = compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER)
-    answer.performTextInput("x".repeat(1000))
+    answer.performTextInput("x".repeat(MAX_TEXT_ANSWER_LENGTH))
+    answer.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Error))
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
 
     answer.performTextInput("x")
-    compose
-        .onNodeWithText("Use 1000 characters or fewer in your answer.")
-        .performScrollTo()
-        .assertIsDisplayed()
+    answer.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Error))
+    compose.onNodeWithText(tooLongMessage).performScrollTo().assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled().performClick()
     assertEquals(0, submits)
 
-    answer.performTextReplacement("x".repeat(1000))
-    compose.onNodeWithText("Use 1000 characters or fewer in your answer.").assertDoesNotExist()
+    answer.performTextReplacement("x".repeat(MAX_TEXT_ANSWER_LENGTH))
+    answer.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Error))
+    compose.onNodeWithText(tooLongMessage).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
   }
 
   @Test
   fun answerLimitUsesTheTrimmedValueThatWillBeStored() {
     show()
-    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("  " + "x".repeat(1000) + "  ")
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_ANSWER)
+        .performTextInput("  " + "x".repeat(MAX_TEXT_ANSWER_LENGTH) + "  ")
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsEnabled()
-    compose.onNodeWithText("Use 1000 characters or fewer in your answer.").assertDoesNotExist()
+    compose.onNodeWithText(tooLongMessage).assertDoesNotExist()
   }
 
   @Test

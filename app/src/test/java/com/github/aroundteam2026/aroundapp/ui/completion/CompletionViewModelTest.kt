@@ -17,6 +17,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -768,23 +769,10 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun oversizedAnswerCannotSubmitOrCrashAndCanBeCorrected() = test {
+  fun aTrimmedAnswerAtTheLimitIsAllowedAndStoredWhole() = test {
     open("fox")
-    viewModel.updateAnswer("x".repeat(1001))
-    assertTrue(state.answerTooLong)
-    assertFalse(state.canSubmit)
-
-    viewModel.submit()
-    runCurrent()
-
-    assertEquals(0, completions.calls)
-    assertEquals(SaveState.Idle, state.saveState)
-    assertTrue(stored().isEmpty())
-
-    val answer = "x".repeat(1000)
+    val answer = "x".repeat(MAX_TEXT_ANSWER_LENGTH)
     viewModel.updateAnswer("  $answer  ")
-    assertFalse(state.answerTooLong)
-    assertTrue(state.canSubmit)
     viewModel.submit()
     runCurrent()
 

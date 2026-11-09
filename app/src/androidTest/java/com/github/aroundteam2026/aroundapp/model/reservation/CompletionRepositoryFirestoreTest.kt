@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
@@ -423,11 +424,12 @@ class CompletionRepositoryFirestoreTest {
     val before = stored(id).data
 
     assertTrue(
-        venueRepository.reject(id, "x".repeat(301)).exceptionOrNull() is IllegalArgumentException
+        venueRepository.reject(id, "x".repeat(MAX_REJECT_REASON_LENGTH + 1)).exceptionOrNull()
+            is IllegalArgumentException
     )
     assertEquals(before, stored(id).data)
 
-    val reason = "x".repeat(300)
+    val reason = "x".repeat(MAX_REJECT_REASON_LENGTH)
     venueRepository.reject(id, reason).getOrThrow()
     assertEquals(reason, fetchAsVenue(id) { it.status == CompletionStatus.REJECTED }.rejectReason)
   }

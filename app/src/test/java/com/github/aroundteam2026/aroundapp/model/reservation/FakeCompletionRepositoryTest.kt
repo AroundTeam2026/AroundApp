@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
@@ -193,22 +194,26 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
-  fun rejectAccepts300CharactersButRefuses301WithoutChangingTheProof() = runBlocking {
+  fun reject_reasonAtAndOverTheLimit_refusesOnlyTheLongOneLeavingTheProof() = runBlocking {
     val id = submit()
     val before = stored()
-    assertTrue(repository.reject(id, "x".repeat(301)).exceptionOrNull() is IllegalArgumentException)
+    assertTrue(
+        repository.reject(id, "x".repeat(MAX_REJECT_REASON_LENGTH + 1)).exceptionOrNull()
+            is IllegalArgumentException
+    )
     assertEquals(before, stored())
 
-    val reason = "x".repeat(300)
+    val reason = "x".repeat(MAX_REJECT_REASON_LENGTH)
     repository.reject(id, reason).getOrThrow()
     assertEquals(reason, stored().rejectReason)
   }
 
   @Test
-  fun oversizedReasonFailsBeforeTheBackendAndTheLookup() = runBlocking {
+  fun reject_oversizedReason_failsBeforeTheBackendAndTheLookup() = runBlocking {
     repository.forcedFailure = IllegalStateException(OFFLINE)
     assertTrue(
-        repository.reject(OTHER_ID, "x".repeat(301)).exceptionOrNull() is IllegalArgumentException
+        repository.reject(OTHER_ID, "x".repeat(MAX_REJECT_REASON_LENGTH + 1)).exceptionOrNull()
+            is IllegalArgumentException
     )
   }
 

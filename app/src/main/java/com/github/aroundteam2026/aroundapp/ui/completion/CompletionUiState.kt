@@ -37,9 +37,9 @@ data class CompletionUiState(
         status == CompletionFormStatus.READY &&
             (saveState == SaveState.Idle || saveState == SaveState.Failed)
 
-  /** Whether the text proof exceeds the stored-answer limit after trimming, as on submission. */
+  /** Whether the answer exceeds the stored-answer limit after trimming, as on submission. */
   val answerTooLong: Boolean
-    get() = proofType == ProofType.TEXT && answer.trim().length > MAX_TEXT_ANSWER_LENGTH
+    get() = answer.trim().length > MAX_TEXT_ANSWER_LENGTH
 
   /** Whether the proof the quest asks for is filled in and the form can be submitted. */
   val canSubmit: Boolean
