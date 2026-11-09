@@ -177,6 +177,38 @@ class VenuePageUiStateTest {
     assertNull(booked.copy(acceptAvailable = false).cancellableReservationId)
   }
 
+  // The bug of #426: the details still offered to cancel, and the proof seemed to vanish
+  @Test
+  fun aReservationWithAProofCanNoLongerBeCancelledWhateverItsStatus() {
+    val booked =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            approvedIds = setOf("r"),
+        )
+
+    CompletionStatus.entries.forEach { status ->
+      val reason = "Too dark".takeIf { status == CompletionStatus.REJECTED }
+      val proof = completion("r").copy(status = status, rejectReason = reason)
+      assertNull(
+          status.name,
+          booked.copy(completions = mapOf("r" to proof)).cancellableReservationId,
+      )
+    }
+  }
+
+  @Test
+  fun aProofOfAnotherReservationLeavesThePickedOneCancellable() {
+    val booked =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            completions = mapOf("other" to completion("other")),
+        )
+
+    assertEquals("r", booked.cancellableReservationId)
+  }
+
   @Test
   fun onlyAnApprovedReservationOfThePickedQuestCanBeCompleted() {
     val booked = loaded.copy(reservationIds = mapOf("a" to "r"), selectedQuestId = "a")
