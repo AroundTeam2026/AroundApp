@@ -28,6 +28,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property arrivalQuestId Id of the quest whose details the page opened as it arrived, as from a
  *   card on the Quests tab, while they are open: closing them leaves the page instead of showing
  *   its list, since the explorer never saw that list. Null otherwise.
+ * @property arrivalMissed The page was to arrive at a quest it doesn't list, such as one whose
+ *   reward expired, and shows its list instead; true until the page has said so once.
  * @property pickBeforeDetails What closing the details picks: the pick from before they opened, or
  *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
@@ -56,6 +58,7 @@ data class VenuePageUiState(
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
     val arrivalQuestId: String? = null,
+    val arrivalMissed: Boolean = false,
     val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
     val reservationIds: Map<String, String> = emptyMap(),
@@ -152,12 +155,15 @@ data class VenuePageUiState(
   /**
    * This page arriving at the details of the quest [questId], as from a card on the Quests tab:
    * they open as with [withQuestDetails], and count as the [arrivalQuestId]. A quest it doesn't
-   * list, such as one whose reward has expired, changes nothing, so the page shows its list
-   * instead.
+   * list, such as one whose reward has expired, leaves its list shown, with [arrivalMissed] set so
+   * that the page says why. A page that isn't loaded, e.g. because the venue is gone, says so
+   * itself and changes nothing.
    */
   fun arrivingAt(questId: String): VenuePageUiState =
-      withQuestDetails(questId).let {
-        if (it.detailQuestId == questId) it.copy(arrivalQuestId = questId) else it
+      when {
+        status != VenuePageStatus.LOADED -> this
+        quests.none { it.questId == questId } -> copy(arrivalMissed = true)
+        else -> withQuestDetails(questId).copy(arrivalQuestId = questId)
       }
 
   /** Whether closing the open details leaves the page, since it arrived at them. */

@@ -32,6 +32,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -106,13 +107,20 @@ class VenuePageViewModelTest {
   }
 
   @Test
-  fun arrivingAtAQuestItDoesNotListShowsTheList() = test {
+  fun arrivingAtAQuestItDoesNotListShowsTheListAndSaysSoOnce() = test {
     arrival = "gone"
     viewModel
     runCurrent()
 
     assertEquals(VenuePageStatus.LOADED, state.status)
     assertNull(state.detailQuestId)
+    assertTrue(state.arrivalMissed)
+
+    viewModel.onArrivalMissedShown()
+    quests.value = quests.value + testQuest(id = "b", venueId = VENUE_ID)
+    runCurrent()
+
+    assertFalse(state.arrivalMissed)
   }
 
   // Coming back, e.g. when its venue extends an expired reward, doesn't open it again

@@ -303,10 +303,17 @@ class VenuePageUiStateTest {
     assertFalse(loaded.withQuestDetails("b").detailsLeaveThePage)
   }
 
-  // A quest whose reward expired is no longer listed: the page shows its list instead
+  // A quest whose reward expired is no longer listed: the page shows its list, and says why
   @Test
-  fun arrivingAtAnUnlistedQuestChangesNothing() {
-    assertSame(loaded, loaded.arrivingAt("gone"))
+  fun arrivingAtAnUnlistedQuestShowsTheListAndSaysSo() {
+    assertEquals(loaded.copy(arrivalMissed = true), loaded.arrivingAt("gone"))
+  }
+
+  // The page says the venue is gone, which explains the quest too
+  @Test
+  fun arrivingAtAPageThatIsNotLoadedChangesNothing() {
+    val gone = VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
+    assertSame(gone, gone.arrivingAt("a"))
   }
 
   // Once they closed, the explorer has seen the list, so details opened from it close back to it

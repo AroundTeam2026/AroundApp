@@ -77,7 +77,11 @@ class VenuePageViewModel(
 
   private var listening: Job? = null
 
-  /** The quest whose details the page opens the first time it shows the venue; null afterwards. */
+  /**
+   * The quest whose details the page opens the first time it shows the venue; null afterwards. Kept
+   * out of the state, which only learns of it once it has been opened, as
+   * [VenuePageUiState.arrivalQuestId], or missed, as [VenuePageUiState.arrivalMissed].
+   */
   private var arriving: String? = arrivalQuestId
 
   /**
@@ -132,6 +136,11 @@ class VenuePageViewModel(
   /** Called when the explorer opens the details of the quest [questId]. */
   fun onQuestDetailsOpened(questId: String) {
     mutableUiState.update { it.withQuestDetails(questId) }
+  }
+
+  /** Called once the page has said that the quest it was to arrive at is no longer listed. */
+  fun onArrivalMissedShown() {
+    mutableUiState.update { it.copy(arrivalMissed = false) }
   }
 
   /** Called when the explorer closes the quest details, however they close them. */

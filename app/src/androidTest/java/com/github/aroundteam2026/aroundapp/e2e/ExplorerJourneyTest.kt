@@ -191,6 +191,12 @@ class ExplorerJourneyTest : TestCase() {
           )
           .assertIsDisplayed()
     }
+    step("Its card opens the quest's details, whose back arrow returns to the Quests tab") {
+      composeTestRule.onNodeWithTag("${C.Tag.OVERVIEW_ROW}_$reservationId").performClick()
+      waitFor(hasTestTag(C.Tag.QUEST_DETAIL_SCREEN))
+      composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
+      waitFor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId"))
+    }
     step("The explorer signs out") {
       composeTestRule.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
       composeTestRule.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
