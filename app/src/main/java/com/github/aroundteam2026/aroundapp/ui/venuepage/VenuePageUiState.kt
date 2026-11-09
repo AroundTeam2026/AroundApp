@@ -92,11 +92,17 @@ data class VenuePageUiState(
     }
 
   /**
-   * The reservation the explorer can cancel for the picked quest, or null when there is none. While
-   * the reservations can't be read it is null too, since the page can't tell if it still stands.
+   * The reservation the explorer can cancel for the picked quest, or null when there is none. Once
+   * they sent its proof, whatever the proof's status, it can't be cancelled, as on the Quests tab
+   * and as the rules enforce. While the reservations can't be read it is null too, since the page
+   * can't tell if it still stands.
    */
   val cancellableReservationId: String?
-    get() = selectedQuestId?.takeIf { acceptAvailable }?.let(reservationIds::get)
+    get() =
+        selectedQuestId
+            ?.takeIf { acceptAvailable }
+            ?.let(reservationIds::get)
+            ?.takeIf { it !in completions }
 
   /**
    * The reservation whose quest the explorer can complete, for the picked quest: the one they can

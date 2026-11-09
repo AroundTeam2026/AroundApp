@@ -440,6 +440,18 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun aReservationWithAProofIsNotCancelled() = test {
+    storeWithProof("a")
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(ReservationStatus.APPROVED, stored().single().status)
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+  }
+
+  @Test
   fun cancelEndsTheReservationAndReopensTheQuest() = test {
     val id = storeFor("a")
     openAndPick("a")

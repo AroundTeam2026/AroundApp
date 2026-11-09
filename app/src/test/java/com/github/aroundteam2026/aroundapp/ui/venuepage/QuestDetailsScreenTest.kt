@@ -422,13 +422,23 @@ class QuestDetailsScreenTest {
     node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
   }
 
-  // Until #426 stops it, a reservation with a proof can still be cancelled
+  // As on the Quests tab: once the proof is sent, the quest is done on the explorer's side
   @Test
-  fun aSentProofLeavesCancellingToItsOwnIssue() {
+  fun aSentProofCanNoLongerBeCancelled() {
     val quest = quest()
     show(quest, withProof(quest, CompletionStatus.PENDING))
 
-    node(C.Tag.CANCEL_RESERVATION).assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
+    node(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
+  }
+
+  @Test
+  fun aRejectedProofKeepsSendingANewOneButNotCancelling() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.REJECTED, "Too dark"))
+
+    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
   }
 
   @Test
