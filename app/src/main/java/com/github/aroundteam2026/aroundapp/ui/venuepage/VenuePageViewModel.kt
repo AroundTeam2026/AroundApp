@@ -16,6 +16,9 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.isValidAt
 import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -48,11 +51,13 @@ import kotlinx.coroutines.launch
 /**
  * Holds the page of the venue [venueId]: its header and the quests explorers can take there.
  *
- * It keeps up with the venue, its active quests and the reservations of [explorerUid] with their
- * parties, and with rewards expiring by [clock]. If the venue or its quests fail to load, the page
- * is [VenuePageStatus.FAILED] until [onRetry]; if the reservations fail, accepting is unavailable
- * ([VenuePageUiState.acceptAvailable]) until the page reopens. Accepting names the explorer as in
- * their profile.
+ * It keeps up with the venue, its active quests, the reservations of [explorerUid] with their
+ * parties and the proofs they sent, and with rewards expiring by [clock]. If the venue or its
+ * quests fail to load, the page is [VenuePageStatus.FAILED] until [onRetry]; if the reservations
+ * fail, accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and
+ * if the proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the
+ * explorer as in their profile. Given [arrivalQuestId], the page opens that quest's details the
+ * first time it shows the venue; see [VenuePageUiState.arrivingAt].
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -61,14 +66,23 @@ class VenuePageViewModel(
     private val reservationRepository: ReservationRepository,
     private val userRepository: UserRepository,
     private val partyRepository: PartyRepository,
+    private val completionRepository: CompletionRepository,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
+    arrivalQuestId: String? = null,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(VenuePageUiState())
   /** What the page shows now; the page observes it. */
   val uiState: StateFlow<VenuePageUiState> = mutableUiState.asStateFlow()
 
   private var listening: Job? = null
+
+  /**
+   * The quest whose details the page opens the first time it shows the venue; null afterwards. Kept
+   * out of the state, which only learns of it once it has been opened, as
+   * [VenuePageUiState.arrivalQuestId], or missed, as [VenuePageUiState.arrivalMissed].
+   */
+  private var arriving: String? = arrivalQuestId
 
   /**
    * The reservations this page created, by reservation id. One that was shown as pending and then
@@ -100,7 +114,15 @@ class VenuePageViewModel(
   private val refusing = mutableSetOf<String>()
 
   /** What the page last heard from its listeners, so it can be shown again; null when failed. */
-  private var latest: Triple<Venue?, List<VenuePageQuest>, Booked?>? = null
+  private var latest: Heard<VenuePageQuest>? = null
+
+  /** What the listeners sent; [booked] or [completions] is null once its listener failed. */
+  private data class Heard<Q>(
+      val venue: Venue?,
+      val quests: List<Q>,
+      val booked: Booked?,
+      val completions: List<Completion>?,
+  )
 
   init {
     listen()
@@ -114,6 +136,11 @@ class VenuePageViewModel(
   /** Called when the explorer opens the details of the quest [questId]. */
   fun onQuestDetailsOpened(questId: String) {
     mutableUiState.update { it.withQuestDetails(questId) }
+  }
+
+  /** Called once the page has said that the quest it was to arrive at is no longer listed. */
+  fun onArrivalMissedShown() {
+    mutableUiState.update { it.copy(arrivalMissed = false) }
   }
 
   /** Called when the explorer closes the quest details, however they close them. */
@@ -240,10 +267,11 @@ class VenuePageViewModel(
   }
 
   /**
-   * Listens to the venue, its quests and the explorer's reservations and their parties until the
-   * ViewModel is cleared or listening fails. The quests are checked again each time a reward
-   * expires, even when nothing else changes. A failure of the reservations or parties only is not
-   * the page's: it goes on without them, with accepting unavailable.
+   * Listens to the venue, its quests, the explorer's reservations and their parties, and the proofs
+   * they sent until the ViewModel is cleared or listening fails. The quests are checked again each
+   * time a reward expires, even when nothing else changes. A failure of the reservations or parties
+   * only is not the page's: it goes on without them, with accepting unavailable. Nor is a failure
+   * of the proofs, with sending one unavailable.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen() {
@@ -265,15 +293,20 @@ class VenuePageViewModel(
                     Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
                     emit(null)
                   },
-          ) { venue, quests, reservations ->
-            Triple(venue, quests, reservations)
-          }
-          .transformLatest { (venue, quests, reservations) ->
+              completionRepository
+                  .observeForExplorer(explorerUid)
+                  .map<List<Completion>, List<Completion>?> { it }
+                  .catch {
+                    Log.w(TAG, "Listening to the proofs of $explorerUid failed", it)
+                    emit(null)
+                  },
+              ::Heard,
+          )
+          .transformLatest { (venue, quests, booked, completions) ->
             while (true) {
               val now = clock()
-              emit(
-                  Triple(venue, venuePageQuests(quests, venue?.featuredQuestId, now), reservations)
-              )
+              val valid = venuePageQuests(quests, venue?.featuredQuestId, now)
+              emit(Heard(venue, valid, booked, completions))
               val nextExpiry = quests.nextExpiryAfter(now) ?: break
               delay(nextExpiry - now)
             }
@@ -286,7 +319,7 @@ class VenuePageViewModel(
           .collect { page ->
             latest = page
             // A refused write is over once Firestore no longer lists anything for its quest
-            page.third?.reservations?.let { listed ->
+            page.booked?.reservations?.let { listed ->
               refusing.retainAll { quest ->
                 listed.any { it.questId == quest && it.venueId == venueId }
               }
@@ -301,7 +334,7 @@ class VenuePageViewModel(
    * doesn't count as accepted: it stays "accepting", or "failed", whatever Firestore lists.
    */
   private fun show() {
-    val (venue, quests, booked) = latest ?: return
+    val (venue, quests, booked, completions) = latest ?: return
     val accepted = booked?.let {
       acceptedPartiesOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
     }
@@ -310,7 +343,13 @@ class VenuePageViewModel(
     }
     val approved = booked?.reservations?.approvedIds()
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
-    mutableUiState.update { it.showing(venue, quests, accepted, reservationIds, approved, refused) }
+    mutableUiState.update {
+      it.showing(venue, quests, accepted, reservationIds, approved, refused, completions)
+    }
+    arriving?.let { questId ->
+      arriving = null
+      mutableUiState.update { it.arrivingAt(questId) }
+    }
   }
 
   /**
@@ -344,22 +383,27 @@ class VenuePageViewModel(
 
     /**
      * Builds the [VenuePageViewModel] of the venue [venueId] for the explorer [explorerUid], with
-     * the app's repositories.
+     * the app's repositories, opening the details of [arrivalQuestId] if given.
      */
-    fun factory(venueId: String, explorerUid: String): ViewModelProvider.Factory =
-        viewModelFactory {
-          initializer {
-            VenuePageViewModel(
-                venueId,
-                VenueRepositoryProvider.repository,
-                QuestRepositoryProvider.repository,
-                ReservationRepositoryProvider.repository,
-                UserRepositoryProvider.repository,
-                PartyRepositoryProvider.repository,
-                explorerUid,
-            )
-          }
-        }
+    fun factory(
+        venueId: String,
+        explorerUid: String,
+        arrivalQuestId: String? = null,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer {
+        VenuePageViewModel(
+            venueId,
+            VenueRepositoryProvider.repository,
+            QuestRepositoryProvider.repository,
+            ReservationRepositoryProvider.repository,
+            UserRepositoryProvider.repository,
+            PartyRepositoryProvider.repository,
+            CompletionRepositoryProvider.repository,
+            explorerUid,
+            arrivalQuestId = arrivalQuestId,
+        )
+      }
+    }
   }
 }
 
@@ -421,11 +465,12 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
 
 /**
  * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
- * [accepted] ones, with the explorer's [approved] reservations, or "not found" when [venue] is
- * null. A quest being accepted that is now accepted is done accepting, a reservation no longer
- * listed is done cancelling, and a quest in [refused] failed. A null [accepted] means the
- * reservations can't be read: the page keeps what it knew and stops offering to accept, cancel or
- * complete.
+ * [accepted] ones, with the explorer's [approved] reservations and the proofs in [completions], or
+ * "not found" when [venue] is null. A quest being accepted that is now accepted is done accepting,
+ * a reservation no longer listed is done cancelling, and a quest in [refused] failed. A null
+ * [accepted] means the reservations can't be read: the page keeps what it knew and stops offering
+ * to accept, cancel or complete. Null [completions] likewise mean the proofs can't be read, so it
+ * stops offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
@@ -434,6 +479,7 @@ private fun VenuePageUiState.showing(
     reservationIds: Map<String, String>?,
     approved: Set<String>?,
     refused: Set<String>,
+    completions: List<Completion>?,
 ): VenuePageUiState =
     if (venue == null) {
       VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
@@ -453,6 +499,8 @@ private fun VenuePageUiState.showing(
               failedCancelIds = failedCancelIds.intersect(reservationIds?.values.orEmpty()),
               acceptAvailable = accepted != null,
               approvedIds = approved ?: approvedIds,
+              completions = completions?.associateBy { it.reservationId } ?: this.completions,
+              proofsAvailable = completions != null,
           )
           .withQuests(quests)
     }

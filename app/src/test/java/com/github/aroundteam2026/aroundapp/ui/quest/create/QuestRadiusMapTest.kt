@@ -49,4 +49,19 @@ class QuestRadiusMapTest {
     showForm(CreateQuestUiState())
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS_MAP).assertDoesNotExist()
   }
+
+  @Test
+  fun thePreviewShowsTheMapOfItsVenue() {
+    compose.setContent { CreateQuestPreview() }
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS_MAP).performScrollTo()
+  }
+
+  @Test
+  @Config(qualifiers = "+night")
+  fun thePreviewShowsTheMapOfItsVenueInDark() {
+    compose.setContent { CreateQuestPreview() }
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS_MAP).performScrollTo()
+  }
 }

@@ -10,6 +10,8 @@
          it is declared, Android only opens the camera after the explorer allows it, which gives
          the ask-first and refused states #330 asks for. Don't remove it as unused. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- The connectivity repository reads the default network. Granted at install, never asked. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Phones without a camera can still install the app and pick a proof from the gallery -->
     <uses-feature
         android:name="android.hardware.camera"
