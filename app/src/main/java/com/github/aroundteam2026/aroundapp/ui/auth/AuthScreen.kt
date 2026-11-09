@@ -68,12 +68,12 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthInputValidation
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.quest.create.questFieldColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -431,7 +431,7 @@ private fun AuthCredentials(
         enabled = !state.isLoading,
         isError = state.error == AuthFormError.INVALID_EMAIL,
         shape = MaterialTheme.shapes.small,
-        colors = questFieldColors(),
+        colors = aroundFieldColors(),
         textStyle = AroundTextStyles.FieldValue,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         modifier =
@@ -688,7 +688,7 @@ private fun PasswordField(
         enabled = enabled,
         isError = isError,
         shape = MaterialTheme.shapes.small,
-        colors = questFieldColors(),
+        colors = aroundFieldColors(),
         textStyle = AroundTextStyles.FieldValue,
         visualTransformation =
             if (visible) VisualTransformation.None else PasswordVisualTransformation(),
