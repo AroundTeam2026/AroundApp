@@ -280,10 +280,11 @@ class FakeQuestRepositoryTest {
   }
 
   @Test
-  fun updateQuest_failsAndStoresNothingForAnUnknownId() = runBlocking {
+  fun updateQuest_succeedsAndStoresNothingForAnUnknownId() = runBlocking {
+    // Like Firestore, which returns success and only rejects the write on the server
     val result = repository.updateQuest(testQuest(id = "unknown"))
 
-    assertTrue(result.exceptionOrNull() is NoSuchElementException)
+    assertTrue(result.isSuccess)
     assertNull(repository.getQuest("unknown"))
   }
 

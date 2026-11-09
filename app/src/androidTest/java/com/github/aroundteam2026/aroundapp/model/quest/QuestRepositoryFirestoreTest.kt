@@ -240,13 +240,18 @@ class QuestRepositoryFirestoreTest {
   @Test
   fun createQuest_succeedsWhileOffline() = withTimeoutBlocking {
     db.disableNetwork().await()
-    val id = repository.createQuest(quest(title = "Offline")).getOrThrow()
-
-    // check it's already in local cache
-    assertEquals("Offline", repository.getQuest(id)?.title)
+    // The client is shared across tests, so it must come back online even if this test fails
+    val id =
+        try {
+          val id = repository.createQuest(quest(title = "Offline")).getOrThrow()
+          // check it's already in local cache
+          assertEquals("Offline", repository.getQuest(id)?.title)
+          id
+        } finally {
+          db.enableNetwork().await()
+        }
 
     // check it syncs to the server when back online
-    db.enableNetwork().await()
     assertEquals("Offline", getQuestFromServer(id)?.title)
   }
 
@@ -331,12 +336,17 @@ class QuestRepositoryFirestoreTest {
     // Offline before the create too: the memory cache keeps the document only while a write to it
     // is pending, and an update can't be applied locally to a document the cache doesn't hold
     db.disableNetwork().await()
-    val id = repository.createQuest(quest()).getOrThrow()
+    // The client is shared across tests, so it must come back online even if this test fails
+    val id =
+        try {
+          val id = repository.createQuest(quest()).getOrThrow()
+          repository.updateQuest(quest(id = id, status = QuestStatus.ARCHIVED)).getOrThrow()
+          assertEquals(QuestStatus.ARCHIVED, repository.getQuest(id)?.status)
+          id
+        } finally {
+          db.enableNetwork().await()
+        }
 
-    repository.updateQuest(quest(id = id, status = QuestStatus.ARCHIVED)).getOrThrow()
-    assertEquals(QuestStatus.ARCHIVED, repository.getQuest(id)?.status)
-
-    db.enableNetwork().await()
     assertEquals(QuestStatus.ARCHIVED, getQuestFromServer(id)?.status)
   }
 

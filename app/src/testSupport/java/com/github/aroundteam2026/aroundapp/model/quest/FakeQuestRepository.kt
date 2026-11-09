@@ -79,21 +79,20 @@ class FakeQuestRepository(
 
   /**
    * Replaces the stored quest with `quest.id` by [quest], keeping its `venueId` and `createdAt` and
-   * setting `updatedAt` to [now]. Returns [forcedFailure] instead, storing nothing, if it is set,
-   * and a [NoSuchElementException] failure if no quest has that id. That failure comes earlier than
-   * with [QuestRepositoryFirestore], which returns success and only logs the server's later
-   * rejection, so callers mustn't rely on it.
+   * setting `updatedAt` to [now]. Returns [forcedFailure] instead, storing nothing, if it is set.
+   * If no quest has that id, it stores nothing and still returns success, like
+   * [QuestRepositoryFirestore], whose server rejects that write later.
    */
   override suspend fun updateQuest(quest: Quest): Result<Unit> {
     forcedFailure?.let {
       return Result.failure(it)
     }
-    val stored =
-        quests.value[quest.id]
-            ?: return Result.failure(NoSuchElementException("No quest with id ${quest.id}"))
-    val updated =
-        quest.copy(venueId = stored.venueId, createdAt = stored.createdAt, updatedAt = now())
-    quests.update { it + (quest.id to updated) }
+    quests.update { all ->
+      val stored = all[quest.id] ?: return@update all
+      all +
+          (quest.id to
+              quest.copy(venueId = stored.venueId, createdAt = stored.createdAt, updatedAt = now()))
+    }
     return Result.success(Unit)
   }
 }
