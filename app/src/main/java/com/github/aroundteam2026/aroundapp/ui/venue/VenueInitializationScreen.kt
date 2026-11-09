@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
  * Entry point for the venue sign-up flow. The navigation owner supplies the existing ViewModel and
@@ -208,8 +209,9 @@ fun VenueInitializationContent(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     disabledContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedBorderColor = MaterialTheme.colorScheme.onSurface,
-                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                    // Purple on cream, cream in dark mode, where purple barely shows
+                    focusedBorderColor = AroundTheme.colors.accentText,
+                    cursorColor = AroundTheme.colors.accentText,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 ),
             keyboardOptions =
