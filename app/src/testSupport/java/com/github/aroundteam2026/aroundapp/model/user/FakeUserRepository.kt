@@ -46,4 +46,18 @@ class FakeUserRepository : UserRepository {
       else -> Result.success(Unit)
     }
   }
+
+  override suspend fun updateProfile(
+      uid: String,
+      displayName: String,
+      pictureUrl: String?,
+  ): Result<Unit> {
+    val previous = users.getAndUpdate { current ->
+      current[uid]?.let {
+        current + (uid to it.copy(displayName = displayName, pictureUrl = pictureUrl))
+      } ?: current
+    }
+    return if (uid in previous) Result.success(Unit)
+    else Result.failure(IllegalArgumentException("User not found"))
+  }
 }

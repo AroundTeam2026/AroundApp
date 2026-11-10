@@ -9,7 +9,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.PROOF_PHOTO_LIMIT_BYTES
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.CoroutineContext
 import kotlin.random.Random
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -31,6 +33,8 @@ class ProofPhotosTest {
   private val folder = File(app.cacheDir, "proofs").apply { mkdirs() }
 
   private fun shrink(source: Uri, with: ProofPhotos = photos) = runBlocking { with.shrink(source) }
+
+  private fun discard(photo: Uri, with: ProofPhotos = photos) = runBlocking { with.discard(photo) }
 
   @Test
   fun aLargePhotoShrinksToTheMaximumEdgeKeepingItsShape() {
@@ -108,11 +112,35 @@ class ProofPhotosTest {
     val target = File(folder, "camera-shared.jpg").apply { writeText("photo") }
     val shared = Uri.parse("content://${ProofPhotos.authority(app)}/proofs/${target.name}")
 
-    assertTrue(photos.discard(copy))
-    assertTrue(photos.discard(shared))
+    assertTrue(discard(copy))
+    assertTrue(discard(shared))
 
     assertFalse(File(copy.path!!).exists())
     assertFalse(target.exists())
+  }
+
+  // Deleting touches the disk, so it mustn't run on the screen's thread
+  @Test
+  fun discardDeletesOnItsIoDispatcher() {
+    val io = RecordingDispatcher()
+    val target = File(folder, "camera-io.jpg").apply { writeText("photo") }
+
+    assertTrue(discard(Uri.fromFile(target), ProofPhotos(app, io)))
+
+    assertTrue(io.dispatched)
+    assertFalse(target.exists())
+  }
+
+  // A failed compression would otherwise send an empty file as the proof
+  @Test
+  fun aCopyThatFailsToCompressFailsAndIsNotKept() {
+    val source = testImage(app, 80, 60)
+    val failing = ProofPhotos(app, Dispatchers.Unconfined, compress = { _, _ -> false })
+    val before = folder.list().orEmpty().toSet()
+
+    assertThrows(IOException::class.java) { shrink(source, failing) }
+
+    assertEquals(before, folder.list().orEmpty().toSet())
   }
 
   @Test
@@ -120,15 +148,22 @@ class ProofPhotosTest {
     val gallery = testImage(app, 80, 60)
     val elsewhere = File(folder, "kept.jpg").apply { writeText("photo") }
 
-    assertFalse(photos.discard(gallery))
-    assertFalse(photos.discard(Uri.parse("content://media/external/images/1")))
-    assertFalse(photos.discard(Uri.parse("content://other.app.files/proofs/kept.jpg")))
-    assertFalse(photos.discard(Uri.fromFile(File(folder, "../${File(gallery.path!!).name}"))))
+    assertFalse(discard(gallery))
+    assertFalse(discard(Uri.parse("content://media/external/images/1")))
+    assertFalse(discard(Uri.parse("content://other.app.files/proofs/kept.jpg")))
+    assertFalse(discard(Uri.fromFile(File(folder, "../${File(gallery.path!!).name}"))))
     // Already gone: nothing to delete
-    assertFalse(photos.discard(Uri.fromFile(File(folder, "gone.jpg"))))
+    assertFalse(discard(Uri.fromFile(File(folder, "gone.jpg"))))
 
     assertTrue(File(gallery.path!!).exists())
     assertTrue(elsewhere.exists())
+  }
+
+  // The picker discards in a finally, where a throw would crash the screen
+  @Test
+  fun discardOfAPathThatCantBeResolvedDeletesNothingAndDoesNotThrow() {
+    // Java can't resolve a path with a NUL in it: canonicalFile throws IOException
+    assertFalse(discard(Uri.fromFile(File(folder, "bad\u0000.jpg"))))
   }
 
   // FileProvider matches paths with "/", so it can't find the cache under Windows' "\" paths: this
@@ -172,6 +207,16 @@ class ProofPhotosTest {
 
   private companion object {
     const val GRAIN = 24
+  }
+}
+
+/** Runs what it's given at once, and records that it was given something. */
+private class RecordingDispatcher : CoroutineDispatcher() {
+  var dispatched = false
+
+  override fun dispatch(context: CoroutineContext, block: Runnable) {
+    dispatched = true
+    block.run()
   }
 }
 

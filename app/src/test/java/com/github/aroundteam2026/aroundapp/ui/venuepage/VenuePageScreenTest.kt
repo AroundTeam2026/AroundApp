@@ -32,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -98,6 +99,23 @@ class VenuePageScreenTest {
     listOf(C.Tag.VENUE_PAGE_HEADER, C.Tag.VENUE_PAGE_NOT_FOUND, C.Tag.VENUE_PAGE_FAILED).forEach {
       compose.onNodeWithTag(it).assertDoesNotExist()
     }
+  }
+
+  @Test
+  fun aQuestTheVenueNoLongerListsSaysSo() {
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageOnFakes(
+            "venue-1",
+            onBack = {},
+            onSubmitProof = { _, _ -> },
+            arrivalQuestId = "gone",
+        )
+      }
+    }
+
+    compose.onNodeWithText("This quest is no longer available.").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_PAGE_SCREEN).assertIsDisplayed()
   }
 
   @Test
@@ -440,6 +458,7 @@ class VenuePageScreenTest {
             reservations,
             testUsers("explorer"),
             party,
+            FakeCompletionRepository(),
             "explorer",
         )
     compose.setContent {

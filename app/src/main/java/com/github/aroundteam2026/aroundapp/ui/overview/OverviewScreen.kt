@@ -47,21 +47,21 @@ import java.time.Clock
  * the app's repositories. It is the tab's own screen rather than a route, so the Quests tab stays
  * selected while it is shown.
  *
- * @param onOpenVenue Opens the page of the venue with this id, when its card is tapped.
+ * @param onOpenQuest Opens the details of this quest on its venue's page, when its card is tapped.
  */
 @Composable
-fun OverviewScreen(explorerUid: String, onOpenVenue: (venueId: String) -> Unit) =
-    OverviewScreen(viewModel(factory = OverviewViewModel.factory(explorerUid)), onOpenVenue)
+fun OverviewScreen(explorerUid: String, onOpenQuest: (venueId: String, questId: String) -> Unit) =
+    OverviewScreen(viewModel(factory = OverviewViewModel.factory(explorerUid)), onOpenQuest)
 
 /** The overview showing what [viewModel] holds; see the other [OverviewScreen]. */
 @Composable
 fun OverviewScreen(
     viewModel: OverviewViewModel,
-    onOpenVenue: (venueId: String) -> Unit,
+    onOpenQuest: (venueId: String, questId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  OverviewContent(state, onOpenVenue, viewModel::retry, viewModel::cancel, modifier)
+  OverviewContent(state, onOpenQuest, viewModel::retry, viewModel::cancel, modifier)
 }
 
 /**
@@ -69,7 +69,7 @@ fun OverviewScreen(
  * title, then what [state] says it can show. It sits inside the app's scaffold, which already keeps
  * it clear of the system bars.
  *
- * @param onOpenVenue Opens the page of the venue with this id, when its card is tapped.
+ * @param onOpenQuest Opens the details of this quest on its venue's page, when its card is tapped.
  * @param onRetry Called when the explorer taps "Try again" after a failure.
  * @param onCancel Cancels the reservation with this id, once the explorer has confirmed on its
  *   card.
@@ -78,7 +78,7 @@ fun OverviewScreen(
 @Composable
 fun OverviewContent(
     state: OverviewUiState,
-    onOpenVenue: (venueId: String) -> Unit,
+    onOpenQuest: (venueId: String, questId: String) -> Unit,
     onRetry: () -> Unit,
     onCancel: (reservationId: String) -> Unit,
     modifier: Modifier = Modifier,
@@ -93,7 +93,7 @@ fun OverviewContent(
       OverviewStatus.FAILED -> Centered { Failed(onRetry) }
       OverviewStatus.LOADED ->
           if (state.rows.isEmpty()) Centered { Empty() }
-          else Rows(state, onOpenVenue, onCancel, clock)
+          else Rows(state, onOpenQuest, onCancel, clock)
     }
   }
 }
@@ -130,7 +130,7 @@ private fun Title(state: OverviewUiState) {
 @Composable
 private fun Rows(
     state: OverviewUiState,
-    onOpenVenue: (venueId: String) -> Unit,
+    onOpenQuest: (venueId: String, questId: String) -> Unit,
     onCancel: (reservationId: String) -> Unit,
     clock: Clock,
 ) {
@@ -148,7 +148,7 @@ private fun Rows(
     items(state.rows, key = { it.reservationId }) { row ->
       OverviewQuestRow(
           row,
-          onClick = { onOpenVenue(row.venueId) },
+          onClick = { onOpenQuest(row.venueId, row.questId) },
           clock = clock,
           cancelStatus = state.cancelStatusOf(row.reservationId),
           // Once the proof is sent, the quest is done on the explorer's side
@@ -235,5 +235,5 @@ private val ILLUSTRATION_ICON_SIZE = 48.dp
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun OverviewPreview() {
-  AroundAppTheme { OverviewContent(OverviewUiState(OverviewStatus.LOADED), {}, {}, {}) }
+  AroundAppTheme { OverviewContent(OverviewUiState(OverviewStatus.LOADED), { _, _ -> }, {}, {}) }
 }

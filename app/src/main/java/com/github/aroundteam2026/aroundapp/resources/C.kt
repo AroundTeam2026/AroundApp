@@ -123,6 +123,7 @@ object C {
     const val ACCEPT_QUEST_BAR = "accept_quest_bar"
     const val ACCEPT_QUEST_BUTTON = "accept_quest_button"
     const val SUBMIT_PROOF_BUTTON = "submit_proof_button"
+    const val SEND_NEW_PROOF_BUTTON = "send_new_proof_button"
     const val ACCEPT_QUEST_NEEDS_MORE = "accept_quest_needs_more"
     const val ACCEPT_QUEST_FAILED = "accept_quest_failed"
     const val ACCEPT_QUEST_UNAVAILABLE = "accept_quest_unavailable"
@@ -137,6 +138,7 @@ object C {
     const val QUEST_DETAIL_DESCRIPTION = "quest_detail_description"
     const val QUEST_DETAIL_REQUIREMENTS = "quest_detail_requirements"
     const val QUEST_DETAIL_PROOF = "quest_detail_proof"
+    const val QUEST_DETAIL_PROOF_STATUS = "quest_detail_proof_status"
     const val QUEST_DETAIL_REWARD_DETAILS = "quest_detail_reward_details"
     const val QUEST_DETAIL_REWARD_EXPIRY = "quest_detail_reward_expiry"
     const val QUEST_DETAIL_PARTY_RULE = "quest_detail_party_rule"
@@ -191,6 +193,11 @@ object C {
     const val CREATE_QUEST_RADIUS_SLIDER = "create_quest_radius_slider"
     const val CREATE_QUEST_RADIUS_MAP = "create_quest_radius_map"
     const val CREATE_QUEST_WALK_TIME = "create_quest_walk_time"
+    const val CREATE_QUEST_DISTANCE_FROM_VENUE = "create_quest_distance_from_venue"
+    const val CREATE_QUEST_LOCATION_AT_VENUE = "create_quest_location_at_venue"
+    const val CREATE_QUEST_LOCATION_ELSEWHERE = "create_quest_location_elsewhere"
+    const val CREATE_QUEST_LOCATION_HINT = "create_quest_location_hint"
+    const val CREATE_QUEST_LOCATION_USE_VENUE = "create_quest_location_use_venue"
     const val CREATE_QUEST_PARTY_SIZE = "create_quest_party_size"
     const val CREATE_QUEST_PARTY_INCREMENT = "create_quest_party_increment"
     const val CREATE_QUEST_PARTY_DECREMENT = "create_quest_party_decrement"
@@ -284,6 +291,14 @@ object C {
     const val PROOF_PHOTO_OPEN_SETTINGS = "proof_photo_open_settings"
     const val PROOF_PHOTO_ERROR = "proof_photo_error"
 
+    // Proof photo full screen
+    const val PROOF_VIEWER = "proof_viewer"
+    const val PROOF_VIEWER_IMAGE = "proof_viewer_image"
+    const val PROOF_VIEWER_CLOSE = "proof_viewer_close"
+    const val PROOF_VIEWER_TITLE = "proof_viewer_title"
+    const val PROOF_VIEWER_SUBTITLE = "proof_viewer_subtitle"
+    const val PROOF_VIEWER_ZOOM = "proof_viewer_zoom"
+
     // Reject proof sheet
     const val REJECT_PROOF_SHEET = "reject_proof_sheet"
     /** Followed by `_` and the `RejectReason`'s name, e.g. `reject_proof_reason_OTHER`. */
@@ -306,6 +321,7 @@ object C {
     const val REVIEW_PROOF_PHOTO = "review_proof_photo"
     const val REVIEW_PROOF_PHOTO_IMAGE = "review_proof_photo_image"
     const val REVIEW_PROOF_PHOTO_RETRY = "review_proof_photo_retry"
+    const val REVIEW_PROOF_PHOTO_ZOOM = "review_proof_photo_zoom"
     const val REVIEW_PROOF_ANSWER = "review_proof_answer"
     const val REVIEW_PROOF_HINT = "review_proof_hint"
     const val REVIEW_PROOF_REJECT = "review_proof_reject"

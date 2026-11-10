@@ -1,5 +1,7 @@
 rules_version = '2';
 
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Firestore security rules v2, following docs/firestore-schema.md (schema v1).
 // Anything not allowed below is denied. Every write is checked against the schema: only its fields,
@@ -38,10 +40,14 @@ service cloud.firestore {
       return value is int && value >= 20 && value <= 200;
     }
 
-    function isValidUser(data) {
+    function isValidUser(data, uid) {
       return data.keys().hasAll(['displayName', 'createdAt'])
-          && data.keys().hasOnly(['displayName', 'role', 'createdAt'])
-          && data.displayName is string
+          && data.keys().hasOnly(['displayName', 'pictureUrl', 'role', 'createdAt'])
+          && isText(data.displayName, 100)
+          && (!('pictureUrl' in data)
+              || (isText(data.pictureUrl, 2000)
+                  && data.pictureUrl.matches(
+                      'gs://[^/]+/user-pictures/' + uid + '/[^/]+')))
           && data.get('role', null) in [null, 'EXPLORER', 'VENUE']
           && data.createdAt is timestamp;
     }
@@ -58,12 +64,14 @@ service cloud.firestore {
           && (!('featuredQuestId' in data) || data.featuredQuestId is string);
     }
 
+    // A quest without a location takes place at its venue's location.
     function isValidQuest(data) {
       return data.keys().hasAll(['venueId', 'radiusMeters', 'title', 'description',
               'requirements', 'proofType', 'minPartySize', 'status', 'createdAt', 'updatedAt'])
-          && data.keys().hasOnly(['venueId', 'radiusMeters', 'title', 'description',
+          && data.keys().hasOnly(['venueId', 'location', 'radiusMeters', 'title', 'description',
               'requirements', 'proofType', 'minPartySize', 'exactPartySize', 'reward', 'status',
               'createdAt', 'updatedAt'])
+          && (!('location' in data) || data.location is latlng)
           && isRadius(data.radiusMeters)
           && isText(data.title, 60)
           && isText(data.description, 500)
@@ -117,7 +125,7 @@ service cloud.firestore {
       return data.keys().hasAll(['questId', 'venueId', 'slotStart', 'status', 'createdAt',
               'explorerName', 'joinedCount'])
           && data.keys().hasOnly(['questId', 'venueId', 'slotStart', 'status', 'createdAt',
-              'explorerName', 'joinedCount'])
+              'explorerName', 'joinedCount', 'partyCode'])
           && data.questId is string
           && data.venueId is string
           && data.slotStart is timestamp
@@ -129,6 +137,27 @@ service cloud.firestore {
     // The most explorers a party holds at once.
     function maxPartySize() {
       return 10;
+    }
+
+    // The quest of the reservation [data]. Costs one document read.
+    function questOf(data) {
+      return get(/databases/$(database)/documents/quests/$(data.questId)).data;
+    }
+
+    // The most joined members a party for [quest] holds: its size if exact, else maxPartySize(),
+    // and never more than maxPartySize(). Quests written before exactPartySize are read as at
+    // least.
+    function partyCapacity(quest) {
+      return quest.get('exactPartySize', false) && quest.minPartySize < maxPartySize()
+          ? quest.minPartySize
+          : maxPartySize();
+    }
+
+    // A party of [joined] members has the size [quest] asks for: exactly or at least minPartySize.
+    function meetsPartySize(quest, joined) {
+      return quest.get('exactPartySize', false)
+          ? joined == quest.minPartySize
+          : joined >= quest.minPartySize;
     }
 
     // [name] is the display name in the signed-in user's profile, so nobody reserves under another
@@ -184,6 +213,36 @@ service cloud.firestore {
       return exists(ownMembership(reservationId));
     }
 
+    // The signed-in user's completion of [reservationId]. Its id is built from the reservation and
+    // the user, so checking it costs one document read.
+    function ownCompletion(reservationId) {
+      return /databases/$(database)/documents/completions/$(reservationId + '_' + request.auth.uid);
+    }
+
+    // The membership [data] is the creator's: the creator's membership is written in one batch with
+    // the reservation and joined at its creation time, which no later join may have.
+    function isCreatorMembership(data) {
+      return data.joinedAt == get(reservation(data.reservationId)).data.createdAt;
+    }
+
+    // [code] is a party code: 6 characters out of the digits 2 to 9 and the capital letters but I,
+    // L and O, which are easy to mistake for one another.
+    function isPartyCode(code) {
+      return code is string && code.matches('[2-9A-HJKMNP-Z]{6}');
+    }
+
+    function partyCode(code) {
+      return /databases/$(database)/documents/party_codes/$(code);
+    }
+
+    // The reservation [data], created as [reservationId], has a party code written in the same
+    // batch that leads back to it. Reservations created before party codes have none.
+    function hasOwnPartyCode(data, reservationId) {
+      return 'partyCode' in data
+          && isPartyCode(data.partyCode)
+          && getAfter(partyCode(data.partyCode)).data.reservationId == reservationId;
+    }
+
     // The signed-in user is a joined member of the party of [reservationId].
     function isJoinedMember(reservationId) {
       return isMember(reservationId)
@@ -199,12 +258,13 @@ service cloud.firestore {
 
     // This write moves the reservation's joinedCount by [delta] only, in one batch with the
     // signed-in user's own membership joining (+1, while pending and not full) or withdrawing (-1).
+    // A join costs one more read, for the quest's party capacity.
     function isJoinedCountChange(reservationId, delta) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedCount'])
           && request.resource.data.joinedCount == resource.data.joinedCount + delta
           && ((delta == 1
                   && resource.data.status == 'PENDING'
-                  && request.resource.data.joinedCount <= maxPartySize()
+                  && request.resource.data.joinedCount <= partyCapacity(questOf(resource.data))
                   && !exists(ownMembership(reservationId))
                   && willBeJoinedMember(reservationId))
               || (delta == -1
@@ -267,13 +327,14 @@ service cloud.firestore {
                   && isFilledText(after.rejectReason, 300)));
     }
 
-    // Only the owner reads their profile.
+    // Signed-in users get profiles by uid for names and pictures, but cannot list all users.
     // The role is write-once: it can be chosen while null, then never changed.
     match /users/{uid} {
-      allow read: if isUser(uid);
-      allow create: if isUser(uid) && isValidUser(request.resource.data);
+      allow get: if signedIn();
+      allow create: if isUser(uid) && isValidUser(request.resource.data, uid);
       allow update: if isUser(uid)
-          && isValidUser(request.resource.data)
+          && isValidUser(request.resource.data, uid)
+          && request.resource.data.createdAt == resource.data.createdAt
           && (resource.data.get('role', null) == null
               || request.resource.data.get('role', null) == resource.data.role);
     }
@@ -287,7 +348,7 @@ service cloud.firestore {
       allow delete: if isUser(ownerUid) && hasRole('VENUE');
     }
 
-    // venueId is the owning venue's uid and can't be reassigned.
+    // venueId is the owning venue's uid and can't be reassigned; createdAt can't change either.
     match /quests/{questId} {
       allow read: if signedIn();
       allow create: if isUser(request.resource.data.venueId)
@@ -295,28 +356,38 @@ service cloud.firestore {
           && isValidQuest(request.resource.data);
       allow update: if isUser(resource.data.venueId)
           && request.resource.data.venueId == resource.data.venueId
+          && request.resource.data.createdAt == resource.data.createdAt
           && hasRole('VENUE')
           && isValidQuest(request.resource.data);
       allow delete: if isUser(resource.data.venueId) && hasRole('VENUE');
     }
 
     // An explorer account creates a pending reservation, in one batch with their own joined
-    // membership, that carries their profile's display name and doesn't start in the past, for an
-    // active quest of the venue it names, with a joinedCount of 1. Afterwards the status changes
-    // along an allowed transition: the venue answers it, and a joined member of the party can
-    // cancel it. joinedCount only moves with a membership joining or withdrawing in the same batch.
-    // The venue and the party's joined members read it. Anyone signed in may find that an id has no
-    // reservation: the app listens to a reservation it just created, offline maybe, before the
-    // server has it.
+    // membership, joined at the reservation's createdAt, which marks them as its creator, and
+    // optionally with its party code. It carries their profile's display name and doesn't start in
+    // the past, for an active quest of the venue it names, with a joinedCount of 1. Afterwards the
+    // status changes along an allowed transition: the venue answers it, approving only a party of
+    // the size its quest asks for, and a joined member of the party can cancel it until they send
+    // their proof, whatever its status. joinedCount only moves with a membership joining or
+    // withdrawing in the same batch, and never above the quest's party capacity. An explorer may get
+    // a reservation they know the id of, as one given a party code does to see the quest, status and
+    // joinedCount of the party before joining it. A venue gets its own reservations. Anyone signed in
+    // may find that an id has no reservation: the app listens to a reservation it just created,
+    // offline maybe, before the server has it, and a venue answering an unknown id gets "missing".
+    // Only the reservation's venue lists them.
     match /reservations/{reservationId} {
-      allow read: if signedIn()
+      allow get: if signedIn()
           && (resource == null
               || request.auth.uid == resource.data.venueId
-              || isJoinedMember(reservationId));
+              || hasRole('EXPLORER'));
+      allow list: if signedIn() && request.auth.uid == resource.data.venueId;
       allow create: if signedIn()
           && hasRole('EXPLORER')
           && isValidReservation(request.resource.data)
           && willBeJoinedMember(reservationId)
+          && getAfter(ownMembership(reservationId)).data.joinedAt
+              == request.resource.data.createdAt
+          && hasOwnPartyCode(request.resource.data, reservationId)
           && isOwnDisplayName(request.resource.data.explorerName)
           && request.resource.data.status == 'PENDING'
           && request.resource.data.joinedCount == 1
@@ -325,9 +396,12 @@ service cloud.firestore {
       allow update: if signedIn()
           && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
                   && isReservationTransition(resource.data.status, request.resource.data.status)
-                  && (request.auth.uid == resource.data.venueId
+                  && ((request.auth.uid == resource.data.venueId
+                          && (request.resource.data.status != 'APPROVED'
+                              || meetsPartySize(questOf(resource.data), resource.data.joinedCount)))
                       || (isJoinedMember(reservationId)
-                          && request.resource.data.status == 'CANCELLED')))
+                          && request.resource.data.status == 'CANCELLED'
+                          && !exists(ownCompletion(reservationId)))))
               || isJoinedCountChange(reservationId, 1)
               || isJoinedCountChange(reservationId, -1));
     }
@@ -335,9 +409,13 @@ service cloud.firestore {
     // One membership per explorer and reservation, under the id `{reservationId}_{uid}`. An
     // explorer account joins a pending reservation as themselves, in one batch that adds 1 to its
     // joinedCount, which caps the party; getAfter also sees a reservation created in the same
-    // batch. Afterwards the member can only withdraw, which also moves updatedAt and takes 1 off
-    // joinedCount, and never join again. The party's members, withdrawn ones too, and the
-    // reservation's venue read it, so a member who withdrew still sees who else was in the party.
+    // batch, where the membership is the creator's and the reservation's rule checks it is joined
+    // at its createdAt; a later join can't be joined at that time. Afterwards the member can only
+    // withdraw, while the reservation is pending or approved and before they send a proof, which
+    // also moves updatedAt and takes 1 off joinedCount, and never join again. The creator never
+    // withdraws: they cancel the reservation instead. The party's members, withdrawn ones too, and
+    // the reservation's venue read it, so a member who withdrew still sees who else was in the
+    // party.
     // Memberships are never deleted, so a withdrawal stays recorded.
     // A reservation that doesn't exist has no memberships, and anyone signed in may list them: the
     // app listens to the party of a reservation it just created before the server has it.
@@ -354,6 +432,8 @@ service cloud.firestore {
           && memberId == request.resource.data.reservationId + '_' + request.auth.uid
           && request.resource.data.status == 'JOINED'
           && getAfter(reservation(request.resource.data.reservationId)).data.status == 'PENDING'
+          && (!exists(reservation(request.resource.data.reservationId))
+              || !isCreatorMembership(request.resource.data))
           && movesJoinedCount(request.resource.data.reservationId, 1);
       allow update: if isUser(resource.data.uid)
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -363,7 +443,26 @@ service cloud.firestore {
           && resource.data.status == 'JOINED'
           && request.resource.data.status == 'WITHDRAWN'
           && request.resource.data.updatedAt is timestamp
+          && get(reservation(resource.data.reservationId)).data.status in ['PENDING', 'APPROVED']
+          && !isCreatorMembership(resource.data)
+          && !exists(ownCompletion(resource.data.reservationId))
           && movesJoinedCount(resource.data.reservationId, -1);
+    }
+
+    // A party code, under its id, leads to its reservation, so an explorer who was given the code
+    // can find the reservation to join. Anyone signed in may get a code they know, but nobody
+    // lists them. It is created only in one batch with its reservation, by the reservation's
+    // creator, and never changes: writing a code that is taken is an update, which is refused, so
+    // codes stay unique.
+    match /party_codes/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+          && isPartyCode(code)
+          && request.resource.data.keys().hasOnly(['reservationId'])
+          && request.resource.data.reservationId is string
+          && !exists(reservation(request.resource.data.reservationId))
+          && getAfter(reservation(request.resource.data.reservationId)).data.get('partyCode', null)
+              == code;
     }
 
     // One completion per explorer and reservation, under the id `{reservationId}_{explorerUid}`. A

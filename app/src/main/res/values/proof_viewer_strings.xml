@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The proof photo full screen, opened from the completion form and from Review proof -->
+    <string name="proof_viewer_close">Close the photo</string>
+    <!-- Read by screen readers on a photo that opens full screen when tapped -->
+    <string name="proof_viewer_open">Open the photo full screen</string>
+    <!-- On the photo, before it is opened -->
+    <string name="proof_viewer_tap_to_zoom">Tap to zoom</string>
+    <!-- The argument is how far the photo is zoomed in, e.g. "2" or "1.5" -->
+    <string name="proof_viewer_zoom_level">%1$s×</string>
+    <string name="proof_viewer_hint">Pinch to zoom · drag to move · double-tap to fit</string>
+    <!-- The quest's title, then when the proof was sent, e.g. "Find the hidden fox · sent 2 min. ago" -->
+    <string name="proof_viewer_quest_and_sent">%1$s · sent %2$s</string>
+    <string name="proof_viewer_quest_and_sent_just_now">%1$s · sent just now</string>
+</resources>

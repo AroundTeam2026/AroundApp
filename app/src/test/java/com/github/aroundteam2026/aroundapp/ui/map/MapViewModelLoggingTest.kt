@@ -62,4 +62,25 @@ class MapViewModelLoggingTest {
         assertEquals(Log.WARN, log.type)
         assertEquals(offline, log.throwable)
       }
+
+  @Test
+  fun failingQuestsAreLogged() =
+      runTest(dispatcher) {
+        val offline = IOException("offline")
+        val viewModel =
+            MapViewModel(
+                FakeLocationRepository(null),
+                ScriptedQuestRepository(activeQuests = flow { throw offline }),
+                FakeVenueRepository(),
+            )
+
+        viewModel.onVisibleAreaChanged(
+            GeoBounds(south = 46.50, west = 6.60, north = 46.55, east = 6.66)
+        )
+        runCurrent()
+
+        val log = ShadowLog.getLogsForTag("MapViewModel").single()
+        assertEquals(Log.WARN, log.type)
+        assertEquals(offline, log.throwable)
+      }
 }

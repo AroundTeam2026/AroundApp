@@ -9,9 +9,9 @@ import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
-import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.ADDRESS_DRIFT_METERS
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchController.Companion.ADDRESS_DRIFT_METERS
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchController.Companion.SEARCH_DELAY_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.FRAMED_RADIUS_METERS
-import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.SEARCH_DELAY_MILLIS
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

@@ -15,6 +15,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -41,7 +42,12 @@ class VenueDestinationsTest {
   /** Shared by the form and the Quests tab, so a saved quest reaches the list. */
   private val quests = FakeQuestRepository()
   private val form =
-      CreateQuestViewModel(auth, FakeVenueRepository(listOf(testVenue(id = VENUE_ID))), quests)
+      CreateQuestViewModel(
+          auth,
+          FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
+          quests,
+          FakeAddressSearchRepository(),
+      )
 
   /** A venue NavHost that opens on the home of a placed venue without quests, on fakes. */
   @Before

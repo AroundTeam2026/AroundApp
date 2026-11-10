@@ -14,7 +14,7 @@ import com.google.firebase.firestore.DocumentSnapshot
  *
  * Each reservation also stores its number of [PartyMemberStatus.JOINED] members in [JOINED_COUNT],
  * since the rules can't count documents: every write that adds or withdraws a membership moves it
- * in the same batch, and the rules cap it at [MAX_PARTY_SIZE].
+ * in the same batch, and the rules cap it at the [partyCapacity] of the reservation's quest.
  */
 internal object PartyUserFirestore {
   const val COLLECTION = "party_user"

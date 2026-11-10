@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.quest
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -135,6 +136,24 @@ class FakeQuestRepositoryTest {
     }
   }
 
+  // #430: like the Firestore repository, the fake keeps a quest's own location as given
+  @Test
+  fun createQuest_keepsTheQuestsOwnLocation() = runBlocking {
+    val location = Location(46.5191, -6.5668)
+    val id = repository.createQuest(testQuest(location = location)).getOrThrow()
+
+    assertEquals(location, repository.getQuest(id)?.location)
+    assertEquals(location, repository.observeActiveQuests().first().single().location)
+  }
+
+  // #430: a quest without a location of its own stays at its venue, never at a made-up place
+  @Test
+  fun createQuest_keepsANullLocation() = runBlocking {
+    val id = repository.createQuest(testQuest(location = null)).getOrThrow()
+
+    assertNull(repository.getQuest(id)?.location)
+  }
+
   @Test
   fun createQuest_returnsNewUniqueId() = runBlocking {
     val first = repository.createQuest(testQuest()).getOrThrow()
@@ -249,6 +268,71 @@ class FakeQuestRepositoryTest {
     assertThrows(IllegalArgumentException::class.java) {
       FakeQuestRepository(initialQuests = listOf(testQuest(id = "same"), testQuest(id = "same")))
     }
+  }
+
+  @Test
+  fun updateQuest_replacesTheEditableFields() = runBlocking {
+    val stored = testQuest(id = "q", createdAt = 1L)
+    repository = FakeQuestRepository(now = { FIXED_NOW }, initialQuests = listOf(stored))
+    val edited =
+        stored.copy(
+            title = "New title",
+            proofType = ProofType.TEXT,
+            minPartySize = 3,
+            reward = null,
+        )
+
+    repository.updateQuest(edited).getOrThrow()
+
+    // updatedAt is checked by updateQuest_keepsVenueIdAndCreatedAtAndSetsUpdatedAt
+    assertEquals(edited, repository.getQuest("q")?.copy(updatedAt = edited.updatedAt))
+  }
+
+  @Test
+  fun updateQuest_keepsVenueIdAndCreatedAtAndSetsUpdatedAt() = runBlocking {
+    val stored = testQuest(id = "q", venueId = "v1", createdAt = 1L)
+    repository = FakeQuestRepository(now = { FIXED_NOW }, initialQuests = listOf(stored))
+
+    repository.updateQuest(stored.copy(venueId = "v2", createdAt = 5L, updatedAt = 6L)).getOrThrow()
+
+    assertEquals(stored.copy(updatedAt = FIXED_NOW), repository.getQuest("q"))
+  }
+
+  @Test
+  fun updateQuest_succeedsAndStoresNothingForAnUnknownId() = runBlocking {
+    // Like Firestore, which returns success and only rejects the write on the server
+    val result = repository.updateQuest(testQuest(id = "unknown"))
+
+    assertTrue(result.isSuccess)
+    assertNull(repository.getQuest("unknown"))
+  }
+
+  @Test
+  fun updateQuest_returnsFailureWhenForcedAndStoresNothing() = runBlocking {
+    val stored = testQuest(id = "q")
+    repository = FakeQuestRepository(initialQuests = listOf(stored))
+    val error = IllegalStateException("forced")
+    repository.forcedFailure = error
+
+    val result = repository.updateQuest(stored.copy(title = "New title"))
+
+    assertSame(error, result.exceptionOrNull())
+    assertEquals(stored, repository.getQuest("q"))
+  }
+
+  @Test
+  fun updateQuest_archivingRemovesTheQuestFromActiveQuestsOnly() = runBlocking {
+    val stored = testQuest(id = "q", venueId = "v1")
+    repository = FakeQuestRepository(now = { FIXED_NOW }, initialQuests = listOf(stored))
+
+    repository.updateQuest(stored.copy(status = QuestStatus.ARCHIVED)).getOrThrow()
+
+    assertTrue(repository.observeActiveQuests().first().isEmpty())
+    assertTrue(repository.observeActiveQuestsByVenue("v1").first().isEmpty())
+    assertEquals(
+        listOf(QuestStatus.ARCHIVED),
+        repository.observeQuestsByVenue("v1").first().map { it.status },
+    )
   }
 
   private companion object {

@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.res.Configuration
@@ -6,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +45,9 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.overview.slotFormat
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
@@ -63,8 +68,8 @@ import java.util.Date
  * The whole of [quest], as the Figma frame "Quest details": the venue, the quest's title and chips,
  * then a card for each part of it, over a bar that stays in place to accept the quest or, once it
  * is accepted, to cancel the reservation after asking. Once the venue approved the reservation, the
- * bar offers to submit the proof. The rows only fit part of a quest, so this is where the rest is
- * read.
+ * bar offers to submit the proof, and once it is sent, a card under the title says where it stands.
+ * The rows only fit part of a quest, so this is where the rest is read.
  *
  * @param state The venue's page, for the venue and how accepting and cancelling stand.
  * @param quest The quest to show.
@@ -105,6 +110,7 @@ fun QuestDetailsScreen(
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
       Header(state, quest)
+      state.proof?.let { ProofStatusCard(it, state.venueName) }
       if (quest.description.isNotBlank()) {
         Card(R.drawable.ic_info, R.string.quest_detail_about) {
           CardText(quest.description, C.Tag.QUEST_DETAIL_DESCRIPTION)
@@ -116,20 +122,20 @@ fun QuestDetailsScreen(
       ProofCard(quest.proofType)
       RadiusCard(state, quest)
     }
-    AcceptQuestBar(
+    val cancelAction: @Composable ColumnScope.() -> Unit = {
+      CancelReservationAction(
+          state.cancelStatus,
+          state.venueName,
+          onCancel,
+          horizontalAlignment = Alignment.CenterHorizontally,
+      )
+    }
+    QuestActionBar(
         state,
         onAccept,
-        onSubmitProof = state.completableReservationId?.let { id -> { onSubmitProof(id) } },
-    ) {
-      if (state.cancellableReservationId != null) {
-        CancelReservationAction(
-            state.cancelStatus,
-            state.venueName,
-            onCancel,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        )
-      }
-    }
+        onSubmitProof,
+        footer = cancelAction.takeIf { state.cancellableReservationId != null },
+    )
   }
 }
 
@@ -173,6 +179,112 @@ private fun Header(state: VenuePageUiState, quest: VenuePageQuest) {
     )
   }
 }
+
+/**
+ * Where [proof] stands, as the Figma frames "Quest details · state": waiting for [venueName], or
+ * its answer, with the reason of a rejection.
+ */
+@Composable
+private fun ProofStatusCard(proof: Completion, venueName: String) {
+  val colors = MaterialTheme.colorScheme
+  val theme = AroundTheme.colors
+  val look =
+      when (proof.status) {
+        CompletionStatus.PENDING ->
+            ProofStatusLook(
+                R.drawable.ic_clock,
+                R.string.quest_detail_proof_pending_label,
+                R.string.quest_detail_proof_pending_title,
+                stringResource(R.string.quest_detail_proof_pending_text, venueName),
+                tile = theme.lavender,
+                icon = theme.accentText,
+                dot = theme.accentText,
+                label = colors.onSurfaceVariant,
+                border = colors.outline,
+            )
+        CompletionStatus.APPROVED ->
+            ProofStatusLook(
+                R.drawable.ic_check,
+                R.string.quest_detail_proof_approved_label,
+                R.string.quest_detail_proof_approved_title,
+                stringResource(R.string.quest_detail_proof_approved_text, venueName),
+                tile = theme.sage,
+                icon = colors.surface,
+                dot = theme.sage,
+                label = colors.onSurfaceVariant,
+                border = null,
+            )
+        CompletionStatus.REJECTED ->
+            ProofStatusLook(
+                R.drawable.ic_proof_rejected,
+                R.string.quest_detail_proof_rejected_label,
+                R.string.quest_detail_proof_rejected_title,
+                proof.rejectReason.orEmpty(),
+                tile = theme.panel,
+                icon = colors.error,
+                dot = colors.error,
+                label = colors.error,
+                border = colors.error,
+            )
+      }
+  Row(
+      Modifier.fillMaxWidth()
+          .clip(PROOF_STATUS_SHAPE)
+          .background(colors.surface)
+          .then(
+              look.border?.let { Modifier.border(PROOF_STATUS_BORDER, it, PROOF_STATUS_SHAPE) }
+                  ?: Modifier
+          )
+          .padding(AroundSpacing.Large)
+          .testTag(C.Tag.QUEST_DETAIL_PROOF_STATUS),
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.InsetPadding),
+  ) {
+    Box(
+        Modifier.size(PROOF_STATUS_TILE_SIZE).background(look.tile, AroundPillShape),
+        contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+          painterResource(look.iconRes),
+          contentDescription = null,
+          Modifier.size(PROOF_STATUS_ICON_SIZE),
+          tint = look.icon,
+      )
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap)) {
+      Row(
+          horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Box(Modifier.size(PROOF_STATUS_DOT_SIZE).background(look.dot, AroundPillShape))
+        Text(
+            stringResource(look.labelRes).uppercase(currentLocale()),
+            color = look.label,
+            style = AroundTextStyles.Label,
+        )
+      }
+      Text(
+          stringResource(look.titleRes),
+          Modifier.semantics { heading() },
+          color = colors.onSurface,
+          style = AroundTextStyles.CardHeading,
+      )
+      Text(look.text, color = colors.onSurfaceVariant, style = AroundTextStyles.RowDescription)
+    }
+  }
+}
+
+/** How [ProofStatusCard] draws a status: its texts and colours; no [border] means no outline. */
+private class ProofStatusLook(
+    @param:DrawableRes val iconRes: Int,
+    @param:StringRes val labelRes: Int,
+    @param:StringRes val titleRes: Int,
+    val text: String,
+    val tile: Color,
+    val icon: Color,
+    val dot: Color,
+    val label: Color,
+    val border: Color?,
+)
 
 /** What explorers must do, on the one card that stands out. */
 @Composable
@@ -487,14 +599,53 @@ private val SEAT_RING = 1.5.dp
 private val SEAT_DASH = 4.dp
 private val PROOF_TILE_SIZE = 40.dp
 private val PROOF_ICON_SIZE = 20.dp
+private val PROOF_STATUS_SHAPE = RoundedCornerShape(22.dp)
+private val PROOF_STATUS_BORDER = 1.5.dp
+private val PROOF_STATUS_TILE_SIZE = 44.dp
+private val PROOF_STATUS_ICON_SIZE = 22.dp
+private val PROOF_STATUS_DOT_SIZE = 6.dp
+private const val SAMPLE_QUEST_ID = "quest"
+private const val SAMPLE_RESERVATION_ID = "reservation"
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 internal fun QuestDetailsPreview() {
+  QuestDetailsSample()
+}
+
+@Preview(name = "Rejected, light")
+@Preview(name = "Rejected, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+internal fun QuestDetailsRejectedPreview() {
+  QuestDetailsSample(
+      reservationIds = mapOf(SAMPLE_QUEST_ID to SAMPLE_RESERVATION_ID),
+      completions =
+          mapOf(
+              SAMPLE_RESERVATION_ID to
+                  Completion(
+                      id = "completion",
+                      reservationId = SAMPLE_RESERVATION_ID,
+                      venueId = "venue",
+                      explorerUid = "explorer",
+                      proof = Proof.Photo("gs://proofs/fox.jpg"),
+                      status = CompletionStatus.REJECTED,
+                      rejectReason =
+                          "The photo is too dark to see the drink. Try again near the window.",
+                      submittedAt = 0L,
+                  )
+          ),
+  )
+}
+
+@Composable
+private fun QuestDetailsSample(
+    reservationIds: Map<String, String> = emptyMap(),
+    completions: Map<String, Completion> = emptyMap(),
+) {
   val quest =
       VenuePageQuest(
-          questId = "quest",
+          questId = SAMPLE_QUEST_ID,
           title = "Find the hidden fox",
           description =
               "Spot the little ceramic fox hidden somewhere in the café and snap a photo.",
@@ -513,6 +664,8 @@ internal fun QuestDetailsPreview() {
             quests = listOf(quest),
             selectedQuestId = quest.questId,
             detailQuestId = quest.questId,
+            reservationIds = reservationIds,
+            completions = completions,
         ),
         quest,
         onBack = {},

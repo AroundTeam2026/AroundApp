@@ -22,6 +22,36 @@ import org.junit.Test
 class FakeUserRepositoryTest {
 
   @Test
+  fun updateProfile_changesOnlyNameAndPictureAndEmitsTheChange() = runTest {
+    val repository = FakeUserRepository()
+    val original = User("user-1", "Ada", Role.EXPLORER, 1_000L)
+    repository.createUser(original).getOrThrow()
+    val observed = async { repository.observeUser(original.uid).take(2).toList() }
+    runCurrent()
+
+    repository
+        .updateProfile(original.uid, "Ada Lovelace", "gs://bucket/user-pictures/user-1/1")
+        .getOrThrow()
+
+    val updated =
+        original.copy(
+            displayName = "Ada Lovelace",
+            pictureUrl = "gs://bucket/user-pictures/user-1/1",
+        )
+    Assert.assertEquals(listOf(original, updated), observed.await())
+    repository.updateProfile(original.uid, "Ada", null).getOrThrow()
+    Assert.assertEquals(original, repository.getUser(original.uid))
+  }
+
+  @Test
+  fun updateProfile_missingUserFailsWithoutCreatingOne() = runTest {
+    val repository = FakeUserRepository()
+
+    Assert.assertTrue(repository.updateProfile("missing", "Ada", null).isFailure)
+    Assert.assertNull(repository.getUser("missing"))
+  }
+
+  @Test
   fun createUser_thenGetUser_returnsCreatedUser() = runTest {
     val repository = FakeUserRepository()
     val user =

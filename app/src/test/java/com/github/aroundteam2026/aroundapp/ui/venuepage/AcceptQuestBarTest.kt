@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import org.junit.Assert.assertEquals
@@ -56,6 +57,28 @@ class AcceptQuestBarTest {
     show(LOADED)
 
     compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
+  }
+
+  @Test
+  fun theNewProofButtonCallsItsAction() {
+    var opened = 0
+    compose.setContent {
+      AroundAppTheme { ProofBar(CompletionStatus.REJECTED, onSendNewProof = { opened++ }) }
+    }
+
+    compose.onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsEnabled().performClick()
+
+    assertEquals(1, opened)
+  }
+
+  @Test
+  fun onlyARejectedProofGetsTheNewProofButton() {
+    compose.setContent {
+      AroundAppTheme { ProofBar(CompletionStatus.PENDING, onSendNewProof = {}) }
+    }
+
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BAR).assertExists()
+    compose.onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON).assertDoesNotExist()
   }
 
   @Test
