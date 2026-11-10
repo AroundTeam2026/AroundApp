@@ -99,7 +99,8 @@ class ProofPhotos(
    * else, such as a photo from the gallery, is left alone. Runs on [io], off the main thread, as
    * deleting touches the disk.
    *
-   * @return whether a file was deleted.
+   * @return whether a file was deleted; false too when [photo]'s path can't even be resolved, as a
+   *   cleanup that fails must not crash the screen.
    */
   suspend fun discard(photo: Uri): Boolean =
       withContext(io) {
@@ -111,7 +112,11 @@ class ProofPhotos(
                   photo.lastPathSegment?.let { File(folder, it) }
               else -> null
             }
-        file != null && file.canonicalFile.parentFile == folder.canonicalFile && file.delete()
+        try {
+          file != null && file.canonicalFile.parentFile == folder.canonicalFile && file.delete()
+        } catch (_: IOException) {
+          false
+        }
       }
 
   /** Decodes [uri], scaled down so that its longer side is at most [maxEdge] pixels. */

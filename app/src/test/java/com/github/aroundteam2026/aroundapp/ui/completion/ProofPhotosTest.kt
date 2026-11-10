@@ -159,6 +159,13 @@ class ProofPhotosTest {
     assertTrue(elsewhere.exists())
   }
 
+  // The picker discards in a finally, where a throw would crash the screen
+  @Test
+  fun discardOfAPathThatCantBeResolvedDeletesNothingAndDoesNotThrow() {
+    // Java can't resolve a path with a NUL in it: canonicalFile throws IOException
+    assertFalse(discard(Uri.fromFile(File(folder, "bad\u0000.jpg"))))
+  }
+
   // FileProvider matches paths with "/", so it can't find the cache under Windows' "\" paths: this
   // test runs on CI (Linux) and on Linux and macOS machines
   @Test
