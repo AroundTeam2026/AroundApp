@@ -49,6 +49,22 @@ interface PartyRepository {
 }
 
 /**
+ * Observes the memberships of the party of each reservation of [reservationIds], joined or
+ * withdrawn. Emits once every party has been read, then again whenever one changes.
+ *
+ * @return the memberships, keyed by reservation id, with every id of [reservationIds]; an empty map
+ *   at once when there are none.
+ * @throws Exception from the flow if the listener of any party fails, as [observeMembers] does.
+ */
+fun PartyRepository.observeParties(
+    reservationIds: Collection<String>
+): Flow<Map<String, List<PartyMember>>> {
+  val ids = reservationIds.distinct()
+  if (ids.isEmpty()) return flowOf(emptyMap())
+  return combine(ids.map { id -> observeMembers(id).map { id to it } }) { it.toMap() }
+}
+
+/**
  * Observes how many explorers are [PartyMemberStatus.JOINED] in the party of each reservation of
  * [reservationIds]. Emits once every party has been read, then again whenever one changes.
  *
@@ -58,16 +74,8 @@ interface PartyRepository {
  */
 fun PartyRepository.observeJoinedCounts(
     reservationIds: Collection<String>
-): Flow<Map<String, Int>> {
-  val ids = reservationIds.distinct()
-  if (ids.isEmpty()) return flowOf(emptyMap())
-  return combine(
-      ids.map { id ->
-        observeMembers(id).map { members ->
-          id to members.count { it.status == PartyMemberStatus.JOINED }
-        }
-      }
-  ) {
-    it.toMap()
-  }
-}
+): Flow<Map<String, Int>> =
+    observeParties(reservationIds).map { it.mapValues { (_, party) -> party.joinedCount() } }
+
+/** How many of these memberships are [PartyMemberStatus.JOINED]. */
+fun List<PartyMember>.joinedCount(): Int = count { it.status == PartyMemberStatus.JOINED }

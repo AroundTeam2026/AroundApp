@@ -8,9 +8,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
-import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
+import com.github.aroundteam2026.aroundapp.model.party.createdParty
+import com.github.aroundteam2026.aroundapp.model.party.joinedCount
+import com.github.aroundteam2026.aroundapp.model.party.observeParties
+import com.github.aroundteam2026.aroundapp.model.party.partyCapacity
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
@@ -93,10 +97,16 @@ class VenuePageViewModel(
   private class Write(val questId: String, var shown: Boolean = false)
 
   /**
-   * The explorer's [reservations] and the number of joined members of the pending and approved ones
-   * at this venue, by reservation id.
+   * The explorer's [reservations] and the memberships of the parties of the pending and approved
+   * ones at this venue, by reservation id.
    */
-  private data class Booked(val reservations: List<Reservation>, val partySizes: Map<String, Int>)
+  private data class Booked(
+      val reservations: List<Reservation>,
+      val parties: Map<String, List<PartyMember>>,
+  ) {
+    /** The number of joined members of each party of [parties], by reservation id. */
+    val partySizes: Map<String, Int> = parties.mapValues { (_, party) -> party.joinedCount() }
+  }
 
   /**
    * The quests whose reservation this page is creating and the backend hasn't answered yet.
@@ -286,7 +296,7 @@ class VenuePageViewModel(
                     // Only the parties acceptedPartiesOf counts, so an old reservation elsewhere
                     // can't make accepting unavailable here
                     val ids = reservations.filter { it.acceptsAQuestOf(venueId) }.map { it.id }
-                    partyRepository.observeJoinedCounts(ids).map { Booked(reservations, it) }
+                    partyRepository.observeParties(ids).map { Booked(reservations, it) }
                   }
                   .map<Booked, Booked?> { it }
                   .catch {
@@ -343,8 +353,10 @@ class VenuePageViewModel(
     }
     val approved = booked?.reservations?.approvedIds()
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
+    val codes = booked?.let { partyCodesOf(it.reservations, it.parties, explorerUid, venueId) }
     mutableUiState.update {
       it.showing(venue, quests, accepted, reservationIds, approved, refused, completions)
+          .copy(partyCodes = codes ?: it.partyCodes)
     }
     arriving?.let { questId ->
       arriving = null
@@ -453,6 +465,28 @@ internal fun acceptedReservationsOf(
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxBy { partySizes[it.id] ?: 1 }.id }
 
+/**
+ * The party code of each reservation at the venue [venueId] that [explorerUid] created and friends
+ * can still join, keyed by reservation id. Friends join only while a reservation is
+ * [ReservationStatus.PENDING], and only the creator, whose membership in [parties] says so, is
+ * shown the code; a reservation made before party codes has none.
+ */
+internal fun partyCodesOf(
+    reservations: List<Reservation>,
+    parties: Map<String, List<PartyMember>>,
+    explorerUid: String,
+    venueId: String,
+): Map<String, String> =
+    reservations
+        .filter { it.venueId == venueId && it.status == ReservationStatus.PENDING }
+        .filter { reservation ->
+          parties[reservation.id].orEmpty().any {
+            it.uid == explorerUid && it.createdParty(reservation)
+          }
+        }
+        .mapNotNull { reservation -> reservation.partyCode?.let { reservation.id to it } }
+        .toMap()
+
 /** The ids of the reservations among these that the venue approved. */
 private fun List<Reservation>.approvedIds(): Set<String> = filter {
   it.status == ReservationStatus.APPROVED
@@ -516,4 +550,5 @@ private fun Quest.toVenuePageQuest() =
         reward = reward,
         exactPartySize = exactPartySize,
         radiusMeters = radiusMeters,
+        partyCapacity = partyCapacity,
     )

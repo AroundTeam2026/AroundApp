@@ -15,7 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-/** Tests [observeJoinedCounts] on a [FakePartyRepository]. */
+/** Tests [observeJoinedCounts] and [observeParties] on a [FakePartyRepository]. */
 class ObserveJoinedCountsTest {
   private val party = FakePartyRepository(now = { 0L })
 
@@ -33,6 +33,24 @@ class ObserveJoinedCountsTest {
             mapOf("r1" to 2, "r2" to 1),
             party.observeJoinedCounts(listOf("r1", "r2")).first(),
         )
+      }
+
+  /** Withdrawn members are kept, so callers can tell who left; each party is listed on its own. */
+  @Test
+  fun observeParties_listsEveryMembershipOfEachParty() =
+      runBlocking<Unit> {
+        party.join("r1", "u1").getOrThrow()
+        party.join("r1", "u2").getOrThrow()
+        party.withdraw("r1", "u2").getOrThrow()
+
+        val parties = party.observeParties(listOf("r1", "r2")).first()
+
+        assertEquals(setOf("r1", "r2"), parties.keys)
+        assertEquals(
+            mapOf("u1" to PartyMemberStatus.JOINED, "u2" to PartyMemberStatus.WITHDRAWN),
+            parties.getValue("r1").associate { it.uid to it.status },
+        )
+        assertEquals(emptyList<PartyMember>(), parties.getValue("r2"))
       }
 
   /** Every id asked for is in the map, so callers never have to guess a missing party's size. */

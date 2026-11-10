@@ -93,6 +93,8 @@ class VenuePageQuestsTest {
                 reward = reward,
                 exactPartySize = true,
                 radiusMeters = 80,
+                // Exactly 3, so no more than 3 can join
+                partyCapacity = 3,
             )
         ),
         venuePageQuests(listOf(quest), null, now),

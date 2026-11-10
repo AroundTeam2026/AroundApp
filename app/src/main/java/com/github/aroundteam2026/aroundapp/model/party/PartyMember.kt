@@ -1,6 +1,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.party
 
+import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
+
 /**
  * An explorer's membership in the party of one reservation. A withdrawal keeps the membership, so
  * the party's history stays: memberships are never deleted.
@@ -33,6 +35,15 @@ enum class PartyMemberStatus {
 /** Whether a membership may change from [from] to [to]: a member can only withdraw. */
 fun canTransition(from: PartyMemberStatus, to: PartyMemberStatus): Boolean =
     from == PartyMemberStatus.JOINED && to == PartyMemberStatus.WITHDRAWN
+
+/**
+ * Whether this membership is that of the explorer who created [reservation]: theirs is written with
+ * the reservation, so it joined at its `createdAt`, which no later join can. There is no creator
+ * field; the rules tell the creator the same way. Every member of a reservation made before parties
+ * counts as its creator.
+ */
+fun PartyMember.createdParty(reservation: Reservation): Boolean =
+    reservationId == reservation.id && joinedAt == reservation.createdAt
 
 /**
  * The id of [uid]'s membership in the party of [reservationId]. Built from both, so the rules can

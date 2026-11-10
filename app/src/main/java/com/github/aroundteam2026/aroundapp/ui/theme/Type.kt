@@ -56,6 +56,8 @@ object AroundTextStyles {
   val OverlayTitle = heading(22, tracking = 0.0)
   val AvatarLarge = heading(20, tracking = 0.0)
   val CardHeading = heading(20, tracking = 0.0)
+  /** A party code, spaced out so each character reads apart. */
+  val PartyCode = heading(26, tracking = 2.08)
   val AvatarSmall = heading(13, tracking = 0.0)
   val Tagline = body(17)
   val BodyLarge = body(16, 24)
