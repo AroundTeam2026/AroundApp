@@ -89,5 +89,7 @@
     <string name="edit_quest_submit">Save changes</string>
     <string name="edit_quest_saving">Saving…</string>
     <string name="edit_quest_saving_line">Saving your changes…</string>
-    <string name="edit_quest_save_failed">Couldn\'t save your changes. Check your connection and try again.</string>
+    <string name="edit_quest_save_failed">Couldn\'t save your changes. Try again.</string>
+    <string name="edit_quest_load_failed">Couldn\'t open this quest.</string>
+    <string name="create_quest_locked">Can\'t change while explorers have reserved this quest.</string>
 </resources>

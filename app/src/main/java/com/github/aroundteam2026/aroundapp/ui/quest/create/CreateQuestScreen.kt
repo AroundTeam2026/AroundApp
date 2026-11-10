@@ -130,6 +130,7 @@ fun CreateQuestScreen(
       onSubmit = viewModel::submit,
       onClose = onClose,
       onRetryVenue = viewModel::retryVenue,
+      onRetryQuest = viewModel::retryQuest,
       snackbarHostState = snackbarHostState,
       modifier = modifier,
   )
@@ -137,7 +138,7 @@ fun CreateQuestScreen(
 
 /**
  * Stateless form, scrolling above the sticky [CreateQuestBar]. [onRetryVenue] reads the venue again
- * after it couldn't be read.
+ * after it couldn't be read; [onRetryQuest] does the same for the quest to edit.
  */
 @Composable
 fun CreateQuestContent(
@@ -151,6 +152,7 @@ fun CreateQuestContent(
     onClose: () -> Unit,
     onRetryVenue: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetryQuest: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
   Scaffold(
@@ -158,7 +160,7 @@ fun CreateQuestContent(
       containerColor = MaterialTheme.colorScheme.background,
       contentWindowInsets = WindowInsets.safeDrawing,
       snackbarHost = { SnackbarHost(snackbarHostState) },
-      bottomBar = { CreateQuestBar(state, onSubmit, onRetryVenue) },
+      bottomBar = { CreateQuestBar(state, onSubmit, onRetryVenue, onRetryQuest) },
   ) { padding ->
     Column(
         Modifier.fillMaxSize()

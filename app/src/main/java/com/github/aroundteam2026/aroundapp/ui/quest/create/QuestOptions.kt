@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -31,11 +32,13 @@ internal fun SelectableOption(
     padding: PaddingValues,
     modifier: Modifier = Modifier,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    enabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
   Surface(
       selected = selected,
       onClick = onClick,
+      enabled = enabled,
       shape = shape,
       color =
           if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -43,7 +46,7 @@ internal fun SelectableOption(
       border =
           if (selected) BorderStroke(SELECTED_BORDER, MaterialTheme.colorScheme.primary)
           else BorderStroke(BORDER, MaterialTheme.colorScheme.outline),
-      modifier = modifier.testTag(tag),
+      modifier = modifier.alpha(if (enabled) 1f else DISABLED_ALPHA).testTag(tag),
   ) {
     Column(
         Modifier.padding(padding),
