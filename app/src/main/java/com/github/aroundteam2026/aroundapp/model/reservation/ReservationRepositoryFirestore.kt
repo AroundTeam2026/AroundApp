@@ -163,6 +163,29 @@ class ReservationRepositoryFirestore(
         Result.failure(e)
       }
 
+  /**
+   * Reads the reservation's document from the server, with the `joinedCount` it stores. A missing
+   * or malformed document is a [NoSuchElementException]; a read that fails, e.g. offline, is the
+   * Firestore exception.
+   */
+  override suspend fun getPartyPreview(reservationId: String): Result<PartyPreview> =
+      try {
+        val document = reservations.document(reservationId).get(Source.SERVER).await()
+        val reservation =
+            document.toReservation()
+                ?: throw NoSuchElementException("No reservation with id $reservationId")
+        Result.success(
+            PartyPreview(
+                reservation,
+                document.getLong(PartyUserFirestore.JOINED_COUNT)?.toInt() ?: 0,
+            )
+        )
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
+
   override fun observeForVenue(venueId: String): Flow<List<Reservation>> =
       reservations.whereEqualTo(VENUE_ID, venueId).observe { it.toReservation() }
 

@@ -25,6 +25,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -458,6 +459,61 @@ class ReservationRepositoryFirestoreTest {
         assertTrue("Expected a failure but got $error", error != null)
         assertFalse(error is PartyCodeNotFoundException)
       }
+
+  /**
+   * Bug: an explorer who hasn't joined the party can't read its reservation, or the count of joined
+   * members is not the stored one, so joining by a party code can't show who they would join.
+   */
+  @Test
+  fun getPartyPreview_byAnExplorerOutsideTheParty_returnsTheReservationAndItsJoinedCount() =
+      withTimeoutBlocking {
+        val id = createAndSync()
+        val friendUid = signInNewUser(FRIEND_APP, Role.EXPLORER)
+        val friendDb = emulatorClient(FRIEND_APP)
+        val friendRepository = ReservationRepositoryFirestore(friendDb)
+
+        val alone = friendRepository.getPartyPreview(id).getOrThrow()
+        PartyRepositoryFirestore(friendDb).join(id, friendUid).getOrThrow()
+        friendDb.waitForPendingWrites().await()
+        val together = venueRepository.getPartyPreview(id).getOrThrow()
+
+        assertEquals(fetchAsVenue(id), alone.reservation)
+        assertEquals(1, alone.joinedCount)
+        assertEquals(2, together.joinedCount)
+      }
+
+  /** Bug: an unknown id fails like being offline, or finds some reservation. */
+  @Test
+  fun getPartyPreview_forAnUnknownId_failsWithNoSuchElement() = withTimeoutBlocking {
+    val error = explorerRepository.getPartyPreview("missing").exceptionOrNull()
+
+    assertTrue("Expected NoSuchElementException but got $error", error is NoSuchElementException)
+  }
+
+  /** Bug: offline, the party is reported unknown, or read from the cache rather than the server. */
+  @Test
+  fun getPartyPreview_whileOffline_failsWithAnotherErrorThanNoSuchElement() = withTimeoutBlocking {
+    val id = createAndSync()
+    // A listener keeps the document in the memory cache, so a read allowed to use the cache would
+    // succeed offline
+    val cached = CompletableDeferred<Unit>()
+    val registration =
+        explorerDb.collection(RESERVATIONS).document(id).addSnapshotListener { snapshot, _ ->
+          if (snapshot?.exists() == true) cached.complete(Unit)
+        }
+    val error =
+        try {
+          cached.await()
+          explorerDb.disableNetwork().await()
+          explorerRepository.getPartyPreview(id).exceptionOrNull()
+        } finally {
+          registration.remove()
+          explorerDb.enableNetwork().await()
+        }
+
+    assertTrue("Expected a failure but got $error", error != null)
+    assertFalse(error is NoSuchElementException)
+  }
 
   /** Bug: observeForVenue does not filter on the venue, or also filters on the status. */
   @Test

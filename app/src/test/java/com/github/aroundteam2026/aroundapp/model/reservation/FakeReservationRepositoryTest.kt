@@ -223,6 +223,51 @@ class FakeReservationRepositoryTest {
       }
 
   @Test
+  fun getPartyPreview_returnsTheReservationWithItsJoinedMembersOnly() =
+      runBlocking<Unit> {
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
+        party.join(id, "u2").getOrThrow()
+        party.join(id, "u3").getOrThrow()
+        party.withdraw(id, "u3").getOrThrow()
+
+        val preview = repository.getPartyPreview(id).getOrThrow()
+
+        assertEquals(repository.observeForVenue("v1").first().single(), preview.reservation)
+        assertEquals(2, preview.joinedCount)
+      }
+
+  @Test
+  fun getPartyPreview_followsTheReservationsStatus() =
+      runBlocking<Unit> {
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
+        repository.updateStatus(id, ReservationStatus.REJECTED).getOrThrow()
+
+        val preview = repository.getPartyPreview(id).getOrThrow()
+
+        assertEquals(ReservationStatus.REJECTED, preview.reservation.status)
+      }
+
+  @Test
+  fun getPartyPreview_ofAnUnknownId_failsWithNoSuchElement() =
+      runBlocking<Unit> {
+        repository.createReservation(reservation(), "u1").getOrThrow()
+
+        val error = repository.getPartyPreview("missing").exceptionOrNull()
+
+        assertTrue("$error", error is NoSuchElementException)
+      }
+
+  @Test
+  fun getPartyPreview_whenFailureIsForced_returnsIt() =
+      runBlocking<Unit> {
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
+        val failure = IllegalStateException("offline")
+        repository.forcedFailure = failure
+
+        assertEquals(failure, repository.getPartyPreview(id).exceptionOrNull())
+      }
+
+  @Test
   fun observeForVenue_returnsOnlyThatVenuesReservations() =
       runBlocking<Unit> {
         val mine = repository.createReservation(reservation(venueId = "v1"), "u1").getOrThrow()
