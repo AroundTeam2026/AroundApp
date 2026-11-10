@@ -23,9 +23,9 @@ import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchController
 import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchStatus
 import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchUiState
-import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant
@@ -78,14 +78,16 @@ class CreateQuestViewModelTest {
       questRepository: QuestRepository = quests,
       clock: Clock = Clock.systemUTC(),
       addresses: AddressSearchRepository = FakeAddressSearchRepository(),
-  ) = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues, questRepository, clock, addresses)
+  ) = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues, questRepository, addresses, clock)
 
   /** A form whose signed-in venue is placed and loaded, saving to [questRepository]. */
   private fun newLoadedViewModel(
       questRepository: QuestRepository = quests,
       clock: Clock = Clock.systemUTC(),
+      addresses: AddressSearchRepository = FakeAddressSearchRepository(),
   ): CreateQuestViewModel {
-    viewModel = newViewModel(FakeVenueRepository(listOf(venue(50))), questRepository, clock)
+    viewModel =
+        newViewModel(FakeVenueRepository(listOf(venue(50))), questRepository, clock, addresses)
     loadVenue()
     return viewModel
   }
@@ -277,6 +279,7 @@ class CreateQuestViewModelTest {
             FakeAuthRepository(),
             FakeVenueRepository(listOf(venue(100))),
             quests,
+            FakeAddressSearchRepository(),
         )
     loadVenue()
     assertEquals(QuestLimits.DEFAULT_RADIUS_METERS, state.radiusMeters)
@@ -799,13 +802,13 @@ class CreateQuestViewModelTest {
 
         viewModel.updateAddressQuery("Esp")
         assertEquals(AddressSearchStatus.SEARCHING, state.addressSearch.status)
-        advanceTimeBy(VenueAreaViewModel.SEARCH_DELAY_MILLIS - 1)
+        advanceTimeBy(AddressSearchController.SEARCH_DELAY_MILLIS - 1)
         runCurrent()
         assertTrue(addresses.searches.isEmpty())
 
         advanceTimeBy(1)
         runCurrent()
-        val near = VENUE_LOCATION.boundsWithin(VenueAreaViewModel.FRAMED_RADIUS_METERS)
+        val near = VENUE_LOCATION.boundsWithin(CreateQuestViewModel.SEARCH_AREA_METERS)
         assertEquals(listOf(FakeAddressSearchRepository.Search("Esp", near)), addresses.searches)
         assertEquals(AddressSearchUiState(listOf(MONTBENON)), state.addressSearch)
       }
@@ -862,20 +865,89 @@ class CreateQuestViewModelTest {
   }
 
   @Test
-  fun aFormBuiltWithoutASearchSaysItIsUnavailable() =
+  fun aPinNeverMovedFromTheVenueSavesNoLocation() =
       runTest(dispatcher) {
-        viewModel =
-            CreateQuestViewModel(
-                FakeAuthRepository(VENUE_ID),
-                FakeVenueRepository(listOf(venue(50))),
-                quests,
-            )
-        loadVenue()
+        newLoadedViewModel()
+        fillValid()
+        viewModel.placeElsewhere()
+        viewModel.submit()
+        runCurrent()
+        assertEquals(SaveState.Saved("quest-1"), state.saveState)
+        assertNull(quests.getQuest("quest-1")?.location)
+      }
+
+  @Test
+  fun aSearchThatThrowsShowsAsFailed() =
+      runTest(dispatcher) {
+        newLoadedViewModel(addresses = FakeAddressSearchRepository { throw IOException("offline") })
         viewModel.placeElsewhere()
         viewModel.updateAddressQuery("Esplanade")
         advanceUntilIdle()
-        assertEquals(AddressSearchStatus.UNAVAILABLE, state.addressSearch.status)
+        assertEquals(AddressSearchStatus.FAILED, state.addressSearch.status)
       }
+
+  @Test
+  fun aSearchThatEndsDuringASaveStopsShowingAsRunning() =
+      runTest(dispatcher) {
+        val answer = CompletableDeferred<Result<String>>()
+        val slow =
+            object : QuestRepository by quests {
+              override suspend fun createQuest(quest: Quest): Result<String> = answer.await()
+            }
+        val addresses = FakeAddressSearchRepository { AddressSearchResult.Found(listOf(MONTBENON)) }
+        newLoadedViewModel(slow, addresses = addresses)
+        fillValid()
+        viewModel.placeElsewhere()
+        viewModel.updateAddressQuery("Esp")
+
+        viewModel.submit()
+        advanceTimeBy(AddressSearchController.SEARCH_DELAY_MILLIS + 1)
+        assertEquals(SaveState.Saving, state.saveState)
+        assertEquals(AddressSearchUiState(listOf(MONTBENON)), state.addressSearch)
+
+        answer.complete(Result.failure(IOException("offline")))
+        runCurrent()
+        assertEquals(AddressSearchStatus.IDLE, state.addressSearch.status)
+      }
+
+  @Test
+  fun theQuestCantMoveWhileItIsSaved() =
+      runTest(dispatcher) {
+        val answer = CompletableDeferred<Result<String>>()
+        val slow =
+            object : QuestRepository by quests {
+              override suspend fun createQuest(quest: Quest): Result<String> = answer.await()
+            }
+        newLoadedViewModel(slow)
+        fillValid()
+        viewModel.placeElsewhere()
+        viewModel.submit()
+        runCurrent()
+
+        viewModel.moveQuest(MONTBENON.location)
+        viewModel.pickAddress(MONTBENON)
+        viewModel.updateAddressQuery("Esplanade")
+        viewModel.placeAtVenue()
+
+        assertEquals(VENUE_LOCATION, state.questLocation)
+        assertEquals("", state.addressQuery)
+      }
+
+  @Test
+  fun movingThePinFarFromThePickedAddressEmptiesTheField() {
+    newLoadedViewModel()
+    viewModel.placeElsewhere()
+    viewModel.pickAddress(MONTBENON)
+
+    // About 30 m away: the address still says where the quest is
+    viewModel.moveQuest(Location(46.5210, 6.6270))
+    assertEquals(MONTBENON.address, state.addressQuery)
+
+    // Back at the venue, about 500 m away: it no longer does
+    viewModel.moveQuest(VENUE_LOCATION)
+    assertEquals("", state.addressQuery)
+    assertEquals(VENUE_LOCATION, state.location)
+  }
 
   /** A clock at [instant], which a test can move forward. */
   private class MovableClock(var instant: Instant) : Clock() {

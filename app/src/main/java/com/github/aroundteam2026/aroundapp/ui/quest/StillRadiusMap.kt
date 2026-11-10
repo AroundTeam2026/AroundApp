@@ -103,9 +103,8 @@ private fun RadiusMapContent(
   val style = remember(resources, darkTheme) { MapStyleOptions(mapStyle(resources, darkTheme)) }
   val dash = with(LocalDensity.current) { DASH.toPx() }
   val stroke = with(LocalDensity.current) { CIRCLE_STROKE.toPx() }
-  val pin =
-      if (onMoved != null) rememberDraggableMarker(center, onMoved)
-      else rememberUpdatedMarkerState(center.toLatLng())
+  // One marker state whether it can be dragged or not, so turning dragging on or off keeps the pin
+  val pin = rememberDraggableMarker(center) { onMoved?.invoke(it) }
   val camera = rememberCameraPositionState()
   GoogleMap(
       modifier = Modifier.fillMaxSize(),

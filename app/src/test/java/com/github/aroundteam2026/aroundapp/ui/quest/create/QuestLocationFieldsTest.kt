@@ -128,7 +128,7 @@ class QuestLocationFieldsTest {
             FakeAuthRepository(VENUE_ID),
             FakeVenueRepository(listOf(venue)),
             FakeQuestRepository(),
-            addressSearchRepository = addresses,
+            addresses,
         )
     compose.setContent {
       AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}, onCreated = {}) }

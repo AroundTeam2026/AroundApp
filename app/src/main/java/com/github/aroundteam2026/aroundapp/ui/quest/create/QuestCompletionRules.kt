@@ -54,6 +54,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -266,7 +267,11 @@ private fun UnlockRadius(state: CreateQuestUiState, actions: QuestCompletionActi
         state.walkMinutes,
         venue = state.venueLocation.takeUnless { state.atVenue },
         venueName = state.venueName,
-        onMoved = actions.location.onMove,
+        // The quest being saved can't move, so neither can its pin
+        onMoved =
+            actions.location.onMove.takeUnless {
+              state.atVenue || state.saveState == SaveState.Saving
+            },
     )
   }
   Spacer(Modifier.height(AroundSpacing.CompactGap))

@@ -32,8 +32,8 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
  * A still map of the unlock radius: the quest's pin at [center] and the circle of [radiusMeters]
  * around it. At the venue, [venue] is null and the chip says about how many minutes, [walkMinutes],
  * it takes to walk across the circle. Elsewhere, the venue's own pin shows at [venue], the chip
- * says how far the quest is from [venueName], and tapping the map or dragging the pin calls
- * [onMoved].
+ * says how far the quest is from [venueName]. With [onMoved], tapping the map or dragging the pin
+ * calls it.
  */
 @Composable
 internal fun QuestRadiusMap(
@@ -42,7 +42,7 @@ internal fun QuestRadiusMap(
     walkMinutes: Int,
     venue: Location?,
     venueName: String,
-    onMoved: (Location) -> Unit,
+    onMoved: ((Location) -> Unit)?,
 ) {
   val description =
       if (venue == null) R.string.create_quest_radius_map
@@ -53,7 +53,7 @@ internal fun QuestRadiusMap(
       stringResource(description, radiusMeters),
       Modifier.border(BORDER, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
           .testTag(C.Tag.CREATE_QUEST_RADIUS_MAP),
-      onMoved = onMoved.takeIf { venue != null },
+      onMoved = onMoved,
       venue = venue,
   ) {
     val chipModifier = Modifier.padding(AroundSpacing.CompactGap)

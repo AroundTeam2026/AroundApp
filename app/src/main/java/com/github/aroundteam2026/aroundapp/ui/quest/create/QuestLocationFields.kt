@@ -38,7 +38,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchBar
-import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchStatus
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchUiState
 
 /** What the quest's location does when the venue changes it; each does nothing by default. */
 class QuestLocationActions(
@@ -84,13 +84,10 @@ internal fun QuestLocationFields(state: CreateQuestUiState, actions: QuestLocati
     return
   }
   // The suggestions open under the field, where the keyboard may hide them, so the form scrolls
-  // them into view as they come
+  // them into view once as they open, not again for each new list while the venue types
   val searchInView = remember { BringIntoViewRequester() }
-  val answered = state.addressSearch.status != AddressSearchStatus.IDLE
-  val found = state.addressSearch.suggestions
-  LaunchedEffect(answered, found) {
-    if (answered || found.isNotEmpty()) searchInView.bringIntoView()
-  }
+  val open = state.addressSearch != AddressSearchUiState()
+  LaunchedEffect(open) { if (open) searchInView.bringIntoView() }
   AddressSearchBar(
       query = state.addressQuery,
       state = state.addressSearch,
