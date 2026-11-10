@@ -15,8 +15,12 @@ import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -45,10 +49,15 @@ class VenuePagePartyCodeTest {
           testQuest(id = "pair", venueId = VENUE_ID, minPartySize = 2).copy(exactPartySize = true),
       )
 
+  private val venue = MutableStateFlow<Venue?>(testVenue(id = VENUE_ID))
+
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE_ID,
-        FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
+        // The fake, but with a venue the test can take away
+        object : VenueRepository by FakeVenueRepository(listOf(testVenue(id = VENUE_ID))) {
+          override fun observeVenue(venueId: String): Flow<Venue?> = venue
+        },
         ScriptedQuestRepository(activeQuestsByVenue = { flowOf(quests) }),
         reservations,
         testUsers(EXPLORER),
@@ -121,6 +130,7 @@ class VenuePagePartyCodeTest {
   fun anApprovedReservationHidesTheCode() = test {
     val id = storeFor("a")
     openDetails("a")
+    assertEquals(CODE, state.partyCode)
 
     reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
     runCurrent()
@@ -128,13 +138,30 @@ class VenuePagePartyCodeTest {
     assertNull(state.partyCode)
   }
 
+  // The quest takes exactly 2, so the friend who makes 2 is the last who can join
   @Test
   fun aFullPartyHidesTheCode() = test {
-    storeFor("pair", friends = listOf("friend"))
-
+    val id = storeFor("pair")
     openDetails("pair")
+    assertEquals(CODE, state.partyCode)
+
+    party.join(id, "friend").getOrThrow()
+    runCurrent()
 
     assertNull(state.partyCode)
+  }
+
+  // A venue that's gone takes its page, codes included, with it
+  @Test
+  fun aVenueThatDisappearsTakesTheCodesWithIt() = test {
+    storeFor("a")
+    openDetails("a")
+    assertEquals(CODE, state.partyCode)
+
+    venue.value = null
+    runCurrent()
+
+    assertEquals(VenuePageUiState(status = VenuePageStatus.NOT_FOUND), state)
   }
 
   @Test

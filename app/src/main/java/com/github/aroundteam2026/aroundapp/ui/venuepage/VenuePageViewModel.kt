@@ -355,8 +355,7 @@ class VenuePageViewModel(
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
     val codes = booked?.let { partyCodesOf(it.reservations, it.parties, explorerUid, venueId) }
     mutableUiState.update {
-      it.showing(venue, quests, accepted, reservationIds, approved, refused, completions)
-          .copy(partyCodes = codes ?: it.partyCodes)
+      it.showing(venue, quests, accepted, reservationIds, approved, refused, completions, codes)
     }
     arriving?.let { questId ->
       arriving = null
@@ -499,12 +498,12 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
 
 /**
  * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
- * [accepted] ones, with the explorer's [approved] reservations and the proofs in [completions], or
- * "not found" when [venue] is null. A quest being accepted that is now accepted is done accepting,
- * a reservation no longer listed is done cancelling, and a quest in [refused] failed. A null
- * [accepted] means the reservations can't be read: the page keeps what it knew and stops offering
- * to accept, cancel or complete. Null [completions] likewise mean the proofs can't be read, so it
- * stops offering to complete.
+ * [accepted] ones, with the explorer's [approved] reservations, the proofs in [completions] and the
+ * party [codes] they can share, or "not found" when [venue] is null. A quest being accepted that is
+ * now accepted is done accepting, a reservation no longer listed is done cancelling, and a quest in
+ * [refused] failed. A null [accepted] means the reservations can't be read: the page keeps what it
+ * knew and stops offering to accept, cancel, complete or share a code. Null [completions] likewise
+ * mean the proofs can't be read, so it stops offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
@@ -514,6 +513,7 @@ private fun VenuePageUiState.showing(
     approved: Set<String>?,
     refused: Set<String>,
     completions: List<Completion>?,
+    codes: Map<String, String>?,
 ): VenuePageUiState =
     if (venue == null) {
       VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
@@ -535,6 +535,7 @@ private fun VenuePageUiState.showing(
               approvedIds = approved ?: approvedIds,
               completions = completions?.associateBy { it.reservationId } ?: this.completions,
               proofsAvailable = completions != null,
+              partyCodes = codes ?: partyCodes,
           )
           .withQuests(quests)
     }

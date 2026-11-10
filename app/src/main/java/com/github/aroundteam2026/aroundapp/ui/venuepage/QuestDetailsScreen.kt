@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.party.PARTY_CODE_LENGTH
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -717,7 +718,7 @@ private val PARTY_CODE_BORDER = 1.dp
 private val PARTY_CODE_SHARE_SHAPE = RoundedCornerShape(14.dp)
 private val PARTY_CODE_SHARE_ICON_SIZE = 18.dp
 /** How many characters each half of a shown party code has. */
-private const val PARTY_CODE_HALF = 3
+private const val PARTY_CODE_HALF = PARTY_CODE_LENGTH / 2
 private const val SAMPLE_QUEST_ID = "quest"
 private const val SAMPLE_RESERVATION_ID = "reservation"
 
