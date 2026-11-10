@@ -18,6 +18,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
+import com.google.firebase.firestore.WriteBatch
 import com.google.firebase.firestore.firestore
 import java.util.UUID
 import java.util.concurrent.ExecutionException
@@ -376,11 +377,13 @@ class FirestoreRulesTest {
     val friend = newUser(Role.EXPLORER)
     signInAs(explorer)
 
-    assertDenied(newReservation().set(reservation(quest, venue)), "a reservation without a member")
+    assertDenied(
+        withPartyCode(newReservation(), reservation(quest, venue)).commit(),
+        "a reservation without a member",
+    )
     val reservation = newReservation()
     assertDenied(
-        db.batch()
-            .set(reservation, reservation(quest, venue))
+        withPartyCode(reservation, reservation(quest, venue))
             .set(membership(reservation.id, friend), member(reservation.id, friend))
             .commit(),
         "another explorer's membership",
@@ -865,8 +868,7 @@ class FirestoreRulesTest {
     signInAs(explorer)
 
     assertDenied(
-        db.batch()
-            .set(reservation, data)
+        withPartyCode(reservation, data)
             .set(
                 membership(reservation.id, explorer),
                 member(reservation.id, explorer, minutesAgo(1)),
@@ -1041,6 +1043,7 @@ class FirestoreRulesTest {
             .commit()
 
     val code = newPartyCode()
+    assertDenied(create(null, null), "no party code")
     assertDenied(create(code, null), "a code without its document")
     assertDenied(create(code, code, target = "another"), "a code leading elsewhere")
     assertDenied(create(code, newPartyCode()), "another code's document")
@@ -1510,8 +1513,8 @@ class FirestoreRulesTest {
 
   /**
    * Has [creator] create [reservation] with [data], in one batch with their joined membership,
-   * joined at the reservation's createdAt, and the party code of [data] if it has one, as the app
-   * does. Signs [creator] in.
+   * joined at the reservation's createdAt, and its party code, as the app does: the one in [data],
+   * or a new one. Signs [creator] in.
    */
   private fun createWithMembership(
       reservation: DocumentReference,
@@ -1520,14 +1523,20 @@ class FirestoreRulesTest {
   ): Task<Void> {
     signInAs(creator)
     val createdAt = data["createdAt"] as? Timestamp ?: Timestamp.now()
-    val batch =
-        db.batch()
-            .set(reservation, data)
-            .set(membership(reservation.id, creator), member(reservation.id, creator, createdAt))
-    (data["partyCode"] as? String)?.let {
-      batch.set(partyCodeDocument(it), mapOf("reservationId" to reservation.id))
-    }
-    return batch.commit()
+    return withPartyCode(reservation, data)
+        .set(membership(reservation.id, creator), member(reservation.id, creator, createdAt))
+        .commit()
+  }
+
+  /**
+   * A batch that writes [reservation] with [data] and its party code, which the rules require on
+   * creation, and the code's document: the code in [data], or a new one.
+   */
+  private fun withPartyCode(reservation: DocumentReference, data: Map<String, Any?>): WriteBatch {
+    val code = data["partyCode"] as? String ?: newPartyCode()
+    return db.batch()
+        .set(reservation, data + ("partyCode" to code))
+        .set(partyCodeDocument(code), mapOf("reservationId" to reservation.id))
   }
 
   /**
