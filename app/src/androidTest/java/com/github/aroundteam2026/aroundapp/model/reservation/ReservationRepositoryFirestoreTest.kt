@@ -186,10 +186,6 @@ class ReservationRepositoryFirestoreTest {
             "Expected an IllegalStateException but got $error",
             error is IllegalStateException,
         )
-        assertEquals(
-            FirebaseFirestoreException.Code.PERMISSION_DENIED,
-            (error?.cause as? FirebaseFirestoreException)?.code,
-        )
         assertEquals(MAX_PARTY_CODE_ATTEMPTS, draws)
       }
 
@@ -417,17 +413,19 @@ class ReservationRepositoryFirestoreTest {
 
   /**
    * Bug: a code typed in lower case or with a space between its groups is not found, or only a
-   * member of the party can find it, though the explorer looking it up hasn't joined yet. The
-   * venue, outside the party, looks it up.
+   * member of the party can find it, though the explorer looking it up hasn't joined yet. A friend,
+   * another explorer outside the party, looks it up, as when joining by code.
    */
   @Test
-  fun findReservationIdByCode_typedInLowerCaseWithSpaces_findsItOutsideTheParty() =
+  fun findReservationIdByCode_typedInLowerCaseWithSpaces_findsItForAnExplorerOutsideTheParty() =
       withTimeoutBlocking {
         val id = createAndSync()
         val code = fetchAsVenue(id).partyCode!!
         val typed = code.lowercase().chunked(TYPED_GROUP_SIZE).joinToString(" ")
+        signInNewUser(FRIEND_APP, Role.EXPLORER)
+        val friendRepository = ReservationRepositoryFirestore(emulatorClient(FRIEND_APP))
 
-        assertEquals(id, venueRepository.findReservationIdByCode(typed).getOrThrow())
+        assertEquals(id, friendRepository.findReservationIdByCode(typed).getOrThrow())
       }
 
   /** Bug: an unknown or malformed code fails like being offline, or finds some reservation. */

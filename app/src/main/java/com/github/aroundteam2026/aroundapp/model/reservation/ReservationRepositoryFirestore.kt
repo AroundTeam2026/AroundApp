@@ -68,37 +68,47 @@ class ReservationRepositoryFirestore(
    *
    * The rules refuse a code that is already taken. When they refuse a batch and its code's document
    * exists on the server, it writes the batch again under a new id with a new code, at most
-   * [MAX_PARTY_CODE_ATTEMPTS] codes in all, and then fails with an [IllegalStateException] caused
-   * by the last refusal. Any other refusal in that time, e.g. because [creatorUid] is not the
-   * signed-in user, is returned as the Firestore exception, and Firestore drops its local copy of
-   * the batch. Without an answer in time, e.g. while offline, it returns success and a later
-   * refusal, a taken code included, is only logged. Errors while issuing the write are returned as
-   * a failure too.
+   * [MAX_PARTY_CODE_ATTEMPTS] codes in all, and then fails with an [IllegalStateException]. Any
+   * other refusal in that time, e.g. because [creatorUid] is not the signed-in user, is returned as
+   * the Firestore exception, and Firestore drops its local copy of the batch. Without an answer in
+   * time, e.g. while offline, it returns success and a later refusal, a taken code included, is
+   * only logged. Errors while issuing the write are returned as a failure too.
    */
   override suspend fun createReservation(
       reservation: Reservation,
       creatorUid: String,
-  ): Result<String> {
-    return try {
-      val time = Timestamp(Date(now()))
-      var takenCodeRefusal: FirebaseFirestoreException? = null
-      for (attempt in 1..MAX_PARTY_CODE_ATTEMPTS) {
-        val code = newCode()
-        try {
-          return Result.success(create(reservation, creatorUid, time, code))
-        } catch (e: FirebaseFirestoreException) {
-          if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED || !isTaken(code)) throw e
-          Log.i(TAG, "Party code $code is taken (attempt $attempt)")
-          takenCodeRefusal = e
-        }
+  ): Result<String> =
+      try {
+        // One time for every attempt, so the creator stays joined at the reservation's creation
+        val time = Timestamp(Date(now()))
+        val id =
+            (1..MAX_PARTY_CODE_ATTEMPTS).firstNotNullOfOrNull {
+              createUnlessTaken(reservation, creatorUid, time, newCode())
+            } ?: throw IllegalStateException(EVERY_PARTY_CODE_TAKEN)
+        Result.success(id)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Result.failure(e)
       }
-      Result.failure(IllegalStateException(EVERY_PARTY_CODE_TAKEN, takenCodeRefusal))
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      Result.failure(e)
-    }
-  }
+
+  /**
+   * Writes the new reservation with the party code [code] like [create], but returns null instead
+   * of throwing when the rules refused it because another reservation already has [code].
+   */
+  private suspend fun createUnlessTaken(
+      reservation: Reservation,
+      creatorUid: String,
+      time: Timestamp,
+      code: String,
+  ): String? =
+      try {
+        create(reservation, creatorUid, time, code)
+      } catch (e: FirebaseFirestoreException) {
+        if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED || !isTaken(code)) throw e
+        Log.i(TAG, "Party code $code is taken, drawing another")
+        null
+      }
 
   /**
    * Writes the batch of a new reservation with the party code [code], created at [time], and waits

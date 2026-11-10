@@ -2,8 +2,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
-import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.EVERY_PARTY_CODE_TAKEN
+import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
@@ -89,9 +89,7 @@ class FakeReservationRepository(
     }
     val code =
         generateSequence { newCode() }.take(MAX_PARTY_CODE_ATTEMPTS).firstOrNull { it !in codes }
-            ?: return Result.failure(
-                IllegalStateException(EVERY_PARTY_CODE_TAKEN)
-            )
+            ?: return Result.failure(IllegalStateException(EVERY_PARTY_CODE_TAKEN))
     val id = "reservation-${nextId++}"
     party.join(id, creatorUid).onFailure {
       return Result.failure(it)

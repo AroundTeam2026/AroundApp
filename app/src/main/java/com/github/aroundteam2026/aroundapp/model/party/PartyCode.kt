@@ -1,7 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.party
 
+import java.security.SecureRandom
 import kotlin.random.Random
+import kotlin.random.asKotlinRandom
 
 /**
  * The characters of a party code: the digits 2 to 9 and the capital letters but I, L and O, which
@@ -24,8 +26,17 @@ const val MAX_PARTY_CODE_ATTEMPTS = 5
  */
 const val EVERY_PARTY_CODE_TAKEN = "Every party code drawn was taken"
 
-/** A new party code of [PARTY_CODE_LENGTH] characters drawn from [PARTY_CODE_ALPHABET]. */
-fun newPartyCode(random: Random = Random.Default): String = buildString {
+/**
+ * Where party codes are drawn from by default. Anyone who guesses a code can join its party, so the
+ * codes must not be predictable, which [Random.Default] doesn't promise.
+ */
+private val secureRandom = SecureRandom().asKotlinRandom()
+
+/**
+ * A new party code of [PARTY_CODE_LENGTH] characters drawn from [PARTY_CODE_ALPHABET] with
+ * [random], a cryptographically secure source unless a test passes a seeded one.
+ */
+fun newPartyCode(random: Random = secureRandom): String = buildString {
   repeat(PARTY_CODE_LENGTH) {
     append(PARTY_CODE_ALPHABET[random.nextInt(PARTY_CODE_ALPHABET.length)])
   }
