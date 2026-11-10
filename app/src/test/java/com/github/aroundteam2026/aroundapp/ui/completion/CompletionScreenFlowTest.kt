@@ -1,11 +1,11 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Application
 import android.location.LocationManager
-import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +52,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** The real screen and ViewModel, with repository fakes: UI actions must reach stored results. */
 @RunWith(RobolectricTestRunner::class)
@@ -171,11 +172,14 @@ class CompletionScreenFlowTest {
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
   }
 
+  // A readable photo, decoded with native graphics: the picker retakes a photo it can't preview,
+  // in the background, which raced the tap on "Retake" (#393)
   @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
   fun photoRetakeClearsTheViewModelAndRequiresAnotherPhoto() {
     show(ProofType.PHOTO)
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_GALLERY).assertIsDisplayed()
-    compose.runOnIdle { viewModel.pickPhoto(Uri.parse("content://proof/picked")) }
+    compose.runOnIdle { viewModel.pickPhoto(testImage(app, 80, 60)) }
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_RETAKE).performClick()
     compose.runOnIdle { assertNull(viewModel.uiState.value.photo) }
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_GALLERY).assertIsDisplayed()
