@@ -55,7 +55,7 @@ class AroundAppVenuePageTest {
           explorerUid = "explorer",
           navController = navController,
           onSignOut = {},
-          overview = { OverviewOnFakes(it) },
+          overview = { onOpenQuest, onJoinParty -> OverviewOnFakes(onOpenQuest, onJoinParty) },
       )
     }
 

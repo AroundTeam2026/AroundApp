@@ -80,7 +80,7 @@ class CompletionDestinationTest {
           venuePage = { venueId, questId, onBack, onSubmitProof ->
             VenuePageOnFakes(venueId, onBack, onSubmitProof, approvedQuestId, questId)
           },
-          overview = { OverviewOnFakes(it) },
+          overview = { onOpenQuest, onJoinParty -> OverviewOnFakes(onOpenQuest, onJoinParty) },
           completion = { reservationId, venueName, close ->
             this.close = close
             Column(Modifier.testTag(SCREEN)) {

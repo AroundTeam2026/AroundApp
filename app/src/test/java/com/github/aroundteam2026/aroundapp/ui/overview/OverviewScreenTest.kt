@@ -1,6 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -11,6 +14,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
@@ -43,6 +47,7 @@ class OverviewScreenTest {
 
   private val opened = mutableListOf<Pair<String, String>>()
   private var retries = 0
+  private var joinParty = 0
   private val cancelled = mutableListOf<String>()
 
   private fun show(state: OverviewUiState) {
@@ -53,6 +58,7 @@ class OverviewScreenTest {
             onOpenQuest = { venueId, questId -> opened += venueId to questId },
             onRetry = { retries++ },
             onCancel = { cancelled += it },
+            onJoinParty = { joinParty++ },
             clock = CLOCK,
         )
       }
@@ -61,6 +67,37 @@ class OverviewScreenTest {
 
   private fun loaded(vararg rows: OverviewRow) =
       OverviewUiState(OverviewStatus.LOADED, rows.toList())
+
+  @Test
+  fun everyStateOfTheOverviewOffersJoiningAParty() {
+    val states =
+        listOf(
+            OverviewUiState(),
+            OverviewUiState(OverviewStatus.FAILED),
+            loaded(),
+            loaded(row("reservation-1")),
+        )
+    var current by mutableStateOf(states.first())
+    compose.setContent {
+      AroundAppTheme { OverviewContent(current, { _, _ -> }, {}, {}, {}, clock = CLOCK) }
+    }
+
+    for (shown in states) {
+      current = shown
+      compose.waitForIdle()
+      compose.onNodeWithTag(C.Tag.OVERVIEW_JOIN_PARTY).assertIsDisplayed()
+      compose.onNodeWithText("Join a party").assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun theJoinAPartyButtonCallsOnJoinParty() {
+    show(loaded())
+
+    compose.onNodeWithTag(C.Tag.OVERVIEW_JOIN_PARTY).performClick()
+
+    assertEquals(1, joinParty)
+  }
 
   @Test
   fun loadingShowsTheHeaderTitleAndASpinner() {
@@ -167,7 +204,9 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
+    compose.setContent {
+      AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }, onJoinParty = {}) }
+    }
 
     compose.onNode(hasTestTag(C.Tag.CANCEL_RESERVATION), useUnmergedTree = true).performClick()
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
@@ -194,7 +233,9 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
+    compose.setContent {
+      AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }, onJoinParty = {}) }
+    }
 
     compose.onNodeWithTag(C.Tag.OVERVIEW_LIST).assertIsDisplayed()
     compose
