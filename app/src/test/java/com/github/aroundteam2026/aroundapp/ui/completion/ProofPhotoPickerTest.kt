@@ -39,6 +39,8 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.File
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -192,6 +194,24 @@ class ProofPhotoPickerTest {
 
     assertEquals(1, picked.size)
     node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
+  }
+
+  // Leaving cancels the copy, and with it the cleanup unless that cleanup can't be cancelled
+  @Test
+  fun leavingWhileATakenPhotoIsShrunkStillDeletesTheOriginal() {
+    allowCamera()
+    val io = HeldDispatcher()
+    val held = ProofPhotos(app, io, share = { Uri.fromFile(it) })
+    val results = FakeActivityResults(camera = photo())
+    var shown by mutableStateOf(true)
+    compose.setContent { if (shown) Picker(results, photo = null, photos = held) }
+    tap(C.Tag.PROOF_PHOTO_TAKE)
+
+    shown = false
+    do compose.waitForIdle() while (io.runHeld())
+
+    assertTrue(picked.isEmpty())
+    assertFalse(results.cameraFile().exists())
   }
 
   @Test
@@ -380,6 +400,22 @@ class ProofPhotoPickerTest {
 
   /** A small photo, as the camera app would take it. */
   private fun photo() = Bitmap.createBitmap(80, 60, Bitmap.Config.ARGB_8888)
+}
+
+/** Holds what it's given until [runHeld], as a slow disk would, so a test can act in between. */
+private class HeldDispatcher : CoroutineDispatcher() {
+  private val held = ArrayDeque<Runnable>()
+
+  override fun dispatch(context: CoroutineContext, block: Runnable) {
+    held += block
+  }
+
+  /** Runs everything held so far, and tells whether there was anything. */
+  fun runHeld(): Boolean {
+    val any = held.isNotEmpty()
+    while (held.isNotEmpty()) held.removeFirst().run()
+    return any
+  }
 }
 
 /**

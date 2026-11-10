@@ -203,7 +203,6 @@ class ProofPhotosTest {
   }
 }
 
-/** A plain PNG of [width] by [height] pixels in the cache, as a photo picked from the gallery. */
 /** Runs what it's given at once, and records that it was given something. */
 private class RecordingDispatcher : CoroutineDispatcher() {
   var dispatched = false
@@ -214,6 +213,7 @@ private class RecordingDispatcher : CoroutineDispatcher() {
   }
 }
 
+/** A plain PNG of [width] by [height] pixels in the cache, as a photo picked from the gallery. */
 internal fun testImage(app: Application, width: Int, height: Int): Uri {
   val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
   val file = File.createTempFile("picked", ".png", app.cacheDir)

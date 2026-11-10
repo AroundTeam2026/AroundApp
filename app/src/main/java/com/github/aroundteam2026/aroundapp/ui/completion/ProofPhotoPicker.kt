@@ -30,7 +30,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The proof photo of a photo quest, as the Figma "Photo" box of `S4 · Submit proof`: "Take photo"
@@ -79,11 +81,10 @@ fun ProofPhotoPicker(
       } catch (_: Exception) {
         error = ProofPhotoError.UNREADABLE
       } finally {
-        // The camera's original, whether or not the copy worked; a photo from the gallery is not
-        // ours
-        // to delete
-        photos.discard(source)
         shrinking = false
+        // The camera's original, whether or not the copy worked; a photo from the gallery is not
+        // ours to delete. Even once the screen is gone, which cancels this coroutine
+        withContext(NonCancellable) { photos.discard(source) }
       }
     }
   }
