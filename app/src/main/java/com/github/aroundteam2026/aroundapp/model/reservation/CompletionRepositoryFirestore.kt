@@ -26,9 +26,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Documents that cannot be mapped back to a [Completion] are logged and skipped: the `observe*`
  * flows leave them out, and [approve] and [reject] treat them as missing.
  *
- * The security rules let a joined member of an approved reservation create only their own pending
- * completion, and only the venue answer it. A submission refused within [confirmTimeoutMs] comes
- * back as a failure, and one refused later is only logged.
+ * The security rules let any joined member of an approved reservation create its party's pending
+ * completion, once, and only the venue answer it. A submission refused within [confirmTimeoutMs]
+ * comes back as a failure, and one refused later is only logged.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it
@@ -59,7 +59,7 @@ class CompletionRepositoryFirestore(
       proof: Proof,
   ): Result<String> =
       try {
-        val document = completions.document(completionId(reservationId, explorerUid))
+        val document = completions.document(completionId(reservationId))
         // A plain write, unlike a transaction, works offline, so it doesn't read first: the rules
         // refuse a second submission as an update, and only then is the document read to tell
         // that refusal apart from the others

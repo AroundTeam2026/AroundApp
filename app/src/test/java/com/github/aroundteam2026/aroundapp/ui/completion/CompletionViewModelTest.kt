@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
@@ -285,7 +286,7 @@ class CompletionViewModelTest {
     assertEquals(reservationId, completion.reservationId)
     assertEquals(CAFE, completion.venueId)
     assertEquals(EXPLORER, completion.explorerUid)
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertEquals(0, photos.uploads.size)
   }
 
@@ -530,7 +531,7 @@ class CompletionViewModelTest {
 
     assertEquals(listOf(PHOTO), photos.uploads.values.toList())
     assertEquals(Proof.Photo(location(1)), stored().single().proof)
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test
@@ -546,7 +547,7 @@ class CompletionViewModelTest {
 
     gate.complete(Unit)
     runCurrent()
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test
@@ -612,7 +613,7 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertEquals(1, stored().size)
   }
 
@@ -678,7 +679,7 @@ class CompletionViewModelTest {
     viewModel
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertFalse(state.canSubmit)
     viewModel.submit()
     runCurrent()
@@ -717,18 +718,18 @@ class CompletionViewModelTest {
     fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test
-  fun aPartyMembersCompletionOfTheSameReservationDoesNotCount() = test {
+  fun aPartyMembersCompletionOfTheSameReservationShowsSubmitted() = test {
     reservationId = book("fox")
     fakeCompletions.submit(reservationId, CAFE, "friend", Proof.Text("By the till")).getOrThrow()
     viewModel
     runCurrent()
 
-    assertEquals(CompletionFormStatus.READY, state.status)
-    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+    assertFalse(state.canSubmit)
   }
 
   @Test
@@ -747,12 +748,12 @@ class CompletionViewModelTest {
 
     listenerGate.complete(Unit)
     runCurrent()
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
 
     submitGate.complete(Unit) // the submit now fails: it is already stored
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test
@@ -765,7 +766,7 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test

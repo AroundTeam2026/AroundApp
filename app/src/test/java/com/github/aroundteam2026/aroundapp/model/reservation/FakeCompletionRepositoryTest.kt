@@ -71,6 +71,18 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
+  fun submit_byAnotherMemberOfTheParty_failsAndKeepsTheFirst() =
+      runBlocking<Unit> {
+        submit()
+        val first = stored()
+
+        val result = repository.submit(RESERVATION_ID, VENUE_ID, OTHER_ID, OTHER_PROOF)
+
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        assertEquals(first, stored())
+      }
+
+  @Test
   fun submit_whenFailureIsForced_returnsItAndStoresNothing() =
       runBlocking<Unit> {
         val failure = IllegalStateException(OFFLINE)
@@ -95,7 +107,7 @@ class FakeCompletionRepositoryTest {
   fun observeForExplorer_returnsOnlyThatExplorersCompletions() =
       runBlocking<Unit> {
         val mine = submit()
-        submit(explorerUid = OTHER_ID)
+        submit(reservationId = OTHER_ID, explorerUid = OTHER_ID)
 
         assertEquals(
             listOf(mine),
@@ -104,15 +116,14 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
-  fun observeForReservation_returnsEveryExplorerOfThatReservationOnly() =
+  fun observeForReservation_returnsOnlyThatReservationsCompletion() =
       runBlocking<Unit> {
-        val mine = submit()
-        val friends = submit(explorerUid = OTHER_ID)
+        val partyProof = submit()
         submit(reservationId = OTHER_ID)
 
         assertEquals(
-            setOf(mine, friends),
-            repository.observeForReservation(RESERVATION_ID).first().map { it.id }.toSet(),
+            listOf(partyProof),
+            repository.observeForReservation(RESERVATION_ID).first().map { it.id },
         )
       }
 
@@ -241,7 +252,7 @@ class FakeCompletionRepositoryTest {
     const val VENUE_ID = "v1"
     const val EXPLORER_UID = "u1"
     const val OTHER_ID = "other"
-    const val COMPLETION_ID = "${RESERVATION_ID}_$EXPLORER_UID"
+    const val COMPLETION_ID = RESERVATION_ID
     const val REASON = "Blurry photo"
     const val BLANK = " "
     const val OFFLINE = "offline"

@@ -49,7 +49,7 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     forcedFailure?.let {
       return Result.failure(it)
     }
-    val id = completionId(reservationId, explorerUid)
+    val id = completionId(reservationId)
     if (id in completions.value) {
       return Result.failure(IllegalStateException("Completion $id was already submitted"))
     }

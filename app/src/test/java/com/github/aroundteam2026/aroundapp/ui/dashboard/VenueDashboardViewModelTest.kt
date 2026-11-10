@@ -396,12 +396,12 @@ class VenueDashboardViewModelTest {
             partySize = 3,
             status = ReservationStatus.APPROVED,
         )
-    val newer = sendProof(reservation, explorerUid = "grace", sentAt = NOW - HOUR)
+    val newer = sendProof(reserve(status = ReservationStatus.APPROVED), sentAt = NOW - HOUR)
     val older =
         sendProof(
             reservation,
-            explorerUid = "friend",
-            proof = Proof.Photo("gs://proofs/friend.jpg"),
+            explorerUid = "grace",
+            proof = Proof.Photo("gs://proofs/grace.jpg"),
             sentAt = NOW - 2 * HOUR,
         )
     watch()
@@ -423,10 +423,11 @@ class VenueDashboardViewModelTest {
 
   @Test
   fun proofsSentAtTheSameTimeGoSmallestIdFirst() = test {
-    val reservation = reserve(status = ReservationStatus.APPROVED)
-    // Stored first, but its id ("<reservation>_zoe") is the larger one
-    val larger = sendProof(reservation, explorerUid = "zoe")
-    val smaller = sendProof(reservation, explorerUid = "amy")
+    val first = reserve(status = ReservationStatus.APPROVED)
+    val second = reserve(status = ReservationStatus.APPROVED)
+    // Stored first, but its id, its reservation's, is the larger one
+    val larger = sendProof(second)
+    val smaller = sendProof(first)
     watch()
 
     assertTrue(smaller < larger)
@@ -445,9 +446,10 @@ class VenueDashboardViewModelTest {
 
   @Test
   fun reviewedProofsAndOtherVenuesProofsAreLeftOut() = test {
-    val reservation = reserve(status = ReservationStatus.APPROVED)
-    completions.approve(sendProof(reservation, explorerUid = "a")).getOrThrow()
-    completions.reject(sendProof(reservation, explorerUid = "b"), "Blurry").getOrThrow()
+    val approved = reserve(status = ReservationStatus.APPROVED)
+    val rejected = reserve(status = ReservationStatus.APPROVED)
+    completions.approve(sendProof(approved)).getOrThrow()
+    completions.reject(sendProof(rejected), "Blurry").getOrThrow()
     sendProof("elsewhere", venueId = "other-venue")
     watch()
 

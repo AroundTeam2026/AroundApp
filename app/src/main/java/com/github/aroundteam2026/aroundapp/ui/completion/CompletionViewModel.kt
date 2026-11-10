@@ -193,9 +193,9 @@ class CompletionViewModel(
   }
 
   /**
-   * Listens to the reservation and, apart from it, to the explorer's completions, until the
-   * ViewModel is cleared or listening to the reservation fails. The quest doesn't change, so it is
-   * read once per listening.
+   * Listens to the reservation and, apart from it, to the party's completion, until the ViewModel
+   * is cleared or listening to the reservation fails. The quest doesn't change, so it is read once
+   * per listening.
    */
   private fun listen() {
     listening?.cancel()
@@ -238,11 +238,11 @@ class CompletionViewModel(
   }
 
   /**
-   * Shows the reservation as completed once the explorer has a completion of it, whatever its
-   * status.
+   * Shows the reservation as completed once its party has a completion of it, whatever its status
+   * and whichever member sent it.
    */
   private suspend fun listenToCompletions() {
-    val id = completionId(reservationId, explorerUid)
+    val id = completionId(reservationId)
     try {
       completionRepository.observeForReservation(reservationId).collect { completions ->
         if (completions.any { it.id == id }) {

@@ -97,7 +97,7 @@ class ReviewProofViewModelTest {
   }
 
   /** The proof the ViewModel reviews; set by [sendProof] or by the test. */
-  private var id = completionId(RESERVATION_ID_UNKNOWN, EXPLORER_UID)
+  private var id = completionId(RESERVATION_ID_UNKNOWN)
 
   /** Who is signed in when the ViewModel starts: the venue, unless a test signs it out. */
   private var signedIn: String? = VENUE_ID
@@ -420,7 +420,7 @@ class ReviewProofViewModelTest {
   @Test
   fun aProofThatCantBeFoundFailsUntilItShowsUp() = test {
     val reservationId = reserve()
-    id = completionId(reservationId, EXPLORER_UID)
+    id = completionId(reservationId)
     watch()
 
     assertEquals(ReviewProofStatus.FAILED, state.status)

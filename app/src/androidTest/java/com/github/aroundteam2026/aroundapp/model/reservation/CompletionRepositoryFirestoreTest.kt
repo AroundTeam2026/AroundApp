@@ -4,6 +4,7 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
@@ -73,6 +74,9 @@ class CompletionRepositoryFirestoreTest {
   /** Uid of the explorer signed in by [setUp]. */
   private lateinit var explorerUid: String
 
+  /** Uid of the second explorer signed in by [approvedReservationWithFriend]. */
+  private lateinit var friendUid: String
+
   /** Uid of the venue signed in by [setUp], used as the venue id of every reservation. */
   private lateinit var venueId: String
 
@@ -102,7 +106,7 @@ class CompletionRepositoryFirestoreTest {
 
     assertEquals(
         Completion(
-            id = completionId(reservationId, explorerUid),
+            id = completionId(reservationId),
             reservationId = reservationId,
             venueId = venueId,
             explorerUid = explorerUid,
@@ -170,21 +174,56 @@ class CompletionRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: the read that follows a refusal lets its own refusal escape, or reports another explorer's
-   * completion as this explorer's second submission, when neither may read it.
+   * Bug: the read that follows a refusal lets its own refusal escape, or reports another party's
+   * completion as this explorer's second submission, when they may not read it.
    */
   @Test
   fun submit_overACompletionTheCallerCannotRead_returnsPermissionDenied() = withTimeoutBlocking {
-    val reservationId = approvedReservation()
+    val reservationId = newId()
     writeBypassingRules(
-        "$COMPLETIONS/${completionId(reservationId, FRIEND_UID)}",
-        validFields() + ("explorerUid" to FRIEND_UID),
+        "$COMPLETIONS/${completionId(reservationId)}",
+        validFields() + ("reservationId" to reservationId) + ("explorerUid" to FRIEND_UID),
     )
 
     assertPermissionDenied(
-        explorerRepository.submit(reservationId, venueId, FRIEND_UID, TEXT_PROOF)
+        explorerRepository.submit(reservationId, venueId, explorerUid, TEXT_PROOF)
     )
   }
+
+  /**
+   * Bug: a member who didn't book can't send the party's proof, or it is stored under their uid
+   * instead of the reservation, so the rest of the party doesn't find it.
+   */
+  @Test
+  fun submit_byAnotherJoinedMember_isThePartysCompletion() = withTimeoutBlocking {
+    val reservationId = approvedReservationWithFriend()
+
+    val id = friendRepository().submit(reservationId, venueId, friendUid, TEXT_PROOF).getOrThrow()
+
+    val partys = explorerRepository.observeForReservation(reservationId).first { it.isNotEmpty() }
+    assertEquals(completionId(reservationId), id)
+    assertEquals(listOf(id to friendUid), partys.map { it.id to it.explorerUid })
+  }
+
+  /**
+   * Bug: a second member's proof replaces the party's, or comes back as a plain refusal that the
+   * ViewModel can't tell from any other. It must fail with [IllegalStateException] and keep the
+   * first.
+   */
+  @Test
+  fun submit_byAnotherMemberAfterThePartysProof_failsWithIllegalStateAndKeepsTheFirst() =
+      withTimeoutBlocking {
+        val reservationId = approvedReservationWithFriend()
+        val id = submit(reservationId)
+
+        val result =
+            friendRepository()
+                .submit(reservationId, venueId, friendUid, Proof.Text("Another answer"))
+
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        assertEquals(explorerUid, stored(id).getString("explorerUid"))
+        assertEquals(TEXT_PROOF.answer, stored(id).getString("textAnswer"))
+      }
 
   /** Bug: a completion of a reservation the venue hasn't approved is reported as stored. */
   @Test
@@ -194,7 +233,7 @@ class CompletionRepositoryFirestoreTest {
     assertPermissionDenied(
         explorerRepository.submit(reservationId, venueId, explorerUid, TEXT_PROOF)
     )
-    assertFalse(stored(completionId(reservationId, explorerUid)).exists())
+    assertFalse(stored(completionId(reservationId)).exists())
   }
 
   /**
@@ -273,12 +312,15 @@ class CompletionRepositoryFirestoreTest {
     assertEquals(setOf(answered, pending), ids.toSet())
   }
 
-  /** Bug: observeForReservation misses another member's completion, or leaks another party's. */
+  /**
+   * Bug: observeForReservation misses a completion stored under the per-explorer id used before
+   * parties shared one proof, or leaks another party's.
+   */
   @Test
   fun observeForReservation_returnsThePartysCompletionsOnly() = withTimeoutBlocking {
     val reservationId = approvedReservation()
     val mine = submit(reservationId)
-    val friends = completionId(reservationId, FRIEND_UID)
+    val friends = "${reservationId}_$FRIEND_UID"
     writeBypassingRules(
         "$COMPLETIONS/$friends",
         validFields() + ("reservationId" to reservationId) + ("explorerUid" to FRIEND_UID),
@@ -547,6 +589,24 @@ class CompletionRepositoryFirestoreTest {
     return id
   }
 
+  /**
+   * Same as [approvedReservation], with a second explorer, signed in as [friendUid] on
+   * [FRIEND_APP], joining the party before the venue approves it.
+   */
+  private suspend fun approvedReservationWithFriend(): String {
+    friendUid = signInNewUser(FRIEND_APP, Role.EXPLORER)
+    val id = pendingReservation()
+    PartyRepositoryFirestore(emulatorClient(FRIEND_APP)).join(id, friendUid).getOrThrow()
+    ReservationRepositoryFirestore(venueDb)
+        .updateStatus(id, ReservationStatus.APPROVED)
+        .getOrThrow()
+    return id
+  }
+
+  /** Repository used by the second explorer of [approvedReservationWithFriend]. */
+  private fun friendRepository() =
+      CompletionRepositoryFirestore(emulatorClient(FRIEND_APP)) { FIXED_NOW }
+
   /** Submits [proof] as the explorer and returns the completion's id. */
   private suspend fun submit(reservationId: String, proof: Proof = TEXT_PROOF): String =
       explorerRepository.submit(reservationId, venueId, explorerUid, proof).getOrThrow()
@@ -587,6 +647,9 @@ class CompletionRepositoryFirestoreTest {
 
     /** Name of the app the venue signs in on. */
     const val VENUE_APP = "completion-test-venue"
+
+    /** Name of the app a second member of the explorer's party signs in on. */
+    const val FRIEND_APP = "completion-test-friend"
 
     /** Name of the app whose client is terminated on purpose. */
     const val TERMINATED_APP = "completion-test-terminated"
