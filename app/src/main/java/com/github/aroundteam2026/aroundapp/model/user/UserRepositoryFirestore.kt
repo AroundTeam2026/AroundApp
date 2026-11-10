@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.user
@@ -7,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
@@ -27,8 +29,8 @@ import kotlinx.coroutines.tasks.await
  * as its enum name, omitted while null. The uid is the document id rather than a stored field.
  * Documents that cannot be mapped back to a [User] are logged and read as missing.
  *
- * The security rules let a user read and write only their own profile, so reading or writing
- * another uid's fails with the Firestore exception, and the role, once set, never changes.
+ * Signed-in users can get profiles by uid for names and pictures, but cannot list all users. Only
+ * the owner can write one, and the role, once set, never changes.
  *
  * @param db Firestore client to read from and write to.
  */
@@ -78,6 +80,27 @@ class UserRepositoryFirestore(private val db: FirebaseFirestore) : UserRepositor
           },
       ) { transaction, document ->
         transaction.update(document, ROLE, role.name)
+      }
+
+  /** Checks existence and changes only editable profile fields in one server transaction. */
+  override suspend fun updateProfile(
+      uid: String,
+      displayName: String,
+      pictureUrl: String?,
+  ): Result<Unit> =
+      write(
+          uid,
+          refusal = { stored ->
+            if (!stored.exists()) IllegalArgumentException("No user with uid $uid") else null
+          },
+      ) { transaction, document ->
+        transaction.update(
+            document,
+            mapOf(
+                DISPLAY_NAME to displayName,
+                PICTURE_URL to (pictureUrl ?: FieldValue.delete()),
+            ),
+        )
       }
 
   /**
@@ -137,6 +160,7 @@ class UserRepositoryFirestore(private val db: FirebaseFirestore) : UserRepositor
   /** The document fields for this profile, without its uid and its null role. */
   private fun User.toFirestore(): Map<String, Any> = buildMap {
     put(DISPLAY_NAME, displayName)
+    pictureUrl?.let { put(PICTURE_URL, it) }
     role?.let { put(ROLE, it.name) }
     put(CREATED_AT, Timestamp(Date(createdAt)))
   }
@@ -148,6 +172,7 @@ class UserRepositoryFirestore(private val db: FirebaseFirestore) : UserRepositor
       User(
           uid = id,
           displayName = required(DISPLAY_NAME) { getString(it) },
+          pictureUrl = getString(PICTURE_URL),
           role = getString(ROLE)?.let(Role::valueOf),
           createdAt = required(CREATED_AT) { getTimestamp(it) }.toDate().time,
       )
@@ -162,6 +187,7 @@ class UserRepositoryFirestore(private val db: FirebaseFirestore) : UserRepositor
     const val USERS = "users"
 
     const val DISPLAY_NAME = "displayName"
+    const val PICTURE_URL = "pictureUrl"
     const val ROLE = "role"
     const val CREATED_AT = "createdAt"
   }

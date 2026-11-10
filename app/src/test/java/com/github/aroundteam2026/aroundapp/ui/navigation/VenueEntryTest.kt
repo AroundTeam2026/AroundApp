@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -95,7 +96,11 @@ class VenueEntryTest {
         },
         createQuestFactory =
             viewModelFactory {
-              initializer { CreateQuestViewModel(auth, venues, quests).also { createQuest = it } }
+              initializer {
+                CreateQuestViewModel(auth, venues, quests, FakeAddressSearchRepository()).also {
+                  createQuest = it
+                }
+              }
             },
         venueQuestsFactory = venueQuestsFactoryOnFakes(),
         dashboardFactory = venueDashboardFactoryOnFakes(),

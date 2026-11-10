@@ -5,11 +5,18 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepository
+import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -20,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchController
 import java.time.Clock
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
@@ -36,7 +44,9 @@ import kotlinx.coroutines.launch
  * ignored while saving. The radius starts at the venue's own once loaded, unless already chosen,
  * and is [QuestLimits.DEFAULT_RADIUS_METERS] until then. The venue's location centres the radius
  * map and places the saved quest; if the venue can't be read, the form says so and [retryVenue]
- * reads it again. [clock] rejects a reward expiry that has passed.
+ * reads it again. The venue can place the quest somewhere else instead, by searching its address
+ * with [addressSearchRepository] and moving its pin. [clock] rejects a reward expiry that has
+ * passed.
  *
  * To edit, the form reads the quest and fills itself in with it, keeping its radius over the
  * venue's. Saving then updates that quest, keeping its id and status. If the quest can't be read or
@@ -46,6 +56,7 @@ class CreateQuestViewModel(
     private val authRepository: AuthRepository,
     private val venueRepository: VenueRepository,
     private val questRepository: QuestRepository,
+    addressSearchRepository: AddressSearchRepository,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val questId: String? = null,
 ) : ViewModel() {
@@ -58,6 +69,16 @@ class CreateQuestViewModel(
 
   /** The signed-in venue, once loaded; the saved quest copies its id, name and location. */
   private var venue: Venue? = null
+
+  /** Searches the address typed in the field, around where the quest is. */
+  private val addressSearch =
+      AddressSearchController(viewModelScope, addressSearchRepository) { change ->
+        // Not through edit: a search that ends during a save must still stop showing as running
+        mutableUiState.update { it.copy(addressSearch = change(it.addressSearch)) }
+      }
+
+  /** Where the address picked last is, while the field still shows it. */
+  private var pickedAddress: Location? = null
 
   /** The quest being edited, once read; its id and status are kept when it is saved. */
   private var editedQuest: Quest? = null
@@ -104,6 +125,66 @@ class CreateQuestViewModel(
   fun updateRadius(meters: Int) {
     radiusChosen = true
     edit { it.copy(radiusMeters = clampRadius(meters)) }
+  }
+
+  /** Places the quest at the venue's own location, forgetting the one chosen and its search. */
+  fun placeAtVenue() {
+    if (saving) return
+    addressSearch.dismiss()
+    pickedAddress = null
+    edit { it.copy(questLocation = null, addressQuery = "") }
+  }
+
+  /** Places the quest somewhere else, starting from the venue's location until it is moved. */
+  fun placeElsewhere() {
+    edit { it.copy(questLocation = it.questLocation ?: it.venueLocation) }
+  }
+
+  /**
+   * Moves the quest to [location], where the venue tapped the map or dropped the pin, and closes
+   * the address suggestions. A move farther than [AddressSearchController.ADDRESS_DRIFT_METERS]
+   * from the picked address empties the field, which no longer says where the quest is. Does
+   * nothing while the quest is at the venue, or being saved.
+   */
+  fun moveQuest(location: Location) {
+    if (saving || mutableUiState.value.atVenue) return
+    addressSearch.dismiss()
+    val drifted =
+        pickedAddress?.let {
+          it.distanceTo(location) > AddressSearchController.ADDRESS_DRIFT_METERS
+        } == true
+    if (drifted) pickedAddress = null
+    edit { it.copy(questLocation = location, addressQuery = if (drifted) "" else it.addressQuery) }
+  }
+
+  /** Sets the address field to [query], as typed, and searches it once typing pauses. */
+  fun updateAddressQuery(query: String) {
+    if (saving) return
+    pickedAddress = null
+    edit { it.copy(addressQuery = query) }
+    addressSearch.onQueryChanged(query, ::searchArea)
+  }
+
+  /** Searches the address field at once, however short, unless it is blank: the search key. */
+  fun searchAddress() {
+    if (saving) return
+    addressSearch.searchNow(mutableUiState.value.addressQuery, ::searchArea)
+  }
+
+  /** Moves the quest to [suggestion], whose address the field then shows. */
+  fun pickAddress(suggestion: AddressSuggestion) {
+    if (saving) return
+    addressSearch.dismiss()
+    pickedAddress = suggestion.location
+    edit { it.copy(questLocation = suggestion.location, addressQuery = suggestion.address) }
+  }
+
+  /** Empties the address field and drops its search; the quest stays where it is. */
+  fun clearAddress() {
+    if (saving) return
+    addressSearch.dismiss()
+    pickedAddress = null
+    edit { it.copy(addressQuery = "") }
   }
 
   /** Raises the party size by one. */
@@ -209,6 +290,13 @@ class CreateQuestViewModel(
     viewModelScope.launch { loadVenue() }
   }
 
+  /** Where the address search looks first: around the quest, once the venue is loaded. */
+  private fun searchArea() = mutableUiState.value.location?.boundsWithin(SEARCH_AREA_METERS)
+
+  /** Whether the quest is being saved, so the form can't change. */
+  private val saving: Boolean
+    get() = mutableUiState.value.saveState == SaveState.Saving
+
   /**
    * Reads the quest [id] and fills the form in with it, or flags it as unavailable if it can't be
    * read or doesn't exist.
@@ -271,13 +359,9 @@ class CreateQuestViewModel(
     this.venue = venue
     val radius = clampRadius(venue.radiusMeters)
     mutableUiState.update {
-      if (radiusChosen) it.copy(venueLocation = venue.location)
-      else
-          it.copy(
-              venueLocation = venue.location,
-              radiusMeters = radius,
-              customRadius = !RadiusPreset.isPreset(radius),
-          )
+      val placed = it.copy(venueName = venue.name, venueLocation = venue.location)
+      if (radiusChosen) placed
+      else placed.copy(radiusMeters = radius, customRadius = !RadiusPreset.isPreset(radius))
     }
   }
 
@@ -286,6 +370,12 @@ class CreateQuestViewModel(
 
   companion object {
     private const val TAG = "CreateQuestViewModel"
+
+    /**
+     * How far around the quest the address search looks first: about a neighbourhood, so a nearby
+     * street comes first and one in another town is still found.
+     */
+    const val SEARCH_AREA_METERS = 2_000.0
 
     /**
      * Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories, to edit
@@ -297,6 +387,7 @@ class CreateQuestViewModel(
             AuthRepositoryProvider.repository,
             VenueRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
+            AddressSearchRepositoryProvider.repository(this[APPLICATION_KEY]!!),
             questId = questId,
         )
       }

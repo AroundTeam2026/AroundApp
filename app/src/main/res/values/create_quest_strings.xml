@@ -20,6 +20,13 @@
     <string name="create_quest_explorers_see">Explorers see:</string>
     <!-- Placeholder until the explorer's quest view exists -->
     <string name="create_quest_explorer_preview">Will come back to this once explorer view is done</string>
+    <string name="create_quest_location">Where it happens</string>
+    <string name="create_quest_location_at_venue">At %1$s</string>
+    <string name="create_quest_location_elsewhere">Somewhere else</string>
+    <string name="create_quest_location_at_venue_hint">Explorers find the quest at your venue\'s pin.</string>
+    <string name="create_quest_location_search">Search for the quest\'s address</string>
+    <string name="create_quest_location_elsewhere_hint">Tap the map or drag the pin to the exact spot. Explorers find the quest there and send their proof from inside its radius.</string>
+    <string name="create_quest_location_use_venue">Use %1$s\'s location</string>
     <string name="create_quest_radius">Unlock radius</string>
     <string name="create_quest_radius_hint">Explorers can submit proof once they are this close.</string>
     <string name="create_quest_meters">%1$d m</string>
@@ -27,7 +34,9 @@
     <string name="create_quest_radius_door">At the door</string>
     <string name="create_quest_radius_street">On the street</string>
     <string name="create_quest_radius_map">Map of the %1$d m unlock radius around your venue</string>
+    <string name="create_quest_radius_map_elsewhere">Map of the %1$d m unlock radius around the quest\'s pin</string>
     <string name="create_quest_walk_time">≈ %1$d min walk</string>
+    <string name="create_quest_distance_from_venue">%1$s from %2$s</string>
     <string name="create_quest_radius_custom">Custom</string>
     <string name="create_quest_radius_range">%1$d–%2$d m</string>
     <string name="create_quest_party_size">Minimum party</string>

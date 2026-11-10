@@ -119,21 +119,20 @@ object AddressSearchDefaults {
           ink = AroundColors.Ink,
           muted = AroundColors.InkMuted,
           line = AroundColors.Line,
-          avatar = Color(0xFF5EA89D),
+          avatar = AroundColors.Tertiary,
           onAvatar = AroundColors.Cream,
           highlight = AroundColors.Purple,
-          shadow = Color(0x266B5947),
+          shadow = AroundColors.AddressShadow,
       )
 
-  // The app has no dark colours yet. The dark mode's highlight is its accent text colour, the same
-  // as its ink, as in Figma
+  // Figma uses the dark mode's ink colour for its accent text.
   private val DARK =
       LIGHT.copy(
-          surface = Color(0xFF383838),
-          ink = Color(0xFFFDFFE8),
-          muted = Color(0xFFB5B6A6),
-          line = Color(0xFF474547),
-          highlight = Color(0xFFFDFFE8),
+          surface = AroundColors.DarkSurface,
+          ink = AroundColors.Cream,
+          muted = AroundColors.DarkMuted,
+          line = AroundColors.DarkLine,
+          highlight = AroundColors.Cream,
       )
 
   /** The colours for dark mode when [darkTheme], else for light mode. */
@@ -150,7 +149,8 @@ object AddressSearchDefaults {
  * Nothing shows under the field while there is nothing to say, and the card scrolls when the bar is
  * short, as above the keyboard. Typing calls [onQueryChange], the search key [onSearch], and the
  * clear button [onClear]. Tapping a suggestion calls [onPick] and hides the keyboard. While a
- * search runs, the previous suggestions stay in view but can't be picked.
+ * search runs, the previous suggestions stay in view but can't be picked. [placeholder] says what
+ * to search while the field is empty.
  */
 @Composable
 fun AddressSearchBar(
@@ -161,11 +161,12 @@ fun AddressSearchBar(
     onClear: () -> Unit,
     onPick: (AddressSuggestion) -> Unit,
     modifier: Modifier = Modifier,
+    placeholder: String = stringResource(R.string.venue_address_placeholder),
     colors: AddressSearchColors = AddressSearchDefaults.colors(),
 ) {
   val focusManager = LocalFocusManager.current
   Column(modifier, verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-    SearchField(query, onQueryChange, onSearch, onClear, colors)
+    SearchField(query, placeholder, onQueryChange, onSearch, onClear, colors)
     val message = statusMessage(state)
     // Takes what height is left, without stretching, so a short space makes it scroll
     val cardModifier = Modifier.weight(1f, fill = false)
@@ -209,6 +210,7 @@ private fun statusMessage(state: AddressSearchUiState): String? =
 @Composable
 private fun SearchField(
     query: String,
+    placeholder: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     onClear: () -> Unit,
@@ -256,7 +258,7 @@ private fun SearchField(
           Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
               Text(
-                  stringResource(R.string.venue_address_placeholder),
+                  placeholder,
                   color = colors.muted,
                   style = QUERY_STYLE,
                   maxLines = 1,

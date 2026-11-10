@@ -17,7 +17,9 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -83,6 +85,7 @@ class CompletionViewModelTest {
   private val fakeCompletions = FakeCompletionRepository { NOW }
   private val completions = GatedCompletions(fakeCompletions)
   private val photos = FakeProofPhotoRepository()
+  private var photoRepository: ProofPhotoRepository = photos
   private var venues = FakeVenueRepository(listOf(testVenue(id = CAFE)))
   private val locations = FakeLocationRepository(VENUE_LOCATION)
 
@@ -95,7 +98,7 @@ class CompletionViewModelTest {
         venues,
         locations,
         completions,
-        photos,
+        photoRepository,
     )
   }
 
@@ -763,6 +766,37 @@ class CompletionViewModelTest {
     runCurrent()
 
     assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+  }
+
+  @Test
+  fun aTrimmedAnswerAtTheLimitIsAllowedAndStoredWhole() = test {
+    open("fox")
+    val answer = "x".repeat(MAX_TEXT_ANSWER_LENGTH)
+    viewModel.updateAnswer("  $answer  ")
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(Proof.Text(answer), stored().single().proof)
+    assertTrue(state.saveState is SaveState.Saved)
+  }
+
+  @Test
+  fun oversizedUploadedLocationFailsWithoutCrashingOrSubmitting() = test {
+    photoRepository =
+        object : ProofPhotoRepository by photos {
+          override suspend fun upload(reservationId: String, photo: Uri) =
+              Result.success("x".repeat(2001))
+        }
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(SaveState.Failed, state.saveState)
+    assertEquals(PHOTO, state.photo)
+    assertTrue(state.isEditable)
+    assertEquals(0, completions.calls)
+    assertTrue(stored().isEmpty())
   }
 
   private companion object {

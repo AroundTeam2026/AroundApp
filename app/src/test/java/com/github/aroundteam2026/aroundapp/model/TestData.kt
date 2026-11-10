@@ -18,6 +18,7 @@ import kotlinx.coroutines.runBlocking
 fun testQuest(
     id: String = "quest",
     venueId: String = "venue",
+    location: Location? = null,
     title: String = "Order the secret menu",
     reward: Reward? = Reward.FreeItem("Coffee", specifics = null),
     minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
@@ -29,6 +30,7 @@ fun testQuest(
     Quest(
         id = id,
         venueId = venueId,
+        location = location,
         radiusMeters = 50,
         title = title,
         description = "Description",

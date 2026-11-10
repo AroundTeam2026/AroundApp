@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -69,6 +70,7 @@ class EditQuestViewModelTest {
             FakeAuthRepository(VENUE_ID),
             FakeVenueRepository(listOf(venue)),
             questRepository,
+            FakeAddressSearchRepository(),
             clock,
             questId,
         )
@@ -83,6 +85,7 @@ class EditQuestViewModelTest {
             FakeAuthRepository(VENUE_ID),
             FakeVenueRepository(),
             quests,
+            FakeAddressSearchRepository(),
             clock,
             QUEST_ID,
         )

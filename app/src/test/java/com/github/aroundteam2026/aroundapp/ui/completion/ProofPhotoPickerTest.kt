@@ -4,6 +4,9 @@ package com.github.aroundteam2026.aroundapp.ui.completion
 import android.Manifest
 import android.app.Application
 import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.Settings
@@ -15,12 +18,14 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.TakePicture
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -30,9 +35,12 @@ import androidx.compose.ui.test.performClick
 import androidx.core.app.ActivityOptionsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.File
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,21 +71,36 @@ class ProofPhotoPickerTest {
   private fun proofPhotos(limitBytes: Int = Int.MAX_VALUE) =
       ProofPhotos(app, Dispatchers.Unconfined, limitBytes, share = { Uri.fromFile(it) })
 
-  /** Shows the picker with [photo]; each photo it hands over becomes the picked one. */
+  /**
+   * Shows the picker with [photo]; each photo it hands over becomes the picked one. [context]
+   * replaces the activity's, as when a test needs a missing settings screen.
+   */
   private fun show(
       results: FakeActivityResults,
       photo: Uri? = null,
       photos: ProofPhotos = this.photos,
+      context: Context? = null,
   ): FakeActivityResults {
-    compose.setContent { Picker(results, photo, photos) }
+    compose.setContent {
+      if (context == null) Picker(results, photo, photos)
+      else Picker(results, photo, photos, context)
+    }
     compose.waitForIdle()
     return results
   }
 
   @Composable
-  private fun Picker(results: FakeActivityResults, photo: Uri?, photos: ProofPhotos) {
+  private fun Picker(
+      results: FakeActivityResults,
+      photo: Uri?,
+      photos: ProofPhotos,
+      context: Context = LocalContext.current,
+  ) {
     var current by remember { mutableStateOf(photo) }
-    CompositionLocalProvider(LocalActivityResultRegistryOwner provides results) {
+    CompositionLocalProvider(
+        LocalActivityResultRegistryOwner provides results,
+        LocalContext provides context,
+    ) {
       AroundAppTheme {
         ProofPhotoPicker(
             venueName = "Café Lumière",
@@ -114,8 +137,8 @@ class ProofPhotoPickerTest {
   private fun FakeActivityResults.cameraFile() =
       File((inputsOf<TakePicture>().single() as Uri).path!!)
 
-  private fun errorSays(text: String) {
-    node(C.Tag.PROOF_PHOTO_ERROR).assertIsDisplayed().assertTextEquals(text)
+  private fun errorSays(@StringRes message: Int) {
+    node(C.Tag.PROOF_PHOTO_ERROR).assertIsDisplayed().assertTextEquals(app.getString(message))
   }
 
   @Test
@@ -173,13 +196,31 @@ class ProofPhotoPickerTest {
     node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
   }
 
+  // Leaving cancels the copy, and with it the cleanup unless that cleanup can't be cancelled
+  @Test
+  fun leavingWhileATakenPhotoIsShrunkStillDeletesTheOriginal() {
+    allowCamera()
+    val io = HeldDispatcher()
+    val held = ProofPhotos(app, io, share = { Uri.fromFile(it) })
+    val results = FakeActivityResults(camera = photo())
+    var shown by mutableStateOf(true)
+    compose.setContent { if (shown) Picker(results, photo = null, photos = held) }
+    tap(C.Tag.PROOF_PHOTO_TAKE)
+
+    shown = false
+    do compose.waitForIdle() while (io.runHeld())
+
+    assertTrue(picked.isEmpty())
+    assertFalse(results.cameraFile().exists())
+  }
+
   @Test
   fun withoutACameraAppTheBoxSaysSoAndTheGalleryStillWorks() {
     allowCamera()
     show(FakeActivityResults(noCameraApp = true, gallery = testImage(app, 80, 60)))
 
     tap(C.Tag.PROOF_PHOTO_TAKE)
-    errorSays("No camera app found. Pick a photo from your gallery instead.")
+    errorSays(R.string.proof_photo_no_camera)
     tap(C.Tag.PROOF_PHOTO_GALLERY)
 
     assertEquals(1, picked.size)
@@ -195,6 +236,28 @@ class ProofPhotoPickerTest {
     val opened = shadowOf(compose.activity).nextStartedActivity
     assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, opened.action)
     assertEquals("package:${app.packageName}", opened.dataString)
+  }
+
+  // A phone whose settings app can't show the app's page would otherwise crash here
+  @Test
+  fun withoutASettingsScreenTheBoxSaysSoAndTheGalleryStillWorks() {
+    val noSettings =
+        object : ContextWrapper(compose.activity) {
+          override fun startActivity(intent: Intent?) {
+            throw ActivityNotFoundException("No settings screen")
+          }
+        }
+    show(
+        FakeActivityResults(permission = false, gallery = testImage(app, 80, 60)),
+        context = noSettings,
+    )
+    tap(C.Tag.PROOF_PHOTO_TAKE)
+
+    tap(C.Tag.PROOF_PHOTO_OPEN_SETTINGS)
+    errorSays(R.string.proof_photo_no_settings)
+    tap(C.Tag.PROOF_PHOTO_GALLERY)
+
+    assertEquals(1, picked.size)
   }
 
   @Test
@@ -261,7 +324,25 @@ class ProofPhotoPickerTest {
     tap(C.Tag.PROOF_PHOTO_GALLERY)
 
     assertTrue(picked.isEmpty())
-    errorSays("Couldn't use this photo. Try another one.")
+    errorSays(R.string.proof_photo_unreadable)
+  }
+
+  // The empty buffer of a failed compression would otherwise go off as the proof
+  @Test
+  fun aPhotoThatFailsToCompressSaysSoAndPicksNothing() {
+    val failing =
+        ProofPhotos(
+            app,
+            Dispatchers.Unconfined,
+            share = { Uri.fromFile(it) },
+            compress = { _, _ -> false },
+        )
+    show(FakeActivityResults(gallery = testImage(app, 80, 60)), photos = failing)
+
+    tap(C.Tag.PROOF_PHOTO_GALLERY)
+
+    assertTrue(picked.isEmpty())
+    errorSays(R.string.proof_photo_unreadable)
   }
 
   @Test
@@ -274,7 +355,7 @@ class ProofPhotoPickerTest {
     tap(C.Tag.PROOF_PHOTO_GALLERY)
 
     assertTrue(picked.isEmpty())
-    errorSays("This photo is too big to send. Try another one.")
+    errorSays(R.string.proof_photo_too_big)
   }
 
   @Test
@@ -290,12 +371,19 @@ class ProofPhotoPickerTest {
     node(C.Tag.PROOF_PHOTO_TAKE).assertIsDisplayed()
   }
 
+  // Otherwise the box stays empty, as if the photo were still loading, and the copy is sent
   @Test
-  fun aPhotoThatCantBeShownStillCountsAsPicked() {
-    show(FakeActivityResults(), photo = Uri.fromFile(File(app.cacheDir, "gone.jpg")))
+  fun aPhotoThatCantBeShownIsDroppedAndTheBoxSaysWhy() {
+    val broken =
+        File(File(app.cacheDir, "proofs").apply { mkdirs() }, "proof-broken.jpg").apply {
+          writeText("not a photo")
+        }
+    show(FakeActivityResults(), photo = Uri.fromFile(broken))
 
-    node(C.Tag.PROOF_PHOTO_IMAGE).assertDoesNotExist()
-    node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
+    assertEquals(1, retakes)
+    assertFalse(broken.exists())
+    errorSays(R.string.proof_photo_unreadable)
+    node(C.Tag.PROOF_PHOTO_TAKE).assertIsDisplayed()
   }
 
   // The app passes no ProofPhotos, so the picker makes its own from the app's context
@@ -314,11 +402,28 @@ class ProofPhotoPickerTest {
   private fun photo() = Bitmap.createBitmap(80, 60, Bitmap.Config.ARGB_8888)
 }
 
+/** Holds what it's given until [runHeld], as a slow disk would, so a test can act in between. */
+private class HeldDispatcher : CoroutineDispatcher() {
+  private val held = ArrayDeque<Runnable>()
+
+  override fun dispatch(context: CoroutineContext, block: Runnable) {
+    held += block
+  }
+
+  /** Runs everything held so far, and tells whether there was anything. */
+  fun runHeld(): Boolean {
+    val any = held.isNotEmpty()
+    while (held.isNotEmpty()) held.removeFirst().run()
+    return any
+  }
+}
+
 /**
  * Answers the picker's requests in place of Android and the other apps, and records them: the
  * camera permission with [permission], the camera by writing [camera] into its file (or cancelling
- * when null, or failing when there is [noCameraApp]), and the gallery with [gallery]. With
- * [holdCamera], the camera stays open until [finishCamera].
+ * when null, leaving the empty file a camera app may have created, or failing when there is
+ * [noCameraApp]), and the gallery with [gallery]. With [holdCamera], the camera stays open until
+ * [finishCamera].
  */
 internal class FakeActivityResults(
     private val permission: Boolean? = null,
@@ -341,8 +446,12 @@ internal class FakeActivityResults(
   }
 
   private fun takePhoto(requestCode: Int, target: Uri) {
-    camera?.let { photo ->
-      File(target.path!!).outputStream().use { photo.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+    val file = File(target.path!!)
+    if (camera == null) {
+      // A cancelled camera app may still leave the file it was given, empty
+      file.createNewFile()
+    } else {
+      file.outputStream().use { camera.compress(Bitmap.CompressFormat.JPEG, 90, it) }
     }
     activityResultRegistry.dispatchResult(requestCode, camera != null)
   }

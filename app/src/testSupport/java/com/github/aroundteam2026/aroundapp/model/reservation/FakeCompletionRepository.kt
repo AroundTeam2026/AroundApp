@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import kotlinx.coroutines.flow.Flow
@@ -24,9 +25,9 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     CompletionRepository {
   /**
    * Simulates a backend error (e.g. no network or a refused write) so callers' error paths can be
-   * tested. While non-null, [submit], [approve] and [reject] with a non-blank reason return
-   * `Result.failure(forcedFailure)` and change nothing; a blank reason is the caller's mistake, so
-   * it fails first, as it would without a backend. Set it back to null to make writes succeed
+   * tested. While non-null, [submit], [approve] and [reject] with a valid reason return
+   * `Result.failure(forcedFailure)` and change nothing; an invalid reason is the caller's mistake,
+   * so it fails first, as it would without a backend. Set it back to null to make writes succeed
    * again.
    */
   var forcedFailure: Throwable? = null
@@ -89,10 +90,19 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
   override suspend fun approve(id: String): Result<Unit> =
       answer(id, CompletionStatus.APPROVED, rejectReason = null)
 
-  /** Fails with [IllegalArgumentException] if [reason] is blank, before looking up [id]. */
+  /**
+   * Fails with [IllegalArgumentException] if [reason] is blank or too long, before looking up [id].
+   */
   override suspend fun reject(id: String, reason: String): Result<Unit> {
     if (reason.isBlank()) {
       return Result.failure(IllegalArgumentException("A rejection needs a reason"))
+    }
+    if (reason.length > MAX_REJECT_REASON_LENGTH) {
+      return Result.failure(
+          IllegalArgumentException(
+              "A rejection reason must be at most $MAX_REJECT_REASON_LENGTH characters"
+          )
+      )
     }
     return answer(id, CompletionStatus.REJECTED, reason)
   }
