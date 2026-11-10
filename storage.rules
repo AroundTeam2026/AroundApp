@@ -1,5 +1,6 @@
 rules_version = '2';
 
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Cloud Storage holds the proof photos of quest completions, under proofs/{reservationId}/. The
 // reservation and its party are read from Firestore, where docs/firestore-schema.md describes them.
@@ -34,6 +35,17 @@ service firebase.storage {
           && resource == null
           && isJoinedMember(reservationId)
           && reservation(reservationId).status == 'APPROVED'
+          && request.resource.size < maxPhotoBytes()
+          && request.resource.contentType.matches('image/.*');
+    }
+
+    // Profile pictures may be shown to signed-in users, but only their owner may upload one.
+    // A fresh id on each change prevents a cached image from hiding the new picture.
+    match /user-pictures/{uid}/{photoId} {
+      allow get: if request.auth != null;
+      allow create: if request.auth != null
+          && request.auth.uid == uid
+          && resource == null
           && request.resource.size < maxPhotoBytes()
           && request.resource.contentType.matches('image/.*');
     }

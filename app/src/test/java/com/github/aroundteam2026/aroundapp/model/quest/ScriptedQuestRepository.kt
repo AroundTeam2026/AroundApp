@@ -15,8 +15,10 @@ class ScriptedQuestRepository(
     var activeQuestsByVenue: (String) -> Flow<List<Quest>> = { flowOf(emptyList()) },
     var quest: suspend (String) -> Quest? = { null },
     var create: suspend (Quest) -> Result<String> = { Result.success("created") },
+    var update: suspend (Quest) -> Result<Unit> = { Result.success(Unit) },
 ) : QuestRepository {
   val created = mutableListOf<Quest>()
+  val updated = mutableListOf<Quest>()
   var activeQuestsCollections = 0
 
   override fun observeActiveQuests(): Flow<List<Quest>> {
@@ -33,6 +35,11 @@ class ScriptedQuestRepository(
   override suspend fun createQuest(quest: Quest): Result<String> {
     created += quest
     return create(quest)
+  }
+
+  override suspend fun updateQuest(quest: Quest): Result<Unit> {
+    updated += quest
+    return update(quest)
   }
 
   companion object {

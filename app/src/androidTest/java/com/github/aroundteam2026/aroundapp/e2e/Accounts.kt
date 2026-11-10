@@ -54,6 +54,18 @@ fun ComposeTestRule.signIn(email: String, landsOn: String) {
   leaveAuthFor(landsOn)
 }
 
+/**
+ * Signs out from the Profile tab, tagged [profileTab] in the explorer's and the venue's bars, and
+ * waits for the auth screen.
+ */
+fun ComposeTestRule.signOut(profileTab: String = C.Tag.PROFILE_TAB) {
+  onNodeWithTag(profileTab).performClick()
+  onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
+  waitUntil(SETUP_TIMEOUT_MS) {
+    onAllNodes(hasTestTag(C.Tag.AUTH_SCREEN)).fetchSemanticsNodes().isNotEmpty()
+  }
+}
+
 /** Closes the soft keyboard, then taps the auth form's submit button, scrolled into view. */
 fun ComposeTestRule.submitAuthForm() {
   closeKeyboard()

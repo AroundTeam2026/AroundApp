@@ -34,7 +34,7 @@ data class OverviewUiState(
  *
  * @property reservationId Id of the reservation the row shows.
  * @property questId Id of the accepted quest.
- * @property venueId Id of the quest's venue, whose page a tap opens.
+ * @property venueId Id of the quest's venue, whose page a tap opens with the quest's details.
  * @property questTitle The quest's title.
  * @property reward The quest's reward, or null if it has none.
  * @property venueName The venue's name.

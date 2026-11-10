@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,6 +31,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 
 /** The title, description and requirements of the quest, each with its counter and error. */
 @Composable
@@ -151,7 +151,7 @@ internal fun QuestInputField(
       isError = isError,
       shape = MaterialTheme.shapes.small,
       textStyle = if (singleLine) AroundTextStyles.FieldValue else AroundTextStyles.TextArea,
-      colors = questFieldColors(),
+      colors = aroundFieldColors(),
       keyboardOptions = keyboardOptions,
       modifier = modifier.semantics { contentDescription = label },
   )
@@ -167,17 +167,6 @@ internal fun QuestFieldError(text: String, tag: String) {
       modifier = Modifier.testTag(tag).semantics { liveRegion = LiveRegionMode.Polite },
   )
 }
-
-/** The colours of every quest form text field: the surface inside, purple once focused. */
-@Composable
-internal fun questFieldColors() =
-    OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = MaterialTheme.colorScheme.surface,
-        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-        errorContainerColor = MaterialTheme.colorScheme.surface,
-        focusedBorderColor = MaterialTheme.colorScheme.primary,
-        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-    )
 
 @Preview(widthDp = 413)
 @Composable

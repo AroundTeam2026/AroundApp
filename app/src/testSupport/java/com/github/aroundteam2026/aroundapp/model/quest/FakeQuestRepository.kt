@@ -25,8 +25,8 @@ class FakeQuestRepository(
 ) : QuestRepository {
   /**
    * Simulates a backend error (e.g. no network or a rejected write) so callers' error paths can be
-   * tested. While non-null, [createQuest] returns `Result.failure(forcedFailure)` and stores
-   * nothing. Set it back to null to make writes succeed again.
+   * tested. While non-null, [createQuest] and [updateQuest] return `Result.failure(forcedFailure)`
+   * and store nothing. Set it back to null to make writes succeed again.
    */
   var forcedFailure: Throwable? = null
 
@@ -75,5 +75,24 @@ class FakeQuestRepository(
     val time = now()
     quests.update { it + (id to quest.copy(id = id, createdAt = time, updatedAt = time)) }
     return Result.success(id)
+  }
+
+  /**
+   * Replaces the stored quest with `quest.id` by [quest], keeping its `venueId` and `createdAt` and
+   * setting `updatedAt` to [now]. Returns [forcedFailure] instead, storing nothing, if it is set.
+   * If no quest has that id, it stores nothing and still returns success, like
+   * [QuestRepositoryFirestore], whose server rejects that write later.
+   */
+  override suspend fun updateQuest(quest: Quest): Result<Unit> {
+    forcedFailure?.let {
+      return Result.failure(it)
+    }
+    quests.update { all ->
+      val stored = all[quest.id] ?: return@update all
+      all +
+          (quest.id to
+              quest.copy(venueId = stored.venueId, createdAt = stored.createdAt, updatedAt = now()))
+    }
+    return Result.success(Unit)
   }
 }

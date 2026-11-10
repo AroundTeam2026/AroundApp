@@ -6,6 +6,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
@@ -24,6 +25,11 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property selectedQuestId Id of the quest the explorer picked to accept, or null when none is
  *   picked.
  * @property detailQuestId Id of the quest whose details are open, or null when none is.
+ * @property arrivalQuestId Id of the quest whose details the page opened as it arrived, as from a
+ *   card on the Quests tab, while they are open: closing them leaves the page instead of showing
+ *   its list, since the explorer never saw that list. Null otherwise.
+ * @property arrivalMissed The page was to arrive at a quest it doesn't list, such as one whose
+ *   reward expired, and shows its list instead; true until the page has said so once.
  * @property pickBeforeDetails What closing the details picks: the pick from before they opened, or
  *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
@@ -38,6 +44,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   page can't tell what they accepted and so doesn't book anything.
  * @property approvedIds Ids of the explorer's reservations the venue approved, whose quest they can
  *   now complete.
+ * @property completions The proofs the explorer sent, by reservation id.
+ * @property proofsAvailable False once the explorer's proofs can't be read, since then the page
+ *   can't tell if one was sent and so doesn't offer to send one.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -48,6 +57,8 @@ data class VenuePageUiState(
     val quests: List<VenuePageQuest> = emptyList(),
     val selectedQuestId: String? = null,
     val detailQuestId: String? = null,
+    val arrivalQuestId: String? = null,
+    val arrivalMissed: Boolean = false,
     val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
     val reservationIds: Map<String, String> = emptyMap(),
@@ -57,6 +68,8 @@ data class VenuePageUiState(
     val failedCancelIds: Set<String> = emptySet(),
     val acceptAvailable: Boolean = true,
     val approvedIds: Set<String> = emptySet(),
+    val completions: Map<String, Completion> = emptyMap(),
+    val proofsAvailable: Boolean = true,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -79,18 +92,31 @@ data class VenuePageUiState(
     }
 
   /**
-   * The reservation the explorer can cancel for the picked quest, or null when there is none. While
-   * the reservations can't be read it is null too, since the page can't tell if it still stands.
+   * The reservation the explorer can cancel for the picked quest, or null when there is none. Once
+   * they sent its proof, whatever the proof's status, it can't be cancelled, as on the Quests tab
+   * and as the rules enforce. While the reservations can't be read it is null too, since the page
+   * can't tell if it still stands.
    */
   val cancellableReservationId: String?
-    get() = selectedQuestId?.takeIf { acceptAvailable }?.let(reservationIds::get)
+    get() =
+        selectedQuestId
+            ?.takeIf { acceptAvailable }
+            ?.let(reservationIds::get)
+            ?.takeIf { it !in completions }
 
   /**
    * The reservation whose quest the explorer can complete, for the picked quest: the one they can
-   * cancel, once the venue approved it. Null otherwise.
+   * cancel, once the venue approved it and until they send a proof. Null otherwise, and while the
+   * proofs can't be read.
    */
   val completableReservationId: String?
-    get() = cancellableReservationId?.takeIf { it in approvedIds }
+    get() = cancellableReservationId?.takeIf {
+      it in approvedIds && proofsAvailable && it !in completions
+    }
+
+  /** The proof the explorer sent for the picked quest, or null when there is none. */
+  val proof: Completion?
+    get() = selectedQuestId?.let(reservationIds::get)?.let(completions::get)
 
   /** How cancelling the picked quest's reservation stands; [CancelStatus.NONE] when none is. */
   val cancelStatus: CancelStatus
@@ -116,7 +142,8 @@ data class VenuePageUiState(
   /**
    * This page listing [quests] instead. A picked quest that isn't among them is unpicked, so it
    * isn't picked again if it comes back, as when its venue extends an expired reward; likewise, its
-   * details close, which gives back the pick from before they opened.
+   * details close, which gives back the pick from before they opened, and they no longer count as
+   * the details the page arrived at.
    */
   fun withQuests(quests: List<VenuePageQuest>): VenuePageUiState {
     fun String?.ifListed() = this?.takeIf { id -> quests.any { it.questId == id } }
@@ -126,9 +153,28 @@ data class VenuePageUiState(
         quests = quests,
         selectedQuestId = pick.ifListed(),
         detailQuestId = detailQuestId.ifListed(),
+        arrivalQuestId = arrivalQuestId.takeIf { !detailsClosed },
         pickBeforeDetails = pickBeforeDetails.ifListed().takeIf { !detailsClosed },
     )
   }
+
+  /**
+   * This page arriving at the details of the quest [questId], as from a card on the Quests tab:
+   * they open as with [withQuestDetails], and count as the [arrivalQuestId]. A quest it doesn't
+   * list, such as one whose reward has expired, leaves its list shown, with [arrivalMissed] set so
+   * that the page says why. A page that isn't loaded, e.g. because the venue is gone, says so
+   * itself and changes nothing.
+   */
+  fun arrivingAt(questId: String): VenuePageUiState =
+      when {
+        status != VenuePageStatus.LOADED -> this
+        quests.none { it.questId == questId } -> copy(arrivalMissed = true)
+        else -> withQuestDetails(questId).copy(arrivalQuestId = questId)
+      }
+
+  /** Whether closing the open details leaves the page, since it arrived at them. */
+  val detailsLeaveThePage: Boolean
+    get() = detailQuestId != null && detailQuestId == arrivalQuestId
 
   /**
    * This page with the details of the quest [questId] open, and that quest picked, since the
@@ -151,7 +197,12 @@ data class VenuePageUiState(
       if (detailQuestId == null) {
         this
       } else {
-        copy(detailQuestId = null, selectedQuestId = pickBeforeDetails, pickBeforeDetails = null)
+        copy(
+            detailQuestId = null,
+            arrivalQuestId = null,
+            selectedQuestId = pickBeforeDetails,
+            pickBeforeDetails = null,
+        )
       }
 
   /**

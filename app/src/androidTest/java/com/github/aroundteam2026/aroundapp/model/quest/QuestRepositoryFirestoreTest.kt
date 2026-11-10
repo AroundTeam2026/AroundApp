@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorClient
@@ -12,6 +13,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
 import java.util.Date
 import kotlinx.coroutines.CoroutineStart
@@ -99,15 +101,16 @@ class QuestRepositoryFirestoreTest {
     val otherId =
         repository.createQuest(fullQuest().copy(reward = Reward.Other("Sticker"))).getOrThrow()
     val noRewardId = repository.createQuest(fullQuest().copy(reward = null)).getOrThrow()
+    val atVenueId = repository.createQuest(fullQuest().copy(location = null)).getOrThrow()
 
     // Only the stored representation is checked here; the values are checked by the round trip.
     // The memory cache drops a document once the server has saved it and no listener holds it,
     // so the reads go to the server, after it has saved every write.
     db.waitForPendingWrites().await()
     val full = db.collection(QUESTS).document(fullId).get(Source.SERVER).await()
-    // The venue's name and location are read from the venue, never copied onto the quest
+    // The venue's name is read from the venue, never copied onto the quest
     assertFalse("venueName must not be stored", full.contains("venueName"))
-    assertFalse("location must not be stored", full.contains("location"))
+    assertEquals(GeoPoint(QUEST_LOCATION.lat, QUEST_LOCATION.lng), full.get("location"))
     assertTrue(full.get("createdAt") is Timestamp)
     assertTrue(full.get("updatedAt") is Timestamp)
     assertEquals("DRAFT", full.get("status"))
@@ -126,6 +129,34 @@ class QuestRepositoryFirestoreTest {
     assertEquals(mapOf("type" to "OTHER", "description" to "Sticker"), other)
     val noReward = db.collection(QUESTS).document(noRewardId).get(Source.SERVER).await()
     assertFalse("a null reward must be omitted", noReward.contains("reward"))
+    val atVenue = db.collection(QUESTS).document(atVenueId).get(Source.SERVER).await()
+    assertFalse("a null location must be omitted", atVenue.contains("location"))
+  }
+
+  /**
+   * Bug: a quest without a location of its own is skipped, or read with a made-up location (e.g.
+   * 0, 0) instead of null, so it no longer takes place at its venue.
+   */
+  @Test
+  fun createQuest_thenGetQuest_keepsANullLocation() = withTimeoutBlocking {
+    val id = repository.createQuest(fullQuest().copy(location = null)).getOrThrow()
+
+    val stored = getQuestFromServer(id)!!
+    assertNull(stored.location)
+  }
+
+  /**
+   * Bug: a location that is not a GeoPoint is read as no location, so the quest silently moves to
+   * its venue instead of being skipped like any other malformed quest.
+   */
+  @Test
+  fun getQuest_skipsAQuestWhoseLocationIsNotAGeoPoint() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    // The rules refuse such a location, so it goes past them, once the quest is on the server
+    db.waitForPendingWrites().await()
+    writeBypassingRules("$QUESTS/$id", mapOf("location" to "Lausanne"))
+
+    assertNull(repository.getQuest(id))
   }
 
   /**
@@ -240,13 +271,18 @@ class QuestRepositoryFirestoreTest {
   @Test
   fun createQuest_succeedsWhileOffline() = withTimeoutBlocking {
     db.disableNetwork().await()
-    val id = repository.createQuest(quest(title = "Offline")).getOrThrow()
-
-    // check it's already in local cache
-    assertEquals("Offline", repository.getQuest(id)?.title)
+    // The client is shared across tests, so it must come back online even if this test fails
+    val id =
+        try {
+          val id = repository.createQuest(quest(title = "Offline")).getOrThrow()
+          // check it's already in local cache
+          assertEquals("Offline", repository.getQuest(id)?.title)
+          id
+        } finally {
+          db.enableNetwork().await()
+        }
 
     // check it syncs to the server when back online
-    db.enableNetwork().await()
     assertEquals("Offline", getQuestFromServer(id)?.title)
   }
 
@@ -262,6 +298,111 @@ class QuestRepositoryFirestoreTest {
     terminated.terminate().await()
     val result2 = QuestRepositoryFirestore(terminated).createQuest(quest())
     assertTrue(result2.isFailure)
+  }
+
+  /** Bug: a field is dropped or mis-mapped on update, or the update never reaches the server. */
+  @Test
+  fun updateQuest_thenGetQuest_roundTripsEveryEditableField() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    val edited = fullQuest().copy(id = id)
+
+    repository.updateQuest(edited).getOrThrow()
+    val stored = getQuestFromServer(id)!!
+
+    // Timestamps are checked by updateQuest_keepsVenueIdAndCreatedAtAndSetsUpdatedAt.
+    assertEquals(edited.copy(createdAt = stored.createdAt, updatedAt = stored.updatedAt), stored)
+  }
+
+  /**
+   * Bug: the update overwrites createdAt or venueId with the caller's values (the rules would then
+   * reject it), or doesn't set updatedAt from the clock.
+   */
+  @Test
+  fun updateQuest_keepsVenueIdAndCreatedAtAndSetsUpdatedAt() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    val later = QuestRepositoryFirestore(db) { FIXED_NOW + 1_000L }
+
+    later
+        .updateQuest(
+            quest(id = id, title = "New title")
+                .copy(venueId = "another-venue", createdAt = 1L, updatedAt = 2L)
+        )
+        .getOrThrow()
+    val stored = getQuestFromServer(id)!!
+
+    assertEquals("New title", stored.title)
+    assertEquals(venueId, stored.venueId)
+    assertEquals(FIXED_NOW, stored.createdAt)
+    assertEquals(FIXED_NOW + 1_000L, stored.updatedAt)
+  }
+
+  /** Bug: a reward removed by the venue stays in the document, or is stored as null. */
+  @Test
+  fun updateQuest_deletesADroppedReward() = withTimeoutBlocking {
+    val id = repository.createQuest(fullQuest()).getOrThrow()
+
+    repository.updateQuest(fullQuest().copy(id = id, reward = null)).getOrThrow()
+    db.waitForPendingWrites().await()
+    val document = db.collection(QUESTS).document(id).get(Source.SERVER).await()
+
+    assertFalse("a dropped reward must be deleted", document.contains("reward"))
+  }
+
+  /**
+   * Bug: a location removed by the venue stays in the document, so the quest keeps taking place
+   * away from its venue.
+   */
+  @Test
+  fun updateQuest_deletesADroppedLocation() = withTimeoutBlocking {
+    val id = repository.createQuest(fullQuest()).getOrThrow()
+
+    repository.updateQuest(fullQuest().copy(id = id, location = null)).getOrThrow()
+    db.waitForPendingWrites().await()
+    val document = db.collection(QUESTS).document(id).get(Source.SERVER).await()
+
+    assertFalse("a dropped location must be deleted", document.contains("location"))
+  }
+
+  /** Bug: the update creates a quest for an id that has none, like set() would. */
+  @Test
+  fun updateQuest_doesNotCreateAMissingQuest() = withTimeoutBlocking {
+    val id = db.collection(QUESTS).document().id
+
+    assertTrue(repository.updateQuest(quest(id = id)).isSuccess)
+
+    assertNull(getQuestFromServer(id))
+  }
+
+  /**
+   * Bug: updateQuest awaits the server acknowledgement, so it hangs while the device is offline, or
+   * the offline update is lost instead of synced later.
+   */
+  @Test
+  fun updateQuest_succeedsWhileOffline() = withTimeoutBlocking {
+    // Offline before the create too: the memory cache keeps the document only while a write to it
+    // is pending, and an update can't be applied locally to a document the cache doesn't hold
+    db.disableNetwork().await()
+    // The client is shared across tests, so it must come back online even if this test fails
+    val id =
+        try {
+          val id = repository.createQuest(quest()).getOrThrow()
+          repository.updateQuest(quest(id = id, status = QuestStatus.ARCHIVED)).getOrThrow()
+          assertEquals(QuestStatus.ARCHIVED, repository.getQuest(id)?.status)
+          id
+        } finally {
+          db.enableNetwork().await()
+        }
+
+    assertEquals(QuestStatus.ARCHIVED, getQuestFromServer(id)?.status)
+  }
+
+  /**
+   * Bug: an exception escapes updateQuest instead of becoming a failure, here for an id Firestore
+   * can't use as a document id.
+   */
+  @Test
+  fun updateQuest_returnsFailureWhenTheWriteCannotBeIssued() = withTimeoutBlocking {
+    assertTrue(repository.updateQuest(quest(id = "")).isFailure)
   }
 
   /** Bug: getQuest throws for an id with no document instead of returning null as KDoc promises. */
@@ -370,6 +511,7 @@ class QuestRepositoryFirestoreTest {
       Quest(
           id = "",
           venueId = venueId,
+          location = QUEST_LOCATION,
           radiusMeters = 120,
           title = "Find the mural",
           description = "A mural hides behind the bar.",
@@ -475,6 +617,12 @@ class QuestRepositoryFirestoreTest {
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
+
+    /**
+     * Where [fullQuest] takes place. The negative longitude catches a lost sign, and the latitude
+     * and longitude differ so that a swap shows.
+     */
+    val QUEST_LOCATION = Location(46.5191, -6.5668)
 
     /** When [fullQuest]'s reward expires, in epoch ms; the non-zero ms catch precision loss. */
     const val REWARD_EXPIRES_AT = 1_800_000_000_456L

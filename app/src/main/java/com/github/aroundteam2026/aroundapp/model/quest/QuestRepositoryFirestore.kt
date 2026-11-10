@@ -3,9 +3,13 @@
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import android.util.Log
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.required
+import com.github.aroundteam2026.aroundapp.model.toGeoPoint
+import com.github.aroundteam2026.aroundapp.model.toLocation
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import java.util.Date
@@ -17,11 +21,12 @@ import kotlinx.coroutines.tasks.await
 /**
  * [QuestRepository] backed by the Firestore `quests` collection.
  *
- * Firestore types stay inside this class. Epoch-millisecond times are stored as `Timestamp`s, enums
- * as their names and [Reward] as a nested map whose `type` field names its subtype. Null fields are
- * omitted, and the quest id is the document id rather than a stored field. Documents that cannot be
- * mapped back to a [Quest], including those whose reward cannot be read, are logged and skipped:
- * the `observe*` flows leave them out and [getQuest] returns null.
+ * Firestore types stay inside this class. Epoch-millisecond times are stored as `Timestamp`s, a
+ * [Location] as a `GeoPoint`, enums as their names and [Reward] as a nested map whose `type` field
+ * names its subtype. Null fields are omitted, and the quest id is the document id rather than a
+ * stored field. Documents that cannot be mapped back to a [Quest], including those whose reward
+ * cannot be read, are logged and skipped: the `observe*` flows leave them out and [getQuest]
+ * returns null.
  *
  * @param db Firestore client to read from and write to.
  * @param now Clock used for `createdAt` and `updatedAt`, in epoch milliseconds.
@@ -63,6 +68,31 @@ class QuestRepositoryFirestore(
       }
 
   /**
+   * Sends only the editable fields and the new `updatedAt`, never `venueId` or `createdAt`, so the
+   * stored ones are kept. A dropped location or reward is deleted from the document, so a null
+   * location moves the quest back to its venue: callers must pass the stored location through. Like
+   * [createQuest], it doesn't wait for the server: a later rejection (e.g. no quest with this id)
+   * is only logged, and exceptions thrown while issuing the write are returned as a failure.
+   */
+  override suspend fun updateQuest(quest: Quest): Result<Unit> =
+      try {
+        val document = quests.document(quest.id)
+        val fields =
+            quest.editableFields() +
+                mapOf(
+                    LOCATION to (quest.location?.toGeoPoint() ?: FieldValue.delete()),
+                    REWARD to (quest.reward?.toFirestore() ?: FieldValue.delete()),
+                    UPDATED_AT to Timestamp(Date(now())),
+                )
+        document.update(fields).addOnFailureListener {
+          Log.w(TAG, "Update of quest ${document.id} was rejected", it)
+        }
+        Result.success(Unit)
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
+
+  /**
    * Turns Firestore's callback-style listener into a Kotlin Flow<List<Quest>>, which ViewModels can
    * collect. Every observe* method uses it.
    */
@@ -80,6 +110,18 @@ class QuestRepositoryFirestore(
   /** The document fields for this quest, with [time] as both creation and update time. */
   private fun Quest.toFirestore(time: Timestamp): Map<String, Any> = buildMap {
     put(VENUE_ID, venueId)
+    putAll(editableFields())
+    location?.let { put(LOCATION, it.toGeoPoint()) }
+    reward?.let { put(REWARD, it.toFirestore()) }
+    put(CREATED_AT, time)
+    put(UPDATED_AT, time)
+  }
+
+  /**
+   * The fields a venue may change after creation, except the location and the reward, which may be
+   * absent.
+   */
+  private fun Quest.editableFields(): Map<String, Any> = buildMap {
     put(RADIUS_METERS, radiusMeters)
     put(TITLE, title)
     put(DESCRIPTION, description)
@@ -87,10 +129,7 @@ class QuestRepositoryFirestore(
     put(PROOF_TYPE, proofType.name)
     put(MIN_PARTY_SIZE, minPartySize)
     put(EXACT_PARTY_SIZE, exactPartySize)
-    reward?.let { put(REWARD, it.toFirestore()) }
     put(STATUS, status.name)
-    put(CREATED_AT, time)
-    put(UPDATED_AT, time)
   }
 
   private fun Reward.toFirestore(): Map<String, Any> = buildMap {
@@ -121,6 +160,9 @@ class QuestRepositoryFirestore(
       Quest(
           id = id,
           venueId = required(VENUE_ID) { getString(it) },
+          // Absent means the venue's location; a value that isn't a GeoPoint throws, so the quest
+          // is skipped rather than shown at the venue
+          location = getGeoPoint(LOCATION)?.toLocation(),
           radiusMeters = required(RADIUS_METERS) { getLong(it) }.toInt(),
           title = required(TITLE) { getString(it) },
           description = required(DESCRIPTION) { getString(it) },
@@ -170,6 +212,7 @@ class QuestRepositoryFirestore(
     const val QUESTS = "quests"
 
     const val VENUE_ID = "venueId"
+    const val LOCATION = "location"
     const val RADIUS_METERS = "radiusMeters"
     const val TITLE = "title"
     const val DESCRIPTION = "description"
