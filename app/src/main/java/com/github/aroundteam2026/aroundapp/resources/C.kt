@@ -145,7 +145,6 @@ object C {
     const val QUEST_DETAIL_PARTY_JOINED = "quest_detail_party_joined"
     const val QUEST_DETAIL_PARTY_BIGGER = "quest_detail_party_bigger"
     const val QUEST_DETAIL_PARTY_CODE = "quest_detail_party_code"
-    const val QUEST_DETAIL_PARTY_CODE_COPY = "quest_detail_party_code_copy"
     const val QUEST_DETAIL_PARTY_CODE_SHARE = "quest_detail_party_code_share"
     const val QUEST_DETAIL_SEAT_EMPTY = "quest_detail_seat_empty"
     const val QUEST_DETAIL_RADIUS = "quest_detail_radius"
