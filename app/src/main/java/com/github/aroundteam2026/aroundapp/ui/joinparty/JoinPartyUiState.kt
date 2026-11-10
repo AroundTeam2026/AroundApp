@@ -48,7 +48,7 @@ data class JoinPartyUiState(
     /** The venue already approved the reservation, so the party takes no one else. */
     data object Closed : Error
 
-    /** The explorer is already in the party, as its creator or as a member who left. */
+    /** The explorer is already joined in the party, e.g. as its creator. */
     data object AlreadyJoined : Error
 
     /** The device is offline. */
