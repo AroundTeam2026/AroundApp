@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.util.Log
@@ -104,12 +105,19 @@ class CompletionRepositoryFirestore(
       answer(id, CompletionStatus.APPROVED, rejectReason = null)
 
   /**
-   * Answers the completion with [id]; see [answer]. A blank [reason] fails with
+   * Answers the completion with [id]; see [answer]. A blank or oversized [reason] fails with
    * [IllegalArgumentException] before any request reaches the backend.
    */
   override suspend fun reject(id: String, reason: String): Result<Unit> {
     if (reason.isBlank()) {
       return Result.failure(IllegalArgumentException("A rejection needs a reason"))
+    }
+    if (reason.length > MAX_REJECT_REASON_LENGTH) {
+      return Result.failure(
+          IllegalArgumentException(
+              "A rejection reason must be at most $MAX_REJECT_REASON_LENGTH characters"
+          )
+      )
     }
     return answer(id, CompletionStatus.REJECTED, reason)
   }

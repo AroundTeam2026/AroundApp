@@ -240,13 +240,18 @@ class QuestRepositoryFirestoreTest {
   @Test
   fun createQuest_succeedsWhileOffline() = withTimeoutBlocking {
     db.disableNetwork().await()
-    val id = repository.createQuest(quest(title = "Offline")).getOrThrow()
-
-    // check it's already in local cache
-    assertEquals("Offline", repository.getQuest(id)?.title)
+    // The client is shared across tests, so it must come back online even if this test fails
+    val id =
+        try {
+          val id = repository.createQuest(quest(title = "Offline")).getOrThrow()
+          // check it's already in local cache
+          assertEquals("Offline", repository.getQuest(id)?.title)
+          id
+        } finally {
+          db.enableNetwork().await()
+        }
 
     // check it syncs to the server when back online
-    db.enableNetwork().await()
     assertEquals("Offline", getQuestFromServer(id)?.title)
   }
 
@@ -262,6 +267,96 @@ class QuestRepositoryFirestoreTest {
     terminated.terminate().await()
     val result2 = QuestRepositoryFirestore(terminated).createQuest(quest())
     assertTrue(result2.isFailure)
+  }
+
+  /** Bug: a field is dropped or mis-mapped on update, or the update never reaches the server. */
+  @Test
+  fun updateQuest_thenGetQuest_roundTripsEveryEditableField() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    val edited = fullQuest().copy(id = id)
+
+    repository.updateQuest(edited).getOrThrow()
+    val stored = getQuestFromServer(id)!!
+
+    // Timestamps are checked by updateQuest_keepsVenueIdAndCreatedAtAndSetsUpdatedAt.
+    assertEquals(edited.copy(createdAt = stored.createdAt, updatedAt = stored.updatedAt), stored)
+  }
+
+  /**
+   * Bug: the update overwrites createdAt or venueId with the caller's values (the rules would then
+   * reject it), or doesn't set updatedAt from the clock.
+   */
+  @Test
+  fun updateQuest_keepsVenueIdAndCreatedAtAndSetsUpdatedAt() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    val later = QuestRepositoryFirestore(db) { FIXED_NOW + 1_000L }
+
+    later
+        .updateQuest(
+            quest(id = id, title = "New title")
+                .copy(venueId = "another-venue", createdAt = 1L, updatedAt = 2L)
+        )
+        .getOrThrow()
+    val stored = getQuestFromServer(id)!!
+
+    assertEquals("New title", stored.title)
+    assertEquals(venueId, stored.venueId)
+    assertEquals(FIXED_NOW, stored.createdAt)
+    assertEquals(FIXED_NOW + 1_000L, stored.updatedAt)
+  }
+
+  /** Bug: a reward removed by the venue stays in the document, or is stored as null. */
+  @Test
+  fun updateQuest_deletesADroppedReward() = withTimeoutBlocking {
+    val id = repository.createQuest(fullQuest()).getOrThrow()
+
+    repository.updateQuest(fullQuest().copy(id = id, reward = null)).getOrThrow()
+    db.waitForPendingWrites().await()
+    val document = db.collection(QUESTS).document(id).get(Source.SERVER).await()
+
+    assertFalse("a dropped reward must be deleted", document.contains("reward"))
+  }
+
+  /** Bug: the update creates a quest for an id that has none, like set() would. */
+  @Test
+  fun updateQuest_doesNotCreateAMissingQuest() = withTimeoutBlocking {
+    val id = db.collection(QUESTS).document().id
+
+    assertTrue(repository.updateQuest(quest(id = id)).isSuccess)
+
+    assertNull(getQuestFromServer(id))
+  }
+
+  /**
+   * Bug: updateQuest awaits the server acknowledgement, so it hangs while the device is offline, or
+   * the offline update is lost instead of synced later.
+   */
+  @Test
+  fun updateQuest_succeedsWhileOffline() = withTimeoutBlocking {
+    // Offline before the create too: the memory cache keeps the document only while a write to it
+    // is pending, and an update can't be applied locally to a document the cache doesn't hold
+    db.disableNetwork().await()
+    // The client is shared across tests, so it must come back online even if this test fails
+    val id =
+        try {
+          val id = repository.createQuest(quest()).getOrThrow()
+          repository.updateQuest(quest(id = id, status = QuestStatus.ARCHIVED)).getOrThrow()
+          assertEquals(QuestStatus.ARCHIVED, repository.getQuest(id)?.status)
+          id
+        } finally {
+          db.enableNetwork().await()
+        }
+
+    assertEquals(QuestStatus.ARCHIVED, getQuestFromServer(id)?.status)
+  }
+
+  /**
+   * Bug: an exception escapes updateQuest instead of becoming a failure, here for an id Firestore
+   * can't use as a document id.
+   */
+  @Test
+  fun updateQuest_returnsFailureWhenTheWriteCannotBeIssued() = withTimeoutBlocking {
+    assertTrue(repository.updateQuest(quest(id = "")).isFailure)
   }
 
   /** Bug: getQuest throws for an id with no document instead of returning null as KDoc promises. */

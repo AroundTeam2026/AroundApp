@@ -22,10 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -39,8 +39,6 @@ private val BUTTON_HEIGHT = 44.dp
 private val BANNER_ELEVATION = 8.dp
 /** The outline of an error banner, from Figma (frame 4484:9165). */
 private val ERROR_BORDER_WIDTH = 1.dp
-/** Figma's shadow: warm brown at 16 %. */
-private val BANNER_SHADOW = Color(0x296B5947)
 
 /**
  * A card at the top of the map that says why the map shows less than usual, with a button that
@@ -72,8 +70,8 @@ internal fun MapBanner(
           .shadow(
               BANNER_ELEVATION,
               AroundCorners.LocationBanner,
-              ambientColor = BANNER_SHADOW,
-              spotColor = BANNER_SHADOW,
+              ambientColor = AroundColors.BannerShadow,
+              spotColor = AroundColors.BannerShadow,
           )
           .background(colors.surface, AroundCorners.LocationBanner)
   Row(

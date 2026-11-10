@@ -1,3 +1,4 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model
 
@@ -46,18 +47,25 @@ class FirestoreRulesTest {
   // ---- users ----
 
   @Test
-  fun userCreatesAndReadsOnlyTheirOwnProfile() {
+  fun signedInUsersReadProfilesButOnlyOwnersWriteThem() {
     val alice = newUser()
     val bob = newUser()
 
     signInAs(bob)
     assertSucceeds(user(bob).set(profile(role = null)))
     assertDenied(user(alice).set(profile(role = null)))
-    assertDenied(user(alice).get(Source.SERVER))
+    signInAs(alice)
+    assertSucceeds(user(alice).set(profile(role = null)))
+    signInAs(bob)
+    assertEquals(
+        DISPLAY_NAME,
+        assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"),
+    )
     assertEquals(
         DISPLAY_NAME,
         assertSucceeds(user(bob).get(Source.SERVER)).getString("displayName"),
     )
+    assertDenied(db.collection("users").get(Source.SERVER))
   }
 
   @Test
@@ -69,6 +77,40 @@ class FirestoreRulesTest {
     assertSucceeds(user(alice).update("role", "EXPLORER"))
     assertDenied(user(alice).update("role", "VENUE"))
     assertDenied(user(alice).update("role", null))
+  }
+
+  @Test
+  fun profileOwnerEditsNameAndPictureWithoutChangingTheRoleOrCreatedAt() {
+    val alice = newUser()
+    val bob = newUser()
+    signInAs(alice)
+    assertSucceeds(user(alice).set(profile(role = "EXPLORER")))
+
+    assertSucceeds(
+        user(alice)
+            .update(
+                "displayName",
+                "Grace",
+                "pictureUrl",
+                "gs://bucket/user-pictures/${alice.uid}/1",
+            )
+    )
+    assertDenied(user(alice).update("pictureUrl", 42))
+    assertDenied(user(alice).update("pictureUrl", "gs://bucket/user-pictures/${bob.uid}/1"))
+    assertDenied(user(alice).update("pictureUrl", "gs://bucket/user-pictures/${alice.uid}/1/extra"))
+    val picturePrefix = "gs://bucket/user-pictures/${alice.uid}/"
+    assertDenied(
+        user(alice).update("pictureUrl", picturePrefix + "x".repeat(2001 - picturePrefix.length))
+    )
+    assertSucceeds(user(alice).update("displayName", "x".repeat(100)))
+    assertDenied(user(alice).update("createdAt", Timestamp.now()))
+    assertDenied(user(bob).update("displayName", "Other"))
+    assertEquals(
+        "x".repeat(100),
+        assertSucceeds(user(alice).get(Source.SERVER)).getString("displayName"),
+    )
+    signOut()
+    assertDenied(user(alice).get(Source.SERVER))
   }
 
   @Test
@@ -90,6 +132,7 @@ class FirestoreRulesTest {
             "an unknown field" to valid + ("email" to alice.email),
             "no createdAt" to valid - "createdAt",
             "a displayName that is not a string" to valid + ("displayName" to 42),
+            "a displayName over the limit" to valid + ("displayName" to "x".repeat(101)),
         ),
     )
   }
@@ -199,9 +242,39 @@ class FirestoreRulesTest {
     assertDenied(quest.update("title", "x".repeat(61)), "an update that breaks the schema")
     assertDenied(quest.update("venueId", other.uid))
 
+    // Another venue's update is checked by
+    // onlyTheOwningVenueUpdatesAWholeQuestAndKeepsItsCreationTime
     signInAs(other)
-    assertDenied(quest.update("title", "Hijacked"))
     assertDenied(quest.delete())
+  }
+
+  @Test
+  fun onlyTheOwningVenueUpdatesAWholeQuestAndKeepsItsCreationTime() {
+    val venue = newUser(Role.VENUE)
+    val other = newUser(Role.VENUE)
+    signInAs(venue)
+    val quest = newQuest()
+    assertSucceeds(quest.set(questData(venue)))
+    // What QuestRepositoryFirestore.updateQuest sends: every editable field and updatedAt
+    val edit =
+        mapOf(
+            "radiusMeters" to 80,
+            "title" to "Find the hidden fox",
+            "description" to "A fox hides somewhere in the café.",
+            "requirements" to "Describe it.",
+            "proofType" to "TEXT",
+            "minPartySize" to 2,
+            "exactPartySize" to true,
+            "status" to "ARCHIVED",
+            "reward" to FieldValue.delete(),
+            "updatedAt" to Timestamp.now(),
+        )
+
+    assertSucceeds(quest.update(edit))
+    assertDenied(quest.update(edit + ("createdAt" to Timestamp.now())), "a changed createdAt")
+
+    signInAs(other)
+    assertDenied(quest.update(edit), "another venue")
   }
 
   @Test

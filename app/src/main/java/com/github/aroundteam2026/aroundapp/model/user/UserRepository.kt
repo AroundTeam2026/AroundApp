@@ -29,4 +29,11 @@ interface UserRepository {
    * the user already has a role.
    */
   suspend fun setRole(uid: String, role: Role): Result<Unit>
+
+  /**
+   * Updates only the profile's name and picture; a null [pictureUrl] removes the picture. Fails
+   * with [IllegalArgumentException] for a missing user. The Firestore implementation requires a
+   * connection to complete its transaction.
+   */
+  suspend fun updateProfile(uid: String, displayName: String, pictureUrl: String?): Result<Unit>
 }
