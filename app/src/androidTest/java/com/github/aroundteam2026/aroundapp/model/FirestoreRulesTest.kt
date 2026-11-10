@@ -1,5 +1,6 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -494,27 +495,41 @@ class FirestoreRulesTest {
     )
   }
 
+  /**
+   * An explorer who was given a party code reads the party's reservation, which they haven't
+   * joined, to see its quest, status and joinedCount before joining. Nobody lists reservations but
+   * their venue, so an id or a code is needed to read one.
+   */
   @Test
-  fun reservationIsReadableByItsVenueAndJoinedMembersOnly() {
+  fun reservationIsReadableBySignedInUsersAndListedByItsVenueOnly() {
     val venue = newUser(Role.VENUE)
     val explorer = newUser(Role.EXPLORER)
     val reservation = pendingReservationOf(explorer, venue)
     val friend = newUser(Role.EXPLORER)
     assertSucceeds(join(reservation.id, friend))
     val outsider = newUser(Role.EXPLORER)
+    val ofTheVenue = db.collection("reservations").whereEqualTo("venueId", venue.uid)
 
     signInAs(venue)
     assertSucceeds(reservation.get(Source.SERVER))
+    assertEquals(1, assertSucceeds(ofTheVenue.get(Source.SERVER)).size())
     signInAs(explorer)
     assertSucceeds(reservation.get(Source.SERVER))
     signInAs(friend)
     assertSucceeds(reservation.get(Source.SERVER))
     signInAs(outsider)
-    assertDenied(reservation.get(Source.SERVER), "a non-member")
+    val seen = assertSucceeds(reservation.get(Source.SERVER))
+    assertEquals("PENDING", seen.getString("status"))
+    assertEquals(2L, seen.getLong("joinedCount"))
+    assertDenied(ofTheVenue.get(Source.SERVER), "another explorer listing a venue's reservations")
+    assertDenied(db.collection("reservations").get(Source.SERVER), "listing every reservation")
 
     signInAs(friend)
     assertSucceeds(withdraw(reservation.id, friend))
-    assertDenied(reservation.get(Source.SERVER), "a withdrawn member")
+    assertSucceeds(reservation.get(Source.SERVER))
+    assertDenied(ofTheVenue.get(Source.SERVER), "a withdrawn member listing")
+    signOut()
+    assertDenied(reservation.get(Source.SERVER), "a signed-out user")
   }
 
   /**
