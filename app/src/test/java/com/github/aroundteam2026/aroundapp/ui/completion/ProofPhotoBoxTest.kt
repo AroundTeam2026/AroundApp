@@ -138,6 +138,7 @@ class ProofPhotoBoxTest {
             ProofPhotoError.NO_CAMERA to R.string.proof_photo_no_camera,
             ProofPhotoError.UNREADABLE to R.string.proof_photo_unreadable,
             ProofPhotoError.TOO_BIG to R.string.proof_photo_too_big,
+            ProofPhotoError.NO_SETTINGS to R.string.proof_photo_no_settings,
         )
         .forEach { (error, message) ->
           shown = error
