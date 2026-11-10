@@ -369,13 +369,17 @@ service cloud.firestore {
     // status changes along an allowed transition: the venue answers it, approving only a party of
     // the size its quest asks for, and a joined member of the party can cancel it until they send
     // their proof, whatever its status. joinedCount only moves with a membership joining or
-    // withdrawing in the same batch, and never above the quest's party capacity. Anyone signed in
-    // may get a reservation they know the id of, as an explorer given a party code does to see the
-    // quest, status and joinedCount of the party before joining it, and to find that an id has no
-    // reservation: the app listens to a reservation it just created, offline maybe, before the
-    // server has it. Only the reservation's venue lists them.
+    // withdrawing in the same batch, and never above the quest's party capacity. An explorer may get
+    // a reservation they know the id of, as one given a party code does to see the quest, status and
+    // joinedCount of the party before joining it. A venue gets its own reservations. Anyone signed in
+    // may find that an id has no reservation: the app listens to a reservation it just created,
+    // offline maybe, before the server has it, and a venue answering an unknown id gets "missing".
+    // Only the reservation's venue lists them.
     match /reservations/{reservationId} {
-      allow get: if signedIn();
+      allow get: if signedIn()
+          && (resource == null
+              || request.auth.uid == resource.data.venueId
+              || hasRole('EXPLORER'));
       allow list: if signedIn() && request.auth.uid == resource.data.venueId;
       allow create: if signedIn()
           && hasRole('EXPLORER')
