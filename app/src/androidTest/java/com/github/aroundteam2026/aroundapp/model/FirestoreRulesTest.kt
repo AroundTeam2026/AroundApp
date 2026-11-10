@@ -625,6 +625,35 @@ class FirestoreRulesTest {
     assertDenied(reservation.update("status", "APPROVED"), "a party below the exact size")
   }
 
+  /** An at-least size above the cap is never reached either, since the party stops at the cap. */
+  @Test
+  fun anAtLeastSizeAboveTheCapIsNeverApproved() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue, minPartySize = MAX_PARTY_SIZE + 1)
+    joinAll(reservation, *Array(MAX_PARTY_SIZE - 1) { newUser(Role.EXPLORER) })
+    val late = newUser(Role.EXPLORER)
+
+    signInAs(late)
+    assertDenied(join(reservation.id, late), "an explorer joining a party at the cap")
+    signInAs(venue)
+    assertDenied(reservation.update("status", "APPROVED"), "a party below the quest's size")
+  }
+
+  /** Quests written before exactPartySize are read as at least, as the rules promise. */
+  @Test
+  fun aQuestWithoutExactPartySizeIsReadAsAtLeast() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue, minPartySize = 2, exactPartySize = null)
+
+    signInAs(venue)
+    assertDenied(reservation.update("status", "APPROVED"), "a party below the quest's size")
+    joinAll(reservation, newUser(Role.EXPLORER), newUser(Role.EXPLORER))
+    signInAs(venue)
+    assertSucceeds(reservation.update("status", "APPROVED"))
+  }
+
   @Test
   fun joinedMemberCancelsButNeverAnswers() {
     val venue = newUser(Role.VENUE)
@@ -949,6 +978,7 @@ class FirestoreRulesTest {
     )
     val stranger = newUser(Role.EXPLORER)
 
+    signInAs(stranger)
     assertEquals(
         reservation.id,
         assertSucceeds(partyCodeDocument(code).get(Source.SERVER)).getString("reservationId"),
@@ -1413,15 +1443,16 @@ class FirestoreRulesTest {
 
   /**
    * Has [venue] create a quest with [status] and [proofType], for a party of at least
-   * [minPartySize], or exactly that many with [exactPartySize], and returns its id. Leaves [venue]
-   * signed in.
+   * [minPartySize], or exactly that many with [exactPartySize], and returns its id. A null
+   * [exactPartySize] leaves the field out, as on quests written before it. Leaves [venue] signed
+   * in.
    */
   private fun questOf(
       venue: TestUser,
       status: String = "ACTIVE",
       proofType: String = "PHOTO",
       minPartySize: Int = 1,
-      exactPartySize: Boolean = false,
+      exactPartySize: Boolean? = false,
   ): String {
     signInAs(venue)
     val quest = newQuest()
@@ -1431,8 +1462,8 @@ class FirestoreRulesTest {
                 "status" to status,
                 "proofType" to proofType,
                 "minPartySize" to minPartySize,
-                "exactPartySize" to exactPartySize,
-            )
+            ) +
+            listOfNotNull(exactPartySize?.let { "exactPartySize" to it })
     assertSucceeds(quest.set(data))
     return quest.id
   }
@@ -1509,7 +1540,7 @@ class FirestoreRulesTest {
       venue: TestUser,
       proofType: String = "PHOTO",
       minPartySize: Int = 1,
-      exactPartySize: Boolean = false,
+      exactPartySize: Boolean? = false,
   ): DocumentReference {
     val quest =
         questOf(
