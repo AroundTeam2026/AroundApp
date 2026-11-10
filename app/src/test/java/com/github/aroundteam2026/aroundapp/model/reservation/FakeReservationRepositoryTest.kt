@@ -3,9 +3,12 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
+import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
+import com.github.aroundteam2026.aroundapp.model.party.isPartyCode
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.CompletableDeferred
@@ -137,6 +140,86 @@ class FakeReservationRepositoryTest {
 
         assertEquals(failure, repository.createReservation(reservation(), "u1").exceptionOrNull())
         assertTrue(repository.observeForVenue("v1").first().isEmpty())
+      }
+
+  @Test
+  fun createReservation_givesEachReservationItsOwnPartyCode() =
+      runBlocking<Unit> {
+        repository.createReservation(reservation(), "u1").getOrThrow()
+        repository.createReservation(reservation(), "u1").getOrThrow()
+
+        val codes = repository.observeForVenue("v1").first().map { it.partyCode }
+        assertTrue("Not party codes: $codes", codes.all { it != null && isPartyCode(it) })
+        assertEquals(codes.size, codes.toSet().size)
+      }
+
+  @Test
+  fun createReservation_withATakenPartyCode_drawsAnother() =
+      runBlocking<Unit> {
+        val drawn = mutableListOf(CODE, CODE, OTHER_CODE).iterator()
+        val repository = FakeReservationRepository(now = { FIXED_NOW }, newCode = drawn::next)
+        val first = repository.createReservation(reservation(), "u1").getOrThrow()
+
+        val second = repository.createReservation(reservation(), "u1").getOrThrow()
+
+        assertEquals(first, repository.findReservationIdByCode(CODE).getOrThrow())
+        assertEquals(second, repository.findReservationIdByCode(OTHER_CODE).getOrThrow())
+      }
+
+  @Test
+  fun createReservation_whenEveryPartyCodeIsTaken_failsAfterTheLastAttemptAndStoresNothing() =
+      runBlocking<Unit> {
+        var draws = 0
+        val repository =
+            FakeReservationRepository(
+                now = { FIXED_NOW },
+                newCode = {
+                  draws++
+                  CODE
+                },
+            )
+        repository.createReservation(reservation(), "u1").getOrThrow()
+        draws = 0
+
+        val result = repository.createReservation(reservation(), "u1")
+
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        assertEquals(MAX_PARTY_CODE_ATTEMPTS, draws)
+        assertEquals(1, repository.observeForVenue("v1").first().size)
+      }
+
+  @Test
+  fun findReservationIdByCode_findsACodeTypedInLowerCaseWithSpaces() =
+      runBlocking<Unit> {
+        val repository = FakeReservationRepository(now = { FIXED_NOW }, newCode = { CODE })
+        val id = repository.createReservation(reservation(), "u1").getOrThrow()
+
+        assertEquals(id, repository.findReservationIdByCode(TYPED_CODE).getOrThrow())
+      }
+
+  @Test
+  fun findReservationIdByCode_forAnUnknownOrMalformedCode_failsWithPartyCodeNotFound() =
+      runBlocking<Unit> {
+        val repository = FakeReservationRepository(now = { FIXED_NOW }, newCode = { CODE })
+        repository.createReservation(reservation(), "u1").getOrThrow()
+
+        // Each typed code and the code the failure reports: normalized when it is a code
+        val reported =
+            mapOf(OTHER_CODE.lowercase() to OTHER_CODE, NOT_A_PARTY_CODE to NOT_A_PARTY_CODE)
+        for ((typed, code) in reported) {
+          val error = repository.findReservationIdByCode(typed).exceptionOrNull()
+          assertTrue("$typed: $error", error is PartyCodeNotFoundException)
+          assertEquals(code, (error as PartyCodeNotFoundException).code)
+        }
+      }
+
+  @Test
+  fun findReservationIdByCode_whenFailureIsForced_returnsIt() =
+      runBlocking<Unit> {
+        val failure = IllegalStateException("offline")
+        repository.forcedFailure = failure
+
+        assertEquals(failure, repository.findReservationIdByCode(CODE).exceptionOrNull())
       }
 
   @Test
@@ -396,6 +479,19 @@ class FakeReservationRepositoryTest {
   private companion object {
     const val PARTY_SIZE = 3
     const val FIXED_NOW = 42_000L
+
+    /** A party code, as stored. */
+    const val CODE = "7KQM42"
+
+    /** [CODE] as an explorer may type it: in lower case and in two groups. */
+    const val TYPED_CODE = "7kq m42"
+
+    /** Another party code than [CODE]. */
+    const val OTHER_CODE = "ABC234"
+
+    /** Not a party code: too short, and with characters that are easy to mistake. */
+    const val NOT_A_PARTY_CODE = "0O1IL"
+
     const val TIMEOUT_MS = 5_000L
   }
 }

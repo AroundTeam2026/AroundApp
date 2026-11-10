@@ -2,11 +2,16 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.party.EVERY_PARTY_CODE_TAKEN
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
+import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
+import com.github.aroundteam2026.aroundapp.model.party.newPartyCode
+import com.github.aroundteam2026.aroundapp.model.party.normalizePartyCode
 import com.github.aroundteam2026.aroundapp.model.party.partyCapacity
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,34 +43,42 @@ import kotlinx.coroutines.flow.update
  *   in [quests], or [MAX_PARTY_SIZE] without them.
  * @param quests Where the quests of the reservations are read, to approve only a party of the size
  *   its quest asks for, as the rules do. Without it, approving doesn't check the party's size.
+ * @param newCode Draws the party code of a new reservation. Random by default; pass a taken code to
+ *   cause a collision.
  */
 class FakeReservationRepository(
     private val now: () -> Long = System::currentTimeMillis,
     party: PartyRepository? = null,
     private val quests: QuestRepository? = null,
+    private val newCode: () -> String = { newPartyCode() },
 ) : ReservationRepository {
   /** Where the parties of the reservations are kept: the one given, or one of their own. */
   val party: PartyRepository = party ?: FakePartyRepository(capacityOf = ::capacityOf, now = now)
 
   /**
    * Simulates a backend error (e.g. no network or a rejected write) so callers' error paths can be
-   * tested. While non-null, [createReservation] and [updateStatus] return
+   * tested. While non-null, [createReservation], [findReservationIdByCode] and [updateStatus] return
    * `Result.failure(forcedFailure)` and change nothing, not even the party. Set it back to null to
-   * make writes succeed again.
+   * make them succeed again.
    */
   var forcedFailure: Throwable? = null
 
   /** All stored reservations, keyed by id. */
   private val reservations = MutableStateFlow<Map<String, Reservation>>(emptyMap())
 
+  /** The id of the reservation of each party code, like the `party_codes` collection. */
+  private val codes = mutableMapOf<String, String>()
+
   /** Number used for the next generated id. */
   private var nextId = 1
 
   /**
-   * Joins [creatorUid] to the party of a new id in [party], then stores a copy of [reservation]
-   * with that id, [now] as its creation time and [ReservationStatus.PENDING] as its status, and
-   * returns the id. Returns [forcedFailure] instead, storing nothing, if it is set, and the failure
-   * of [party] if joining fails, without storing the reservation.
+   * Draws a party code no stored reservation has, drawing again while [newCode] returns a taken one,
+   * at most [MAX_PARTY_CODE_ATTEMPTS] codes in all. Then joins [creatorUid] to the party of a new id
+   * in [party], stores a copy of [reservation] with that id, the code, [now] as its creation time
+   * and [ReservationStatus.PENDING] as its status, and returns the id. Returns [forcedFailure]
+   * instead, storing nothing, if it is set, an [IllegalStateException] if every code drawn was
+   * taken, and the failure of [party] if joining fails, without storing the reservation.
    */
   override suspend fun createReservation(
       reservation: Reservation,
@@ -74,13 +87,39 @@ class FakeReservationRepository(
     forcedFailure?.let {
       return Result.failure(it)
     }
+    val code =
+        generateSequence { newCode() }.take(MAX_PARTY_CODE_ATTEMPTS).firstOrNull { it !in codes }
+            ?: return Result.failure(IllegalStateException(EVERY_PARTY_CODE_TAKEN))
     val id = "reservation-${nextId++}"
     party.join(id, creatorUid).onFailure {
       return Result.failure(it)
     }
-    val stored = reservation.copy(id = id, status = ReservationStatus.PENDING, createdAt = now())
+    val stored =
+        reservation.copy(
+            id = id,
+            status = ReservationStatus.PENDING,
+            createdAt = now(),
+            partyCode = code,
+        )
+    codes[code] = id
     reservations.update { it + (id to stored) }
     return Result.success(id)
+  }
+
+  /**
+   * Returns the id of the reservation with the party code [code], typed in any case and with
+   * spaces, or a [PartyCodeNotFoundException] holding the normalized code, or [code] if it is not a
+   * party code, if none has it. Returns [forcedFailure] if it is set.
+   */
+  override suspend fun findReservationIdByCode(code: String): Result<String> {
+    forcedFailure?.let {
+      return Result.failure(it)
+    }
+    val normalized = normalizePartyCode(code)
+    val id = normalized?.let { codes[it] }
+    // The normalized code when there is one, as the Firestore repository reports it
+    return id?.let { Result.success(it) }
+        ?: Result.failure(PartyCodeNotFoundException(normalized ?: code))
   }
 
   /** Emits every stored reservation of [venueId], and again whenever that list changes. */

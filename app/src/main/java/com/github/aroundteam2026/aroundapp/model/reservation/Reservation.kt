@@ -15,6 +15,8 @@ package com.github.aroundteam2026.aroundapp.model.reservation
  * @property explorerName Display name of the explorer who made the reservation, copied from their
  *   profile when it was made, so the venue can see who reserved without reading profiles it may not
  *   read. It does not follow later renames. Empty for reservations made before it was stored.
+ * @property partyCode The code its creator shares so friends can join the party, assigned by the
+ *   repository on creation and never changed. Null for reservations made before party codes.
  */
 data class Reservation(
     val id: String,
@@ -24,6 +26,7 @@ data class Reservation(
     val status: ReservationStatus,
     val createdAt: Long,
     val explorerName: String = "",
+    val partyCode: String? = null,
 )
 
 /**
@@ -35,7 +38,7 @@ data class Reservation(
  * not be treated as expired.
  *
  * Pass it to [ReservationRepository.createReservation] with the explorer's uid, which assigns the
- * id and creation time; the ones here are placeholders.
+ * id, creation time and party code; the ones here are placeholders.
  */
 fun newPendingReservation(
     questId: String,
