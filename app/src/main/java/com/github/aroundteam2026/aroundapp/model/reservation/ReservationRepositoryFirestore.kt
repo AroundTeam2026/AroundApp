@@ -121,7 +121,7 @@ class ReservationRepositoryFirestore(
    * Fails with [NoSuchElementException] if the reservation is missing or malformed, with
    * [IllegalStateException] if [canTransition] forbids the change, and with the Firestore exception
    * if the rules refuse it, which they do for everyone but the venue and, to cancel, a joined
-   * member of the party.
+   * member of the party, and when approving a party without the size its quest asks for.
    */
   override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> =
       try {

@@ -13,8 +13,8 @@ interface PartyRepository {
    * sets `joinedAt` and `updatedAt`.
    *
    * The security rules only let an explorer join as themselves, a pending reservation, once, while
-   * it has fewer than [MAX_PARTY_SIZE] joined members: the Firestore implementation fails when the
-   * server refuses.
+   * it has fewer joined members than the [partyCapacity] of its quest: the Firestore implementation
+   * fails when the server refuses.
    *
    * @return success, or a failure if [uid] already has a membership for this reservation, whatever
    *   its status, if the party is full, or if the write failed.
@@ -25,8 +25,13 @@ interface PartyRepository {
    * Moves [uid]'s membership in the party of [reservationId] to [PartyMemberStatus.WITHDRAWN] and
    * sets its `updatedAt`. The membership is kept.
    *
+   * The security rules only let an explorer withdraw themselves, while the reservation is pending
+   * or approved and before they sent their proof. The creator can't withdraw and cancels the
+   * reservation instead. Withdrawing can take an approved party below the size its quest asks for
+   * ([meetsPartySize]); the reservation stays approved.
+   *
    * @return success, or a failure if there is no such membership, if it is already withdrawn
-   *   ([IllegalStateException]), or if the write failed.
+   *   ([IllegalStateException]), if the rules refuse the withdrawal, or if the write failed.
    */
   suspend fun withdraw(reservationId: String, uid: String): Result<Unit>
 

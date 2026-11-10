@@ -21,8 +21,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * leaves them out, and [withdraw] treats them as missing.
  *
  * The security rules let an explorer join a pending reservation as themselves while it has fewer
- * than [MAX_PARTY_SIZE] joined members, and only the member withdraw. Joining and withdrawing move
- * the reservation's joined count in the same write, which is how the rules cap the party.
+ * joined members than the [partyCapacity] of its quest, and only the member withdraw, as
+ * [PartyRepository.withdraw] says. Joining and withdrawing move the reservation's joined count in
+ * the same write, which is how the rules cap the party.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [join] waits for the server to confirm the write, in
@@ -81,8 +82,9 @@ class PartyRepositoryFirestore(
    *
    * Fails with [NoSuchElementException] if the membership is malformed, with
    * [IllegalStateException] if it is already withdrawn, and with the Firestore exception if the
-   * rules refuse it. A missing membership is refused too: the read rule cannot evaluate a missing
-   * document, so the server answers `PERMISSION_DENIED`.
+   * rules refuse it, as for the creator or a member who sent their proof. A missing membership is
+   * refused too: the read rule cannot evaluate a missing document, so the server answers
+   * `PERMISSION_DENIED`.
    */
   override suspend fun withdraw(reservationId: String, uid: String): Result<Unit> =
       try {
