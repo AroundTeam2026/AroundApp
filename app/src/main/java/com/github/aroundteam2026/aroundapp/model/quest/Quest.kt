@@ -10,8 +10,6 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  * sets for them are overwritten. An update also keeps the stored [Quest.venueId].
  *
  * @property venueId Id of the owning venue, equal to the venue owner's uid.
- * @property location Where explorers go for this quest, or null to use the venue's location, which
- *   then also moves with the venue. Set for a quest that takes place away from the venue itself.
  * @property radiusMeters Distance from the quest's location (its own, or else the venue's) within
  *   which a visit counts, between [QuestLimits.MIN_RADIUS_METERS] and
  *   [QuestLimits.MAX_RADIUS_METERS].
@@ -24,6 +22,8 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  * @property minPartySize Smallest party allowed to take the quest; defaults to a solo visit.
  * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
  *   least that many; defaults to at least.
+ * @property location Where explorers go for this quest, or null to use the venue's location, which
+ *   then also moves with the venue. Set for a quest that takes place away from the venue itself.
  * @property reward What explorers get on completion, or null if there is none.
  * @property status Lifecycle state; only [QuestStatus.ACTIVE] quests are visible to explorers.
  * @property createdAt Creation time, in epoch milliseconds. Set by [QuestRepository.createQuest].
@@ -33,7 +33,6 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 data class Quest(
     val id: String,
     val venueId: String,
-    val location: Location? = null,
     val radiusMeters: Int,
     val title: String,
     val description: String,
@@ -41,6 +40,7 @@ data class Quest(
     val proofType: ProofType,
     val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
     val exactPartySize: Boolean = false,
+    val location: Location? = null,
     val reward: Reward?,
     val status: QuestStatus,
     val createdAt: Long,

@@ -297,7 +297,8 @@ class FirestoreRulesTest {
             "an unknown status" to valid + ("status" to "LIVE"),
             "a copied venueName" to valid + ("venueName" to "Café"),
             "a location that is not a GeoPoint" to valid + ("location" to "Lausanne"),
-            "a {lat, lng} map as location" to valid + ("location" to mapOf("lat" to 46.52)),
+            "a {lat, lng} map as location" to
+                valid + ("location" to mapOf("lat" to 46.52, "lng" to 6.57)),
             "an unknown field" to valid + ("rating" to 5),
         ),
     )

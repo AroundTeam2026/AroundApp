@@ -5,11 +5,12 @@ package com.github.aroundteam2026.aroundapp.model.quest
 import android.util.Log
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.required
+import com.github.aroundteam2026.aroundapp.model.toGeoPoint
+import com.github.aroundteam2026.aroundapp.model.toLocation
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Query
 import java.util.Date
 import kotlinx.coroutines.channels.awaitClose
@@ -68,7 +69,8 @@ class QuestRepositoryFirestore(
 
   /**
    * Sends only the editable fields and the new `updatedAt`, never `venueId` or `createdAt`, so the
-   * stored ones are kept. A dropped location or reward is deleted from the document. Like
+   * stored ones are kept. A dropped location or reward is deleted from the document, so a null
+   * location moves the quest back to its venue: callers must pass the stored location through. Like
    * [createQuest], it doesn't wait for the server: a later rejection (e.g. no quest with this id)
    * is only logged, and exceptions thrown while issuing the write are returned as a failure.
    */
@@ -78,7 +80,7 @@ class QuestRepositoryFirestore(
         val fields =
             quest.editableFields() +
                 mapOf(
-                    LOCATION to (quest.location?.toFirestore() ?: FieldValue.delete()),
+                    LOCATION to (quest.location?.toGeoPoint() ?: FieldValue.delete()),
                     REWARD to (quest.reward?.toFirestore() ?: FieldValue.delete()),
                     UPDATED_AT to Timestamp(Date(now())),
                 )
@@ -109,7 +111,7 @@ class QuestRepositoryFirestore(
   private fun Quest.toFirestore(time: Timestamp): Map<String, Any> = buildMap {
     put(VENUE_ID, venueId)
     putAll(editableFields())
-    location?.let { put(LOCATION, it.toFirestore()) }
+    location?.let { put(LOCATION, it.toGeoPoint()) }
     reward?.let { put(REWARD, it.toFirestore()) }
     put(CREATED_AT, time)
     put(UPDATED_AT, time)
@@ -129,8 +131,6 @@ class QuestRepositoryFirestore(
     put(EXACT_PARTY_SIZE, exactPartySize)
     put(STATUS, status.name)
   }
-
-  private fun Location.toFirestore() = GeoPoint(lat, lng)
 
   private fun Reward.toFirestore(): Map<String, Any> = buildMap {
     when (val reward = this@toFirestore) {
@@ -162,7 +162,7 @@ class QuestRepositoryFirestore(
           venueId = required(VENUE_ID) { getString(it) },
           // Absent means the venue's location; a value that isn't a GeoPoint throws, so the quest
           // is skipped rather than shown at the venue
-          location = getGeoPoint(LOCATION)?.let { Location(it.latitude, it.longitude) },
+          location = getGeoPoint(LOCATION)?.toLocation(),
           radiusMeters = required(RADIUS_METERS) { getLong(it) }.toInt(),
           title = required(TITLE) { getString(it) },
           description = required(DESCRIPTION) { getString(it) },
