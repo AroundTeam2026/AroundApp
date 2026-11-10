@@ -43,6 +43,18 @@ interface ReservationRepository {
   suspend fun findReservationIdByCode(code: String): Result<String>
 
   /**
+   * Reads the reservation with [reservationId] and its number of joined members, as an explorer who
+   * hasn't joined its party sees it. Asks the backend, never a cache, so a party is read only
+   * online. The security rules let an explorer read any reservation whose id they know, and a venue
+   * its own.
+   *
+   * @param reservationId id of the reservation, e.g. from [findReservationIdByCode].
+   * @return the [PartyPreview], or a [NoSuchElementException] if there is no such reservation or it
+   *   can't be mapped, or another failure if the backend couldn't be asked, e.g. offline.
+   */
+  suspend fun getPartyPreview(reservationId: String): Result<PartyPreview>
+
+  /**
    * Observes the reservations made for one venue's quests. Emits the current list on collection,
    * then again whenever one is added or changes.
    *

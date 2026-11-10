@@ -108,7 +108,7 @@ A short code that leads to one reservation, so its creator can give it to friend
 
 A code is created in one batch with its reservation and never changes. Writing a code that is already taken is refused, so codes stay unique. When the server refuses a new reservation and its code's document exists, the repository draws another code and writes the batch again under a new id, at most 5 codes in all (`MAX_PARTY_CODE_ATTEMPTS`). A reservation created offline can't be retried: if its code turns out to be taken once it is sent, the server refuses it and it is lost, which with about 887 million codes is rare.
 
-The app finds a reservation by its code (`findReservationIdByCode`) in capitals and without spaces, so `7kq m42` finds `7KQM42`, and only from the server: offline, the lookup fails rather than reporting an unknown code.
+The app finds a reservation by its code (`findReservationIdByCode`) in capitals and without spaces, so `7kq m42` finds `7KQM42`, and only from the server: offline, the lookup fails rather than reporting an unknown code. Before joining, the app reads the reservation by that id (`getPartyPreview`), also only from the server, with its `joinedCount`: an explorer outside the party can't read the memberships.
 
 ### `completions/{reservationId}_{explorerUid}`
 

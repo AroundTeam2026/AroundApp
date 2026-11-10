@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
 import com.github.aroundteam2026.aroundapp.model.party.newPartyCode
 import com.github.aroundteam2026.aroundapp.model.party.normalizePartyCode
+import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
 import com.github.aroundteam2026.aroundapp.model.party.partyCapacity
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,9 +58,9 @@ class FakeReservationRepository(
 
   /**
    * Simulates a backend error (e.g. no network or a rejected write) so callers' error paths can be
-   * tested. While non-null, [createReservation], [findReservationIdByCode] and [updateStatus] return
-   * `Result.failure(forcedFailure)` and change nothing, not even the party. Set it back to null to
-   * make them succeed again.
+   * tested. While non-null, [createReservation], [findReservationIdByCode], [getPartyPreview] and
+   * [updateStatus] return `Result.failure(forcedFailure)` and change nothing, not even the party.
+   * Set it back to null to make them succeed again.
    */
   var forcedFailure: Throwable? = null
 
@@ -122,6 +123,24 @@ class FakeReservationRepository(
         ?: Result.failure(PartyCodeNotFoundException(normalized ?: code))
   }
 
+  /**
+   * Returns the stored reservation with [reservationId] and how many explorers are joined in its
+   * party, or a [NoSuchElementException] if there is none. Returns [forcedFailure] if it is set.
+   */
+  override suspend fun getPartyPreview(reservationId: String): Result<PartyPreview> {
+    forcedFailure?.let {
+      return Result.failure(it)
+    }
+    val reservation =
+        reservations.value[reservationId]
+            ?: return Result.failure(NoSuchElementException("No reservation with id $reservationId"))
+    return Result.success(PartyPreview(reservation, joinedCount(reservationId)))
+  }
+
+  /** How many explorers are joined in the party of [reservationId]. */
+  private suspend fun joinedCount(reservationId: String): Int =
+      party.observeJoinedCounts(listOf(reservationId)).first().getValue(reservationId)
+
   /** Emits every stored reservation of [venueId], and again whenever that list changes. */
   override fun observeForVenue(venueId: String): Flow<List<Reservation>> =
       reservations.map { all -> all.values.filter { it.venueId == venueId } }.distinctUntilChanged()
@@ -174,8 +193,7 @@ class FakeReservationRepository(
       val quest =
           quests.getQuest(current.questId)
               ?: return Result.failure(NoSuchElementException("No quest ${current.questId}"))
-      val joined =
-          party.observeMembers(id).first().count { it.status == PartyMemberStatus.JOINED }
+      val joined = joinedCount(id)
       if (!quest.meetsPartySize(joined)) {
         return Result.failure(
             IllegalStateException("A party of $joined doesn't have the size of quest ${quest.id}")
