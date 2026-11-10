@@ -120,8 +120,9 @@ data class CreateQuestUiState(
     val questUnavailable: Boolean = false,
 ) {
   /**
-   * This form filled in with [quest], its fields untouched, so it opens without errors. The reward
-   * expiry is read in [zone], and is flagged if it is before [today].
+   * This form filled in with [quest], its fields untouched, so it opens without errors. The quest
+   * stays where it is: at the venue if it has no location of its own. The reward expiry is read in
+   * [zone], and is flagged if it is before [today].
    */
   fun filledWith(quest: Quest, zone: ZoneId, today: LocalDate): CreateQuestUiState {
     // Clamped like every other radius, so a quest saved under other limits is saved within these
@@ -134,6 +135,7 @@ data class CreateQuestUiState(
         proofType = quest.proofType,
         radiusMeters = radius,
         customRadius = !RadiusPreset.isPreset(radius),
+        questLocation = quest.location,
         minPartySize = quest.minPartySize,
         exactPartySize = quest.exactPartySize,
         reward = RewardFormState.fromReward(quest.reward, zone, today),

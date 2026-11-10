@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
@@ -132,6 +133,34 @@ class EditQuestViewModelTest {
     assertEquals(QuestStatus.ARCHIVED, saved.status)
     // Updated in place, not created as a new quest
     assertEquals(listOf(QUEST_ID), quests.observeQuestsByVenue(VENUE_ID).first().map { it.id })
+  }
+
+  // Saving must not move a quest placed away from the venue back to it
+  @Test
+  fun savingKeepsWhereTheQuestIs() = runTest {
+    val elsewhere = Location(46.5191, 6.5668)
+    val placed = quest.copy(location = elsewhere)
+    val scripted = ScriptedQuestRepository(quest = { placed })
+    open(scripted)
+    assertEquals(elsewhere, state.questLocation)
+
+    viewModel.updateTitle("Find the golden fox")
+    viewModel.submit()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(elsewhere, scripted.updated.single().location)
+  }
+
+  @Test
+  fun aQuestMovedWhileEditedIsSavedAtItsNewPlace() = runTest {
+    val moved = Location(46.5300, 6.6400)
+    open()
+    viewModel.placeElsewhere()
+    viewModel.moveQuest(moved)
+    viewModel.submit()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(moved, quests.getQuest(QUEST_ID)!!.location)
   }
 
   @Test
