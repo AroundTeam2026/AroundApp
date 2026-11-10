@@ -106,7 +106,9 @@ class RegistrationFlowTest {
               AroundApp(
                   explorerUid = "explorer",
                   onSignOut = {},
-                  overview = { OverviewOnFakes(it) },
+                  overview = { onOpenQuest, onJoinParty ->
+                    OverviewOnFakes(onOpenQuest, onJoinParty)
+                  },
               )
             },
             venueEntry = { Text("Venue entry") },

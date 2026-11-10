@@ -249,6 +249,7 @@ object C {
     const val OVERVIEW_ROW_SLOT = "overview_row_slot"
     const val OVERVIEW_ROW_PARTY = "overview_row_party"
     const val OVERVIEW_ROW_STATUS = "overview_row_status"
+    const val OVERVIEW_JOIN_PARTY = "overview_join_party"
     const val CANCEL_RESERVATION = "cancel_reservation"
     const val CANCEL_RESERVATION_FAILED = "cancel_reservation_failed"
     const val CANCEL_RESERVATION_DIALOG = "cancel_reservation_dialog"
@@ -281,6 +282,14 @@ object C {
     const val COMPLETION_SUBMIT = "completion_submit"
     const val COMPLETION_ANSWER = "completion_answer"
     const val COMPLETION_SAVE_ERROR = "completion_save_error"
+
+    // Join a party screen
+    const val JOIN_PARTY_SCREEN = "join_party_screen"
+    const val JOIN_PARTY_CODE = "join_party_code"
+    const val JOIN_PARTY_LOOKING = "join_party_looking"
+    const val JOIN_PARTY_ERROR = "join_party_error"
+    const val JOIN_PARTY_FOUND = "join_party_found"
+    const val JOIN_PARTY_SUBMIT = "join_party_submit"
 
     // Proof photo picker
     const val PROOF_PHOTO = "proof_photo"
