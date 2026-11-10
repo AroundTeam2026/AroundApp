@@ -31,6 +31,7 @@ class VenueQuestsScreenTest {
   @get:Rule val compose = createComposeRule()
   private var formsOpened = 0
   private val questsEdited = mutableListOf<String>()
+  private val archiveCalls = mutableListOf<Pair<String, Boolean>>()
 
   private fun show(state: VenueQuestsUiState) {
     compose.setContent {
@@ -40,6 +41,7 @@ class VenueQuestsScreenTest {
             onCreateQuest = { formsOpened++ },
             onRetry = {},
             onEditQuest = { questsEdited += it },
+            onSetArchived = { quest, archived -> archiveCalls += quest.id to archived },
         )
       }
     }
@@ -96,6 +98,49 @@ class VenueQuestsScreenTest {
             ApplicationProvider.getApplicationContext<Context>()
                 .getString(R.string.venue_quests_edit, "Fox")
         )
+  }
+
+  @Test
+  fun archivingAsksFirstAndArchivesOnceConfirmed() {
+    show(VenueQuestsUiState.Loaded(listOf(testQuest(id = "fox"))))
+
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE).performClick()
+    assertEquals(emptyList<Pair<String, Boolean>>(), archiveCalls)
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM).performClick()
+
+    assertEquals(listOf("fox" to true), archiveCalls)
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM).assertDoesNotExist()
+  }
+
+  @Test
+  fun keepingTheQuestClosesTheDialogWithoutArchiving() {
+    show(VenueQuestsUiState.Loaded(listOf(testQuest(id = "fox"))))
+
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE).performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE_KEEP).performClick()
+
+    assertEquals(emptyList<Pair<String, Boolean>>(), archiveCalls)
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM).assertDoesNotExist()
+  }
+
+  @Test
+  fun anArchivedQuestsBoxUnarchivesItAtOnce() {
+    show(
+        VenueQuestsUiState.Loaded(
+            listOf(testQuest(id = "fox", title = "Fox", status = QuestStatus.ARCHIVED))
+        )
+    )
+
+    compose
+        .onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE)
+        .assertContentDescriptionEquals(
+            ApplicationProvider.getApplicationContext<Context>()
+                .getString(R.string.venue_quests_unarchive, "Fox")
+        )
+        .performClick()
+
+    assertEquals(listOf("fox" to false), archiveCalls)
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM).assertDoesNotExist()
   }
 
   @Test
