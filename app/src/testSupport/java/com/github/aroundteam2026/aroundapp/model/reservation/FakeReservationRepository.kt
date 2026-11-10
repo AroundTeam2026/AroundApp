@@ -5,18 +5,21 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
+import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 /**
- * In-memory [ReservationRepository] for unit tests and for running the app without Firestore.
+ * In-memory [ReservationRepository] for tests.
  *
  * Reservations are kept in insertion order in a [MutableStateFlow]. Each `observe*` flow emits
  * again only when its own result changes, not on every write. Ids are generated as `reservation-1`,
@@ -29,10 +32,13 @@ import kotlinx.coroutines.flow.update
  * @param now Clock used for `createdAt`, in epoch milliseconds. Pass a fixed value in tests to make
  *   timestamps predictable.
  * @param party Where the parties of the reservations are kept.
+ * @param quests Where the quests of the reservations are read, to approve only a party of the size
+ *   its quest asks for, as the rules do. Without it, approving doesn't check the party's size.
  */
 class FakeReservationRepository(
     private val now: () -> Long = System::currentTimeMillis,
-    private val party: PartyRepository = FakePartyRepository(now),
+    private val party: PartyRepository = FakePartyRepository(now = now),
+    private val quests: QuestRepository? = null,
 ) : ReservationRepository {
   /**
    * Simulates a backend error (e.g. no network or a rejected write) so callers' error paths can be
@@ -102,8 +108,9 @@ class FakeReservationRepository(
 
   /**
    * Changes the status of the reservation with [id], keeping every other field. Returns a failure,
-   * changing nothing, if there is no such reservation, if [canTransition] forbids the change, or if
-   * [forcedFailure] is set.
+   * changing nothing, if there is no such reservation, if [canTransition] forbids the change, if
+   * [forcedFailure] is set, or, given [quests], when approving a party that doesn't have the size its
+   * quest asks for ([IllegalStateException]) or whose quest is missing ([NoSuchElementException]).
    */
   override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> {
     forcedFailure?.let {
@@ -116,6 +123,18 @@ class FakeReservationRepository(
       return Result.failure(
           IllegalStateException("A ${current.status} reservation cannot become $status")
       )
+    }
+    if (status == ReservationStatus.APPROVED && quests != null) {
+      val quest =
+          quests.getQuest(current.questId)
+              ?: return Result.failure(NoSuchElementException("No quest ${current.questId}"))
+      val joined =
+          party.observeMembers(id).first().count { it.status == PartyMemberStatus.JOINED }
+      if (!quest.meetsPartySize(joined)) {
+        return Result.failure(
+            IllegalStateException("A party of $joined doesn't have the size of quest ${quest.id}")
+        )
+      }
     }
     reservations.update { it + (id to current.copy(status = status)) }
     return Result.success(Unit)

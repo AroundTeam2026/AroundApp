@@ -5,6 +5,8 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
+import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -267,7 +269,98 @@ class FakeReservationRepositoryTest {
         )
       }
 
+  /**
+   * A repository, with parties of its own, that checks the size of a party on approval against a
+   * quest of [PARTY_SIZE] explorers, and the id of a reservation of that quest with a party of
+   * [joined] explorers.
+   */
+  private suspend fun sizedReservation(
+      exactPartySize: Boolean,
+      joined: Int,
+  ): Pair<FakeReservationRepository, String> {
+    val quest =
+        testQuest(id = reservation().questId, minPartySize = PARTY_SIZE)
+            .copy(exactPartySize = exactPartySize)
+    val sizedParty = FakePartyRepository(now = { FIXED_NOW })
+    val sized =
+        FakeReservationRepository(
+            now = { FIXED_NOW },
+            party = sizedParty,
+            quests = FakeQuestRepository(initialQuests = listOf(quest)),
+        )
+    val id = sized.createReservation(reservation(), "u0").getOrThrow()
+    (1 until joined).forEach { sizedParty.join(id, "u$it").getOrThrow() }
+    return sized to id
+  }
+
+  @Test
+  fun updateStatus_approvingAPartyAboveAnAtLeastSize_succeeds() =
+      runBlocking<Unit> {
+        val (sized, id) = sizedReservation(exactPartySize = false, joined = PARTY_SIZE + 1)
+
+        sized.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+      }
+
+  @Test
+  fun updateStatus_approvingAPartyOfAnExactSize_succeeds() =
+      runBlocking<Unit> {
+        val (sized, id) = sizedReservation(exactPartySize = true, joined = PARTY_SIZE)
+
+        sized.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+      }
+
+  @Test
+  fun updateStatus_approvingAPartyBelowItsQuestsSize_failsAndKeepsTheStatus() =
+      runBlocking<Unit> {
+        val (sized, id) = sizedReservation(exactPartySize = false, joined = PARTY_SIZE - 1)
+
+        val result = sized.updateStatus(id, ReservationStatus.APPROVED)
+
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        assertEquals(ReservationStatus.PENDING, sized.observeForVenue("v1").first().single().status)
+      }
+
+  @Test
+  fun updateStatus_approvingAPartyAboveAnExactSize_fails() =
+      runBlocking<Unit> {
+        val (sized, id) = sizedReservation(exactPartySize = true, joined = PARTY_SIZE + 1)
+
+        assertTrue(
+            sized.updateStatus(id, ReservationStatus.APPROVED).exceptionOrNull()
+                is IllegalStateException
+        )
+      }
+
+  /** Only approving needs the size: the venue can reject or cancel a party of any size. */
+  @Test
+  fun updateStatus_rejectingOrCancellingAPartyBelowItsQuestsSize_succeeds() =
+      runBlocking<Unit> {
+        val (rejecting, rejected) = sizedReservation(exactPartySize = false, joined = 1)
+        rejecting.updateStatus(rejected, ReservationStatus.REJECTED).getOrThrow()
+
+        val (cancelling, cancelled) = sizedReservation(exactPartySize = false, joined = 1)
+        cancelling.updateStatus(cancelled, ReservationStatus.CANCELLED).getOrThrow()
+      }
+
+  @Test
+  fun updateStatus_approvingWithAMissingQuest_failsWithNoSuchElement() =
+      runBlocking<Unit> {
+        val sized =
+            FakeReservationRepository(
+                now = { FIXED_NOW },
+                party = party,
+                quests = FakeQuestRepository(),
+            )
+        val id = sized.createReservation(reservation(), "u1").getOrThrow()
+
+        assertTrue(
+            sized.updateStatus(id, ReservationStatus.APPROVED).exceptionOrNull()
+                is NoSuchElementException
+        )
+      }
+
   private companion object {
+    const val PARTY_SIZE = 3
     const val FIXED_NOW = 42_000L
     const val TIMEOUT_MS = 5_000L
   }

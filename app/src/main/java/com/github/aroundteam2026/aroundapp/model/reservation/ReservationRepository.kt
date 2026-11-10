@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
+import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
 import kotlinx.coroutines.flow.Flow
 
 /** Reads and writes [Reservation]s. ViewModels depend on this interface only. */
@@ -52,12 +53,14 @@ interface ReservationRepository {
    *
    * The security rules let the venue that owns the reservation make any change, and a joined member
    * of the party only cancel it (E21). The Firestore implementation therefore fails when an
-   * explorer asks for any other status, even though the fake allows it.
+   * explorer asks for any other status, even though the fake allows it. The rules also refuse to
+   * approve a party without the size its quest asks for ([meetsPartySize]).
    *
    * @param id id of the reservation.
    * @param status the new status; the change must be allowed by [canTransition].
    * @return success, or a failure if no reservation can be changed under this id, if the change is
-   *   not allowed ([IllegalStateException]), or if the write failed.
+   *   not allowed ([IllegalStateException]), if the party doesn't have its quest's size when
+   *   approving, or if the write failed.
    */
   suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit>
 }
