@@ -2,6 +2,8 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -77,9 +79,9 @@ import java.util.Date
  * then a card for each part of it, over a bar that stays in place to accept the quest or, once it
  * is accepted, to cancel the reservation after asking. Once the venue approved the reservation, the
  * bar offers to submit the proof, and once it is sent, a card under the title says where it stands.
- * The explorer who created the reservation finds its party code on the party card, to share with
- * friends while they can still join. The rows only fit part of a quest, so this is where the rest
- * is read.
+ * The explorer who created the reservation finds its party code on the party card, to copy or share
+ * with friends while they can still join. The rows only fit part of a quest, so this is where the
+ * rest is read.
  *
  * @param state The venue's page, for the venue and how accepting and cancelling stand.
  * @param quest The quest to show.
@@ -401,12 +403,13 @@ private fun PartyCard(quest: VenuePageQuest, joined: Int, code: String?, venueNa
 
 /**
  * The party's [code], as the Figma component "S5 · Party code": shown in two halves, with a button
- * that opens the phone's share sheet with [message].
+ * that copies it and one that opens the phone's share sheet with [message].
  */
 @Composable
 private fun PartyCodeBox(code: String, message: String) {
   val colors = MaterialTheme.colorScheme
   val context = LocalContext.current
+  val copyLabel = stringResource(R.string.quest_detail_party_code_copy)
   val shareTitle = stringResource(R.string.quest_detail_party_code_share)
   Column(
       Modifier.fillMaxWidth()
@@ -427,18 +430,38 @@ private fun PartyCodeBox(code: String, message: String) {
           .padding(AroundSpacing.InsetPadding),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
-    Column(verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
-      Text(
-          stringResource(R.string.quest_detail_party_code).uppercase(currentLocale()),
-          color = colors.onSurfaceVariant,
-          style = AroundTextStyles.Label,
-      )
-      Text(
-          partyCodeShown(code),
-          Modifier.testTag(C.Tag.QUEST_DETAIL_PARTY_CODE),
-          color = colors.onSurface,
-          style = AroundTextStyles.PartyCode,
-      )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
+        Text(
+            stringResource(R.string.quest_detail_party_code).uppercase(currentLocale()),
+            color = colors.onSurfaceVariant,
+            style = AroundTextStyles.Label,
+        )
+        Text(
+            partyCodeShown(code),
+            Modifier.testTag(C.Tag.QUEST_DETAIL_PARTY_CODE),
+            color = colors.onSurface,
+            style = AroundTextStyles.PartyCode,
+        )
+      }
+      Box(
+          Modifier.clip(AroundPillShape)
+              .background(AroundTheme.colors.lavender)
+              .clickable(role = Role.Button) { copyPartyCode(context, copyLabel, code) }
+              .padding(PARTY_CODE_COPY_PADDING),
+          contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+            painterResource(R.drawable.ic_copy),
+            contentDescription = copyLabel,
+            Modifier.size(PARTY_CODE_COPY_ICON_SIZE),
+            // Purple on lavender, cream on dark lavender: primary stays purple in dark mode
+            tint = AroundTheme.colors.accentText,
+        )
+      }
     }
     Row(
         Modifier.fillMaxWidth()
@@ -472,6 +495,13 @@ private fun PartyCodeBox(code: String, message: String) {
  * `7KQ M42`. Joining accepts it with or without the space.
  */
 internal fun partyCodeShown(code: String): String = code.chunked(PARTY_CODE_HALF).joinToString(" ")
+
+/** Puts the party's [code] on the clipboard, under [label], as stored: without the space. */
+private fun copyPartyCode(context: Context, label: String, code: String) {
+  context
+      .getSystemService(ClipboardManager::class.java)
+      ?.setPrimaryClip(ClipData.newPlainText(label, code))
+}
 
 /** Opens the phone's share sheet, titled [title], with [message] to send to friends. */
 private fun sharePartyCode(context: Context, title: String, message: String) {
@@ -714,6 +744,8 @@ private val PROOF_STATUS_DOT_SIZE = 6.dp
 private val PARTY_CODE_CORNER = 16.dp
 private val PARTY_CODE_SHAPE = RoundedCornerShape(PARTY_CODE_CORNER)
 private val PARTY_CODE_BORDER = 1.dp
+private val PARTY_CODE_COPY_PADDING = 10.dp
+private val PARTY_CODE_COPY_ICON_SIZE = 20.dp
 private val PARTY_CODE_SHARE_SHAPE = RoundedCornerShape(14.dp)
 private val PARTY_CODE_SHARE_ICON_SIZE = 18.dp
 /** How many characters each half of a shown party code has. */

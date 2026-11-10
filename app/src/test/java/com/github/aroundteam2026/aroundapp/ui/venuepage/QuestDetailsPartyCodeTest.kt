@@ -2,9 +2,11 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.app.Application
+import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -20,7 +22,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** The party code on the quest details: shown only when the state gives one, and shared. */
+/** The party code on the quest details: shown only when the state gives one, copied and shared. */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
 class QuestDetailsPartyCodeTest {
@@ -73,6 +75,20 @@ class QuestDetailsPartyCodeTest {
 
     node(C.Tag.QUEST_DETAIL_PARTY_CODE).assertDoesNotExist()
     node(C.Tag.QUEST_DETAIL_PARTY_CODE_SHARE).assertDoesNotExist()
+  }
+
+  @Test
+  fun copyPutsTheCodeOnTheClipboardWithoutTheSpace() {
+    show(mapOf(RESERVATION to CODE))
+
+    // Named for screen readers, as it shows an icon only
+    compose
+        .onNodeWithContentDescription("Copy the party code", useUnmergedTree = true)
+        .performScrollTo()
+        .performClick()
+
+    val clipboard = app.getSystemService(ClipboardManager::class.java)
+    assertEquals(CODE, clipboard.primaryClip?.getItemAt(0)?.text)
   }
 
   @Test
