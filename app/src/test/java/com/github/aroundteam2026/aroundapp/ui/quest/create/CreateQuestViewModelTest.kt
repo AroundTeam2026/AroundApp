@@ -525,6 +525,28 @@ class CreateQuestViewModelTest {
       }
 
   @Test
+  fun aQuestPlacedElsewhereIsSavedThereAndOneAtTheVenueWithoutALocation() =
+      runTest(dispatcher) {
+        newLoadedViewModel()
+        fillValid()
+        viewModel.placeElsewhere()
+        viewModel.pickAddress(MONTBENON)
+        viewModel.submit()
+        runCurrent()
+        assertEquals(MONTBENON.location, quests.getQuest("quest-1")?.location)
+
+        newLoadedViewModel()
+        fillValid()
+        viewModel.placeElsewhere()
+        viewModel.moveQuest(MONTBENON.location)
+        viewModel.placeAtVenue()
+        viewModel.submit()
+        runCurrent()
+        assertEquals(SaveState.Saved("quest-2"), state.saveState)
+        assertNull(quests.getQuest("quest-2")?.location)
+      }
+
+  @Test
   fun aSavedQuestIsNotSavedAgain() =
       runTest(dispatcher) {
         newLoadedViewModel()

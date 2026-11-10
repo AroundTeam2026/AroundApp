@@ -160,9 +160,9 @@ data class CreateQuestUiState(
             (saveState == SaveState.Idle || saveState == SaveState.Failed)
 
   /**
-   * The quest to save for [venue], trimmed, as active, where the venue is. Only call it when
-   * [canSubmit] and the venue has a location. Its id and timestamps are left for the repository to
-   * set, and its reward expires at the end of its last day in [zone].
+   * The quest to save for [venue], trimmed, as active, at [questLocation], or at the venue without
+   * one. Only call it when [canSubmit] and the venue has a location. Its id and timestamps are left
+   * for the repository to set, and its reward expires at the end of its last day in [zone].
    */
   fun toQuest(venue: Venue, zone: ZoneId): Quest =
       Quest(
@@ -175,6 +175,7 @@ data class CreateQuestUiState(
           proofType = proofType,
           minPartySize = minPartySize,
           exactPartySize = exactPartySize,
+          location = questLocation,
           reward = reward.toReward(zone),
           status = QuestStatus.ACTIVE,
           createdAt = 0,
