@@ -23,6 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofPhotoViewer
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -59,7 +64,8 @@ internal enum class ProofPhotoError {
  * The proof photo box of a photo quest, as the Figma "Photo" box of `S4 · Submit proof`. Before a
  * photo: the camera icon, what to do at [venueName], and "Take photo" above "Choose from gallery";
  * after a refused camera, why it can't be used and "Open settings" in place of "Take photo". Once
- * [picked], the photo fills the box, with "Retake" in its corner.
+ * [picked], the photo fills the box, with "Retake" in its corner; tapping the photo opens it full
+ * screen, in [ProofPhotoViewer].
  *
  * It only draws: the caller asks for the camera permission and opens the camera, the gallery and
  * the settings.
@@ -68,6 +74,8 @@ internal enum class ProofPhotoError {
  *   shows its background colour.
  * @param error Why the last photo failed, said under the buttons, or null.
  * @param enabled False while a photo is being prepared, which locks the buttons.
+ * @param questTitle The quest the photo is for, said under [venueName] when the photo is full
+ *   screen; nothing when blank.
  */
 @Composable
 internal fun ProofPhotoBox(
@@ -82,10 +90,11 @@ internal fun ProofPhotoBox(
     modifier: Modifier = Modifier,
     error: ProofPhotoError? = null,
     enabled: Boolean = true,
+    questTitle: String = "",
 ) {
   val box = modifier.fillMaxWidth().clip(BOX_SHAPE).testTag(C.Tag.PROOF_PHOTO)
   if (picked) {
-    PickedPhoto(preview, enabled, onRetake, box)
+    PickedPhoto(preview, venueName, questTitle, enabled, onRetake, box)
   } else {
     Choices(
         venueName,
@@ -100,23 +109,47 @@ internal fun ProofPhotoBox(
   }
 }
 
-/** The picked photo filling the box, with "Retake" in its corner. */
+/**
+ * The picked photo filling the box, with "Retake" in its corner. Once drawn, tapping it opens it
+ * full screen, under [venueName] and [questTitle].
+ */
 @Composable
 private fun PickedPhoto(
     preview: ImageBitmap?,
+    venueName: String,
+    questTitle: String,
     enabled: Boolean,
     onRetake: () -> Unit,
     modifier: Modifier,
 ) {
   val colors = MaterialTheme.colorScheme
+  var viewing by rememberSaveable { mutableStateOf(false) }
+  val description = stringResource(R.string.proof_photo_description)
   Box(modifier.height(BOX_HEIGHT).background(AroundTheme.colors.sage)) {
     if (preview != null) {
       Image(
           preview,
-          contentDescription = stringResource(R.string.proof_photo_description),
-          modifier = Modifier.matchParentSize().testTag(C.Tag.PROOF_PHOTO_IMAGE),
+          contentDescription = description,
+          modifier =
+              Modifier.matchParentSize()
+                  .clickable(
+                      onClickLabel = stringResource(R.string.proof_viewer_open),
+                      role = Role.Image,
+                  ) {
+                    viewing = true
+                  }
+                  .testTag(C.Tag.PROOF_PHOTO_IMAGE),
           contentScale = ContentScale.Crop,
       )
+      if (viewing) {
+        ProofPhotoViewer(
+            preview,
+            description,
+            title = venueName,
+            subtitle = questTitle.ifBlank { null },
+            onClose = { viewing = false },
+        )
+      }
     }
     Text(
         stringResource(R.string.proof_photo_retake),

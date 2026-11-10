@@ -291,6 +291,14 @@ object C {
     const val PROOF_PHOTO_OPEN_SETTINGS = "proof_photo_open_settings"
     const val PROOF_PHOTO_ERROR = "proof_photo_error"
 
+    // Proof photo full screen
+    const val PROOF_VIEWER = "proof_viewer"
+    const val PROOF_VIEWER_IMAGE = "proof_viewer_image"
+    const val PROOF_VIEWER_CLOSE = "proof_viewer_close"
+    const val PROOF_VIEWER_TITLE = "proof_viewer_title"
+    const val PROOF_VIEWER_SUBTITLE = "proof_viewer_subtitle"
+    const val PROOF_VIEWER_ZOOM = "proof_viewer_zoom"
+
     // Reject proof sheet
     const val REJECT_PROOF_SHEET = "reject_proof_sheet"
     /** Followed by `_` and the `RejectReason`'s name, e.g. `reject_proof_reason_OTHER`. */
@@ -313,6 +321,7 @@ object C {
     const val REVIEW_PROOF_PHOTO = "review_proof_photo"
     const val REVIEW_PROOF_PHOTO_IMAGE = "review_proof_photo_image"
     const val REVIEW_PROOF_PHOTO_RETRY = "review_proof_photo_retry"
+    const val REVIEW_PROOF_PHOTO_ZOOM = "review_proof_photo_zoom"
     const val REVIEW_PROOF_ANSWER = "review_proof_answer"
     const val REVIEW_PROOF_HINT = "review_proof_hint"
     const val REVIEW_PROOF_REJECT = "review_proof_reject"
