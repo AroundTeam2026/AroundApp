@@ -54,6 +54,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
@@ -218,7 +219,12 @@ private fun ArchiveDialog(title: String, onClose: () -> Unit, onArchive: () -> U
         }
       },
       dismissButton = {
-        TextButton(onClick = onClose, Modifier.testTag(C.Tag.VENUE_QUEST_ARCHIVE_KEEP)) {
+        TextButton(
+            onClick = onClose,
+            // The default primary colour is unreadable on the dark background
+            colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
+            modifier = Modifier.testTag(C.Tag.VENUE_QUEST_ARCHIVE_KEEP),
+        ) {
           Text(stringResource(R.string.venue_quests_archive_keep))
         }
       },
