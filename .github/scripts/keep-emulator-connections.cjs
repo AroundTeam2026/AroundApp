@@ -1,0 +1,15 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+//
+// Loaded into the Firebase CLI with NODE_OPTIONS="--require <this file>" (#393). The Auth and
+// Storage emulators are Node servers, which close a connection idle for 5 s; the device keeps idle
+// connections for minutes and reuses them, so a request sent just as the emulator closed one
+// failed with "unexpected end of stream". Every server the CLI starts now keeps idle connections
+// open, as Firebase's own servers keep them for longer than the device does.
+const http = require("http");
+
+const listen = http.Server.prototype.listen;
+http.Server.prototype.listen = function (...args) {
+  this.keepAliveTimeout = 0; // 0 turns the idle timeout off
+  return listen.apply(this, args);
+};
+console.log("keep-emulator-connections: the emulators keep idle connections open");
