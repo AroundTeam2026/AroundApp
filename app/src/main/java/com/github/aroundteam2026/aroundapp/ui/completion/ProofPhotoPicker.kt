@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
  * @param onPhotoPicked Receives the shrunk copy of a taken or picked photo.
  * @param onRetake Clears [photo], so the explorer can take or pick another one.
  * @param photos Prepares the photos.
+ * @param questTitle The quest the photo is for, said when the photo is opened full screen.
  */
 @Composable
 fun ProofPhotoPicker(
@@ -55,6 +56,7 @@ fun ProofPhotoPicker(
     modifier: Modifier = Modifier,
     photos: ProofPhotos = rememberProofPhotos(),
     enabled: Boolean = true,
+    questTitle: String = "",
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -133,6 +135,7 @@ fun ProofPhotoPicker(
       cameraRefused = cameraRefused,
       error = error,
       enabled = enabled && !shrinking,
+      questTitle = questTitle,
       onTakePhoto = {
         error = null
         if (cameraAllowed(context)) openCamera()

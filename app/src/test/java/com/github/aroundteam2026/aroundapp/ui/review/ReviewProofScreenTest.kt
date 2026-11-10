@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
@@ -93,7 +94,7 @@ class ReviewProofScreenTest {
   fun showsWhoSentThePhotoForWhichQuestAndWhatApprovingGives() {
     show(PHOTO)
 
-    assertEquals("yusuf.s", node(C.Tag.REVIEW_PROOF_EXPLORER).text())
+    assertEquals(EXPLORER, node(C.Tag.REVIEW_PROOF_EXPLORER).text())
     assertEquals(
         string(R.string.review_proof_party_and_sent, partyOf(4), TWO_MIN_AGO),
         node(C.Tag.REVIEW_PROOF_SENT).text(),
@@ -105,7 +106,7 @@ class ReviewProofScreenTest {
         node(C.Tag.REVIEW_PROOF_REQUIREMENTS).text(),
     )
     assertEquals(
-        string(R.string.review_proof_reward_party, "yusuf.s", "Free croissant"),
+        string(R.string.review_proof_reward_party, EXPLORER, "Free croissant"),
         node(C.Tag.REVIEW_PROOF_HINT).text(),
     )
     compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertIsEnabled()
@@ -118,7 +119,7 @@ class ReviewProofScreenTest {
 
     node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE)
         .assertIsDisplayed()
-        .assertContentDescriptionEquals(string(R.string.review_proof_photo_description, "yusuf.s"))
+        .assertContentDescriptionEquals(string(R.string.review_proof_photo_description, EXPLORER))
   }
 
   // The ViewModel turns bytes that aren't an image into ProofPhoto.Failed, with a retry
@@ -127,6 +128,71 @@ class ReviewProofScreenTest {
     assertNotNull(decodePhoto(pngBytes()))
     assertNull(decodePhoto(ByteArray(0)))
     assertNull(decodePhoto(byteArrayOf(1, 2, 3)))
+  }
+
+  @Test
+  fun tappingTheDownloadedPhotoOpensItFullScreen() {
+    show(PHOTO)
+    node(C.Tag.REVIEW_PROOF_PHOTO_ZOOM).assertIsDisplayed()
+
+    node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE).performClick()
+
+    node(C.Tag.PROOF_VIEWER).assertIsDisplayed()
+    assertEquals(EXPLORER, node(C.Tag.PROOF_VIEWER_TITLE).text())
+    assertEquals(
+        string(R.string.proof_viewer_quest_and_sent, "Find the hidden fox", TWO_MIN_AGO),
+        node(C.Tag.PROOF_VIEWER_SUBTITLE).text(),
+    )
+  }
+
+  @Test
+  fun theFullScreenPhotoOfAnUnknownExplorerJustSentSaysSo() {
+    show(PHOTO.copy(explorerName = null, questTitle = null, sentAt = NOW))
+
+    node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE).performClick()
+
+    assertEquals(string(R.string.dashboard_unknown_explorer), node(C.Tag.PROOF_VIEWER_TITLE).text())
+    assertEquals(
+        string(
+            R.string.proof_viewer_quest_and_sent_just_now,
+            string(R.string.dashboard_unknown_quest),
+        ),
+        node(C.Tag.PROOF_VIEWER_SUBTITLE).text(),
+    )
+  }
+
+  @Test
+  fun closingTheFullScreenPhotoReturnsToTheReview() {
+    show(PHOTO)
+    node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE).performClick()
+
+    node(C.Tag.PROOF_VIEWER_CLOSE).performClick()
+
+    node(C.Tag.PROOF_VIEWER).assertDoesNotExist()
+    node(C.Tag.REVIEW_PROOF_SCREEN).assertIsDisplayed()
+    assertEquals(0, backs)
+  }
+
+  // The full-screen photo takes Back first: it closes, and the venue stays on the review
+  @Test
+  fun backClosesTheFullScreenPhotoAndStaysOnTheReview() {
+    show(PHOTO)
+    node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE).performClick()
+    compose.waitForIdle()
+
+    Espresso.pressBack()
+    compose.waitForIdle()
+
+    node(C.Tag.PROOF_VIEWER).assertDoesNotExist()
+    node(C.Tag.REVIEW_PROOF_SCREEN).assertIsDisplayed()
+    assertEquals(0, backs)
+  }
+
+  @Test
+  fun aPhotoNotDownloadedHasNothingToZoom() {
+    show(PHOTO.copy(photo = ProofPhoto.Failed))
+
+    node(C.Tag.REVIEW_PROOF_PHOTO_ZOOM).assertDoesNotExist()
   }
 
   @Test
@@ -246,7 +312,7 @@ class ReviewProofScreenTest {
     compose.onNodeWithTag(C.Tag.REVIEW_PROOF_REJECT).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.REVIEW_PROOF_BACK).assertIsNotEnabled()
     assertEquals(
-        string(R.string.review_proof_sending, "yusuf.s"),
+        string(R.string.review_proof_sending, EXPLORER),
         node(C.Tag.REVIEW_PROOF_HINT).text(),
     )
   }
@@ -406,6 +472,7 @@ class ReviewProofScreenTest {
   }
 
   private companion object {
+    const val EXPLORER = "yusuf.s"
     const val NOW = 1_800_000_000_000L
     val CLOCK: Clock = Clock.fixed(Instant.ofEpochMilli(NOW), ZoneId.of("UTC"))
     val TWO_MIN_AGO =
@@ -420,7 +487,7 @@ class ReviewProofScreenTest {
     val PHOTO =
         ReviewProofUiState(
             status = ReviewProofStatus.LOADED,
-            explorerName = "yusuf.s",
+            explorerName = EXPLORER,
             partySize = 4,
             sentAt = NOW - 2 * DateUtils.MINUTE_IN_MILLIS,
             questTitle = "Find the hidden fox",

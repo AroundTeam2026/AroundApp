@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -66,6 +68,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.partyLabel
 import com.github.aroundteam2026.aroundapp.ui.dashboard.rememberNow
 import com.github.aroundteam2026.aroundapp.ui.dashboard.timeAgo
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofPhotoViewer
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.quest.rewardText
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -170,7 +173,7 @@ internal fun ReviewProofContent(
           Explorer(state, clock)
           Quest(state.questTitle, state.requirements)
           when (val proof = state.proof) {
-            is Proof.Photo -> PhotoProof(state.photo, explorerInSentence(state), onRetry)
+            is Proof.Photo -> PhotoProof(state, explorerInSentence(state), clock, onRetry)
             is Proof.Text -> AnswerProof(proof.answer)
             null -> Unit
           }
@@ -316,11 +319,18 @@ private fun Quest(title: String?, requirements: String?) {
 }
 
 /**
- * The photo sent by [explorer] once downloaded, whole, so nothing near its edges is cut off. Until
- * then a spinner; if it can't be downloaded or read, a placeholder with a way to try again.
+ * The photo sent by [explorer] once downloaded, whole, so nothing near its edges is cut off, with
+ * "Tap to zoom": tapping it opens it full screen, in [ProofPhotoViewer]. Until then a spinner; if
+ * it can't be downloaded or read, a placeholder with a way to try again.
  */
 @Composable
-private fun PhotoProof(photo: ProofPhoto?, explorer: String, onRetry: () -> Unit) {
+private fun PhotoProof(
+    state: ReviewProofUiState,
+    explorer: String,
+    clock: Clock,
+    onRetry: () -> Unit,
+) {
+  var viewing by rememberSaveable { mutableStateOf(false) }
   Box(
       Modifier.fillMaxWidth()
           .height(PHOTO_HEIGHT)
@@ -329,19 +339,76 @@ private fun PhotoProof(photo: ProofPhoto?, explorer: String, onRetry: () -> Unit
           .testTag(C.Tag.REVIEW_PROOF_PHOTO),
       contentAlignment = Alignment.Center,
   ) {
-    when (photo) {
-      is ProofPhoto.Loaded ->
-          Image(
+    when (val photo = state.photo) {
+      is ProofPhoto.Loaded -> {
+        val description = stringResource(R.string.review_proof_photo_description, explorer)
+        Image(
+            photo.image,
+            description,
+            Modifier.fillMaxSize()
+                .clickable(
+                    onClickLabel = stringResource(R.string.proof_viewer_open),
+                    role = Role.Image,
+                ) {
+                  viewing = true
+                }
+                .testTag(C.Tag.REVIEW_PROOF_PHOTO_IMAGE),
+            contentScale = ContentScale.Fit,
+        )
+        TapToZoom(Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Medium))
+        if (viewing) {
+          ProofPhotoViewer(
               photo.image,
-              stringResource(R.string.review_proof_photo_description, explorer),
-              Modifier.fillMaxSize().testTag(C.Tag.REVIEW_PROOF_PHOTO_IMAGE),
-              contentScale = ContentScale.Fit,
+              description,
+              title = state.explorerName ?: stringResource(R.string.dashboard_unknown_explorer),
+              subtitle = viewerSubtitle(state, clock),
+              onClose = { viewing = false },
           )
+        }
+      }
       ProofPhoto.Loading -> CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
       ProofPhoto.Failed -> PhotoPlaceholder(onRetry)
       null -> PhotoPlaceholder(onRetry = null)
     }
   }
+}
+
+/** The "Tap to zoom" hint in the photo's corner, as Figma's "Zoom hint". */
+@Composable
+private fun TapToZoom(modifier: Modifier) {
+  Surface(
+      modifier.testTag(C.Tag.REVIEW_PROOF_PHOTO_ZOOM),
+      shape = AroundPillShape,
+      color = MaterialTheme.colorScheme.surface,
+      contentColor = MaterialTheme.colorScheme.onSurface,
+  ) {
+    Row(
+        Modifier.padding(
+            start = AroundSpacing.CompactGap,
+            end = AroundSpacing.Medium,
+            top = AroundSpacing.SegmentGap,
+            bottom = AroundSpacing.SegmentGap,
+        ),
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(
+          painterResource(R.drawable.ic_zoom_in),
+          contentDescription = null,
+          Modifier.size(ZOOM_ICON_SIZE),
+      )
+      Text(stringResource(R.string.proof_viewer_tap_to_zoom), style = AroundTextStyles.Badge)
+    }
+  }
+}
+
+/** Under the explorer's name on the full-screen photo: "Find the hidden fox · sent 2 min. ago". */
+@Composable
+private fun viewerSubtitle(state: ReviewProofUiState, clock: Clock): String {
+  val quest = state.questTitle ?: stringResource(R.string.dashboard_unknown_quest)
+  val ago = timeAgo(state.sentAt, rememberNow(state.sentAt, clock))
+  return if (ago == null) stringResource(R.string.proof_viewer_quest_and_sent_just_now, quest)
+  else stringResource(R.string.proof_viewer_quest_and_sent, quest, ago)
 }
 
 /** A camera and "Photo proof" where the photo can't be shown; [onRetry], if any, tries again. */
@@ -489,6 +556,7 @@ private val CARD_SHAPE = RoundedCornerShape(18.dp)
 private val PHOTO_SHAPE = RoundedCornerShape(22.dp)
 private val PHOTO_HEIGHT = 300.dp
 private val PLACEHOLDER_ICON_SIZE = 40.dp
+private val ZOOM_ICON_SIZE = 16.dp
 private val ANSWER_STYLE = AroundTextStyles.BodyLarge.copy(fontSize = 18.sp, lineHeight = 25.sp)
 
 // Internal, not private, so a test can draw them: the previews are code too

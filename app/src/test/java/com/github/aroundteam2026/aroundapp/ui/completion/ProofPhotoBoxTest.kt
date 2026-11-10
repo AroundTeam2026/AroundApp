@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
@@ -47,6 +48,7 @@ class ProofPhotoBoxTest {
       cameraRefused: Boolean = false,
       error: ProofPhotoError? = null,
       enabled: Boolean = true,
+      questTitle: String = QUEST,
   ) {
     compose.setContent {
       AroundAppTheme {
@@ -61,6 +63,7 @@ class ProofPhotoBoxTest {
             onRetake = { calls += "retake" },
             error = error,
             enabled = enabled,
+            questTitle = questTitle,
         )
       }
     }
@@ -108,7 +111,7 @@ class ProofPhotoBoxTest {
 
   @Test
   fun aPickedPhotoFillsTheBoxWithRetake() {
-    show(picked = true, preview = ImageBitmap(40, 30))
+    show(picked = true, preview = PICKED_PHOTO)
 
     node(C.Tag.PROOF_PHOTO_IMAGE).assertIsDisplayed()
     node(C.Tag.PROOF_PHOTO_TAKE).assertDoesNotExist()
@@ -125,6 +128,53 @@ class ProofPhotoBoxTest {
 
     node(C.Tag.PROOF_PHOTO_IMAGE).assertDoesNotExist()
     node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
+  }
+
+  @Test
+  fun tappingThePhotoOpensItFullScreenUnderTheVenueAndQuest() {
+    show(picked = true, preview = PICKED_PHOTO)
+    node(C.Tag.PROOF_VIEWER).assertDoesNotExist()
+
+    node(C.Tag.PROOF_PHOTO_IMAGE).performClick()
+
+    node(C.Tag.PROOF_VIEWER).assertIsDisplayed()
+    node(C.Tag.PROOF_VIEWER_TITLE).assertTextEquals(VENUE)
+    node(C.Tag.PROOF_VIEWER_SUBTITLE).assertTextEquals(QUEST)
+  }
+
+  @Test
+  fun withoutAQuestTitleTheFullScreenPhotoOnlyNamesTheVenue() {
+    show(picked = true, preview = PICKED_PHOTO, questTitle = "")
+
+    node(C.Tag.PROOF_PHOTO_IMAGE).performClick()
+
+    node(C.Tag.PROOF_VIEWER_TITLE).assertTextEquals(VENUE)
+    node(C.Tag.PROOF_VIEWER_SUBTITLE).assertDoesNotExist()
+  }
+
+  @Test
+  fun backClosesTheFullScreenPhotoAndReturnsToTheBox() {
+    show(picked = true, preview = PICKED_PHOTO)
+    node(C.Tag.PROOF_PHOTO_IMAGE).performClick()
+    compose.waitForIdle()
+
+    Espresso.pressBack()
+    compose.waitForIdle()
+
+    node(C.Tag.PROOF_VIEWER).assertDoesNotExist()
+    node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
+  }
+
+  @Test
+  fun closingTheFullScreenPhotoReturnsToTheBox() {
+    show(picked = true, preview = PICKED_PHOTO)
+    node(C.Tag.PROOF_PHOTO_IMAGE).performClick()
+
+    node(C.Tag.PROOF_VIEWER_CLOSE).performClick()
+
+    node(C.Tag.PROOF_VIEWER).assertDoesNotExist()
+    node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
+    assertEquals(emptyList<String>(), calls)
   }
 
   @Test
@@ -173,6 +223,8 @@ class ProofPhotoBoxTest {
 
   private companion object {
     const val VENUE = "Café Lumière"
+    const val QUEST = "Find the hidden fox"
+    val PICKED_PHOTO = ImageBitmap(40, 30)
     // Figma: a 290dp box with 54dp buttons
     val FIGMA_BOX_HEIGHT = 290.dp
     val FIGMA_BUTTON_HEIGHT = 54.dp
