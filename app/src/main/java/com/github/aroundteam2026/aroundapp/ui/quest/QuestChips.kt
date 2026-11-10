@@ -112,11 +112,11 @@ private fun Chip(
 }
 
 /**
- * How far [meters] is, in the app's language. The distance is from where the explorer was located
- * when the map opened, not where they are now.
+ * How far [meters] is, in the app's language. On an explorer's chips, the distance is from where
+ * the explorer was located when the map opened, not where they are now.
  */
 @Composable
-private fun distanceText(meters: Double): String {
+internal fun distanceText(meters: Double): String {
   val distance = formatDistance(meters, currentLocale())
   val unit =
       when (distance.unit) {

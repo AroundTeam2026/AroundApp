@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import kotlinx.coroutines.flow.Flow
@@ -86,9 +87,10 @@ interface CompletionRepository {
    * Firestore implementation fails for anyone else.
    *
    * @param id id of the completion.
-   * @param reason why the venue rejects the proof; must not be blank.
-   * @return success, or a failure if [reason] is blank ([IllegalArgumentException]), if there is no
-   *   completion with this id ([NoSuchElementException]), if [canTransition] forbids the change
+   * @param reason why the venue rejects the proof; not blank, at most [MAX_REJECT_REASON_LENGTH]
+   *   characters. Invalid reasons fail before any backend request.
+   * @return success, or a failure if [reason] is invalid ([IllegalArgumentException]), if there is
+   *   no completion with this id ([NoSuchElementException]), if [canTransition] forbids the change
    *   ([IllegalStateException]), or if the write failed.
    */
   suspend fun reject(id: String, reason: String): Result<Unit>

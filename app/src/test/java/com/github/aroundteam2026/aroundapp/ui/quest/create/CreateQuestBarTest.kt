@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -56,7 +57,13 @@ class CreateQuestBarTest {
       questRepository: QuestRepository = quests,
       venues: VenueRepository = FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
   ) {
-    viewModel = CreateQuestViewModel(FakeAuthRepository(VENUE_ID), venues, questRepository)
+    viewModel =
+        CreateQuestViewModel(
+            FakeAuthRepository(VENUE_ID),
+            venues,
+            questRepository,
+            FakeAddressSearchRepository(),
+        )
     compose.setContent {
       AroundAppTheme { CreateQuestScreen(viewModel, onClose = {}, onCreated = { created += it }) }
     }

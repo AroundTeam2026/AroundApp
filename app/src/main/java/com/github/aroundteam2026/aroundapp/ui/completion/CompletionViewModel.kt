@@ -117,15 +117,20 @@ class CompletionViewModel(
 
   /** Uploads the proof of [form] if needed and submits it; says where that left the form. */
   private suspend fun submitProof(form: CompletionUiState, venueId: String): SaveState =
-      proofOf(form)
-          ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
-          ?.fold(
-              { SaveState.Saved(it) },
-              {
-                Log.w(TAG, "Submitting the completion of $reservationId failed", it)
-                SaveState.Failed
-              },
-          ) ?: SaveState.Failed
+      try {
+        proofOf(form)
+            ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
+            ?.fold(
+                { SaveState.Saved(it) },
+                {
+                  Log.w(TAG, "Submitting the completion of $reservationId failed", it)
+                  SaveState.Failed
+                },
+            ) ?: SaveState.Failed
+      } catch (e: IllegalArgumentException) {
+        Log.w(TAG, "Invalid proof for $reservationId", e)
+        SaveState.Failed
+      }
 
   /**
    * Ends a submit with [saveState] and [locationError]. The listener may have shown the completion

@@ -99,6 +99,16 @@ fun CreateQuestScreen(
       onRequirementsChange = viewModel::updateRequirements,
       completionActions =
           QuestCompletionActions(
+              location =
+                  QuestLocationActions(
+                      onAtVenue = viewModel::placeAtVenue,
+                      onElsewhere = viewModel::placeElsewhere,
+                      onMove = viewModel::moveQuest,
+                      onAddressQueryChange = viewModel::updateAddressQuery,
+                      onAddressSearch = viewModel::searchAddress,
+                      onAddressClear = viewModel::clearAddress,
+                      onAddressPick = viewModel::pickAddress,
+                  ),
               onProofTypeChange = viewModel::updateProofType,
               onRadiusPresetSelect = viewModel::selectRadiusPreset,
               onCustomRadiusSelect = viewModel::selectCustomRadius,

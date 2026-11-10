@@ -30,11 +30,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,7 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -67,6 +65,8 @@ import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 
 /**
  * Entry point for the venue sign-up flow. The navigation owner supplies the existing ViewModel and
@@ -109,7 +109,11 @@ fun VenueInitializationContent(
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-  MaterialTheme(colorScheme = VenueSetupColors, typography = VenueSetupTypography) {
+  MaterialTheme(
+      colorScheme = MaterialTheme.colorScheme,
+      shapes = MaterialTheme.shapes,
+      typography = VenueSetupTypography,
+  ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val nameLabel = stringResource(R.string.venue_initialization_name)
     BoxWithConstraints(
@@ -144,6 +148,7 @@ fun VenueInitializationContent(
                     painterResource(R.drawable.venue_setup_back),
                     stringResource(R.string.back),
                     Modifier.size(22.dp),
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
                 )
               }
             }
@@ -200,12 +205,11 @@ fun VenueInitializationContent(
             shape = RoundedCornerShape(14.dp),
             textStyle = MaterialTheme.typography.bodyLarge,
             colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                aroundFieldColors(
                     disabledContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    // Purple on cream, cream in dark mode, where purple barely shows
+                    focusedBorderColor = AroundTheme.colors.accentText,
+                    cursorColor = AroundTheme.colors.accentText,
                 ),
             keyboardOptions =
                 KeyboardOptions(
@@ -282,19 +286,6 @@ fun VenueInitializationContent(
     }
   }
 }
-
-// Scoped to this screen until the app's shared design tokens are implemented.
-private val VenueSetupColors =
-    lightColorScheme(
-        primary = Color(0xFF4D0092),
-        onPrimary = Color(0xFFFDFFE8),
-        background = Color(0xFFFDFFE8),
-        onBackground = Color(0xFF2D2D2D),
-        surface = Color(0xFFFFFFF6),
-        onSurface = Color(0xFF2D2D2D),
-        onSurfaceVariant = Color(0xFF6E6C66),
-        outline = Color(0xFFE3E5CF),
-    )
 
 @OptIn(ExperimentalTextApi::class)
 private val VenueBodyFont =

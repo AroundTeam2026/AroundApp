@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -50,6 +51,20 @@ class CreateQuestUiStateTest {
 
     assertFalse(form.customRadius)
     assertEquals(RadiusPreset.AT_THE_DOOR.meters, form.selectedRadiusPreset)
+  }
+
+  @Test
+  fun filledWithAQuestKeepsWhereItIs() {
+    val today = LocalDate.of(2026, 11, 9)
+    val elsewhere = Location(46.5191, 6.5668)
+    val placed =
+        CreateQuestUiState().filledWith(testQuest(location = elsewhere), ZoneOffset.UTC, today)
+    val atVenue = CreateQuestUiState().filledWith(testQuest(), ZoneOffset.UTC, today)
+
+    assertEquals(elsewhere, placed.questLocation)
+    assertFalse(placed.atVenue)
+    assertNull(atVenue.questLocation)
+    assertTrue(atVenue.atVenue)
   }
 
   // A quest saved under other limits opens, and is saved, within today's

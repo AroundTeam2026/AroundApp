@@ -88,20 +88,21 @@ class OverviewViewModelTest {
   private fun test(body: suspend TestScope.() -> Unit) = runTest(dispatcher) { body() }
 
   /**
-   * Books [questId] at [venueId] as the explorer, with its slot at [slotStart], and has [friends]
-   * join its party; returns its id.
+   * Books [questId] at [venueId] as [creator], the explorer by default, with its slot at
+   * [slotStart], and has [friends] join its party; returns its id.
    */
   private suspend fun book(
       questId: String,
       venueId: String = CAFE,
       slotStart: Long = START,
       friends: List<String> = emptyList(),
+      creator: String = EXPLORER,
   ): String {
     val id =
         reservations
             .createReservation(
                 newPendingReservation(questId, venueId, TEST_EXPLORER_NAME, slotStart),
-                EXPLORER,
+                creator,
             )
             .getOrThrow()
     friends.forEach { party.join(id, it).getOrThrow() }
@@ -191,7 +192,8 @@ class OverviewViewModelTest {
 
   @Test
   fun aReservationTheExplorerWithdrewFromLeavesTheList() = test {
-    val id = book("fox", friends = listOf("friend"))
+    // The creator can't withdraw, so a friend creates the party and the explorer joins it
+    val id = book("fox", friends = listOf(EXPLORER), creator = "friend")
     book("cake")
     viewModel
     runCurrent()

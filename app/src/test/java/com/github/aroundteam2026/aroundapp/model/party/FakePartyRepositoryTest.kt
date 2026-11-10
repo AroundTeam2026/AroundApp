@@ -1,6 +1,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.party
 
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -24,6 +26,9 @@ class FakePartyRepositoryTest {
   fun setUp() {
     repository = FakePartyRepository(now = { clock })
   }
+
+  /** Joins [CREATOR] to `r1` first, so later members of `r1` aren't its creator and may leave. */
+  private suspend fun createParty() = repository.join("r1", CREATOR).getOrThrow()
 
   /** The party of [reservationId] as it is now. */
   private suspend fun party(reservationId: String = "r1") =
@@ -58,7 +63,7 @@ class FakePartyRepositoryTest {
 
         assertTrue(repository.join("r1", "late").exceptionOrNull() is IllegalStateException)
         assertEquals(MAX_PARTY_SIZE, party().size)
-        repository.withdraw("r1", "u0").getOrThrow()
+        repository.withdraw("r1", "u1").getOrThrow()
         repository.join("r1", "late").getOrThrow()
         assertEquals(
             MAX_PARTY_SIZE,
@@ -70,30 +75,33 @@ class FakePartyRepositoryTest {
   @Test
   fun join_afterWithdrawing_fails() =
       runBlocking<Unit> {
+        createParty()
         repository.join("r1", "u1").getOrThrow()
         repository.withdraw("r1", "u1").getOrThrow()
 
         assertTrue(repository.join("r1", "u1").isFailure)
-        assertEquals(PartyMemberStatus.WITHDRAWN, party().single().status)
+        assertEquals(PartyMemberStatus.WITHDRAWN, party().single { it.uid == "u1" }.status)
       }
 
   @Test
   fun withdraw_keepsTheMembershipAndRecordsWhen() =
       runBlocking<Unit> {
+        createParty()
         repository.join("r1", "u1").getOrThrow()
         clock = WITHDRAWN_AT
 
         repository.withdraw("r1", "u1").getOrThrow()
 
         assertEquals(
-            listOf(PartyMember("r1", "u1", PartyMemberStatus.WITHDRAWN, JOINED_AT, WITHDRAWN_AT)),
-            party(),
+            PartyMember("r1", "u1", PartyMemberStatus.WITHDRAWN, JOINED_AT, WITHDRAWN_AT),
+            party().single { it.uid == "u1" },
         )
       }
 
   @Test
   fun withdraw_twice_failsWithIllegalState() =
       runBlocking<Unit> {
+        createParty()
         repository.join("r1", "u1").getOrThrow()
         repository.withdraw("r1", "u1").getOrThrow()
 
@@ -107,6 +115,64 @@ class FakePartyRepositoryTest {
 
         assertTrue(repository.withdraw("r1", "u2").exceptionOrNull() is NoSuchElementException)
         assertTrue(repository.withdraw("r2", "u1").exceptionOrNull() is NoSuchElementException)
+      }
+
+  /** The rules tell the creator by `joinedAt`; the fake by who joined first. */
+  @Test
+  fun withdraw_byTheCreator_failsAndKeepsThemJoined() =
+      runBlocking<Unit> {
+        createParty()
+        repository.join("r1", "u1").getOrThrow()
+
+        assertTrue(repository.withdraw("r1", CREATOR).exceptionOrNull() is IllegalStateException)
+        assertEquals(PartyMemberStatus.JOINED, party().single { it.uid == CREATOR }.status)
+      }
+
+  /** The creator of one party is an ordinary member of another. */
+  @Test
+  fun withdraw_byTheCreatorOfAnotherParty_succeeds() =
+      runBlocking<Unit> {
+        createParty()
+        repository.join("r2", "u1").getOrThrow()
+        repository.join("r2", CREATOR).getOrThrow()
+
+        repository.withdraw("r2", CREATOR).getOrThrow()
+      }
+
+  @Test
+  fun withdraw_onlyWhilePendingOrApproved() =
+      runBlocking<Unit> {
+        for (status in ReservationStatus.entries) {
+          repository = FakePartyRepository(now = { clock }, statusOf = { status })
+          createParty()
+          repository.join("r1", "u1").getOrThrow()
+
+          val allowed = status == ReservationStatus.PENDING || status == ReservationStatus.APPROVED
+          assertEquals("$status", allowed, repository.withdraw("r1", "u1").isSuccess)
+        }
+      }
+
+  @Test
+  fun withdraw_afterSendingTheProof_fails() =
+      runBlocking<Unit> {
+        repository = FakePartyRepository(now = { clock }, hasSentProof = { _, uid -> uid == "u1" })
+        createParty()
+        repository.join("r1", "u1").getOrThrow()
+        repository.join("r1", "u2").getOrThrow()
+
+        assertTrue(repository.withdraw("r1", "u1").exceptionOrNull() is IllegalStateException)
+        repository.withdraw("r1", "u2").getOrThrow()
+      }
+
+  @Test
+  fun join_atTheCapacityOfTheReservation_fails() =
+      runBlocking<Unit> {
+        val exact = testQuest(minPartySize = EXACT_SIZE).copy(exactPartySize = true)
+        repository = FakePartyRepository(now = { clock }, capacityOf = { exact.partyCapacity })
+        repeat(EXACT_SIZE) { repository.join("r1", "u$it").getOrThrow() }
+
+        assertTrue(repository.join("r1", "late").exceptionOrNull() is IllegalStateException)
+        assertEquals(EXACT_SIZE, party().size)
       }
 
   @Test
@@ -153,5 +219,7 @@ class FakePartyRepositoryTest {
     const val JOINED_AT = 1_000L
     const val WITHDRAWN_AT = 2_000L
     const val TIMEOUT_MS = 1_000L
+    const val EXACT_SIZE = 3
+    const val CREATOR = "creator"
   }
 }

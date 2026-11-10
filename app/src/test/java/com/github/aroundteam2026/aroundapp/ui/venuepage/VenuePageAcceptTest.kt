@@ -105,11 +105,18 @@ class VenuePageAcceptTest {
 
   private suspend fun stored(): List<Reservation> = fake.observeForExplorer(EXPLORER).first()
 
-  /** Stores the explorer's reservation of [questId], which [friends] join; returns its id. */
-  private suspend fun storeFor(questId: String, friends: List<String> = emptyList()): String {
+  /**
+   * Stores a reservation of [questId] made by [creator], the explorer by default, which [friends]
+   * join; returns its id.
+   */
+  private suspend fun storeFor(
+      questId: String,
+      friends: List<String> = emptyList(),
+      creator: String = EXPLORER,
+  ): String {
     val id =
         fake
-            .createReservation(newPendingReservation(questId, VENUE_ID, NAME, START), EXPLORER)
+            .createReservation(newPendingReservation(questId, VENUE_ID, NAME, START), creator)
             .getOrThrow()
     friends.forEach { party.join(id, it).getOrThrow() }
     return id
@@ -663,7 +670,8 @@ class VenuePageAcceptTest {
 
   @Test
   fun aQuestTheExplorerWithdrewFromIsNoLongerAccepted() = test {
-    val id = storeFor("a", friends = listOf("friend"))
+    // The creator can't withdraw, so a friend creates the party and the explorer joins it
+    val id = storeFor("a", friends = listOf(EXPLORER), creator = "friend")
     openAndPick("a")
     assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
 

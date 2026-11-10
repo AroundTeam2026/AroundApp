@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
+import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.user.Role
@@ -368,11 +369,13 @@ class ReservationRepositoryFirestoreTest {
         try {
           val friendRepository = ReservationRepositoryFirestore(friendDb) { FIXED_NOW }
           val own = createAndSync()
-          val left = createAndSync()
           val joined = friendRepository.createReservation(reservation(), friendUid).getOrThrow()
+          // The creator can't leave their own party, so the explorer leaves the friend's
+          val left = friendRepository.createReservation(reservation(), friendUid).getOrThrow()
           friendRepository.createReservation(reservation(), friendUid).getOrThrow()
           val party = PartyRepositoryFirestore(explorerDb)
           party.join(joined, explorerUid).getOrThrow()
+          party.join(left, explorerUid).getOrThrow()
           party.withdraw(left, explorerUid).getOrThrow()
 
           val reservations =
@@ -392,7 +395,15 @@ class ReservationRepositoryFirestoreTest {
    */
   @Test
   fun observeForExplorer_followsTheVenuesAnswerAndAWithdrawal() = withTimeoutBlocking {
-    val id = createAndSync()
+    val friendUid = signInNewUser(FRIEND_APP, Role.EXPLORER)
+    val friendDb = emulatorClient(FRIEND_APP)
+    val party = PartyRepositoryFirestore(explorerDb)
+    // The creator can't leave their own party, so the explorer joins and leaves the friend's
+    val id =
+        ReservationRepositoryFirestore(friendDb) { FIXED_NOW }
+            .createReservation(reservation(), friendUid)
+            .getOrThrow()
+    party.join(id, explorerUid).getOrThrow()
     val emissions = Channel<List<Reservation>>(Channel.UNLIMITED)
     val collector =
         launch(start = CoroutineStart.UNDISPATCHED) {
@@ -408,7 +419,7 @@ class ReservationRepositoryFirestoreTest {
         val latest = emissions.receive()
       } while (latest.none { it.id == id && it.status == ReservationStatus.APPROVED })
 
-      PartyRepositoryFirestore(explorerDb).withdraw(id, explorerUid).getOrThrow()
+      party.withdraw(id, explorerUid).getOrThrow()
       do {
         val latest = emissions.receive()
       } while (latest.any { it.id == id })
@@ -577,6 +588,20 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: the venue approves a party smaller than its quest asks for, or the refusal isn't returned
+   * as a failure and leaves the reservation changed.
+   */
+  @Test
+  fun updateStatus_approvingAPartyBelowItsQuestsSize_returnsPermissionDenied() =
+      withTimeoutBlocking {
+        val group = createActiveQuest(minPartySize = GROUP_SIZE)
+        val id = createAndSync(reservation().copy(questId = group))
+
+        assertPermissionDenied(venueRepository.updateStatus(id, ReservationStatus.APPROVED))
+        assertEquals("PENDING", storedStatus(id))
+      }
+
+  /**
    * A reservation for the venue's quest. `id`, `status` and `createdAt` are set by the repository
    * and ignored.
    */
@@ -595,9 +620,10 @@ class ReservationRepositoryFirestoreTest {
    * Has the venue create an active quest and waits until the server has it, since the rules read
    * the quest when a reservation for it is created.
    *
+   * @param minPartySize how many explorers the quest needs.
    * @return the quest's id.
    */
-  private suspend fun createActiveQuest(): String {
+  private suspend fun createActiveQuest(minPartySize: Int = QuestLimits.MIN_PARTY_SIZE): String {
     val quest =
         Quest(
             id = "",
@@ -607,6 +633,7 @@ class ReservationRepositoryFirestoreTest {
             description = "Description",
             requirements = "Requirements",
             proofType = ProofType.PHOTO,
+            minPartySize = minPartySize,
             reward = null,
             status = QuestStatus.ACTIVE,
             createdAt = 0L,
@@ -694,6 +721,9 @@ class ReservationRepositoryFirestoreTest {
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
+
+    /** The size of a quest for more than one explorer, so its creator alone can't be approved. */
+    const val GROUP_SIZE = 2
 
     /** When every reservation's slot starts, in epoch ms; the non-zero ms catch precision loss. */
     const val SLOT_START = 1_800_000_000_456L

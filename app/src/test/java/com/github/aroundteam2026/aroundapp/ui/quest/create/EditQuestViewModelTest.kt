@@ -1,13 +1,19 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -20,6 +26,7 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -47,6 +54,7 @@ class EditQuestViewModelTest {
           )
           .copy(radiusMeters = 100)
   private val quests = FakeQuestRepository(initialQuests = listOf(quest))
+  private val reservations = FakeReservationRepository()
   private lateinit var viewModel: CreateQuestViewModel
   private val state
     get() = viewModel.uiState.value
@@ -62,15 +70,21 @@ class EditQuestViewModelTest {
   }
 
   /** A form editing [questId] from [questRepository], for a venue whose own radius is 25 m. */
-  private fun open(questRepository: QuestRepository = quests, questId: String = QUEST_ID) {
+  private fun open(
+      questRepository: QuestRepository = quests,
+      questId: String = QUEST_ID,
+      reservationRepository: ReservationRepository = reservations,
+  ) {
     val venue = testVenue(id = VENUE_ID).copy(radiusMeters = 25)
     viewModel =
         CreateQuestViewModel(
             FakeAuthRepository(VENUE_ID),
             FakeVenueRepository(listOf(venue)),
             questRepository,
+            FakeAddressSearchRepository(),
             clock,
             questId,
+            reservationRepository,
         )
     dispatcher.scheduler.advanceUntilIdle()
   }
@@ -83,6 +97,7 @@ class EditQuestViewModelTest {
             FakeAuthRepository(VENUE_ID),
             FakeVenueRepository(),
             quests,
+            FakeAddressSearchRepository(),
             clock,
             QUEST_ID,
         )
@@ -131,6 +146,34 @@ class EditQuestViewModelTest {
     assertEquals(listOf(QUEST_ID), quests.observeQuestsByVenue(VENUE_ID).first().map { it.id })
   }
 
+  // Saving must not move a quest placed away from the venue back to it
+  @Test
+  fun savingKeepsWhereTheQuestIs() = runTest {
+    val elsewhere = Location(46.5191, 6.5668)
+    val placed = quest.copy(location = elsewhere)
+    val scripted = ScriptedQuestRepository(quest = { placed })
+    open(scripted)
+    assertEquals(elsewhere, state.questLocation)
+
+    viewModel.updateTitle("Find the golden fox")
+    viewModel.submit()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(elsewhere, scripted.updated.single().location)
+  }
+
+  @Test
+  fun aQuestMovedWhileEditedIsSavedAtItsNewPlace() = runTest {
+    val moved = Location(46.5300, 6.6400)
+    open()
+    viewModel.placeElsewhere()
+    viewModel.moveQuest(moved)
+    viewModel.submit()
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertEquals(moved, quests.getQuest(QUEST_ID)!!.location)
+  }
+
   @Test
   fun aFailedSaveKeepsTheFormAndCanBeRetried() {
     open()
@@ -168,10 +211,68 @@ class EditQuestViewModelTest {
     assertTrue(state.questUnavailable)
   }
 
+  // A network blip must not close the form
   @Test
-  fun aQuestThatCantBeReadIsUnavailable() {
-    open(ScriptedQuestRepository(quest = { throw IOException("offline") }))
+  fun aQuestThatCantBeReadCanBeReadAgain() {
+    val scripted = ScriptedQuestRepository(quest = { throw IOException("offline") })
+    open(scripted)
+    assertTrue(state.questLoadFailed)
+    assertFalse(state.questUnavailable)
+
+    scripted.quest = { quest }
+    viewModel.retryQuest()
+    dispatcher.scheduler.advanceUntilIdle()
+    assertFalse(state.questLoadFailed)
+    assertEquals("Find the hidden fox", state.title)
+  }
+
+  // Its update would be rejected by the rules yet look saved
+  @Test
+  fun anotherVenuesQuestIsUnavailable() {
+    open(ScriptedQuestRepository(quest = { quest.copy(venueId = "other-venue") }))
     assertTrue(state.questUnavailable)
+  }
+
+  // The rules check a pending party against the quest as it is when the venue approves
+  @Test
+  fun pendingReservationsLockThePartySize() = runTest {
+    val id =
+        reservations
+            .createReservation(newPendingReservation(QUEST_ID, VENUE_ID, "Ana", 0), "explorer")
+            .getOrThrow()
+    open()
+    assertTrue(state.partySizeLocked)
+    viewModel.incrementPartySize()
+    viewModel.updateExactPartySize(true)
+    assertEquals(quest.minPartySize, state.minPartySize)
+    assertFalse(state.exactPartySize)
+
+    reservations.updateStatus(id, ReservationStatus.REJECTED)
+    dispatcher.scheduler.advanceUntilIdle()
+    assertFalse(state.partySizeLocked)
+    viewModel.incrementPartySize()
+    assertEquals(quest.minPartySize + 1, state.minPartySize)
+  }
+
+  @Test
+  fun aReservationArrivingPutsTheQuestsPartySizeBack() = runTest {
+    open()
+    viewModel.incrementPartySize()
+    reservations.createReservation(newPendingReservation(QUEST_ID, VENUE_ID, "Ana", 0), "explorer")
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertTrue(state.partySizeLocked)
+    assertEquals(quest.minPartySize, state.minPartySize)
+  }
+
+  @Test
+  fun thePartySizeStaysLockedIfReservationsCantBeRead() {
+    val failing =
+        object : ReservationRepository by reservations {
+          override fun observeForVenue(venueId: String) = flow<Nothing> { throw IOException() }
+        }
+    open(reservationRepository = failing)
+    assertTrue(state.partySizeLocked)
   }
 
   // Nothing to save over: an empty edit form must never create a quest

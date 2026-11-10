@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.quest
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -133,6 +134,24 @@ class FakeQuestRepositoryTest {
 
       assertEquals(listOf(0, 1), emissions.await().map { it.size })
     }
+  }
+
+  // #430: like the Firestore repository, the fake keeps a quest's own location as given
+  @Test
+  fun createQuest_keepsTheQuestsOwnLocation() = runBlocking {
+    val location = Location(46.5191, -6.5668)
+    val id = repository.createQuest(testQuest(location = location)).getOrThrow()
+
+    assertEquals(location, repository.getQuest(id)?.location)
+    assertEquals(location, repository.observeActiveQuests().first().single().location)
+  }
+
+  // #430: a quest without a location of its own stays at its venue, never at a made-up place
+  @Test
+  fun createQuest_keepsANullLocation() = runBlocking {
+    val id = repository.createQuest(testQuest(location = null)).getOrThrow()
+
+    assertNull(repository.getQuest(id)?.location)
   }
 
   @Test

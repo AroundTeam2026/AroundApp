@@ -6,6 +6,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryFirestore
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -75,7 +77,7 @@ class PartyRepositoryFirestoreTest {
           explorerDb = emulatorClient(EXPLORER_APP)
           friendDb = emulatorClient(FRIEND_APP)
           venueDb = emulatorClient(VENUE_APP)
-          reservationId = createPendingReservation()
+          reservationId = createPendingReservation(createActiveQuest())
         }
         explorer = PartyRepositoryFirestore(explorerDb) { JOINED_AT }
         friend = PartyRepositoryFirestore(friendDb) { JOINED_AT }
@@ -152,6 +154,44 @@ class PartyRepositoryFirestoreTest {
     writeBypassingRules("$RESERVATIONS/$reservationId", mapOf("joinedCount" to MAX_PARTY_SIZE))
 
     assertPermissionDenied(friend.join(reservationId, friendUid))
+  }
+
+  /**
+   * Bug: an explorer joins an exact-size party that already has as many members as its quest asks
+   * for.
+   */
+  @Test
+  fun join_aFullExactSizeParty_returnsPermissionDenied() = withTimeoutBlocking {
+    // An exact party of one is full with its creator alone
+    val full = createPendingReservation(createActiveQuest(exactPartySize = true))
+
+    assertPermissionDenied(friend.join(full, friendUid))
+  }
+
+  /** Bug: the creator leaves their own party instead of cancelling the reservation. */
+  @Test
+  fun withdraw_byTheCreator_returnsPermissionDenied() = withTimeoutBlocking {
+    // A later clock, so the rules refuse it for being the creator, not for an unchanged updatedAt
+    val later = PartyRepositoryFirestore(explorerDb) { WITHDRAWN_AT }
+
+    assertPermissionDenied(later.withdraw(reservationId, explorerUid))
+  }
+
+  /** Bug: a member leaves after sending their proof, which the venue would then review. */
+  @Test
+  fun withdraw_afterSendingTheProof_returnsPermissionDenied() = withTimeoutBlocking {
+    val id = createPendingReservation(createActiveQuest(proofType = ProofType.TEXT))
+    friend.join(id, friendUid).getOrThrow()
+    ReservationRepositoryFirestore(venueDb)
+        .updateStatus(id, ReservationStatus.APPROVED)
+        .getOrThrow()
+    CompletionRepositoryFirestore(friendDb)
+        .submit(id, venueId, friendUid, Proof.Text(TEXT_ANSWER))
+        .getOrThrow()
+    friendDb.waitForPendingWrites().await()
+
+    val later = PartyRepositoryFirestore(friendDb) { WITHDRAWN_AT }
+    assertPermissionDenied(later.withdraw(id, friendUid))
   }
 
   /**
@@ -342,8 +382,14 @@ class PartyRepositoryFirestoreTest {
     }
   }
 
-  /** Has the venue create an active quest and waits until the server has it; returns its id. */
-  private suspend fun createActiveQuest(): String {
+  /**
+   * Has the venue create an active quest, for [exactPartySize] explorers or at least one, with
+   * proofs of [proofType], and waits until the server has it; returns its id.
+   */
+  private suspend fun createActiveQuest(
+      exactPartySize: Boolean = false,
+      proofType: ProofType = ProofType.PHOTO,
+  ): String {
     val quest =
         Quest(
             id = "",
@@ -352,7 +398,8 @@ class PartyRepositoryFirestoreTest {
             title = "Title",
             description = "Description",
             requirements = "Requirements",
-            proofType = ProofType.PHOTO,
+            proofType = proofType,
+            exactPartySize = exactPartySize,
             reward = null,
             status = QuestStatus.ACTIVE,
             createdAt = 0L,
@@ -364,13 +411,13 @@ class PartyRepositoryFirestoreTest {
   }
 
   /**
-   * Has the venue create an active quest and the explorer reserve it, which makes them its first
-   * member, then waits until the server has both, since the rules read them.
+   * Has the explorer reserve the venue's quest [questId], which makes them its first member, then
+   * waits until the server has the reservation, since the rules read it.
    *
    * @return the reservation's id.
    */
-  private suspend fun createPendingReservation(): String {
-    val reservation = newPendingReservation(createActiveQuest(), venueId, EXPLORER_NAME, SLOT_START)
+  private suspend fun createPendingReservation(questId: String): String {
+    val reservation = newPendingReservation(questId, venueId, EXPLORER_NAME, SLOT_START)
     val id =
         ReservationRepositoryFirestore(explorerDb)
             .createReservation(reservation, explorerUid)
@@ -419,6 +466,9 @@ class PartyRepositoryFirestoreTest {
     /** Join and withdrawal times; the non-zero ms catch precision loss. */
     const val JOINED_AT = 1_700_000_000_123L
     const val WITHDRAWN_AT = 1_700_000_100_456L
+
+    /** The friend's answer to a text quest. */
+    const val TEXT_ANSWER = "Answer"
 
     /** When the reservation's slot starts, in epoch ms, in the future so the rules accept it. */
     const val SLOT_START = 1_800_000_000_456L

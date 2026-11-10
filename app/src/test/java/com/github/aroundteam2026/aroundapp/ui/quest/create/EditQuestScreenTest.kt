@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -51,6 +52,7 @@ class EditQuestScreenTest {
             FakeAuthRepository(VENUE_ID),
             FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
             quests,
+            FakeAddressSearchRepository(),
             questId = questId,
         )
     compose.setContent {

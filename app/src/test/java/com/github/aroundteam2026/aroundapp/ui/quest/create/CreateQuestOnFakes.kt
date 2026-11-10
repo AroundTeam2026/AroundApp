@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -14,6 +15,11 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
  */
 fun createQuestFactoryOnFakes(): ViewModelProvider.Factory = viewModelFactory {
   initializer {
-    CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository(), FakeQuestRepository())
+    CreateQuestViewModel(
+        FakeAuthRepository(),
+        FakeVenueRepository(),
+        FakeQuestRepository(),
+        FakeAddressSearchRepository(),
+    )
   }
 }

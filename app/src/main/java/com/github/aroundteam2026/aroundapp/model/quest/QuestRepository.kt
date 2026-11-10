@@ -65,6 +65,10 @@ interface QuestRepository {
    * stored `venueId` and `createdAt` and sets `updatedAt` to the update time; the values of those
    * three fields in [quest] are ignored. To archive a quest, update it with [QuestStatus.ARCHIVED].
    *
+   * Every other field is overwritten, including the optional ones: a null `location` or `reward`
+   * deletes the stored one. A null location moves the quest back to its venue's location, so a
+   * caller that doesn't change the location must pass the stored one through.
+   *
    * @param quest the new content of the quest; its `venueId`, `createdAt` and `updatedAt` are
    *   ignored.
    * @return success, or a failure if the write could not be issued. Success does not wait for the
