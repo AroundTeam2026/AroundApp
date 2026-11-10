@@ -1454,6 +1454,27 @@ class FirestoreRulesTest {
     assertEquals(false, assertSucceeds(missing.get(Source.SERVER)).exists())
   }
 
+  // The Quests tab listens to the proof of a reservation it just created, before the server has it
+  @Test
+  fun theCompletionsOfAMissingReservationAreListable() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = approvedReservationOf(explorer, venue)
+    assertSucceeds(completionOf(reservation).set(completion(reservation.id, explorer, venue)))
+    // Signed in from here on: an explorer outside both reservations
+    newUser(Role.EXPLORER)
+    val missing = newReservation()
+
+    val ofMissing = completions().whereEqualTo("reservationId", missing.id)
+    assertEquals(0, assertSucceeds(ofMissing.get(Source.SERVER)).size())
+    assertDenied(
+        completions().whereEqualTo("reservationId", reservation.id).get(Source.SERVER),
+        "another reservation's completions",
+    )
+    signOut()
+    assertDenied(ofMissing.get(Source.SERVER), "signed out")
+  }
+
   @Test
   fun completionIsNeverDeleted() {
     val explorer = newUser(Role.EXPLORER)

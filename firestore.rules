@@ -472,7 +472,9 @@ service cloud.firestore {
     // whatever the first one's status. Only the venue answers it, and can still approve what it
     // rejected, but an approval is final. The member who sent it, the party's joined members and
     // the venue read it. Anyone signed in may find that an id has no completion, which is how an
-    // answer to an unknown id reports it. Completions are never deleted.
+    // answer to an unknown id reports it, and may list the completions of a reservation that
+    // doesn't exist, which are none: the app listens to the proof of a reservation it just created
+    // before the server has it. Completions are never deleted.
     match /completions/{completionId} {
       allow get: if signedIn()
           && (resource == null
@@ -482,7 +484,8 @@ service cloud.firestore {
       allow list: if signedIn()
           && (request.auth.uid == resource.data.explorerUid
               || request.auth.uid == resource.data.venueId
-              || isJoinedMember(resource.data.reservationId));
+              || isJoinedMember(resource.data.reservationId)
+              || !exists(reservation(resource.data.reservationId)));
       allow create: if signedIn()
           && isValidCompletion(request.resource.data)
           && request.resource.data.explorerUid == request.auth.uid
