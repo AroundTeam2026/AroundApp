@@ -513,6 +513,22 @@ class MapViewModelPinsTest {
     assertEquals("geneva", state.selectedVenueId)
   }
 
+  @Test
+  fun tappingThePinOfAQuestAwayFromItsVenueOpensOnlyThatPin() = test {
+    quests.value += testQuest(id = "away", venueId = "cafe", location = museumLocation)
+    showing()
+    assertEquals(
+        listOf("cafe", "cafe"),
+        state.pins.filter { it.venueId == "cafe" }.map { it.venueId },
+    )
+
+    viewModel.onPinClick("away")
+    runCurrent()
+
+    assertEquals("away", state.selectedVenueId)
+    assertEquals(museumLocation, state.pins.single { it.key == state.selectedVenueId }.location)
+  }
+
   private companion object {
     /** When the tests start, in epoch milliseconds. */
     const val START = 1_800_000_000_000L

@@ -477,7 +477,7 @@ private fun ProofCard(proofType: ProofType) {
   }
 }
 
-/** How close to the venue the proof must be sent, on a map once the venue has a location. */
+/** How close to the quest's location, or else the venue's, the proof must be sent, on a map. */
 @Composable
 private fun RadiusCard(state: VenuePageUiState, quest: VenuePageQuest) {
   Card(
@@ -486,7 +486,7 @@ private fun RadiusCard(state: VenuePageUiState, quest: VenuePageQuest) {
       trailing = stringResource(R.string.quest_detail_radius_meters, quest.radiusMeters),
       trailingTag = C.Tag.QUEST_DETAIL_RADIUS,
   ) {
-    state.venueLocation?.let { location ->
+    (quest.location ?: state.venueLocation)?.let { location ->
       StillRadiusMap(
           location,
           quest.radiusMeters,

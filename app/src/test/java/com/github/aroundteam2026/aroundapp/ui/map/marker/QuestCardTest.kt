@@ -57,6 +57,7 @@ class QuestCardTest {
             )
             .copy(exactPartySize = exactPartySize)
     return VenuePin(
+        key = quest.venueId,
         venueId = quest.venueId,
         venueName = venueName,
         location = Location(46.5220, 6.6330),

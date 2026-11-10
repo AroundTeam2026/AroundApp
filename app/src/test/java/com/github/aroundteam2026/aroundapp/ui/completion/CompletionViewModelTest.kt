@@ -79,6 +79,7 @@ class CompletionViewModelTest {
               ),
               testQuest(id = "short-radius", venueId = CAFE, proofType = ProofType.TEXT)
                   .copy(radiusMeters = 20),
+              testQuest(id = "away", venueId = CAFE, location = AWAY, proofType = ProofType.TEXT),
           ),
       )
   private val questRepository = GatedQuests(quests)
@@ -352,6 +353,34 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
     assertEquals(1, completions.calls)
+  }
+
+  @Test
+  fun aQuestAwayFromItsVenueIsSubmittedFromItsOwnLocation() = test {
+    // Its venue has no marker: the quest's own location is all the check needs
+    venues = FakeVenueRepository(listOf(testVenue(id = CAFE, location = null)))
+    open("away")
+    locations.preciseLocation = AWAY
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(null, state.locationError)
+    assertEquals(1, completions.calls)
+  }
+
+  @Test
+  fun aQuestAwayFromItsVenueCannotBeSubmittedFromTheVenue() = test {
+    open("away")
+    locations.preciseLocation = VENUE_LOCATION
+    viewModel.updateAnswer("The fox")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(CompletionLocationError.TOO_FAR, state.locationError)
+    assertEquals(0, completions.calls)
   }
 
   @Test
@@ -804,6 +833,8 @@ class CompletionViewModelTest {
     const val EXPLORER = "explorer"
     const val NOW = 1_800_000_000_000L
     val VENUE_LOCATION = Location(46.5220, 6.6330)
+    /** Where the quest "away" takes place, kilometres from its venue. */
+    val AWAY = Location(46.5191, 6.5668)
     val PHOTO: Uri = Uri.parse("content://media/photos/1")
     val OTHER_PHOTO: Uri = Uri.parse("content://media/photos/2")
   }

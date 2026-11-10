@@ -42,12 +42,12 @@ fun QuestMarkers(
     pins: List<VenuePin>,
     selectedVenueId: String?,
     style: MarkerStyle,
-    onPinClick: (venueId: String) -> Unit,
+    onPinClick: (key: String) -> Unit,
     onCardClick: (VenuePin) -> Unit,
 ) {
   pins.forEach { pin ->
-    key(pin.venueId) {
-      val open = pin.venueId == selectedVenueId
+    key(pin.key) {
+      val open = pin.key == selectedVenueId
       // Real metres on the ground, so the area grows as the explorer zooms in
       val area = pin.area(style)
       Circle(
@@ -64,7 +64,7 @@ fun QuestMarkers(
           contentDescription = pin.description(),
           zIndex = if (open) OPEN_CARD_Z_INDEX else 0f,
           onClick = {
-            if (open) onCardClick(pin) else onPinClick(pin.venueId)
+            if (open) onCardClick(pin) else onPinClick(pin.key)
             // Handled: no info window, and the camera stays put
             true
           },

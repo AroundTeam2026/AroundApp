@@ -315,6 +315,19 @@ class VenuePageViewModelTest {
   }
 
   @Test
+  fun aQuestCarriesItsOwnLocationOrNone() = test {
+    val away = Location(46.5191, 6.5668)
+    quests.value =
+        listOf(testQuest(id = "a", venueId = VENUE_ID), testQuest("b", VENUE_ID, location = away))
+    viewModel
+    runCurrent()
+
+    val byId = state.quests.associateBy { it.questId }
+    assertEquals(null, byId.getValue("a").location)
+    assertEquals(away, byId.getValue("b").location)
+  }
+
+  @Test
   fun theDetailsOpenAndClose() = test {
     viewModel
     runCurrent()

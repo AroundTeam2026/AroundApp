@@ -23,8 +23,8 @@ import java.util.Locale
  * @property reward The quest's reward, or null when it has none.
  * @property minPartySize How many people the quest needs at least.
  * @property exactPartySize Whether the party must have exactly [minPartySize] people.
- * @property distanceMeters How far the venue is from the explorer, or null when their position is
- *   unknown.
+ * @property distanceMeters How far the quest's pin is from the explorer, or null when their
+ *   position is unknown.
  */
 data class NearbyQuest(
     val venueId: String,
@@ -63,8 +63,9 @@ fun nearbyQuests(
   val rows =
       quests
           .filter { it.isValidAt(now) }
-          .groupBy { it.venueId }
-          .flatMap { (venueId, own) ->
+          .groupBy(::pinKey)
+          .flatMap { (_, own) ->
+            val venueId = own.first().venueId
             val venue = venues[venueId] ?: return@flatMap emptyList()
             val shown = shownVenue(own, venue) ?: return@flatMap emptyList()
             val distance = from?.distanceTo(shown.location)

@@ -160,6 +160,20 @@ class MapViewModelOverlayTest {
   }
 
   @Test
+  fun tappingThePageOfAQuestAwayFromItsVenueOpensAndFramesItsOwnPin() = test {
+    val away = Location(46.6100, 6.7100)
+    quests.value += testQuest(id = "away", venueId = "cafe", location = away)
+    viewModel.onNearbyOpen()
+    runCurrent()
+
+    viewModel.onNearbyQuestClick(state.nearby.single { it.questId == "away" })
+    runCurrent()
+
+    assertEquals("away", state.selectedVenueId)
+    assertEquals(away.boundsWithin(MapViewModel.VENUE_FRAME_RADIUS_METERS), state.areaToFrame)
+  }
+
+  @Test
   fun aPageWhoseVenueLostItsQuestsChangesNothing() = test {
     viewModel.onNearbyOpen()
     runCurrent()

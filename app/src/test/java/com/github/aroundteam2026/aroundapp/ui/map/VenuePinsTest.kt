@@ -310,4 +310,39 @@ class VenuePinsTest {
 
     assertEquals(120, pins(quests, venue).single().areaRadiusMeters)
   }
+
+  @Test
+  fun aQuestAwayFromItsVenueGetsItsOwnPinThere() {
+    val away = Location(46.5191, 6.5668)
+    val quests =
+        listOf(
+            testQuest(id = "home", venueId = "cafe"),
+            testQuest(id = "away", venueId = "cafe", location = away).copy(radiusMeters = 80),
+        )
+    val venue = testVenue(id = "cafe", location = Location(2.0, 2.0)).copy(radiusMeters = 120)
+
+    val pins = buildVenuePins(quests, withRecords(quests, venue), now, from = Location(2.0, 2.0))
+    val byKey = pins.associateBy { it.key }
+
+    assertEquals(setOf("cafe", "away"), byKey.keys)
+    assertEquals(listOf("cafe", "cafe"), pins.map { it.venueId })
+    val own = byKey.getValue("away")
+    assertEquals(away, own.location)
+    assertEquals("away", own.featuredQuest.id)
+    assertEquals(80, own.areaRadiusMeters)
+    assertEquals(Location(2.0, 2.0).distanceTo(away), own.distanceMeters!!, 1e-6)
+    val home = byKey.getValue("cafe")
+    assertEquals(Location(2.0, 2.0), home.location)
+    assertEquals(0, home.otherQuestCount)
+    assertEquals(120, home.areaRadiusMeters)
+  }
+
+  @Test
+  fun aQuestAwayFromAVenueNotPlacedYetStillGetsItsPin() {
+    val quest = testQuest(id = "away", venueId = "cafe", location = Location(1.0, 1.0))
+
+    val pin = pins(listOf(quest), testVenue(id = "cafe", location = null)).single()
+
+    assertEquals(Location(1.0, 1.0), pin.location)
+  }
 }
