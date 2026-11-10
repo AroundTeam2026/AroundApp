@@ -40,12 +40,13 @@ One venue per account in v1, so the document id is the owner's uid.
 
 ### `quests/{questId}`
 
-The venue's name and location are not copied here: they are read from `venues/{venueId}`, so they never go stale.
+The venue's name and location are not copied here: they are read from `venues/{venueId}`, so they never go stale. A quest can have a `location` of its own instead, for one that takes place away from the venue; that is the quest's own data, not a copy of the venue's.
 
 | Field | Type | Notes |
 |---|---|---|
 | `venueId` | string | The venue owner's uid. |
-| `radiusMeters` | int | Distance from the venue's `location` within which a visit counts, so moving the venue's area re-centres every quest's area too. 20 to 200; the create-quest form starts from the venue's radius. |
+| `location` | geopoint? | Where explorers go for this quest (#429). Absent when the quest takes place at its venue, which is then read from `venues/{venueId}` and moves with the venue's area. A quest whose `location` is not a geopoint is skipped when read. |
+| `radiusMeters` | int | Distance from the quest's `location`, or from the venue's when the quest has none, within which a visit counts, so moving the venue's area re-centres the area of every quest without a location of its own. 20 to 200; the create-quest form starts from the venue's radius. |
 | `title` | string | At most 60 characters. |
 | `description` | string | At most 500 characters. |
 | `requirements` | string | At most 300 characters. |
@@ -183,7 +184,7 @@ The rules read the reservation and the membership from Firestore, so a proof fol
 
 Decided in #259, from the review of #25 and from R2 (#274). The tables above describe `main`; a change still in progress updates them when it lands.
 
-- **Copied venue fields in `quests`: adopted, done in #279 (F4a and F4b).** `venueName` and `location` go stale once a venue can rename itself or move its area, and dropping them later would mean migrating every stored quest. Readers take them from `venues/{venueId}` with `observeVenues`, one `in` query per 30 venues, as the overview (#269) does, and the rules reject the copies. The quests already stored on `around-67942` keep them until #283 removes them.
+- **Copied venue fields in `quests`: adopted, done in #279 (F4a and F4b).** `venueName` and `location` go stale once a venue can rename itself or move its area, and dropping them later would mean migrating every stored quest. Readers take them from `venues/{venueId}` with `observeVenues`, one `in` query per 30 venues, as the overview (#269) does, and the rules reject a copied `venueName`. #283 removed the copies from the quests already stored on `around-67942`. Since #430 the rules accept a quest `location` again, but as the quest's own place, set by the venue for that quest (#429); a quest without one still takes the venue's.
 - **Party membership: adopted, done in #281 (#294, #298, #295).** `explorerUids` loses who withdrew from a party. One membership document per explorer and reservation (`party_user`) keeps that history. Reservations no longer have `explorerUids`, and its readers (the venue page, the overview, `observeForExplorer` and the read and cancel rules) use the memberships. Reservations already stored on `around-67942` have no memberships, so only their venue can read them.
 - **Ids copied into `completions`: only `questId` is dropped, done in #272 (F5).** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules check them against the reservation and its memberships on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields.
 - **Text proof: adopted, done in #272 (F5).** `proofUrl` couldn't tell a typed answer from an uploaded photo, so a completion holds `photoUrl` for a `PHOTO` quest or `textAnswer` for a `TEXT` quest, never both.

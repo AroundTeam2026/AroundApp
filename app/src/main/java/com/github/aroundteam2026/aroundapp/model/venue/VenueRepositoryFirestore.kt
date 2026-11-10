@@ -5,13 +5,14 @@ package com.github.aroundteam2026.aroundapp.model.venue
 import android.util.Log
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.required
+import com.github.aroundteam2026.aroundapp.model.toGeoPoint
+import com.github.aroundteam2026.aroundapp.model.toLocation
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Transaction
 import java.util.Date
@@ -98,7 +99,7 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
       it.update(
           document,
           mapOf(
-              LOCATION to GeoPoint(location.lat, location.lng),
+              LOCATION to location.toGeoPoint(),
               RADIUS_METERS to radiusMeters,
               ADDRESS to (address ?: FieldValue.delete()),
           ),
@@ -149,7 +150,7 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
   /** The document fields for this venue, without its id and its null fields. */
   private fun Venue.toFirestore(): Map<String, Any> = buildMap {
     put(NAME, name)
-    location?.let { put(LOCATION, GeoPoint(it.lat, it.lng)) }
+    location?.let { put(LOCATION, it.toGeoPoint()) }
     put(RADIUS_METERS, radiusMeters)
     address?.let { put(ADDRESS, it) }
     put(CREATED_AT, Timestamp(Date(createdAt)))
@@ -163,7 +164,7 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
       Venue(
           id = id,
           name = required(NAME) { getString(it) },
-          location = getGeoPoint(LOCATION)?.let { Location(it.latitude, it.longitude) },
+          location = getGeoPoint(LOCATION)?.toLocation(),
           radiusMeters = required(RADIUS_METERS) { getLong(it) }.toInt(),
           address = getString(ADDRESS),
           createdAt = required(CREATED_AT) { getTimestamp(it) }.toDate().time,
