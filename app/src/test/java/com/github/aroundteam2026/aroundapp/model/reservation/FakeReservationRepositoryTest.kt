@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -356,6 +357,39 @@ class FakeReservationRepositoryTest {
         assertTrue(
             sized.updateStatus(id, ReservationStatus.APPROVED).exceptionOrNull()
                 is NoSuchElementException
+        )
+      }
+
+  /** Without a party given, the repository's own one fills up at the size of an exact quest. */
+  @Test
+  fun defaultParty_ofAnExactQuest_isFullAtItsSize() =
+      runBlocking<Unit> {
+        val quest =
+            testQuest(id = reservation().questId, minPartySize = PARTY_SIZE)
+                .copy(exactPartySize = true)
+        val sized =
+            FakeReservationRepository(
+                now = { FIXED_NOW },
+                quests = FakeQuestRepository(initialQuests = listOf(quest)),
+            )
+        val id = sized.createReservation(reservation(), "u0").getOrThrow()
+        (1 until PARTY_SIZE).forEach { sized.party.join(id, "u$it").getOrThrow() }
+
+        assertTrue(sized.party.join(id, "u$PARTY_SIZE").exceptionOrNull() is IllegalStateException)
+      }
+
+  /**
+   * Without quests, the repository's own party holds [MAX_PARTY_SIZE], as for an at least quest.
+   */
+  @Test
+  fun defaultParty_withoutQuests_isFullAtTheMaximum() =
+      runBlocking<Unit> {
+        val unsized = FakeReservationRepository(now = { FIXED_NOW })
+        val id = unsized.createReservation(reservation(), "u0").getOrThrow()
+        (1 until MAX_PARTY_SIZE).forEach { unsized.party.join(id, "u$it").getOrThrow() }
+
+        assertTrue(
+            unsized.party.join(id, "u$MAX_PARTY_SIZE").exceptionOrNull() is IllegalStateException
         )
       }
 

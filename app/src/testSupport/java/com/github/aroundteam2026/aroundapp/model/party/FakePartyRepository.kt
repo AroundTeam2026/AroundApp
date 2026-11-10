@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.update
  *   pass it as a trailing lambda.
  */
 class FakePartyRepository(
-    private val capacityOf: (reservationId: String) -> Int = { MAX_PARTY_SIZE },
+    private val capacityOf: suspend (reservationId: String) -> Int = { MAX_PARTY_SIZE },
     private val statusOf: (reservationId: String) -> ReservationStatus = {
       ReservationStatus.PENDING
     },
