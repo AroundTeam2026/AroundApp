@@ -342,20 +342,24 @@ private fun PhotoProof(
     when (val photo = state.photo) {
       is ProofPhoto.Loaded -> {
         val description = stringResource(R.string.review_proof_photo_description, explorer)
-        Image(
-            photo.image,
-            description,
-            Modifier.fillMaxSize()
-                .clickable(
-                    onClickLabel = stringResource(R.string.proof_viewer_open),
-                    role = Role.Image,
-                ) {
-                  viewing = true
-                }
-                .testTag(C.Tag.REVIEW_PROOF_PHOTO_IMAGE),
-            contentScale = ContentScale.Fit,
-        )
-        TapToZoom(Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Medium))
+        // Clickable around both: the chip's Surface takes the taps that land on it, so a clickable
+        // on the Image alone would miss them
+        Box(
+            Modifier.fillMaxSize().clickable(
+                onClickLabel = stringResource(R.string.proof_viewer_open),
+                role = Role.Image,
+            ) {
+              viewing = true
+            }
+        ) {
+          Image(
+              photo.image,
+              description,
+              Modifier.fillMaxSize().testTag(C.Tag.REVIEW_PROOF_PHOTO_IMAGE),
+              contentScale = ContentScale.Fit,
+          )
+          TapToZoom(Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Medium))
+        }
         if (viewing) {
           ProofPhotoViewer(
               photo.image,

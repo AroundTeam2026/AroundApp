@@ -146,6 +146,15 @@ class ReviewProofScreenTest {
   }
 
   @Test
+  fun tappingTheTapToZoomChipOpensThePhotoFullScreen() {
+    show(PHOTO)
+
+    node(C.Tag.REVIEW_PROOF_PHOTO_ZOOM).performClick()
+
+    node(C.Tag.PROOF_VIEWER).assertIsDisplayed()
+  }
+
+  @Test
   fun theFullScreenPhotoOfAnUnknownExplorerJustSentSaysSo() {
     show(PHOTO.copy(explorerName = null, questTitle = null, sentAt = NOW))
 
