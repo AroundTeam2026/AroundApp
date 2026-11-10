@@ -92,8 +92,12 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
  * @property saveState Where saving the quest stands.
  * @property editing Whether the form edits an existing quest rather than creating one; it then says
  *   "Edit quest" and "Save changes", and shows saving and failure above its button.
- * @property questUnavailable Whether the quest being edited couldn't be read or no longer exists,
+ * @property questUnavailable Whether the quest being edited no longer exists or isn't the venue's,
  *   so the form has nothing to edit and closes.
+ * @property questLoadFailed Whether reading the quest being edited failed, so the form offers to
+ *   read it again.
+ * @property partySizeLocked Whether the party size can't change, as the quest being edited has
+ *   pending reservations; locked until they are known.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -118,6 +122,8 @@ data class CreateQuestUiState(
     val saveState: SaveState = SaveState.Idle,
     val editing: Boolean = false,
     val questUnavailable: Boolean = false,
+    val questLoadFailed: Boolean = false,
+    val partySizeLocked: Boolean = editing,
 ) {
   /**
    * This form filled in with [quest], its fields untouched, so it opens without errors. The quest
