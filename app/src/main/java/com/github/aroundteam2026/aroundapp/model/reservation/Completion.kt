@@ -100,9 +100,6 @@ enum class CompletionStatus {
  * The id of the party's completion of the reservation [reservationId]: the reservation's own id, so
  * a retried submission writes the same document and a party, whichever member sends it, can't
  * complete a reservation twice.
- *
- * Completions stored before parties shared one proof are under `{reservationId}_{explorerUid}`;
- * they are still read and answered, but don't stop a party from sending its proof.
  */
 fun completionId(reservationId: String) = reservationId
 

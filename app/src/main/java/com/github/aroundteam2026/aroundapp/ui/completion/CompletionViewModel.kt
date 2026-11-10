@@ -43,8 +43,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the completion of the reservation [reservationId] by the explorer [explorerUid]: its quest,
- * the proof it asks for, what the explorer filled in, and submitting it.
+ * Holds the completion of the reservation [reservationId], sent for its party by the member
+ * [explorerUid]: its quest, the proof it asks for, what the member filled in, and submitting it.
  *
  * The form is [CompletionFormStatus.READY] only while the reservation is approved, and
  * [SaveState.Saved] once the explorer's completion is stored, even if an earlier submit's answer

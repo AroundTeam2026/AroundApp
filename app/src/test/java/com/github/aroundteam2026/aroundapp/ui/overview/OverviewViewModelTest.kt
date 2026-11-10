@@ -38,6 +38,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 
@@ -117,9 +118,12 @@ class OverviewViewModelTest {
   private suspend fun approvedReservation(questId: String = "fox"): String =
       book(questId).also { answer(it, ReservationStatus.APPROVED) }
 
-  /** Sends the explorer's proof of the reservation [reservationId]; returns the completion's id. */
-  private suspend fun sendProof(reservationId: String): String =
-      completions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the window")).getOrThrow()
+  /**
+   * Sends the party's proof of the reservation [reservationId] as [sender], the explorer unless
+   * given; returns the completion's id.
+   */
+  private suspend fun sendProof(reservationId: String, sender: String = EXPLORER): String =
+      completions.submit(reservationId, CAFE, sender, Proof.Text("By the window")).getOrThrow()
 
   private fun titles() = state.rows.map { it.questTitle }
 
@@ -400,7 +404,7 @@ class OverviewViewModelTest {
     book("fox")
     val broken =
         object : CompletionRepository by completions {
-          override fun observeForExplorer(uid: String): Flow<List<Completion>> = flow {
+          override fun observeForReservation(reservationId: String): Flow<List<Completion>> = flow {
             throw IOException("denied")
           }
         }
@@ -425,6 +429,18 @@ class OverviewViewModelTest {
     completions.approve(proof).getOrThrow()
     runCurrent()
     assertEquals(OverviewRowStatus.COMPLETED, state.rows.single().status)
+  }
+
+  // One proof stands for the whole party, so another member's counts as the explorer's
+  @Test
+  fun aProofSentByAnotherMemberShowsAsSentAndCannotBeCancelled() = test {
+    sendProof(approvedReservation(), sender = "friend")
+    viewModel
+    runCurrent()
+
+    val row = state.rows.single()
+    assertEquals(OverviewRowStatus.PROOF_SENT, row.status)
+    assertFalse(row.status.cancellable)
   }
 
   @Test

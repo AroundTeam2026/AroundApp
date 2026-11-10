@@ -28,7 +28,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * The security rules let any joined member of an approved reservation create its party's pending
  * completion, once, and only the venue answer it. A submission refused within [confirmTimeoutMs]
- * comes back as a failure, and one refused later is only logged.
+ * comes back as a failure, and one refused later is only logged. So when two members submit while
+ * offline, both get success, and the write that reaches the server second is refused and dropped:
+ * that member's proof is lost, while the listeners show them the party's proof, the other member's.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it

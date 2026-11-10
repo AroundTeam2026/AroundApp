@@ -1118,7 +1118,7 @@ class FirestoreRulesTest {
     assertDenied(completions().document(UUID.randomUUID().toString()).set(valid), "a random id")
     assertDenied(
         completions().document("${reservation.id}_${explorer.uid}").set(valid),
-        "the per-explorer id used before parties shared one proof",
+        "an id built from the explorer",
     )
     assertDenied(
         completionOf(reservation).set(valid + ("explorerUid" to friend.uid)),
@@ -1283,7 +1283,7 @@ class FirestoreRulesTest {
         completions()
             .document("${reservation.id}_${friend.uid}")
             .set(completion(reservation.id, friend, venue)),
-        "another member's proof under the per-explorer id",
+        "another member's proof under an id built from their uid",
     )
   }
 

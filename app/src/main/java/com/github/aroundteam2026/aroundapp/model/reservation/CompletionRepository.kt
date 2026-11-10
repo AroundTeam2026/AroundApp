@@ -3,6 +3,8 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 
 /** Reads and writes [Completion]s. ViewModels depend on this interface only. */
 interface CompletionRepository {
@@ -57,8 +59,8 @@ interface CompletionRepository {
 
   /**
    * Observes the completion of one reservation, so every member of its party sees the party's proof
-   * and its result, and any stored before parties shared one proof. Emits the current list on
-   * collection, then again whenever one is added or changes.
+   * and its result. Emits the current list on collection, then again whenever one is added or
+   * changes.
    *
    * The security rules only let a joined member of the party run this, so the Firestore
    * implementation's flow fails for anyone else; a venue uses [observeForVenue] instead.
@@ -96,4 +98,22 @@ interface CompletionRepository {
    *   ([IllegalStateException]), or if the write failed.
    */
   suspend fun reject(id: String, reason: String): Result<Unit>
+}
+
+/**
+ * Observes the completions of every reservation of [reservationIds], so a party member sees the
+ * party's proof whichever member sent it. Emits once every reservation has been read, then again
+ * whenever one changes.
+ *
+ * @return the completions of those reservations, in unspecified order; an empty list at once when
+ *   there are none.
+ * @throws Exception from the flow if the listener of any reservation fails, as
+ *   [CompletionRepository.observeForReservation] does.
+ */
+fun CompletionRepository.observeForReservations(
+    reservationIds: Collection<String>
+): Flow<List<Completion>> {
+  val ids = reservationIds.distinct()
+  if (ids.isEmpty()) return flowOf(emptyList())
+  return combine(ids.map(::observeForReservation)) { it.toList().flatten() }
 }

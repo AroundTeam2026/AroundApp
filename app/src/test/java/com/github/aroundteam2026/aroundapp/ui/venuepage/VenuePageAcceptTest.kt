@@ -404,15 +404,17 @@ class VenuePageAcceptTest {
     assertNull(state.proof)
   }
 
+  // One proof stands for the whole party, and the rules refuse cancelling once it is sent
   @Test
-  fun anotherExplorersProofDoesntShow() = test {
+  fun aProofSentByAnotherMemberShowsAndEndsCompletingAndCancelling() = test {
     val id = storeFor("a")
     fake.updateStatus(id, ReservationStatus.APPROVED)
     completions.submit(id, VENUE_ID, "friend", Proof.Photo("gs://proofs/fox"))
     openAndPick("a")
 
-    assertNull(state.proof)
-    assertEquals(id, state.completableReservationId)
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertNull(state.completableReservationId)
+    assertNull(state.cancellableReservationId)
   }
 
   // Failing to read the proofs mustn't take the page or accepting with it, nor offer a second proof
@@ -1022,12 +1024,13 @@ private fun <T> failingAfter(shownFirst: List<T>?): Flow<List<T>> = flow {
   throw IOException("denied")
 }
 
-/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
+/** Delegates to [inner], but its reservation listener is [failingAfter] [shownFirst]. */
 private class FailingCompletionsRepository(
     private val inner: CompletionRepository,
     private val shownFirst: List<Completion>?,
 ) : CompletionRepository by inner {
-  override fun observeForExplorer(uid: String): Flow<List<Completion>> = failingAfter(shownFirst)
+  override fun observeForReservation(reservationId: String): Flow<List<Completion>> =
+      failingAfter(shownFirst)
 }
 
 /** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */

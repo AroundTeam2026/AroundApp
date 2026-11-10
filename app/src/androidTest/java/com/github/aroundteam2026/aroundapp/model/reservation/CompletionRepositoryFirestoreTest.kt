@@ -312,28 +312,16 @@ class CompletionRepositoryFirestoreTest {
     assertEquals(setOf(answered, pending), ids.toSet())
   }
 
-  /**
-   * Bug: observeForReservation misses a completion stored under the per-explorer id used before
-   * parties shared one proof, or leaks another party's.
-   */
+  /** Bug: observeForReservation misses the party's completion, or leaks another party's. */
   @Test
-  fun observeForReservation_returnsThePartysCompletionsOnly() = withTimeoutBlocking {
+  fun observeForReservation_returnsThePartysCompletionOnly() = withTimeoutBlocking {
     val reservationId = approvedReservation()
-    val mine = submit(reservationId)
-    val friends = "${reservationId}_$FRIEND_UID"
-    writeBypassingRules(
-        "$COMPLETIONS/$friends",
-        validFields() + ("reservationId" to reservationId) + ("explorerUid" to FRIEND_UID),
-    )
+    val partyProof = submit(reservationId)
     submit(approvedReservation())
 
-    val ids =
-        explorerRepository
-            .observeForReservation(reservationId)
-            .first { list -> list.size == 2 }
-            .map { it.id }
+    val ids = explorerRepository.observeForReservation(reservationId).first().map { it.id }
 
-    assertEquals(setOf(mine, friends), ids.toSet())
+    assertEquals(listOf(partyProof), ids)
   }
 
   /** Bug: the flow reads once (get()) instead of listening, so later completions never arrive. */

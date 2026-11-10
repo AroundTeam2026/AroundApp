@@ -113,7 +113,7 @@ The app finds a reservation by its code (`findReservationIdByCode`) in capitals 
 
 One completion per reservation (`completionId`): the proof of its whole party. Any `JOINED` member sends it, and every member reads it and its result. The id is the reservation's, so a retried submission writes the same document instead of a second one, and the party can't complete a reservation twice, whichever member sends it.
 
-Completions stored before parties shared one proof are under `{reservationId}_{explorerUid}`. They stay as they are: their fields are unchanged, so the venue still lists and answers them, and their party still reads them. The rules only look for the party's completion under the reservation's id, so an old one doesn't stop the party from sending a new proof, leaving or cancelling. They aren't migrated.
+Completions written before #466 under `{reservationId}_{explorerUid}` were only test data and aren't supported.
 
 | Field | Type | Notes |
 |---|---|---|

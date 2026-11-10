@@ -25,6 +25,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.observeForReservations
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
@@ -52,12 +53,12 @@ import kotlinx.coroutines.launch
  * Holds the page of the venue [venueId]: its header and the quests explorers can take there.
  *
  * It keeps up with the venue, its active quests, the reservations of [explorerUid] with their
- * parties and the proofs they sent, and with rewards expiring by [clock]. If the venue or its
- * quests fail to load, the page is [VenuePageStatus.FAILED] until [onRetry]; if the reservations
- * fail, accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and
- * if the proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the
- * explorer as in their profile. Given [arrivalQuestId], the page opens that quest's details the
- * first time it shows the venue; see [VenuePageUiState.arrivingAt].
+ * parties and the parties' proofs, and with rewards expiring by [clock]. If the venue or its quests
+ * fail to load, the page is [VenuePageStatus.FAILED] until [onRetry]; if the reservations fail,
+ * accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and if the
+ * proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the explorer
+ * as in their profile. Given [arrivalQuestId], the page opens that quest's details the first time
+ * it shows the venue; see [VenuePageUiState.arrivingAt].
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -267,11 +268,11 @@ class VenuePageViewModel(
   }
 
   /**
-   * Listens to the venue, its quests, the explorer's reservations and their parties, and the proofs
-   * they sent until the ViewModel is cleared or listening fails. The quests are checked again each
-   * time a reward expires, even when nothing else changes. A failure of the reservations or parties
-   * only is not the page's: it goes on without them, with accepting unavailable. Nor is a failure
-   * of the proofs, with sending one unavailable.
+   * Listens to the venue, its quests, the explorer's reservations and their parties, and the
+   * parties' proofs, whichever member sent them, until the ViewModel is cleared or listening fails.
+   * The quests are checked again each time a reward expires, even when nothing else changes. A
+   * failure of the reservations or parties only is not the page's: it goes on without them, with
+   * accepting unavailable. Nor is a failure of the proofs, with sending one unavailable.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen() {
@@ -293,8 +294,13 @@ class VenuePageViewModel(
                     Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
                     emit(null)
                   },
-              completionRepository
+              reservationRepository
                   .observeForExplorer(explorerUid)
+                  .flatMapLatest { reservations ->
+                    // The party's proof, whichever member sent it, of each reservation here
+                    val ids = reservations.filter { it.venueId == venueId }.map { it.id }
+                    completionRepository.observeForReservations(ids)
+                  }
                   .map<List<Completion>, List<Completion>?> { it }
                   .catch {
                     Log.w(TAG, "Listening to the proofs of $explorerUid failed", it)
