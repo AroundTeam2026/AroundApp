@@ -156,6 +156,18 @@ jobs:
           export PATH="$JAVA_HOME/bin:$PATH"
           (npm install -g firebase-tools && NODE_OPTIONS="--require $PWD/.github/scripts/keep-emulator-connections.cjs" firebase emulators:start --only auth,firestore,storage --project demo-project) > firebase-emulators.log 2>&1 &
 
+      # android-emulator-runner downloads the latest emulator in every job, and a download that comes
+      # back broken fails the job ("Error reading Zip content", 4 jobs since 4 Nov; #393). Installed
+      # here first, with retries, the emulator is up to date when the action checks, so it downloads
+      # nothing. This uses the runner's own command-line tools, which the next step removes.
+      - name: Install the Android emulator
+        run: |
+          for attempt in 1 2 3; do
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install emulator --channel=0 > /dev/null && exit 0
+            echo "Downloading the emulator failed (attempt $attempt)"
+          done
+          exit 1
+
       # The runner's command-line tools (12.0) predate the pixel_9 profile, so avdmanager rejects it.
       # When the runner has none, android-emulator-runner installs the newer ones it bundles. That
       # behaviour is the action's own, so both emulator steps pin its exact version. The runner sets
