@@ -27,6 +27,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -516,6 +517,25 @@ class ReservationRepositoryFirestoreTest {
             "Expected NoSuchElementException but got $error",
             error is NoSuchElementException,
         )
+      }
+
+  /**
+   * Bug: cancelling the read is reported as a failed one, so the caller goes on with an error it
+   * never asked for, instead of the cancellation reaching it.
+   */
+  @Test
+  fun getPartyPreview_whenCancelled_rethrowsTheCancellationInsteadOfReturningIt() =
+      withTimeoutBlocking {
+        val id = createAndSync()
+        var returned: Result<PartyPreview>? = null
+        val read =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+              returned = explorerRepository.getPartyPreview(id)
+            }
+
+        read.cancelAndJoin()
+
+        assertNull("The cancelled read returned $returned", returned)
       }
 
   /** Bug: offline, the party is reported unknown, or read from the cache rather than the server. */
