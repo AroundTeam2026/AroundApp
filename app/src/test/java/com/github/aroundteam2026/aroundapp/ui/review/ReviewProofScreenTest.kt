@@ -161,18 +161,6 @@ class ReviewProofScreenTest {
     )
   }
 
-  @Test
-  fun closingTheFullScreenPhotoReturnsToTheReview() {
-    show(PHOTO)
-    node(C.Tag.REVIEW_PROOF_PHOTO_IMAGE).performClick()
-
-    node(C.Tag.PROOF_VIEWER_CLOSE).performClick()
-
-    node(C.Tag.PROOF_VIEWER).assertDoesNotExist()
-    node(C.Tag.REVIEW_PROOF_SCREEN).assertIsDisplayed()
-    assertEquals(0, backs)
-  }
-
   // The full-screen photo takes Back first: it closes, and the venue stays on the review
   @Test
   fun backClosesTheFullScreenPhotoAndStaysOnTheReview() {

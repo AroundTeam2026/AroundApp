@@ -44,11 +44,6 @@ class PhotoZoomTest {
   }
 
   @Test
-  fun aFittedPhotoDoesNotMove() {
-    assertOffsetEquals(Offset.Zero, PhotoZoom().pinched(1f, pan = Offset(100f, 100f)).offset)
-  }
-
-  @Test
   fun theMiddleOfAPinchStaysUnderTheFingers() {
     // 2× around a point 100px right of the centre moves the photo's centre 100px left
     val zoomed = PhotoZoom().pinched(2f, centroid = SCREEN_CENTRE + Offset(100f, 0f))

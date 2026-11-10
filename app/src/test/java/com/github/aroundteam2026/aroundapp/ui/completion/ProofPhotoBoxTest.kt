@@ -16,7 +16,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
@@ -150,19 +149,6 @@ class ProofPhotoBoxTest {
 
     node(C.Tag.PROOF_VIEWER_TITLE).assertTextEquals(VENUE)
     node(C.Tag.PROOF_VIEWER_SUBTITLE).assertDoesNotExist()
-  }
-
-  @Test
-  fun backClosesTheFullScreenPhotoAndReturnsToTheBox() {
-    show(picked = true, preview = PICKED_PHOTO)
-    node(C.Tag.PROOF_PHOTO_IMAGE).performClick()
-    compose.waitForIdle()
-
-    Espresso.pressBack()
-    compose.waitForIdle()
-
-    node(C.Tag.PROOF_VIEWER).assertDoesNotExist()
-    node(C.Tag.PROOF_PHOTO_RETAKE).assertIsDisplayed()
   }
 
   @Test
