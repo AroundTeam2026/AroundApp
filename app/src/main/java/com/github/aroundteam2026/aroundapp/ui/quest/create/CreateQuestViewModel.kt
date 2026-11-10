@@ -19,9 +19,13 @@ import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -33,11 +37,12 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the quest form of the signed-in venue.
+ * Holds the quest form of the signed-in venue, to create a quest, or to edit the quest [questId].
  *
  * Values are kept as typed and trimmed on save, so editing never moves the cursor; edits are
  * ignored while saving. The radius starts at the venue's own once loaded, unless already chosen,
@@ -46,6 +51,12 @@ import kotlinx.coroutines.launch
  * reads it again. The venue can place the quest somewhere else instead, by searching its address
  * with [addressSearchRepository] and moving its pin. [clock] rejects a reward expiry that has
  * passed.
+ *
+ * To edit, the form reads the quest and fills itself in with it, keeping its radius over the
+ * venue's. Saving then updates that quest, keeping its id and status. A failed read can be retried
+ * with [retryQuest]; a quest that no longer exists, or isn't the venue's, makes
+ * [CreateQuestUiState.questUnavailable] close the screen. [reservationRepository] locks the party
+ * size while the quest has pending reservations, which the venue could no longer approve.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
@@ -53,8 +64,10 @@ class CreateQuestViewModel(
     private val questRepository: QuestRepository,
     addressSearchRepository: AddressSearchRepository,
     private val clock: Clock = Clock.systemDefaultZone(),
+    private val questId: String? = null,
+    private val reservationRepository: ReservationRepository? = null,
 ) : ViewModel() {
-  private val mutableUiState = MutableStateFlow(CreateQuestUiState())
+  private val mutableUiState = MutableStateFlow(CreateQuestUiState(editing = questId != null))
   /** The form as the venue has filled it in so far. */
   val uiState: StateFlow<CreateQuestUiState> = mutableUiState.asStateFlow()
 
@@ -74,7 +87,15 @@ class CreateQuestViewModel(
   /** Where the address picked last is, while the field still shows it. */
   private var pickedAddress: Location? = null
 
+  /** The quest being edited, once read; its id and status are kept when it is saved. */
+  private var editedQuest: Quest? = null
+
   init {
+    // In parallel: the quest's radius wins whichever comes first, as it sets radiusChosen
+    if (questId != null) {
+      viewModelScope.launch { loadQuest(questId) }
+      viewModelScope.launch { watchPendingParties(questId) }
+    }
     viewModelScope.launch { loadVenue() }
   }
 
@@ -178,17 +199,19 @@ class CreateQuestViewModel(
 
   /** Raises the party size by one. */
   fun incrementPartySize() {
-    edit { it.copy(minPartySize = it.minPartySize + 1) }
+    editPartySize { it.copy(minPartySize = it.minPartySize + 1) }
   }
 
   /** Lowers the party size by one, never below [QuestLimits.MIN_PARTY_SIZE]. */
   fun decrementPartySize() {
-    edit { it.copy(minPartySize = (it.minPartySize - 1).coerceAtLeast(QuestLimits.MIN_PARTY_SIZE)) }
+    editPartySize {
+      it.copy(minPartySize = (it.minPartySize - 1).coerceAtLeast(QuestLimits.MIN_PARTY_SIZE))
+    }
   }
 
   /** Sets whether the party must have exactly, rather than at least, the party size. */
   fun updateExactPartySize(exact: Boolean) {
-    edit { it.copy(exactPartySize = exact) }
+    editPartySize { it.copy(exactPartySize = exact) }
   }
 
   /** Picks [type] as the reward, or no reward if it is null. */
@@ -227,25 +250,30 @@ class CreateQuestViewModel(
   }
 
   /**
-   * Saves the form as a new active quest of the venue, if it [CreateQuestUiState.canSave]. A reward
-   * expiry that has passed since it was picked shows its error instead. The form keeps its values
-   * whether the save succeeds or fails.
+   * Saves the form as a new active quest of the venue, or over the quest being edited, if it
+   * [CreateQuestUiState.canSave]. A reward expiry that has passed since it was picked shows its
+   * error instead. The form keeps its values whether the save succeeds or fails.
    */
   fun submit() {
     val form = mutableUiState.value
     val venue = venue
+    val edited = editedQuest
     if (!form.canSave || venue == null) return
     if (form.reward.type != null && isPast(form.reward.expiryDate)) {
       updateReward { it.copy(expiryInPast = true) }
       return
     }
     // Built outside the try, so a quest that can't be built is a bug, not a failed save
-    val quest = form.toQuest(venue, clock.zone)
+    val quest =
+        form.toQuest(venue, clock.zone).let {
+          if (edited == null) it else it.copy(id = edited.id, status = edited.status)
+        }
     mutableUiState.update { it.copy(saveState = SaveState.Saving) }
     viewModelScope.launch {
       val result =
           try {
-            questRepository.createQuest(quest)
+            if (edited == null) questRepository.createQuest(quest)
+            else questRepository.updateQuest(quest).map { edited.id }
           } catch (cancelled: CancellationException) {
             throw cancelled
           } catch (e: Exception) {
@@ -274,6 +302,13 @@ class CreateQuestViewModel(
     viewModelScope.launch { loadVenue() }
   }
 
+  /** Reads the quest again after it couldn't be read. Does nothing otherwise. */
+  fun retryQuest() {
+    if (questId == null || !mutableUiState.value.questLoadFailed) return
+    mutableUiState.update { it.copy(questLoadFailed = false) }
+    viewModelScope.launch { loadQuest(questId) }
+  }
+
   /** Where the address search looks first: around the quest, once the venue is loaded. */
   private fun searchArea() = mutableUiState.value.location?.boundsWithin(SEARCH_AREA_METERS)
 
@@ -281,7 +316,60 @@ class CreateQuestViewModel(
   private val saving: Boolean
     get() = mutableUiState.value.saveState == SaveState.Saving
 
+  /**
+   * Reads the quest [id] and fills the form in with it. Flags a failed read, to retry, and a quest
+   * that doesn't exist or isn't the venue's as unavailable.
+   */
+  private suspend fun loadQuest(id: String) {
+    val quest =
+        try {
+          questRepository.getQuest(id)
+        } catch (cancelled: CancellationException) {
+          throw cancelled
+        } catch (e: Exception) {
+          Log.w(TAG, "Reading quest $id failed", e)
+          mutableUiState.update { it.copy(questLoadFailed = true) }
+          return
+        }
+    if (quest == null || quest.venueId != authRepository.currentUserId.value) {
+      mutableUiState.update { it.copy(questUnavailable = true) }
+      return
+    }
+    editedQuest = quest
+    radiusChosen = true
+    mutableUiState.update { it.filledWith(quest, clock.zone, LocalDate.now(clock)) }
+  }
+
+  /**
+   * Locks the party size while quest [id] has pending reservations, putting back the quest's own.
+   * It stays locked if they can't be read.
+   */
+  private suspend fun watchPendingParties(id: String) {
+    val venueId = authRepository.currentUserId.value ?: return
+    val reservations = reservationRepository ?: return
+    reservations
+        .observeForVenue(venueId)
+        .catch { Log.w(TAG, "Watching reservations failed", it) }
+        .collect { all ->
+          val locked = all.any { it.questId == id && it.status == ReservationStatus.PENDING }
+          val quest = editedQuest
+          mutableUiState.update {
+            if (!locked || quest == null) it.copy(partySizeLocked = locked)
+            else
+                it.copy(
+                    partySizeLocked = true,
+                    minPartySize = quest.minPartySize,
+                    exactPartySize = quest.exactPartySize,
+                )
+          }
+        }
+  }
+
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
+
+  private fun editPartySize(transform: (CreateQuestUiState) -> CreateQuestUiState) {
+    if (!mutableUiState.value.partySizeLocked) edit(transform)
+  }
 
   private fun updateReward(transform: (RewardFormState) -> RewardFormState) {
     edit { it.copy(reward = transform(it.reward)) }
@@ -289,9 +377,11 @@ class CreateQuestViewModel(
 
   /**
    * Applies [transform] to the form, unless it is being saved: the quest being saved is the one
-   * submitted, so later edits would be lost.
+   * submitted, so later edits would be lost. Edits are also ignored until the quest to edit is
+   * read, as its values would then overwrite them.
    */
   private fun edit(transform: (CreateQuestUiState) -> CreateQuestUiState) {
+    if (questId != null && editedQuest == null) return
     mutableUiState.update { if (it.saveState == SaveState.Saving) it else transform(it) }
   }
 
@@ -314,8 +404,7 @@ class CreateQuestViewModel(
           return
         }
     mutableUiState.update { it.copy(venueLoadFailed = false, retryingVenue = false) }
-    if (venue == null) return
-    this.venue = venue
+    this.venue = venue ?: return
     val radius = clampRadius(venue.radiusMeters)
     mutableUiState.update {
       val placed = it.copy(venueName = venue.name, venueLocation = venue.location)
@@ -336,14 +425,19 @@ class CreateQuestViewModel(
      */
     const val SEARCH_AREA_METERS = 2_000.0
 
-    /** Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories. */
-    fun factory(): ViewModelProvider.Factory = viewModelFactory {
+    /**
+     * Builds the [CreateQuestViewModel] of the signed-in venue with the app's repositories, to edit
+     * the quest [questId], or to create one if it is null.
+     */
+    fun factory(questId: String? = null): ViewModelProvider.Factory = viewModelFactory {
       initializer {
         CreateQuestViewModel(
             AuthRepositoryProvider.repository,
             VenueRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
             AddressSearchRepositoryProvider.repository(this[APPLICATION_KEY]!!),
+            questId = questId,
+            reservationRepository = ReservationRepositoryProvider.repository,
         )
       }
     }
