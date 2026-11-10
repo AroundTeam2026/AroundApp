@@ -12,7 +12,6 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.address.AddressSearchRepositoryProvider
-import com.github.aroundteam2026.aroundapp.model.address.AddressSearchResult
 import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -27,7 +26,6 @@ import com.github.aroundteam2026.aroundapp.ui.map.DEFAULT_MAP_CENTER
 import com.github.aroundteam2026.aroundapp.ui.map.afterFraming
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,7 +43,7 @@ import kotlinx.coroutines.launch
  * @property address The street address the venue last picked from the search, or its saved one, or
  *   null until it has one. It is saved with the marker, so it is kept only while the address field
  *   shows it: clearing the field or typing over it forgets it. Moving the marker up to
- *   [VenueAreaViewModel.ADDRESS_DRIFT_METERS] from it keeps it, as the marker only refines the
+ *   [AddressSearchController.ADDRESS_DRIFT_METERS] from it keeps it, as the marker only refines the
  *   entrance; moving it farther forgets it, as it no longer says where the marker is. A saved
  *   address is measured from the saved marker.
  * @property addressSearch What the address search found.
@@ -71,32 +69,6 @@ data class VenueAreaUiState(
 }
 
 /**
- * What the address search found. The field's text is [VenueAreaViewModel.addressQuery].
- *
- * @property suggestions The addresses found for the latest search, best first. They stay while the
- *   next search runs, so the list doesn't flicker as the venue types.
- * @property status Whether a search is running, or why there is nothing to show.
- */
-data class AddressSearchUiState(
-    val suggestions: List<AddressSuggestion> = emptyList(),
-    val status: AddressSearchStatus = AddressSearchStatus.IDLE,
-)
-
-/** Where the address search stands. */
-enum class AddressSearchStatus {
-  /** Nothing to search, or the latest search found [AddressSearchUiState.suggestions]. */
-  IDLE,
-  /** A search is waiting for typing to pause, or running. */
-  SEARCHING,
-  /** The latest search found nothing. */
-  NO_RESULTS,
-  /** The latest search failed; trying again may work. */
-  FAILED,
-  /** This device can't search addresses. */
-  UNAVAILABLE,
-}
-
-/**
  * Holds the marker a venue places on the map, the radius in which a visit counts and the venue's
  * street address. It opens on the venue's saved marker, radius and address, framing them, or on the
  * defaults when there are none. The map starts on [DEFAULT_MAP_CENTER], then frames the device once
@@ -118,11 +90,14 @@ class VenueAreaViewModel(
   private var openingLookup: Job? = null
   private var myLocationLookup: Job? = null
   private var located = false
-  private var addressLookup: Job? = null
   private var visibleArea: GeoBounds? = null
   private var addressLocation: Location? = null
   private var radiusChosen = false
   private var addressEdited = false
+  private val addressSearch =
+      AddressSearchController(viewModelScope, addressSearchRepository) { change ->
+        _uiState.update { it.copy(addressSearch = change(it.addressSearch)) }
+      }
 
   /**
    * What the address field shows. It is Compose state rather than part of [uiState], so the field
@@ -174,11 +149,14 @@ class VenueAreaViewModel(
 
   /**
    * Called when the venue taps the map, or drops the dragged marker, at [location]. A marker moved
-   * more than [ADDRESS_DRIFT_METERS] from the picked address forgets it, and empties the field if
-   * it still shows it.
+   * more than [AddressSearchController.ADDRESS_DRIFT_METERS] from the picked address forgets it,
+   * and empties the field if it still shows it.
    */
   fun onMarkerPlaced(location: Location) {
-    val drifted = addressLocation?.let { it.distanceTo(location) > ADDRESS_DRIFT_METERS } == true
+    val drifted =
+        addressLocation?.let {
+          it.distanceTo(location) > AddressSearchController.ADDRESS_DRIFT_METERS
+        } == true
     if (drifted) {
       addressLocation = null
       // The field mustn't keep showing an address that won't be saved; a new search stays
@@ -233,27 +211,18 @@ class VenueAreaViewModel(
   }
 
   /**
-   * Called as the venue types [query] in the address field. Once the trimmed query has at least
-   * [MIN_QUERY_LENGTH] characters, it is searched after [SEARCH_DELAY_MILLIS] without typing,
-   * around the area the map shows; each new query replaces the search still pending or running. A
-   * query other than the kept address forgets it, as the field no longer shows it.
+   * Called as the venue types [query] in the address field, which [AddressSearchController]
+   * searches around the area the map shows. A query other than the kept address forgets it, as the
+   * field no longer shows it.
    */
   fun onAddressQueryChanged(query: String) {
     addressEdited = true
-    addressLookup?.cancel()
     addressQuery = query
-    val forgets = query != _uiState.value.address
-    if (forgets) addressLocation = null
-    val searches = query.trim().length >= MIN_QUERY_LENGTH
-    _uiState.update {
-      it.copy(
-          address = if (forgets) null else it.address,
-          addressSearch =
-              if (searches) it.addressSearch.copy(status = AddressSearchStatus.SEARCHING)
-              else AddressSearchUiState(),
-      )
+    if (query != _uiState.value.address) {
+      addressLocation = null
+      _uiState.update { it.copy(address = null) }
     }
-    if (searches) addressLookup = searchAddress(query, delayMillis = SEARCH_DELAY_MILLIS)
+    addressSearch.onQueryChanged(query) { visibleArea }
   }
 
   /**
@@ -261,13 +230,7 @@ class VenueAreaViewModel(
    * short, unless it is blank.
    */
   fun onAddressSearch() {
-    val query = addressQuery
-    if (query.isBlank()) return
-    addressLookup?.cancel()
-    _uiState.update {
-      it.copy(addressSearch = it.addressSearch.copy(status = AddressSearchStatus.SEARCHING))
-    }
-    addressLookup = searchAddress(query, delayMillis = 0)
+    addressSearch.searchNow(addressQuery) { visibleArea }
   }
 
   /**
@@ -276,7 +239,7 @@ class VenueAreaViewModel(
    * field shows the address, which is kept to save with the venue.
    */
   fun onAddressPicked(suggestion: AddressSuggestion) {
-    addressLookup?.cancel()
+    addressSearch.dismiss()
     openingLookup?.cancel()
     myLocationLookup?.cancel()
     addressQuery = suggestion.address
@@ -286,7 +249,6 @@ class VenueAreaViewModel(
           marker = suggestion.location,
           areaToFrame = suggestion.location.boundsWithin(FRAMED_RADIUS_METERS),
           address = suggestion.address,
-          addressSearch = AddressSearchUiState(),
       )
     }
   }
@@ -305,14 +267,7 @@ class VenueAreaViewModel(
    * still pending or running is dropped. The query stays, to search again.
    */
   fun onAddressSearchDismissed() {
-    addressLookup?.cancel()
-    _uiState.update { it.copy(addressSearch = AddressSearchUiState()) }
-  }
-
-  private fun searchAddress(query: String, delayMillis: Long): Job = viewModelScope.launch {
-    delay(delayMillis)
-    val result = addressSearchRepository.search(query, visibleArea)
-    _uiState.update { it.copy(addressSearch = it.addressSearch.showing(result)) }
+    addressSearch.dismiss()
   }
 
   /**
@@ -365,18 +320,6 @@ class VenueAreaViewModel(
      */
     const val FRAMED_RADIUS_METERS = VenueLimits.MAX_RADIUS_METERS.toDouble()
 
-    /** How long typing must pause before the address is searched. */
-    const val SEARCH_DELAY_MILLIS = 300L
-
-    /** How many characters, spaces aside, a query needs before it is searched while typing. */
-    const val MIN_QUERY_LENGTH = 3
-
-    /**
-     * How far the marker can move from the picked address and keep it: the largest visit radius,
-     * enough to reach an entrance around the corner.
-     */
-    const val ADDRESS_DRIFT_METERS = VenueLimits.MAX_RADIUS_METERS.toDouble()
-
     /**
      * Builds the [VenueAreaViewModel] of the venue with [venueId], with the app's venue, location
      * and address repositories.
@@ -398,19 +341,3 @@ class VenueAreaViewModel(
 /** [radiusMeters] clamped to [VenueLimits]. */
 private fun clampRadius(radiusMeters: Int): Int =
     radiusMeters.coerceIn(VenueLimits.MIN_RADIUS_METERS, VenueLimits.MAX_RADIUS_METERS)
-
-/** This search once [result] arrived: its suggestions, or why there are none. */
-private fun AddressSearchUiState.showing(result: AddressSearchResult): AddressSearchUiState =
-    when (result) {
-      is AddressSearchResult.Found ->
-          copy(
-              suggestions = result.suggestions,
-              status =
-                  if (result.suggestions.isEmpty()) AddressSearchStatus.NO_RESULTS
-                  else AddressSearchStatus.IDLE,
-          )
-      AddressSearchResult.Failed ->
-          copy(suggestions = emptyList(), status = AddressSearchStatus.FAILED)
-      AddressSearchResult.Unavailable ->
-          copy(suggestions = emptyList(), status = AddressSearchStatus.UNAVAILABLE)
-    }
