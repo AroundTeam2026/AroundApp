@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -209,6 +210,8 @@ private fun ArchiveDialog(title: String, onClose: () -> Unit, onArchive: () -> U
               onClose()
               onArchive()
             },
+            colors =
+                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             modifier = Modifier.testTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM),
         ) {
           Text(stringResource(R.string.venue_quests_archive_confirm))
