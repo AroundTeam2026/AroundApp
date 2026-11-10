@@ -3,7 +3,11 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
+import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryFirestore
+import com.github.aroundteam2026.aroundapp.model.party.isPartyCode
+import com.github.aroundteam2026.aroundapp.model.party.newPartyCode
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
@@ -29,7 +33,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -116,10 +122,101 @@ class ReservationRepositoryFirestoreTest {
             status = ReservationStatus.PENDING,
             createdAt = FIXED_NOW,
             explorerName = EXPLORER_NAME,
+            // Drawn at random; createReservation_writesAPartyCodeThatLeadsBackToIt checks it
+            partyCode = stored.partyCode,
         ),
         stored,
     )
   }
+
+  /**
+   * Bug: a reservation is created without a party code, with one that is not a code, or without the
+   * `party_codes` document that leads back to it, so nobody can join by its code.
+   */
+  @Test
+  fun createReservation_writesAPartyCodeThatLeadsBackToIt() = withTimeoutBlocking {
+    val id = createAndSync()
+
+    val code = fetchAsVenue(id).partyCode
+    assertTrue("Not a party code: $code", code != null && isPartyCode(code))
+    assertEquals(id, storedCodeTarget(code!!))
+  }
+
+  /**
+   * Bug: a party code that is already taken makes creating fail, or is written over, instead of a
+   * new code being drawn.
+   */
+  @Test
+  fun createReservation_withATakenPartyCode_drawsAnother() = withTimeoutBlocking {
+    val taken = newPartyCode()
+    val first = createAndSync(repository = repositoryDrawing(taken))
+    val fresh = newPartyCode()
+
+    val second = createAndSync(repository = repositoryDrawing(taken, fresh))
+
+    assertEquals(fresh, fetchAsVenue(second).partyCode)
+    assertEquals(first, storedCodeTarget(taken))
+    assertEquals(second, storedCodeTarget(fresh))
+  }
+
+  /**
+   * Bug: creating draws codes forever, reports success, or fails with a Firebase type a ViewModel
+   * can't name, when every code it draws is taken.
+   */
+  @Test
+  fun createReservation_whenEveryPartyCodeIsTaken_failsWithIllegalStateAfterTheLastAttempt() =
+      withTimeoutBlocking {
+        val taken = newPartyCode()
+        createAndSync(repository = repositoryDrawing(taken))
+        var draws = 0
+        val repository =
+            ReservationRepositoryFirestore(
+                explorerDb,
+                newCode = {
+                  draws++
+                  taken
+                },
+            ) {
+              FIXED_NOW
+            }
+
+        val error = repository.createReservation(reservation(), explorerUid).exceptionOrNull()
+
+        assertTrue(
+            "Expected an IllegalStateException but got $error",
+            error is IllegalStateException,
+        )
+        assertEquals(
+            FirebaseFirestoreException.Code.PERMISSION_DENIED,
+            (error?.cause as? FirebaseFirestoreException)?.code,
+        )
+        assertEquals(MAX_PARTY_CODE_ATTEMPTS, draws)
+      }
+
+  /**
+   * Bug: every refusal is taken for a taken code, so a reservation the rules refuse for another
+   * reason is written again with new codes.
+   */
+  @Test
+  fun createReservation_refusedForAnotherReasonThanItsCode_drawsOnlyOneCode() =
+      withTimeoutBlocking {
+        var draws = 0
+        val repository =
+            ReservationRepositoryFirestore(
+                explorerDb,
+                newCode = {
+                  draws++
+                  newPartyCode()
+                },
+            ) {
+              FIXED_NOW
+            }
+
+        assertPermissionDenied(
+            repository.createReservation(reservation().copy(questId = "missing"), explorerUid)
+        )
+        assertEquals(1, draws)
+      }
 
   /**
    * Bug: the reservation an explorer makes by accepting a quest ([newPendingReservation], what the
@@ -132,9 +229,10 @@ class ReservationRepositoryFirestoreTest {
 
     val id = createAndSync(accepted)
 
+    val stored = fetchAsVenue(id)
     assertEquals(
-        accepted.copy(id = id, createdAt = FIXED_NOW),
-        fetchAsVenue(id),
+        accepted.copy(id = id, createdAt = FIXED_NOW, partyCode = stored.partyCode),
+        stored,
     )
   }
 
@@ -158,9 +256,11 @@ class ReservationRepositoryFirestoreTest {
             "createdAt",
             "explorerName",
             "joinedCount",
+            "partyCode",
         ),
         document.data!!.keys,
     )
+    assertTrue(document.get("partyCode") is String)
     assertTrue(document.get("slotStart") is Timestamp)
     assertTrue(document.get("createdAt") is Timestamp)
     assertEquals("PENDING", document.get("status"))
@@ -188,25 +288,28 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: a reservation stored before `explorerName` existed is treated as malformed, so it vanishes
-   * from the venue's list instead of showing without a name.
+   * Bug: a reservation stored before `explorerName` and `partyCode` existed is treated as
+   * malformed, so it vanishes from the venue's list instead of showing without a name or a code.
    */
   @Test
-  fun observe_readsAReservationWithoutAnExplorerNameAsUnnamed() = withTimeoutBlocking {
-    val id = explorerDb.collection(RESERVATIONS).document().id
-    writeBypassingRules(
-        "$RESERVATIONS/$id",
-        mapOf(
-            "questId" to questId,
-            "venueId" to venueId,
-            "slotStart" to Timestamp(1_800_000_000L, 0),
-            "status" to "PENDING",
-            "createdAt" to Timestamp(1_700_000_000L, 0),
-        ),
-    )
+  fun observe_readsAReservationWithoutAnExplorerNameOrPartyCodeAsUnnamedWithoutCode() =
+      withTimeoutBlocking {
+        val id = explorerDb.collection(RESERVATIONS).document().id
+        writeBypassingRules(
+            "$RESERVATIONS/$id",
+            mapOf(
+                "questId" to questId,
+                "venueId" to venueId,
+                "slotStart" to Timestamp(1_800_000_000L, 0),
+                "status" to "PENDING",
+                "createdAt" to Timestamp(1_700_000_000L, 0),
+            ),
+        )
 
-    assertEquals("", fetchAsVenue(id).explorerName)
-  }
+        val stored = fetchAsVenue(id)
+        assertEquals("", stored.explorerName)
+        assertNull(stored.partyCode)
+      }
 
   /**
    * Bug: the caller's id, status or creation time are kept, so a second reservation overwrites the
@@ -311,6 +414,52 @@ class ReservationRepositoryFirestoreTest {
 
     assertTrue(result.isFailure)
   }
+
+  /**
+   * Bug: a code typed in lower case or with a space between its groups is not found, or only a
+   * member of the party can find it, though the explorer looking it up hasn't joined yet. The
+   * venue, outside the party, looks it up.
+   */
+  @Test
+  fun findReservationIdByCode_typedInLowerCaseWithSpaces_findsItOutsideTheParty() =
+      withTimeoutBlocking {
+        val id = createAndSync()
+        val code = fetchAsVenue(id).partyCode!!
+        val typed = code.lowercase().chunked(TYPED_GROUP_SIZE).joinToString(" ")
+
+        assertEquals(id, venueRepository.findReservationIdByCode(typed).getOrThrow())
+      }
+
+  /** Bug: an unknown or malformed code fails like being offline, or finds some reservation. */
+  @Test
+  fun findReservationIdByCode_forAnUnknownOrMalformedCode_failsWithPartyCodeNotFound() =
+      withTimeoutBlocking {
+        val unknown = newPartyCode()
+        // Each typed code and the code the failure reports: normalized when it is a code
+        val reported = mapOf(unknown.lowercase() to unknown, NOT_A_PARTY_CODE to NOT_A_PARTY_CODE)
+        for ((typed, code) in reported) {
+          val error = explorerRepository.findReservationIdByCode(typed).exceptionOrNull()
+          assertTrue("$typed: $error", error is PartyCodeNotFoundException)
+          assertEquals(code, (error as PartyCodeNotFoundException).code)
+        }
+      }
+
+  /** Bug: offline, a code is reported as unknown, or found in the cache rather than the server. */
+  @Test
+  fun findReservationIdByCode_whileOffline_failsWithAnotherErrorThanNotFound() =
+      withTimeoutBlocking {
+        val code = fetchAsVenue(createAndSync()).partyCode!!
+        explorerDb.disableNetwork().await()
+        val error =
+            try {
+              explorerRepository.findReservationIdByCode(code).exceptionOrNull()
+            } finally {
+              explorerDb.enableNetwork().await()
+            }
+
+        assertTrue("Expected a failure but got $error", error != null)
+        assertFalse(error is PartyCodeNotFoundException)
+      }
 
   /** Bug: observeForVenue does not filter on the venue, or also filters on the status. */
   @Test
@@ -649,11 +798,29 @@ class ReservationRepositoryFirestoreTest {
    * that the venue can read it. [ReservationRepositoryFirestore.createReservation] itself does not
    * wait for the server. This also returns once the server has rejected the write.
    */
-  private suspend fun createAndSync(reservation: Reservation = reservation()): String {
-    val id = explorerRepository.createReservation(reservation, explorerUid).getOrThrow()
+  private suspend fun createAndSync(
+      reservation: Reservation = reservation(),
+      repository: ReservationRepositoryFirestore = explorerRepository,
+  ): String {
+    val id = repository.createReservation(reservation, explorerUid).getOrThrow()
     explorerDb.waitForPendingWrites().await()
     return id
   }
+
+  /** The explorer's repository, drawing [codes] in turn as party codes. */
+  private fun repositoryDrawing(vararg codes: String): ReservationRepositoryFirestore {
+    val next = codes.iterator()
+    return ReservationRepositoryFirestore(explorerDb, newCode = next::next) { FIXED_NOW }
+  }
+
+  /** The reservation id the server stores for the party code [code], read as the venue. */
+  private suspend fun storedCodeTarget(code: String): String? =
+      venueDb
+          .collection(PARTY_CODES)
+          .document(code)
+          .get(Source.SERVER)
+          .await()
+          .getString("reservationId")
 
   /**
    * Reads the reservation with [id] through the venue's client, once [until] accepts it. The venue
@@ -688,6 +855,15 @@ class ReservationRepositoryFirestoreTest {
      * The Firestore collection the repository stores reservations in; some tests use it directly.
      */
     const val RESERVATIONS = "reservations"
+
+    /** The Firestore collection of party codes, which some tests read directly. */
+    const val PARTY_CODES = "party_codes"
+
+    /** How many characters an explorer types before a space when typing a party code. */
+    const val TYPED_GROUP_SIZE = 3
+
+    /** Not a party code: too short, and with characters that are easy to mistake. */
+    const val NOT_A_PARTY_CODE = "0O1IL"
 
     /** The Firestore collection of quests, which a test changes directly as the venue. */
     const val QUESTS = "quests"

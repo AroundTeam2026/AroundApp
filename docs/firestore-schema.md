@@ -70,7 +70,7 @@ Every type may also have `expiresAt` (timestamp?): when the reward stops being v
 
 ### `reservations/{id}`
 
-The party isn't stored here: it is the reservation's memberships in `party_user`. The rules let an explorer create a reservation only in one batch with their own `JOINED` membership, joined at the reservation's `createdAt`, and with its `party_codes` document if it has a `partyCode`.
+The party isn't stored here: it is the reservation's memberships in `party_user`. The rules let an explorer create a reservation only in one batch with their own `JOINED` membership, joined at the reservation's `createdAt`, and with the `party_codes` document of its `partyCode`.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -81,7 +81,7 @@ The party isn't stored here: it is the reservation's memberships in `party_user`
 | `createdAt` | timestamp | Set by the repository. |
 | `explorerName` | string | Display name of the explorer who made the reservation, copied from their `users` profile on creation. Must equal that profile's `displayName` (enforced by the rules). Not updated on a rename. Reservations made before this field existed lack it; the app reads them with an empty name. |
 | `joinedCount` | int | Number of `JOINED` members in `party_user`, so the rules can cap the party at its [capacity](#party-size) and check its size on approval: rules can't count documents. 1 on creation, for the creator. Every join adds 1 and every withdrawal takes 1 off, in the same batch as the membership (enforced by the rules). The app shows the party size from the memberships, not from this field. |
-| `partyCode` | string? | The [party code](#party_codescode) explorers share to join the party, written once on creation with its `party_codes` document (enforced by the rules). Reservations made before party codes have none. |
+| `partyCode` | string? | The [party code](#party_codescode) explorers share to join the party, drawn by the repository and written once on creation with its `party_codes` document (enforced by the rules). Required on creation; reservations made before party codes have none, and the app reads them with none. |
 
 ### `party_user/{reservationId}_{uid}`
 
@@ -105,7 +105,9 @@ A short code that leads to one reservation, so its creator can give it to friend
 |---|---|---|
 | `reservationId` | string | The reservation whose `partyCode` it is. |
 
-A code is created in one batch with its reservation and never changes. Writing a code that is already taken is refused, so codes stay unique. The app doesn't write party codes yet.
+A code is created in one batch with its reservation and never changes. Writing a code that is already taken is refused, so codes stay unique. When the server refuses a new reservation and its code's document exists, the repository draws another code and writes the batch again under a new id, at most 5 codes in all (`MAX_PARTY_CODE_ATTEMPTS`). A reservation created offline can't be retried: if its code turns out to be taken once it is sent, the server refuses it and it is lost, which with about 887 million codes is rare.
+
+The app finds a reservation by its code (`findReservationIdByCode`) in capitals and without spaces, so `7kq m42` finds `7KQM42`, and only from the server: offline, the lookup fails rather than reporting an unknown code.
 
 ### `completions/{reservationId}_{explorerUid}`
 
@@ -162,7 +164,7 @@ Every create and update must match its collection's table above: only the listed
 | `users` | Only the owner | The owner creates and updates it; `role` must be null, `EXPLORER` or `VENUE`, and can't change once set. No delete. |
 | `venues` | Any signed-in user | Only the owner (document id is their uid), whose `users` document has role `VENUE`. |
 | `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
-| `reservations` | The venue and the party's `JOINED` members. Anyone signed in may read an id that has no reservation, since the app listens to one it just created before the server has it. | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one in the same batch as their own `JOINED` membership, joined at its `createdAt`, and its `party_codes` document if it has a `partyCode`, carrying their profile's `displayName` as `explorerName`, with a `joinedCount` of 1, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards `status` changes along an allowed transition: the venue makes any of them, approving only a party of the [size](#party-size) its quest asks for, and a `JOINED` member can only cancel, until they send their proof, whatever its status. `joinedCount` changes alone, by 1, in the same batch as the user's own membership joining or withdrawing. No delete. |
+| `reservations` | The venue and the party's `JOINED` members. Anyone signed in may read an id that has no reservation, since the app listens to one it just created before the server has it. | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one in the same batch as their own `JOINED` membership, joined at its `createdAt`, and the `party_codes` document of its `partyCode`, carrying their profile's `displayName` as `explorerName`, with a `joinedCount` of 1, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards `status` changes along an allowed transition: the venue makes any of them, approving only a party of the [size](#party-size) its quest asks for, and a `JOINED` member can only cancel, until they send their proof, whatever its status. `joinedCount` changes alone, by 1, in the same batch as the user's own membership joining or withdrawing. No delete. |
 | `party_user` | The party's members, `WITHDRAWN` ones too, so a member who withdrew still sees who else was in the party, and the reservation's venue. Anyone signed in may list the party of a reservation that doesn't exist, which is empty, for the same reason. | An explorer, whose `users` document has role `EXPLORER`, creates their own `JOINED` membership, under the id `{reservationId}_{uid}`, for a `PENDING` reservation whose party is below its [capacity](#party-size), joined at another time than the reservation's `createdAt`, adding 1 to its `joinedCount` in the same batch. Afterwards only the member changes it, from `JOINED` to `WITHDRAWN`, along with `updatedAt`, taking 1 off `joinedCount` in the same batch, while the reservation is `PENDING` or `APPROVED`, before they send a proof, and never the creator. No delete. |
 | `party_codes` | Anyone signed in may get a code they know; nobody lists them. | Created only in the same batch as the reservation whose `partyCode` it is, with `reservationId` alone. Never updated or deleted. |
 | `completions` | The explorer who submitted it, the party's `JOINED` members and its venue. Anyone signed in may read an id that has no completion, so an answer to an unknown id can report it. | A `JOINED` member of an `APPROVED` reservation creates their own, `PENDING` and without a `rejectReason`, under the id `{reservationId}_{explorerUid}`, repeating the reservation's `venueId`, with the proof its quest's `proofType` asks for. There is no second submission, whatever the first one's status. Afterwards only the venue changes it: a `PENDING` one to `REJECTED`, changing only `status` and `rejectReason`, and a `PENDING` or `REJECTED` one to `APPROVED`, changing only `status` and removing any `rejectReason`. `APPROVED` is final. No delete. |

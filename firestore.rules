@@ -234,12 +234,12 @@ service cloud.firestore {
       return /databases/$(database)/documents/party_codes/$(code);
     }
 
-    // The reservation [data], created as [reservationId], has no party code, or one written in the
-    // same batch that leads back to it.
+    // The reservation [data], created as [reservationId], has a party code written in the same
+    // batch that leads back to it. Reservations created before party codes have none.
     function hasOwnPartyCode(data, reservationId) {
-      return !('partyCode' in data)
-          || (isPartyCode(data.partyCode)
-              && getAfter(partyCode(data.partyCode)).data.reservationId == reservationId);
+      return 'partyCode' in data
+          && isPartyCode(data.partyCode)
+          && getAfter(partyCode(data.partyCode)).data.reservationId == reservationId;
     }
 
     // The signed-in user is a joined member of the party of [reservationId].
