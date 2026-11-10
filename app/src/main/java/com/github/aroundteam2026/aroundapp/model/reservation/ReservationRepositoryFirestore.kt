@@ -165,8 +165,8 @@ class ReservationRepositoryFirestore(
 
   /**
    * Reads the reservation's document from the server, with the `joinedCount` it stores. A missing
-   * or malformed document is a [NoSuchElementException]; a read that fails, e.g. offline, is the
-   * Firestore exception.
+   * or malformed document, one without its `joinedCount` included, is a [NoSuchElementException]; a
+   * read that fails, e.g. offline, is the Firestore exception.
    */
   override suspend fun getPartyPreview(reservationId: String): Result<PartyPreview> =
       try {
@@ -177,7 +177,11 @@ class ReservationRepositoryFirestore(
         Result.success(
             PartyPreview(
                 reservation,
-                document.getLong(PartyUserFirestore.JOINED_COUNT)?.toInt() ?: 0,
+                // A party always has its creator, so a missing count is malformed, like any field
+                document.getLong(PartyUserFirestore.JOINED_COUNT)?.toInt()
+                    ?: throw NoSuchElementException(
+                        "Reservation $reservationId has no joinedCount"
+                    ),
             )
         )
       } catch (e: CancellationException) {

@@ -490,6 +490,34 @@ class ReservationRepositoryFirestoreTest {
     assertTrue("Expected NoSuchElementException but got $error", error is NoSuchElementException)
   }
 
+  /**
+   * Bug: a reservation without its joinedCount reads as an empty party, so the join screen shows "0
+   * joined" for a party that always has its creator.
+   */
+  @Test
+  fun getPartyPreview_forAReservationWithoutAJoinedCount_failsWithNoSuchElement() =
+      withTimeoutBlocking {
+        val id = explorerDb.collection(RESERVATIONS).document().id
+        writeBypassingRules(
+            "$RESERVATIONS/$id",
+            mapOf(
+                "questId" to questId,
+                "venueId" to venueId,
+                "slotStart" to Timestamp(1_800_000_000L, 0),
+                "status" to "PENDING",
+                "createdAt" to Timestamp(1_700_000_000L, 0),
+                "explorerName" to EXPLORER_NAME,
+            ),
+        )
+
+        val error = explorerRepository.getPartyPreview(id).exceptionOrNull()
+
+        assertTrue(
+            "Expected NoSuchElementException but got $error",
+            error is NoSuchElementException,
+        )
+      }
+
   /** Bug: offline, the party is reported unknown, or read from the cache rather than the server. */
   @Test
   fun getPartyPreview_whileOffline_failsWithAnotherErrorThanNoSuchElement() = withTimeoutBlocking {
