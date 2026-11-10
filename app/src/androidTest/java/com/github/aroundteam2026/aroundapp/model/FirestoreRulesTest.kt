@@ -296,11 +296,25 @@ class FirestoreRulesTest {
             "an unknown proof type" to valid + ("proofType" to "VIDEO"),
             "an unknown status" to valid + ("status" to "LIVE"),
             "a copied venueName" to valid + ("venueName" to "Café"),
-            "a copied location" to valid + ("location" to GeoPoint(46.52, 6.57)),
+            "a location that is not a GeoPoint" to valid + ("location" to "Lausanne"),
+            "a {lat, lng} map as location" to valid + ("location" to mapOf("lat" to 46.52)),
             "an unknown field" to valid + ("rating" to 5),
         ),
     )
     assertSucceeds(newQuest().set(valid + ("exactPartySize" to true)))
+  }
+
+  // #430: a quest may have a location of its own, away from its venue
+  @Test
+  fun questMayHaveALocationOfItsOwn() {
+    val venue = newUser(Role.VENUE)
+    signInAs(venue)
+    val quest = newQuest()
+
+    assertSucceeds(quest.set(questData(venue) + ("location" to GeoPoint(46.52, 6.57))))
+    assertSucceeds(quest.update("location", GeoPoint(46.51, 6.63)))
+    assertDenied(quest.update("location", "Lausanne"), "a location that is not a GeoPoint")
+    assertSucceeds(quest.update("location", FieldValue.delete()))
   }
 
   @Test
