@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.quest
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorClient
@@ -12,6 +13,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
 import java.util.Date
 import kotlinx.coroutines.CoroutineStart
@@ -99,15 +101,16 @@ class QuestRepositoryFirestoreTest {
     val otherId =
         repository.createQuest(fullQuest().copy(reward = Reward.Other("Sticker"))).getOrThrow()
     val noRewardId = repository.createQuest(fullQuest().copy(reward = null)).getOrThrow()
+    val atVenueId = repository.createQuest(fullQuest().copy(location = null)).getOrThrow()
 
     // Only the stored representation is checked here; the values are checked by the round trip.
     // The memory cache drops a document once the server has saved it and no listener holds it,
     // so the reads go to the server, after it has saved every write.
     db.waitForPendingWrites().await()
     val full = db.collection(QUESTS).document(fullId).get(Source.SERVER).await()
-    // The venue's name and location are read from the venue, never copied onto the quest
+    // The venue's name is read from the venue, never copied onto the quest
     assertFalse("venueName must not be stored", full.contains("venueName"))
-    assertFalse("location must not be stored", full.contains("location"))
+    assertEquals(GeoPoint(QUEST_LOCATION.lat, QUEST_LOCATION.lng), full.get("location"))
     assertTrue(full.get("createdAt") is Timestamp)
     assertTrue(full.get("updatedAt") is Timestamp)
     assertEquals("DRAFT", full.get("status"))
@@ -126,6 +129,34 @@ class QuestRepositoryFirestoreTest {
     assertEquals(mapOf("type" to "OTHER", "description" to "Sticker"), other)
     val noReward = db.collection(QUESTS).document(noRewardId).get(Source.SERVER).await()
     assertFalse("a null reward must be omitted", noReward.contains("reward"))
+    val atVenue = db.collection(QUESTS).document(atVenueId).get(Source.SERVER).await()
+    assertFalse("a null location must be omitted", atVenue.contains("location"))
+  }
+
+  /**
+   * Bug: a quest without a location of its own is skipped, or read with a made-up location (e.g.
+   * 0, 0) instead of null, so it no longer takes place at its venue.
+   */
+  @Test
+  fun createQuest_thenGetQuest_keepsANullLocation() = withTimeoutBlocking {
+    val id = repository.createQuest(fullQuest().copy(location = null)).getOrThrow()
+
+    val stored = getQuestFromServer(id)!!
+    assertNull(stored.location)
+  }
+
+  /**
+   * Bug: a location that is not a GeoPoint is read as no location, so the quest silently moves to
+   * its venue instead of being skipped like any other malformed quest.
+   */
+  @Test
+  fun getQuest_skipsAQuestWhoseLocationIsNotAGeoPoint() = withTimeoutBlocking {
+    val id = repository.createQuest(quest()).getOrThrow()
+    // The rules refuse such a location, so it goes past them, once the quest is on the server
+    db.waitForPendingWrites().await()
+    writeBypassingRules("$QUESTS/$id", mapOf("location" to "Lausanne"))
+
+    assertNull(repository.getQuest(id))
   }
 
   /**
@@ -317,6 +348,21 @@ class QuestRepositoryFirestoreTest {
     assertFalse("a dropped reward must be deleted", document.contains("reward"))
   }
 
+  /**
+   * Bug: a location removed by the venue stays in the document, so the quest keeps taking place
+   * away from its venue.
+   */
+  @Test
+  fun updateQuest_deletesADroppedLocation() = withTimeoutBlocking {
+    val id = repository.createQuest(fullQuest()).getOrThrow()
+
+    repository.updateQuest(fullQuest().copy(id = id, location = null)).getOrThrow()
+    db.waitForPendingWrites().await()
+    val document = db.collection(QUESTS).document(id).get(Source.SERVER).await()
+
+    assertFalse("a dropped location must be deleted", document.contains("location"))
+  }
+
   /** Bug: the update creates a quest for an id that has none, like set() would. */
   @Test
   fun updateQuest_doesNotCreateAMissingQuest() = withTimeoutBlocking {
@@ -465,6 +511,7 @@ class QuestRepositoryFirestoreTest {
       Quest(
           id = "",
           venueId = venueId,
+          location = QUEST_LOCATION,
           radiusMeters = 120,
           title = "Find the mural",
           description = "A mural hides behind the bar.",
@@ -570,6 +617,12 @@ class QuestRepositoryFirestoreTest {
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
+
+    /**
+     * Where [fullQuest] takes place. The negative longitude catches a lost sign, and the latitude
+     * and longitude differ so that a swap shows.
+     */
+    val QUEST_LOCATION = Location(46.5191, -6.5668)
 
     /** When [fullQuest]'s reward expires, in epoch ms; the non-zero ms catch precision loss. */
     const val REWARD_EXPIRES_AT = 1_800_000_000_456L

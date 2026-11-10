@@ -63,12 +63,14 @@ service cloud.firestore {
           && (!('featuredQuestId' in data) || data.featuredQuestId is string);
     }
 
+    // A quest without a location takes place at its venue's location.
     function isValidQuest(data) {
       return data.keys().hasAll(['venueId', 'radiusMeters', 'title', 'description',
               'requirements', 'proofType', 'minPartySize', 'status', 'createdAt', 'updatedAt'])
-          && data.keys().hasOnly(['venueId', 'radiusMeters', 'title', 'description',
+          && data.keys().hasOnly(['venueId', 'location', 'radiusMeters', 'title', 'description',
               'requirements', 'proofType', 'minPartySize', 'exactPartySize', 'reward', 'status',
               'createdAt', 'updatedAt'])
+          && (!('location' in data) || data.location is latlng)
           && isRadius(data.radiusMeters)
           && isText(data.title, 60)
           && isText(data.description, 500)
