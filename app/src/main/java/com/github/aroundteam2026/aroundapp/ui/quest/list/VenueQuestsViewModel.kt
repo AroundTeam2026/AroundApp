@@ -11,6 +11,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /** What the venue's Quests tab shows. */
 sealed interface VenueQuestsUiState {
@@ -41,8 +43,10 @@ sealed interface VenueQuestsUiState {
  * is listed when the venue returns to the tab. After [VenueQuestsUiState.Failed], [retry] listens
  * again. It only listens while the tab is watched, so a hidden tab costs no reads.
  */
-class VenueQuestsViewModel(authRepository: AuthRepository, questRepository: QuestRepository) :
-    ViewModel() {
+class VenueQuestsViewModel(
+    authRepository: AuthRepository,
+    private val questRepository: QuestRepository,
+) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listener, even for the same venue. */
   private val retries = MutableStateFlow(0)
 
@@ -70,6 +74,15 @@ class VenueQuestsViewModel(authRepository: AuthRepository, questRepository: Ques
   /** Listens to the venue's quests again, after listening failed. */
   fun retry() {
     retries.update { it + 1 }
+  }
+
+  /**
+   * Archives [quest], hiding it from explorers while keeping its reservations and proofs, or if
+   * [archived] is false makes it active again. The listener then lists it with its new status.
+   */
+  fun setArchived(quest: Quest, archived: Boolean) {
+    val status = if (archived) QuestStatus.ARCHIVED else QuestStatus.ACTIVE
+    viewModelScope.launch { questRepository.updateQuest(quest.copy(status = status)) }
   }
 
   companion object {

@@ -204,7 +204,9 @@ class SessionNavigationTest {
               AroundApp(
                   explorerUid = userId,
                   onSignOut = profile::signOut,
-                  overview = { OverviewOnFakes(it) },
+                  overview = { onOpenQuest, onJoinParty ->
+                    OverviewOnFakes(onOpenQuest, onJoinParty)
+                  },
               )
             },
         )

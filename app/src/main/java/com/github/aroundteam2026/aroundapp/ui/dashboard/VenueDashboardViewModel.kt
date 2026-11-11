@@ -317,7 +317,6 @@ internal fun dashboardOf(
     profiles: Map<String, User?> = emptyMap(),
     pictures: Map<String, ImageBitmap> = emptyMap(),
 ): VenueDashboardUiState {
-  val titles = quests.associate { it.id to it.title }
   val questsById = quests.associateBy { it.id }
   val reservationsById = reservations.associateBy { it.id }
   fun withStatus(status: ReservationStatus) =
@@ -325,19 +324,12 @@ internal fun dashboardOf(
           .filter { it.status == status }
           .sortedWith(compareBy<Reservation> { it.createdAt }.thenBy { it.id })
           .map {
-            val quest = questsById[it.questId]
             val members =
                 leaderFirst(it, parties[it.id].orEmpty()).map { member ->
                   val profile = profiles[member.uid]
                   DashboardMember(profile?.displayName, profile?.pictureUrl?.let(pictures::get))
                 }
-            val block =
-                if (status == ReservationStatus.PENDING) {
-                  approveBlockOf(quest, members.size)
-                } else {
-                  null
-                }
-            it.toDashboardReservation(titles, members, block, quest)
+            it.toDashboardReservation(questsById, members)
           }
   return VenueDashboardUiState(
       status = VenueDashboardStatus.LOADED,
@@ -353,7 +345,7 @@ internal fun dashboardOf(
               .map {
                 it.toDashboardProof(
                     reservationsById[it.reservationId],
-                    titles,
+                    questsById,
                     parties[it.reservationId]?.size ?: 0,
                 )
               },
@@ -381,41 +373,43 @@ internal fun approveBlockOf(quest: Quest?, joined: Int): ApproveBlock? =
       quest == null -> ApproveBlock.QuestMissing
       quest.meetsPartySize(joined) -> null
       joined < quest.minPartySize -> ApproveBlock.TooFew(quest.minPartySize - joined)
-      else -> ApproveBlock.TooMany(quest.minPartySize)
+      else -> ApproveBlock.TooMany(joined, quest.minPartySize)
     }
 
 /**
  * The row of this reservation, whose party has [members], leader first: the leader's name is their
- * profile's, or else the one stored with the reservation.
+ * profile's, or else the one stored with the reservation. Only a pending reservation gets an
+ * [ApproveBlock]: an approved one has nothing to approve.
  */
 private fun Reservation.toDashboardReservation(
-    titles: Map<String, String>,
+    questsById: Map<String, Quest>,
     members: List<DashboardMember>,
-    approveBlock: ApproveBlock?,
-    quest: Quest?,
-) =
-    DashboardReservation(
-        reservationId = id,
-        questTitle = titles[questId],
-        explorerName = members.firstOrNull()?.name ?: explorerName.ifBlank { null },
-        partySize = members.size,
-        requestedAt = createdAt,
-        approved = status == ReservationStatus.APPROVED,
-        approveBlock = approveBlock,
-        members = members,
-        groupSize = quest?.minPartySize?.takeIf { it > 1 },
-        exactGroupSize = quest?.exactPartySize == true,
-    )
+): DashboardReservation {
+  val quest = questsById[questId]
+  return DashboardReservation(
+      reservationId = id,
+      questTitle = quest?.title,
+      explorerName = members.firstOrNull()?.name ?: explorerName.ifBlank { null },
+      partySize = members.size,
+      requestedAt = createdAt,
+      approved = status == ReservationStatus.APPROVED,
+      approveBlock =
+          approveBlockOf(quest, members.size).takeIf { status == ReservationStatus.PENDING },
+      members = members,
+      groupSize = quest?.minPartySize?.takeIf { it > 1 },
+      exactGroupSize = quest?.exactPartySize == true,
+  )
+}
 
 private fun Completion.toDashboardProof(
     reservation: Reservation?,
-    titles: Map<String, String>,
+    questsById: Map<String, Quest>,
     partySize: Int,
 ) =
     DashboardProof(
         completionId = id,
         explorerName = reservation?.explorerName?.ifBlank { null },
-        questTitle = reservation?.let { titles[it.questId] },
+        questTitle = reservation?.let { questsById[it.questId]?.title },
         partySize = partySize,
         proofType = proof.type,
         sentAt = submittedAt,

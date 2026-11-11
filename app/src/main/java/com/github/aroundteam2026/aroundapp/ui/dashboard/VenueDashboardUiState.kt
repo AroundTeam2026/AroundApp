@@ -105,8 +105,11 @@ sealed interface ApproveBlock {
   /** The party needs [missing] more explorers, at least one. */
   data class TooFew(val missing: Int) : ApproveBlock
 
-  /** The quest takes exactly [size] explorers and the party has more: some have to leave. */
-  data class TooMany(val size: Int) : ApproveBlock
+  /**
+   * The quest takes exactly [size] explorers and [joined] of them, more than [size], joined: some
+   * have to leave.
+   */
+  data class TooMany(val joined: Int, val size: Int) : ApproveBlock
 
   /** The venue deleted the quest, so there is no size to check and the rules refuse approving. */
   data object QuestMissing : ApproveBlock

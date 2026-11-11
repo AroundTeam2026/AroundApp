@@ -149,9 +149,13 @@ private fun approveBlockText(block: ApproveBlock): String =
       is ApproveBlock.TooFew ->
           pluralStringResource(R.plurals.dashboard_approve_needs_more, block.missing, block.missing)
       is ApproveBlock.TooMany ->
-          pluralStringResource(R.plurals.dashboard_approve_needs_exactly, block.size, block.size)
-      // ApproveBlock.QuestMissing, the only other kind
-      else -> stringResource(R.string.dashboard_approve_quest_missing)
+          pluralStringResource(
+              R.plurals.dashboard_approve_too_many,
+              block.joined,
+              block.joined,
+              block.size,
+          )
+      ApproveBlock.QuestMissing -> stringResource(R.string.dashboard_approve_quest_missing)
     }
 
 /**
@@ -472,7 +476,7 @@ private val BUTTON_ICON_GAP = 6.dp
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-internal fun DashboardReservationRowPreview() {
+private fun DashboardReservationRowPreview() {
   val now = System.currentTimeMillis()
   AroundAppTheme {
     Column(

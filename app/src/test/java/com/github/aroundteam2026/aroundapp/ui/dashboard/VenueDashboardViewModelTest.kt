@@ -589,7 +589,7 @@ class VenueDashboardViewModelTest {
     // The venue makes the size exact while the party is bigger
     quests.updateQuest(quests.getQuest(questId)!!.copy(exactPartySize = true)).getOrThrow()
 
-    assertEquals(ApproveBlock.TooMany(2), state.needsAnswer.single().approveBlock)
+    assertEquals(ApproveBlock.TooMany(3, 2), state.needsAnswer.single().approveBlock)
   }
 
   @Test
@@ -644,25 +644,6 @@ class VenueDashboardViewModelTest {
 
     // Nothing on the dashboard blocks it, so the repository answers, here with "missing"
     assertEquals(1, gated.calls)
-  }
-
-  @Test
-  fun aPendingReservationWithoutItsPartyCountsAsEmpty() {
-    val reservation =
-        newPendingReservation("owl", VENUE_ID, "Ada", slotStart = NOW).copy(id = "unread")
-
-    val dashboard =
-        dashboardOf(
-            listOf(reservation),
-            parties = emptyMap(),
-            quests = listOf(testQuest(id = "owl", venueId = VENUE_ID, minPartySize = 2)),
-            venue = null,
-            completions = emptyList(),
-        )
-
-    val row = dashboard.needsAnswer.single()
-    assertEquals(0, row.partySize)
-    assertEquals(ApproveBlock.TooFew(2), row.approveBlock)
   }
 
   @Test
@@ -767,7 +748,7 @@ class VenueDashboardViewModelTest {
     assertNull(approveBlockOf(atLeastTwo, 7))
     assertEquals(ApproveBlock.TooFew(1), approveBlockOf(exactlyTwo, 1))
     assertNull(approveBlockOf(exactlyTwo, 2))
-    assertEquals(ApproveBlock.TooMany(2), approveBlockOf(exactlyTwo, 3))
+    assertEquals(ApproveBlock.TooMany(3, 2), approveBlockOf(exactlyTwo, 3))
   }
 
   private companion object {

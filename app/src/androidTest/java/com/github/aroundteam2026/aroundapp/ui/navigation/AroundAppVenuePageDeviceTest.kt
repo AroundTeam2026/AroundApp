@@ -130,7 +130,7 @@ class AroundAppVenuePageDeviceTest {
           explorerUid = explorerUid,
           onSignOut = {},
           navController = navController,
-          overview = {},
+          overview = { _, _ -> },
       )
     }
     composeTestRule.runOnUiThread { navController.navigateToVenuePage(venue.id) }
