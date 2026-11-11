@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -164,7 +164,7 @@ fun NearbyQuestOverlay(
     Box(
         Modifier.testTag(C.Tag.NEARBY_GRABBER)
             .size(GRABBER_WIDTH, GRABBER_HEIGHT)
-            .background(colors.outline, RoundedCornerShape(GRABBER_HEIGHT / 2))
+            .background(colors.outline, AroundPillShape)
     )
     NearbyQuestPager(
         quests,

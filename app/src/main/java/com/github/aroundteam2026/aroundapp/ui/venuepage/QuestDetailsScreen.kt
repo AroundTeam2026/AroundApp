@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
@@ -26,7 +27,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -72,7 +72,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
@@ -251,10 +253,10 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
       }
   Row(
       Modifier.fillMaxWidth()
-          .clip(PROOF_STATUS_SHAPE)
+          .clip(AroundCorners.Photo)
           .background(colors.surface)
           .then(
-              look.border?.let { Modifier.border(PROOF_STATUS_BORDER, it, PROOF_STATUS_SHAPE) }
+              look.border?.let { Modifier.border(PROOF_STATUS_BORDER, it, AroundCorners.Photo) }
                   ?: Modifier
           )
           .padding(AroundSpacing.Large)
@@ -418,7 +420,7 @@ private fun PartyCodeBox(code: String, message: String) {
   val shareTitle = stringResource(R.string.quest_detail_party_code_share)
   Column(
       Modifier.fillMaxWidth()
-          .clip(PARTY_CODE_SHAPE)
+          .clip(AroundShapes.medium)
           .background(colors.surface)
           .drawBehind {
             val width = PARTY_CODE_BORDER.toPx()
@@ -472,7 +474,7 @@ private fun PartyCodeBox(code: String, message: String) {
     }
     Row(
         Modifier.fillMaxWidth()
-            .clip(PARTY_CODE_SHARE_SHAPE)
+            .clip(AroundShapes.small)
             .background(colors.primary)
             .clickable(role = Role.Button) { sharePartyCode(context, shareTitle, message) }
             .padding(vertical = AroundSpacing.Medium)
@@ -668,7 +670,10 @@ private fun Card(
     content: @Composable ColumnScope.() -> Unit,
 ) {
   Column(
-      Modifier.fillMaxWidth().clip(CARD_SHAPE).background(container).padding(AroundSpacing.Large),
+      Modifier.fillMaxWidth()
+          .clip(AroundShapes.large)
+          .background(container)
+          .padding(AroundSpacing.Large),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
   ) {
     Row(
@@ -740,7 +745,6 @@ internal fun rewardDetails(reward: Reward?): String? =
 private const val EXPIRY_SKELETON = "yMMMd"
 
 private val AVATAR_SIZE = 44.dp
-private val CARD_SHAPE = RoundedCornerShape(20.dp)
 private val CARD_ICON_SIZE = 14.dp
 private val TEXT_GAP = 2.dp
 private val SEAT_SIZE = 36.dp
@@ -749,16 +753,13 @@ private val SEAT_RING = 1.5.dp
 private val SEAT_DASH = 4.dp
 private val PROOF_TILE_SIZE = 40.dp
 private val PROOF_ICON_SIZE = 20.dp
-private val PROOF_STATUS_SHAPE = RoundedCornerShape(22.dp)
 private val PROOF_STATUS_BORDER = 1.5.dp
 private val PROOF_STATUS_TILE_SIZE = 44.dp
 private val PROOF_STATUS_ICON_SIZE = 22.dp
 private val PROOF_STATUS_DOT_SIZE = 6.dp
 private val PARTY_CODE_CORNER = 16.dp
-private val PARTY_CODE_SHAPE = RoundedCornerShape(PARTY_CODE_CORNER)
 private val PARTY_CODE_BORDER = 1.dp
 private val PARTY_CODE_COPY_ICON_SIZE = 20.dp
-private val PARTY_CODE_SHARE_SHAPE = RoundedCornerShape(14.dp)
 private val PARTY_CODE_SHARE_ICON_SIZE = 18.dp
 /** How many characters each half of a shown party code has. */
 private const val PARTY_CODE_HALF = PARTY_CODE_LENGTH / 2

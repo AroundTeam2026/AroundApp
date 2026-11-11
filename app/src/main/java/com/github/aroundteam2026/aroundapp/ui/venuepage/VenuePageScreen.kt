@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -57,6 +56,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatarStyle
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -261,7 +261,7 @@ private fun Quests(
   val colors = MaterialTheme.colorScheme
   Column(
       Modifier.fillMaxWidth()
-          .clip(QUESTS_SHAPE)
+          .clip(AroundCorners.Photo)
           .background(colors.surface)
           .padding(
               start = AroundSpacing.Large,
@@ -412,7 +412,6 @@ internal val DefaultQuestRow: VenuePageQuestRow = { quest, selected, onClick, on
 private val BACK_SIZE = 44.dp
 private val AVATAR_SIZE = 64.dp
 private val ADDRESS_ICON_SIZE = 16.dp
-private val QUESTS_SHAPE = RoundedCornerShape(22.dp)
 private val DIVIDER_WIDTH = 1.dp
 
 @Preview(name = "Light")
