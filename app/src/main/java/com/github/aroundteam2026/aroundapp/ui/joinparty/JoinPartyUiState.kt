@@ -15,9 +15,12 @@ data class JoinPartyUiState(
     val lookup: Lookup = Lookup.Idle,
     val join: Join = Join.IDLE,
 ) {
-  /** Whether the button works: something is typed, and the explorer isn't joining or done. */
+  /**
+   * Whether the button works: something is typed, no lookup is out, and the explorer isn't joining
+   * or done.
+   */
   val canSubmit: Boolean
-    get() = code.isNotBlank() && join == Join.IDLE
+    get() = code.isNotBlank() && lookup != Lookup.Looking && join == Join.IDLE
 
   /** What the typed code leads to. */
   sealed interface Lookup {
@@ -50,6 +53,9 @@ data class JoinPartyUiState(
 
     /** The explorer is already joined in the party, e.g. as its creator. */
     data object AlreadyJoined : Error
+
+    /** The explorer left the party, which the rules don't let them join again. */
+    data object Left : Error
 
     /** The device is offline. */
     data object Offline : Error

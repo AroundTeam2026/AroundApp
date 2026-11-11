@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -16,7 +17,9 @@ import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRowStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
@@ -140,9 +143,12 @@ class JoinPartyViewModelTest {
 
     type()
     assertEquals(JoinPartyUiState.Lookup.Looking, state.lookup)
+    assertFalse(state.canSubmit)
+    submit()
     lookups.gate?.complete(Unit)
     runCurrent()
 
+    assertEquals(1, lookups.lookups)
     assertEquals(id, found.reservationId)
     assertEquals("Fox", found.questTitle)
     assertEquals("Café Lumen", found.venueName)
@@ -270,9 +276,44 @@ class JoinPartyViewModelTest {
   }
 
   @Test
-  fun theCreatorJoiningTheirOwnPartyIsToldTheyAreAlreadyIn() = test {
+  fun aJoinedMemberTypingTheirPartysCodeIsToldAtOnceTheyAreAlreadyIn() = test {
     book(creator = EXPLORER)
+    // Told before the party's size, so the creator of a full party isn't told it is full
+    reservations.party.join(book("duo", creator = EXPLORER, code = OTHER_CODE), "bob").getOrThrow()
+
     type()
+    assertEquals(JoinPartyUiState.Error.AlreadyJoined, refusal)
+    type(OTHER_CODE)
+    assertEquals(JoinPartyUiState.Error.AlreadyJoined, refusal)
+  }
+
+  // The rules refuse the memberships of a party to anyone outside it, as the Firestore one does
+  @Test
+  fun aMembershipReadTheRulesRefuseCountsAsNoMembership() = test {
+    book()
+    parties.membersRefused = true
+
+    type()
+
+    assertTrue(state.lookup is JoinPartyUiState.Lookup.Found)
+  }
+
+  @Test
+  fun aMemberWhoLeftIsToldTheyLeftTheParty() = test {
+    val id = book()
+    reservations.party.join(id, EXPLORER).getOrThrow()
+    reservations.party.withdraw(id, EXPLORER).getOrThrow()
+
+    type()
+
+    assertEquals(JoinPartyUiState.Error.Left, refusal)
+  }
+
+  @Test
+  fun aPartyTheExplorerJoinedMeanwhileFromElsewhereIsReportedAlreadyJoined() = test {
+    val id = book()
+    type()
+    reservations.party.join(id, EXPLORER).getOrThrow()
 
     submit()
 
@@ -288,6 +329,7 @@ class JoinPartyViewModelTest {
 
     submit()
     assertEquals(JoinPartyUiState.Error.Failed, refusal)
+    assertEquals("the code is read once, not again after a refused join", 1, lookups.lookups)
     connectivity.online.value = false
     submit()
     submit()
@@ -321,6 +363,11 @@ class JoinPartyViewModelTest {
     var joins = 0
     var gate: CompletableDeferred<Unit>? = null
     var refusing = false
+    var membersRefused = false
+
+    override fun observeMembers(reservationId: String): Flow<List<PartyMember>> =
+        if (membersRefused) flow { throw IllegalStateException("Permission denied") }
+        else delegate.observeMembers(reservationId)
 
     override suspend fun join(reservationId: String, uid: String): Result<Unit> {
       joins++

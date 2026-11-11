@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PARTY_CODE_LENGTH
+import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.partyCapacity
@@ -89,7 +90,7 @@ class JoinPartyViewModel(
     mutableUiState.update { it.copy(lookup = JoinPartyUiState.Lookup.Looking) }
     val code = mutableUiState.value.code
     lookingUp = viewModelScope.launch {
-      val result = lookUp(code)
+      val result = lookUp { reservationRepository.findReservationIdByCode(code).getOrThrow() }
       mutableUiState.update { it.copy(lookup = result) }
     }
   }
@@ -102,33 +103,34 @@ class JoinPartyViewModel(
         .onFailure { failure ->
           Log.w(TAG, "Joining the party of ${party.reservationId} failed", failure)
           // The rules refuse a full, ended or already joined party alike: look it up to tell which
-          var lookup = lookUp(mutableUiState.value.code)
-          if (lookup is JoinPartyUiState.Lookup.Found) {
-            lookup =
-                if (isMemberOf(party)) refused(JoinPartyUiState.Error.AlreadyJoined)
-                else refusalFor(failure)
-          }
+          var lookup = lookUp { party.reservationId }
+          if (lookup is JoinPartyUiState.Lookup.Found) lookup = refusalFor(failure)
           mutableUiState.update { it.copy(lookup = lookup, join = JoinPartyUiState.Join.IDLE) }
         }
   }
 
-  /** Whether the explorer is joined in the party of [party], e.g. as its creator. */
-  private suspend fun isMemberOf(party: OverviewRow): Boolean =
+  /**
+   * The status of the explorer's membership in the party of [reservationId], or null if they have
+   * none. Only a party's members can read its memberships, so for anyone else the read is refused,
+   * which also reads as no membership.
+   */
+  private suspend fun membershipOf(reservationId: String): PartyMemberStatus? =
       try {
-        reservationRepository.observeForExplorer(explorerUid).first().any {
-          it.id == party.reservationId
-        }
+        partyRepository
+            .observeMembers(reservationId)
+            .first()
+            .firstOrNull { it.uid == explorerUid }
+            ?.status
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        false
+        null
       }
 
-  /** The party the typed [code] leads to, or why it can't be joined. */
-  private suspend fun lookUp(code: String): JoinPartyUiState.Lookup =
+  /** The party whose reservation id [reservationId] gives, or why it can't be joined. */
+  private suspend fun lookUp(reservationId: suspend () -> String): JoinPartyUiState.Lookup =
       try {
-        val id = reservationRepository.findReservationIdByCode(code).getOrThrow()
-        val preview = reservationRepository.getPartyPreview(id).getOrThrow()
+        val preview = reservationRepository.getPartyPreview(reservationId()).getOrThrow()
         when (preview.reservation.status) {
           ReservationStatus.APPROVED -> refused(JoinPartyUiState.Error.Closed)
           ReservationStatus.REJECTED,
@@ -141,13 +143,19 @@ class JoinPartyViewModel(
         refusalFor(e)
       }
 
-  /** The pending party of [preview], found if it has room, with its quest and venue. */
+  /**
+   * The pending party of [preview], found if the explorer isn't in it and it has room, with its
+   * quest and venue.
+   */
   private suspend fun openParty(preview: PartyPreview): JoinPartyUiState.Lookup {
     val reservation = preview.reservation
     val quest = questRepository.getQuest(reservation.questId)
     val venue = venueRepository.getVenue(reservation.venueId)
+    val membership = membershipOf(reservation.id)
     return when {
       quest == null || venue == null -> refused(JoinPartyUiState.Error.Ended)
+      membership == PartyMemberStatus.JOINED -> refused(JoinPartyUiState.Error.AlreadyJoined)
+      membership == PartyMemberStatus.WITHDRAWN -> refused(JoinPartyUiState.Error.Left)
       preview.joinedCount >= quest.partyCapacity ->
           refused(JoinPartyUiState.Error.Full(preview.joinedCount, quest.partyCapacity))
       else -> {
