@@ -18,9 +18,7 @@ object AroundColors {
   /** The brand purple: primary actions, rewards. */
   val Purple = Color(0xFF4D0092)
   val PrimaryDark = Color(0xFF36006A)
-  /** The secondary teal: the venue's avatar, its ring on the map, distances. */
-  val Teal = Color(0xFF6FA8A0)
-  /** Second-draft teal; [Teal] preserves existing screen assets. */
+  /** The teal of the venue's avatar, its ring on the map and distances. */
   val Tertiary = Color(0xFF5EA89D)
   val Secondary = Color(0xFF62BAAD)
   val Panel = Color(0xFFF6F8DE)
