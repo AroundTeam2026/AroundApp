@@ -100,6 +100,19 @@ class VenueQuestsViewModelTest {
     )
   }
 
+  @Test
+  fun archivingAQuestListsItArchivedAndUnarchivingMakesItActiveAgain() = runTest {
+    val quest = testQuest(id = "fox", venueId = VENUE_ID)
+    val viewModel = watch(viewModel(FakeQuestRepository(initialQuests = listOf(quest))))
+    fun status() = (viewModel.uiState.value as VenueQuestsUiState.Loaded).quests.single().status
+
+    viewModel.setArchived(quest, archived = true)
+    assertEquals(QuestStatus.ARCHIVED, status())
+
+    viewModel.setArchived(quest, archived = false)
+    assertEquals(QuestStatus.ACTIVE, status())
+  }
+
   private companion object {
     const val VENUE_ID = "venue-1"
     const val OTHER_VENUE_ID = "venue-2"

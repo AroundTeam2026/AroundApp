@@ -26,6 +26,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -56,7 +57,8 @@ import kotlinx.coroutines.launch
  * venue's. Saving then updates that quest, keeping its id and status. A failed read can be retried
  * with [retryQuest]; a quest that no longer exists, or isn't the venue's, makes
  * [CreateQuestUiState.questUnavailable] close the screen. [reservationRepository] locks the party
- * size while the quest has pending reservations, which the venue could no longer approve.
+ * size while the quest has pending reservations, which the venue could no longer approve, and the
+ * proof type while it has any, which explorers reserved for.
  */
 class CreateQuestViewModel(
     private val authRepository: AuthRepository,
@@ -67,7 +69,15 @@ class CreateQuestViewModel(
     private val questId: String? = null,
     private val reservationRepository: ReservationRepository? = null,
 ) : ViewModel() {
-  private val mutableUiState = MutableStateFlow(CreateQuestUiState(editing = questId != null))
+  // Locked until the quest's reservations are known
+  private val mutableUiState =
+      MutableStateFlow(
+          CreateQuestUiState(
+              editing = questId != null,
+              partySizeLocked = questId != null,
+              proofTypeLocked = questId != null,
+          )
+      )
   /** The form as the venue has filled it in so far. */
   val uiState: StateFlow<CreateQuestUiState> = mutableUiState.asStateFlow()
 
@@ -116,7 +126,7 @@ class CreateQuestViewModel(
 
   /** Sets the kind of proof explorers submit to [type]. */
   fun updateProofType(type: ProofType) {
-    edit { it.copy(proofType = type) }
+    if (!mutableUiState.value.proofTypeLocked) edit { it.copy(proofType = type) }
   }
 
   /** Sets the radius to the preset [meters] and hides the slider. */
@@ -341,8 +351,8 @@ class CreateQuestViewModel(
   }
 
   /**
-   * Locks the party size while quest [id] has pending reservations, putting back the quest's own.
-   * It stays locked if they can't be read.
+   * Locks the party size while quest [id] has pending reservations, and the proof type while it has
+   * active ones, putting back the quest's own. Both stay locked if they can't be read.
    */
   private suspend fun watchPendingParties(id: String) {
     val venueId = authRepository.currentUserId.value ?: return
@@ -351,16 +361,21 @@ class CreateQuestViewModel(
         .observeForVenue(venueId)
         .catch { Log.w(TAG, "Watching reservations failed", it) }
         .collect { all ->
-          val locked = all.any { it.questId == id && it.status == ReservationStatus.PENDING }
+          val ofQuest = all.filter { it.questId == id }
+          val partyLocked = ofQuest.any { it.status == ReservationStatus.PENDING }
+          val proofLocked = ofQuest.any { it.status.isActive }
           val quest = editedQuest
           mutableUiState.update {
-            if (!locked || quest == null) it.copy(partySizeLocked = locked)
-            else
-                it.copy(
-                    partySizeLocked = true,
-                    minPartySize = quest.minPartySize,
-                    exactPartySize = quest.exactPartySize,
-                )
+            val locked = it.copy(partySizeLocked = partyLocked, proofTypeLocked = proofLocked)
+            when {
+              quest == null -> locked
+              else ->
+                  locked.copy(
+                      minPartySize = if (partyLocked) quest.minPartySize else it.minPartySize,
+                      exactPartySize = if (partyLocked) quest.exactPartySize else it.exactPartySize,
+                      proofType = if (proofLocked) quest.proofType else it.proofType,
+                  )
+            }
           }
         }
   }

@@ -87,7 +87,8 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
     Spacer(Modifier.height(AroundSpacing.SectionGap))
     FieldLabel(stringResource(R.string.create_quest_proof_type))
     Spacer(Modifier.height(AroundSpacing.CompactGap))
-    ProofOptions(state.proofType, actions.onProofTypeChange)
+    ProofOptions(state.proofType, actions.onProofTypeChange, enabled = !state.proofTypeLocked)
+    if (state.proofTypeLocked) LockedNote(C.Tag.CREATE_QUEST_PROOF_LOCKED)
     Spacer(Modifier.height(AroundSpacing.Small))
     ExplorerPreview()
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
@@ -98,12 +99,25 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
     UnlockRadius(state, actions)
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
     PartyCard(state, actions)
+    if (state.partySizeLocked) LockedNote(C.Tag.CREATE_QUEST_PARTY_LOCKED)
   }
+}
+
+/** Why the rule above can't change while the quest is being edited. */
+@Composable
+private fun LockedNote(tag: String) {
+  Spacer(Modifier.height(AroundSpacing.CompactGap))
+  Text(
+      stringResource(R.string.create_quest_locked),
+      style = AroundTextStyles.Caption,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.testTag(tag),
+  )
 }
 
 /** One card per [ProofType], side by side and as tall as each other. */
 @Composable
-private fun ProofOptions(selected: ProofType, onSelect: (ProofType) -> Unit) {
+private fun ProofOptions(selected: ProofType, onSelect: (ProofType) -> Unit, enabled: Boolean) {
   Row(
       Modifier.fillMaxWidth().height(IntrinsicSize.Min),
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
@@ -134,6 +148,7 @@ private fun ProofOptions(selected: ProofType, onSelect: (ProofType) -> Unit) {
           shape = MaterialTheme.shapes.medium,
           padding = PaddingValues(AroundSpacing.InsetPadding),
           modifier = Modifier.weight(1f).fillMaxHeight(),
+          enabled = enabled,
       ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
           IconTile(icon, isSelected)
@@ -354,6 +369,7 @@ private fun RowScope.RadiusOption(
 @Composable
 private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions) {
   val size = state.minPartySize
+  val enabled = !state.partySizeLocked
   Row(
       Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
@@ -391,7 +407,7 @@ private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions
           StepperButton(
               icon = R.drawable.ic_minus,
               description = stringResource(R.string.create_quest_party_decrement),
-              enabled = size > QuestLimits.MIN_PARTY_SIZE,
+              enabled = enabled && size > QuestLimits.MIN_PARTY_SIZE,
               filled = false,
               onClick = actions.onDecrementPartySize,
               tag = C.Tag.CREATE_QUEST_PARTY_DECREMENT,
@@ -401,6 +417,7 @@ private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions
               description = stringResource(R.string.create_quest_party_increment),
               filled = true,
               onClick = actions.onIncrementPartySize,
+              enabled = enabled,
               tag = C.Tag.CREATE_QUEST_PARTY_INCREMENT,
           )
         }
@@ -423,6 +440,7 @@ private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions
             selected = !state.exactPartySize,
             onClick = { actions.onExactPartySizeChange(false) },
             tag = C.Tag.CREATE_QUEST_PARTY_AT_LEAST,
+            enabled = enabled,
         )
         PartyRule(
             title = stringResource(R.string.create_quest_party_exactly, size),
@@ -430,6 +448,7 @@ private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions
             selected = state.exactPartySize,
             onClick = { actions.onExactPartySizeChange(true) },
             tag = C.Tag.CREATE_QUEST_PARTY_EXACTLY,
+            enabled = enabled,
         )
       }
     }
@@ -531,6 +550,7 @@ private fun RowScope.PartyRule(
     selected: Boolean,
     onClick: () -> Unit,
     tag: String,
+    enabled: Boolean,
 ) {
   SelectableOption(
       selected = selected,
@@ -540,6 +560,7 @@ private fun RowScope.PartyRule(
       padding =
           PaddingValues(horizontal = AroundSpacing.InsetPadding, vertical = AroundSpacing.Medium),
       modifier = Modifier.weight(1f).fillMaxHeight(),
+      enabled = enabled,
   ) {
     OptionText(title, hint, selected)
   }
@@ -565,4 +586,4 @@ private val RADIUS_HINT_STYLE: TextStyle = AroundTextStyles.Small.copy(fontSize 
 private const val SEAT_COUNT = 8
 
 /** Opacity of a stepper button that can't be pressed. */
-private const val DISABLED_ALPHA = 0.38f
+internal const val DISABLED_ALPHA = 0.38f

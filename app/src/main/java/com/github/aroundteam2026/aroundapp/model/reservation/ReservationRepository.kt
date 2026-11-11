@@ -80,10 +80,10 @@ interface ReservationRepository {
   /**
    * Moves a reservation to [status], changing nothing else.
    *
-   * The security rules let the venue that owns the reservation make any change, and a joined member
-   * of the party only cancel it (E21). The Firestore implementation therefore fails when an
-   * explorer asks for any other status, even though the fake allows it. The rules also refuse to
-   * approve a party without the size its quest asks for ([meetsPartySize]).
+   * The security rules let the venue that owns the reservation make any change while it is pending,
+   * and a joined member of the party only cancel it (E21). The Firestore implementation therefore
+   * fails when an explorer asks for any other status, even though the fake allows it. The rules
+   * also refuse to approve a party without the size its quest asks for ([meetsPartySize]).
    *
    * @param id id of the reservation.
    * @param status the new status; the change must be allowed by [canTransition].

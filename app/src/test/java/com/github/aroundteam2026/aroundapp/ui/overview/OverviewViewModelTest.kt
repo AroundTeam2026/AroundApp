@@ -7,6 +7,7 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
+import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
@@ -162,6 +163,17 @@ class OverviewViewModelTest {
         ),
         state.rows,
     )
+  }
+
+  // Archiving hides a quest from explorers, not from those who already reserved it
+  @Test
+  fun aReservationOfAnArchivedQuestStillShowsItsQuest() = test {
+    approvedReservation("fox")
+    quests["fox"] = quests.getValue("fox").copy(status = QuestStatus.ARCHIVED)
+    viewModel
+    runCurrent()
+
+    assertEquals(listOf("Find the hidden fox"), titles())
   }
 
   @Test
