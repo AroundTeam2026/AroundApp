@@ -108,6 +108,62 @@ class DashboardReservationRowTest {
   }
 
   @Test
+  fun aRowThatCanBeApprovedShowsNoReason() {
+    show(pending())
+
+    node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).assertDoesNotExist()
+  }
+
+  @Test
+  fun aPartyBelowItsSizeDisablesOnlyApproveAndSaysHowManyMore() {
+    show(pending().copy(approveBlock = ApproveBlock.TooFew(2)))
+
+    node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    node(C.Tag.DASHBOARD_ROW_DECLINE).assertIsEnabled()
+    assertEquals(
+        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_more, 2, 2),
+        node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
+    )
+    node(C.Tag.DASHBOARD_ROW_APPROVE).performClick()
+    node(C.Tag.DASHBOARD_ROW_DECLINE).performClick()
+
+    assertEquals(0, approvals)
+    assertEquals(1, declines)
+  }
+
+  @Test
+  fun aPartyAboveAnExactSizeSaysTheSize() {
+    show(pending(partySize = 3).copy(approveBlock = ApproveBlock.TooMany(2)))
+
+    node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    assertEquals(
+        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_exactly, 2, 2),
+        node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
+    )
+  }
+
+  @Test
+  fun aDeletedQuestSaysItCantBeApproved() {
+    show(pending().copy(questTitle = null, approveBlock = ApproveBlock.QuestMissing))
+
+    node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    assertEquals(
+        string(R.string.dashboard_approve_quest_missing),
+        node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
+    )
+  }
+
+  @Test
+  fun thePreviewShowsAPartyBelowItsSize() {
+    compose.setContent { DashboardReservationRowPreview() }
+
+    assertEquals(
+        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_more, 2, 2),
+        node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
+    )
+  }
+
+  @Test
   fun anApprovedRowShowsItsPillButNoButtons() {
     show(pending().copy(approved = true))
 

@@ -55,7 +55,9 @@ import kotlinx.coroutines.delay
  * title and when it was requested, then the party, led by the explorer who reserved.
  *
  * A pending reservation ends with Decline and Approve; an approved one shows an "Approved" pill
- * instead. Reservations have no visit time yet, so no slot is shown.
+ * instead. While the reservation has an [DashboardReservation.approveBlock], Approve is disabled
+ * and the reason is shown under the buttons; Decline stays enabled. Reservations have no visit time
+ * yet, so no slot is shown.
  *
  * @param reservation The reservation to draw.
  * @param onDecline Declines it; only a pending reservation offers it.
@@ -120,13 +122,33 @@ internal fun DashboardReservationRow(
             background = colors.primary,
             content = colors.onPrimary,
             tag = C.Tag.DASHBOARD_ROW_APPROVE,
-            enabled = !saving,
+            enabled = !saving && reservation.approveBlock == null,
             onClick = onApprove,
+        )
+      }
+      reservation.approveBlock?.let {
+        Text(
+            approveBlockText(it),
+            Modifier.fillMaxWidth().testTag(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED),
+            color = colors.onSurfaceVariant,
+            style = AroundTextStyles.Caption,
         )
       }
     }
   }
 }
+
+/** Why Approve is disabled, e.g. "Needs 2 more explorers before you can approve". */
+@Composable
+private fun approveBlockText(block: ApproveBlock): String =
+    when (block) {
+      is ApproveBlock.TooFew ->
+          pluralStringResource(R.plurals.dashboard_approve_needs_more, block.missing, block.missing)
+      is ApproveBlock.TooMany ->
+          pluralStringResource(R.plurals.dashboard_approve_needs_exactly, block.size, block.size)
+      // ApproveBlock.QuestMissing, the only other kind
+      else -> stringResource(R.string.dashboard_approve_quest_missing)
+    }
 
 /**
  * The [clock]'s time, read again when the minute since [requestedAt] changes, so "Requested … ago"
@@ -370,7 +392,7 @@ private val BUTTON_ICON_GAP = 6.dp
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun DashboardReservationRowPreview() {
+internal fun DashboardReservationRowPreview() {
   val now = System.currentTimeMillis()
   AroundAppTheme {
     Column(
@@ -385,6 +407,19 @@ private fun DashboardReservationRowPreview() {
               partySize = 3,
               requestedAt = now - 12 * DateUtils.MINUTE_IN_MILLIS,
               approved = false,
+          ),
+          onDecline = {},
+          onApprove = {},
+      )
+      DashboardReservationRow(
+          DashboardReservation(
+              reservationId = "too-small",
+              questTitle = "Brunch for six",
+              explorerName = "Nora B.",
+              partySize = 4,
+              requestedAt = now - 30 * DateUtils.MINUTE_IN_MILLIS,
+              approved = false,
+              approveBlock = ApproveBlock.TooFew(2),
           ),
           onDecline = {},
           onApprove = {},
