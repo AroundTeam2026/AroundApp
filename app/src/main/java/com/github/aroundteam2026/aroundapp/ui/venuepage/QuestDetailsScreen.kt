@@ -7,6 +7,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -26,7 +28,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -448,12 +452,14 @@ private fun PartyCodeBox(code: String, message: String) {
             style = AroundTextStyles.PartyCode,
         )
       }
-      Box(
-          Modifier.clip(AroundPillShape)
-              .background(AroundTheme.colors.lavender)
-              .clickable(role = Role.Button) { copyPartyCode(context, copyLabel, code) }
-              .padding(PARTY_CODE_COPY_PADDING),
-          contentAlignment = Alignment.Center,
+      // A 40 dp circle, as in Figma, with Material's 48 dp touch target around it
+      FilledIconButton(
+          onClick = { copyPartyCode(context, copyLabel, code) },
+          colors =
+              IconButtonDefaults.filledIconButtonColors(
+                  containerColor = AroundTheme.colors.lavender,
+                  contentColor = AroundTheme.colors.accentText,
+              ),
       ) {
         Icon(
             painterResource(R.drawable.ic_copy),
@@ -497,11 +503,17 @@ private fun PartyCodeBox(code: String, message: String) {
  */
 internal fun partyCodeShown(code: String): String = code.chunked(PARTY_CODE_HALF).joinToString(" ")
 
-/** Puts the party's [code] on the clipboard, under [label], as stored: without the space. */
+/**
+ * Puts the party's [code] on the clipboard, under [label], as stored: without the space. Android 13
+ * and later confirm a copy themselves; earlier versions show nothing, so this says so with a toast.
+ */
 private fun copyPartyCode(context: Context, label: String, code: String) {
   context
       .getSystemService(ClipboardManager::class.java)
       ?.setPrimaryClip(ClipData.newPlainText(label, code))
+  if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
+    Toast.makeText(context, R.string.quest_detail_party_code_copied, Toast.LENGTH_SHORT).show()
+  }
 }
 
 /** Opens the phone's share sheet, titled [title], with [message] to send to friends. */
@@ -745,7 +757,6 @@ private val PROOF_STATUS_DOT_SIZE = 6.dp
 private val PARTY_CODE_CORNER = 16.dp
 private val PARTY_CODE_SHAPE = RoundedCornerShape(PARTY_CODE_CORNER)
 private val PARTY_CODE_BORDER = 1.dp
-private val PARTY_CODE_COPY_PADDING = 10.dp
 private val PARTY_CODE_COPY_ICON_SIZE = 20.dp
 private val PARTY_CODE_SHARE_SHAPE = RoundedCornerShape(14.dp)
 private val PARTY_CODE_SHARE_ICON_SIZE = 18.dp

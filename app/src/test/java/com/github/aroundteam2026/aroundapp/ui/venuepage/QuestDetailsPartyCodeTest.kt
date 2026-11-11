@@ -5,22 +5,28 @@ import android.app.Application
 import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.assertTouchWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowToast
 
 /** The party code on the quest details: shown only when the state gives one, copied and shared. */
 @RunWith(RobolectricTestRunner::class)
@@ -77,18 +83,43 @@ class QuestDetailsPartyCodeTest {
     node(C.Tag.QUEST_DETAIL_PARTY_CODE_SHARE).assertDoesNotExist()
   }
 
+  // Named for screen readers, as it shows an icon only; the button takes its icon's name
+  private fun copyButton() =
+      compose.onNodeWithContentDescription(app.getString(R.string.quest_detail_party_code_copy))
+
+  // Android 13 and later (Robolectric runs 34 here) confirm the copy themselves, so no toast
   @Test
   fun copyPutsTheCodeOnTheClipboardWithoutTheSpace() {
     show(mapOf(RESERVATION to CODE))
 
-    // Named for screen readers, as it shows an icon only
-    compose
-        .onNodeWithContentDescription("Copy the party code", useUnmergedTree = true)
-        .performScrollTo()
-        .performClick()
+    copyButton().performScrollTo().performClick()
 
     val clipboard = app.getSystemService(ClipboardManager::class.java)
     assertEquals(CODE, clipboard.primaryClip?.getItemAt(0)?.text)
+    assertNull(ShadowToast.getTextOfLatestToast())
+  }
+
+  @Test
+  @Config(sdk = [32])
+  fun copyConfirmsWithAToastBeforeAndroid13() {
+    show(mapOf(RESERVATION to CODE))
+
+    copyButton().performScrollTo().performClick()
+
+    assertEquals(
+        app.getString(R.string.quest_detail_party_code_copied),
+        ShadowToast.getTextOfLatestToast(),
+    )
+  }
+
+  @Test
+  fun theCopyButtonHasAFullSizeTouchTarget() {
+    show(mapOf(RESERVATION to CODE))
+
+    copyButton()
+        .performScrollTo()
+        .assertTouchWidthIsEqualTo(MIN_TOUCH_TARGET)
+        .assertTouchHeightIsEqualTo(MIN_TOUCH_TARGET)
   }
 
   @Test
@@ -120,5 +151,6 @@ class QuestDetailsPartyCodeTest {
     const val QUEST = "fox"
     const val RESERVATION = "r"
     const val CODE = "7KQM42"
+    val MIN_TOUCH_TARGET = 48.dp
   }
 }

@@ -42,6 +42,7 @@
     <!-- The code the party's creator shares so friends can join -->
     <string name="quest_detail_party_code">Party code</string>
     <string name="quest_detail_party_code_copy">Copy the party code</string>
+    <string name="quest_detail_party_code_copied">Code copied</string>
     <string name="quest_detail_party_code_share">Share the code</string>
     <string name="quest_detail_party_code_hint">Friends enter it under Quests › Join a party.</string>
     <!-- What the share sheet sends: the quest's title, the venue's name and the code -->
