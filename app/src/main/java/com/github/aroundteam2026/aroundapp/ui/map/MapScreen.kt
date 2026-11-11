@@ -88,7 +88,7 @@ fun MapScreen(
       )
       QuestMarkers(
           pins = state.pins,
-          selectedVenueId = state.selectedVenueId,
+          selectedPinKey = state.selectedPinKey,
           style = markerStyle,
           onPinClick = viewModel::onPinClick,
           onCardClick = { onOpenVenue(it.venueId, it.venueName) },

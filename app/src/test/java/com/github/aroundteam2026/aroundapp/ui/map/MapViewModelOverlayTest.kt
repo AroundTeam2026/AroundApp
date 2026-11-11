@@ -98,12 +98,12 @@ class MapViewModelOverlayTest {
   fun openingTheOverlayClosesTheOpenCard() = test {
     viewModel.onPinClick("cafe")
     runCurrent()
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", state.selectedPinKey)
 
     viewModel.onNearbyOpen()
     runCurrent()
 
-    assertNull(state.selectedVenueId)
+    assertNull(state.selectedPinKey)
   }
 
   @Test
@@ -115,7 +115,7 @@ class MapViewModelOverlayTest {
     runCurrent()
 
     assertFalse(state.showsNearby)
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", state.selectedPinKey)
   }
 
   @Test
@@ -140,7 +140,7 @@ class MapViewModelOverlayTest {
     runCurrent()
 
     assertFalse(state.showsNearby)
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", state.selectedPinKey)
     // The open venue keeps its pin until the camera gets there
     assertEquals(listOf("cafe"), state.pins.map { it.venueId })
   }
@@ -169,7 +169,7 @@ class MapViewModelOverlayTest {
     viewModel.onNearbyQuestClick(state.nearby.single { it.questId == "away" })
     runCurrent()
 
-    assertEquals("away", state.selectedVenueId)
+    assertEquals("away", state.selectedPinKey)
     assertEquals(away.boundsWithin(MapViewModel.VENUE_FRAME_RADIUS_METERS), state.areaToFrame)
   }
 
@@ -215,7 +215,7 @@ class MapViewModelOverlayTest {
     runCurrent()
 
     assertEquals(framed, state.areaToFrame)
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", state.selectedPinKey)
     // The explorer is located all the same, so the list measures from them
     assertNotNull(state.nearby.single().distanceMeters)
   }

@@ -50,8 +50,8 @@ import kotlinx.coroutines.launch
  *   it is off. False until they answer.
  * @property pins The venues to mark: those on screen with valid quests, and the open one wherever
  *   it is.
- * @property selectedVenueId The [VenuePin.key] of the pin whose card is open, or null when every
- *   pin is closed.
+ * @property selectedPinKey The [VenuePin.key] of the pin whose card is open, or null when every pin
+ *   is closed.
  * @property nearby The valid quests for the list: those within [MapViewModel.NEARBY_RADIUS_METERS]
  *   of the explorer, nearest first, or, while their position is unknown, every valid quest by venue
  *   name, with no distance. Only those that pass [filters] are listed.
@@ -68,7 +68,7 @@ data class MapUiState(
     val showsUserLocation: Boolean = false,
     val locationRefused: Boolean = false,
     val pins: List<VenuePin> = emptyList(),
-    val selectedVenueId: String? = null,
+    val selectedPinKey: String? = null,
     val nearby: List<NearbyQuest> = emptyList(),
     val showsNearby: Boolean = false,
     val filters: NearbyFilters = NearbyFilters(),
@@ -110,7 +110,7 @@ class MapViewModel(
   /** Where the explorer was located, which pins measure their distance from; null until then. */
   private val explorer = MutableStateFlow<Location?>(null)
   /** The [VenuePin.key] of the pin whose card the explorer opened, or null. */
-  private val selectedVenueId = MutableStateFlow<String?>(null)
+  private val selectedPinKey = MutableStateFlow<String?>(null)
   /** The filters of the nearby list. */
   private val filters = MutableStateFlow(NearbyFilters())
   /** Bumped by [onRetry] when the quests failed: each new value listens to them again. */
@@ -142,7 +142,7 @@ class MapViewModel(
     viewModelScope.launch {
       // The venues on screen get a pin, and the open one keeps it wherever it is: the card is far
       // bigger than the pin, so it can still be on screen when its venue isn't
-      combine(content, visibleArea, selectedVenueId, filters, retryWaiting) {
+      combine(content, visibleArea, selectedPinKey, filters, retryWaiting) {
               (pins, nearby, questsFailed, venuesFailed),
               area,
               opened,
@@ -157,12 +157,12 @@ class MapViewModel(
           }
           .collect { (shown, opened, selected, nearby, chosen, failed, retrying) ->
             // A venue left without valid quests closes its card for good
-            if (selected == null && opened != null) selectedVenueId.compareAndSet(opened, null)
+            if (selected == null && opened != null) selectedPinKey.compareAndSet(opened, null)
             // One update, so the pins and the list always come from the same snapshot
             _uiState.update {
               it.copy(
                   pins = shown,
-                  selectedVenueId = selected,
+                  selectedPinKey = selected,
                   nearby = nearby,
                   filters = chosen,
                   loadFailed = failed,
@@ -212,19 +212,19 @@ class MapViewModel(
   fun onPinClick(key: String) {
     if (content.value.pins.none { it.key == key }) return
     picked = true
-    selectedVenueId.value = key
+    selectedPinKey.value = key
     // The card must stay in sight
     _uiState.update { it.copy(showsNearby = false) }
   }
 
   /** Called when the explorer taps the map itself: closes the open card, not the nearby quests. */
   fun onMapClick() {
-    selectedVenueId.value = null
+    selectedPinKey.value = null
   }
 
   /** Called when the explorer opens the nearby quests: shows them, closing the open card. */
   fun onNearbyOpen() {
-    selectedVenueId.value = null
+    selectedPinKey.value = null
     _uiState.update { it.copy(showsNearby = true) }
   }
 
@@ -266,7 +266,7 @@ class MapViewModel(
     val pin =
         pins.find { it.key == quest.questId } ?: pins.find { it.key == quest.venueId } ?: return
     picked = true
-    selectedVenueId.value = pin.key
+    selectedPinKey.value = pin.key
     _uiState.update {
       it.copy(
           areaToFrame = pin.location.boundsWithin(VENUE_FRAME_RADIUS_METERS),

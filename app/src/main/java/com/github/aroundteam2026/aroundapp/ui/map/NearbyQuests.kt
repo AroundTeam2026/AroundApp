@@ -86,12 +86,14 @@ fun nearbyQuests(
               )
             }
           }
-  // A stable sort, so each venue's quests keep the newest-first order they were built in
   return if (from == null) {
+    // A quest away from its venue is a group of its own: rank keeps the venue's rows newest first
+    val rank = quests.sortedWith(NEWEST_FIRST).withIndex().associate { it.value.id to it.index }
     // Not by character code, which would put lower case and accented letters last
     rows.sortedWith(
         compareBy(Collator.getInstance(locale)) { row: NearbyQuest -> row.venueName }
             .thenBy { it.venueId }
+            .thenBy { rank[it.questId] }
     )
   } else {
     rows.sortedWith(compareBy<NearbyQuest> { it.distanceMeters }.thenBy { it.venueId })

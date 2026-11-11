@@ -81,7 +81,7 @@ class MapViewModelPinsTest {
 
   /** The pin whose card is open, or null. */
   private val selectedPin
-    get() = state.pins.find { it.venueId == state.selectedVenueId }
+    get() = state.pins.find { it.venueId == state.selectedPinKey }
 
   private val pinIds
     get() = state.pins.map { it.venueId }.toSet()
@@ -387,7 +387,7 @@ class MapViewModelPinsTest {
   fun nothingIsSelectedAtFirst() = test {
     showing()
 
-    assertNull(state.selectedVenueId)
+    assertNull(state.selectedPinKey)
     assertNull(selectedPin)
   }
 
@@ -398,7 +398,7 @@ class MapViewModelPinsTest {
     viewModel.onPinClick("cafe")
     runCurrent()
 
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", state.selectedPinKey)
     assertEquals("cafe", selectedPin?.venueId)
   }
 
@@ -412,7 +412,7 @@ class MapViewModelPinsTest {
     viewModel.onPinClick("bar")
     runCurrent()
 
-    assertEquals("bar", state.selectedVenueId)
+    assertEquals("bar", state.selectedPinKey)
   }
 
   @Test
@@ -424,7 +424,7 @@ class MapViewModelPinsTest {
     viewModel.onMapClick()
     runCurrent()
 
-    assertNull(state.selectedVenueId)
+    assertNull(state.selectedPinKey)
     assertEquals(setOf("cafe", "bar"), pinIds)
   }
 
@@ -440,7 +440,7 @@ class MapViewModelPinsTest {
     viewModel.onPinClick("cafe")
     runCurrent()
 
-    assertEquals("bar", state.selectedVenueId)
+    assertEquals("bar", state.selectedPinKey)
   }
 
   @Test
@@ -452,7 +452,7 @@ class MapViewModelPinsTest {
     quests.value = listOf(barQuest)
     runCurrent()
 
-    assertNull(state.selectedVenueId)
+    assertNull(state.selectedPinKey)
     assertNull(selectedPin)
 
     // A new quest brings the pin back, but the explorer must tap it to open it again
@@ -460,7 +460,7 @@ class MapViewModelPinsTest {
     runCurrent()
 
     assertEquals(setOf("cafe", "bar"), pinIds)
-    assertNull(state.selectedVenueId)
+    assertNull(state.selectedPinKey)
   }
 
   @Test
@@ -472,7 +472,7 @@ class MapViewModelPinsTest {
     quests.value += testQuest(id = "cafe-2", venueId = "cafe")
     runCurrent()
 
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", state.selectedPinKey)
     assertEquals(1, selectedPin?.otherQuestCount)
   }
 
@@ -510,7 +510,7 @@ class MapViewModelPinsTest {
     viewModel.onPinClick("geneva")
     runCurrent()
 
-    assertEquals("geneva", state.selectedVenueId)
+    assertEquals("geneva", state.selectedPinKey)
   }
 
   @Test
@@ -525,8 +525,8 @@ class MapViewModelPinsTest {
     viewModel.onPinClick("away")
     runCurrent()
 
-    assertEquals("away", state.selectedVenueId)
-    assertEquals(museumLocation, state.pins.single { it.key == state.selectedVenueId }.location)
+    assertEquals("away", state.selectedPinKey)
+    assertEquals(museumLocation, state.pins.single { it.key == state.selectedPinKey }.location)
   }
 
   private companion object {

@@ -212,13 +212,13 @@ class CompletionScreenTest {
     show()
     compose
         .onNodeWithText(
-            "You’re outside this quest’s unlock radius. Move closer to the venue, then try sending your proof again."
+            "You’re outside this quest’s unlock radius. Move closer to where the quest takes place, then try sending your proof again."
         )
         .assertIsDisplayed()
     compose.runOnIdle { state = state.copy(locationError = CompletionLocationError.UNAVAILABLE) }
     compose
         .onNodeWithText(
-            "Around cannot get a precise device or venue location, so it cannot check that you’re at the venue. Check location access and try again."
+            "Around cannot get a precise device or quest location, so it cannot check that you’re where the quest takes place. Check location access and try again."
         )
         .assertIsDisplayed()
     compose.onNodeWithText("Check location access").performClick()

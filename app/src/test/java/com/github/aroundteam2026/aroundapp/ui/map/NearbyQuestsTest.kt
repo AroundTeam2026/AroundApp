@@ -359,4 +359,14 @@ class NearbyQuestsTest {
     assertEquals(100.0, rows.single().distanceMeters!!, 0.01)
     assertEquals("cafe", rows.single().venueId)
   }
+
+  @Test
+  fun withoutAPositionAQuestAwayFromItsVenueStaysInItsVenuesNewestFirstOrder() {
+    val old = questAt(100.0, id = "old", venueId = "cafe", createdAt = 1)
+    val new = questAt(100.0, id = "new", venueId = "cafe", createdAt = 3)
+    val away = testQuest(id = "away", venueId = "cafe", location = north(500.0), createdAt = 2)
+
+    assertEquals(listOf("new", "away", "old"), nearby(listOf(old, away, new), from = null).ids())
+    assertEquals(listOf("new", "away", "old"), nearby(listOf(away, new, old), from = null).ids())
+  }
 }

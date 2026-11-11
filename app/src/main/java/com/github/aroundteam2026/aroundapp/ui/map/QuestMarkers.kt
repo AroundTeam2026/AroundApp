@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.mapNotNull
 private const val OPEN_CARD_Z_INDEX = 1f
 
 /**
- * Marks each of [pins] on the map: a pin, or the card of the pin keyed [selectedVenueId], over its
+ * Marks each of [pins] on the map: a pin, or the card of the pin keyed [selectedPinKey], over its
  * area. Tapping a pin calls [onPinClick] with its [VenuePin.key]; tapping the card calls
  * [onCardClick].
  *
@@ -40,14 +40,14 @@ private const val OPEN_CARD_Z_INDEX = 1f
 @GoogleMapComposable
 fun QuestMarkers(
     pins: List<VenuePin>,
-    selectedVenueId: String?,
+    selectedPinKey: String?,
     style: MarkerStyle,
     onPinClick: (key: String) -> Unit,
     onCardClick: (VenuePin) -> Unit,
 ) {
   pins.forEach { pin ->
     key(pin.key) {
-      val open = pin.key == selectedVenueId
+      val open = pin.key == selectedPinKey
       // Real metres on the ground, so the area grows as the explorer zooms in
       val area = pin.area(style)
       Circle(
