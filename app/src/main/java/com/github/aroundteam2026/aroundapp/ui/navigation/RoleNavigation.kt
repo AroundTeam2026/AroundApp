@@ -100,7 +100,7 @@ fun RoleNavigation(
 
 /** A failed profile read is distinct from an absent profile; retry keeps the auth session. */
 @Composable
-private fun ProfileError(onRetry: () -> Unit, onSignOut: () -> Unit) {
+internal fun ProfileError(onRetry: () -> Unit, onSignOut: () -> Unit) {
   Column(
       Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp).testTag(C.Tag.ROLE_PROFILE_ERROR),
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),

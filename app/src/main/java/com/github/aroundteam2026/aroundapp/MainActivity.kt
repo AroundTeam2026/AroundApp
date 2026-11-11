@@ -11,11 +11,13 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.RoleNavigation
 import com.github.aroundteam2026.aroundapp.ui.navigation.VenueEntry
+import com.github.aroundteam2026.aroundapp.ui.profile.ExplorerProfileSetupGate
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
@@ -28,12 +30,18 @@ class MainActivity : ComponentActivity() {
       val auth = AuthRepositoryProvider.repository
       val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(auth))
       val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
+      val users = UserRepositoryProvider.repository
+      val pictures = remember { UserPictureRepositoryProvider.repository(applicationContext) }
       AroundAppTheme {
         RoleNavigation(
             authRepository = auth,
-            userRepository = UserRepositoryProvider.repository,
+            userRepository = users,
             pendingRoleStore = pendingRole,
-            explorerScreen = { uid -> AroundApp(explorerUid = uid, onSignOut = profile::signOut) },
+            explorerScreen = { uid ->
+              ExplorerProfileSetupGate(uid, users, pictures, profile::signOut) {
+                AroundApp(explorerUid = uid, onSignOut = profile::signOut)
+              }
+            },
             venueScreen = { uid ->
               VenueEntry(uid, auth, VenueRepositoryProvider.repository, profile::signOut)
             },
