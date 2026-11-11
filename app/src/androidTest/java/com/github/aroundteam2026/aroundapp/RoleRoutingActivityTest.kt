@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.e2e.E2eRule
+import com.github.aroundteam2026.aroundapp.e2e.closeKeyboard
 import com.github.aroundteam2026.aroundapp.e2e.submitAuthForm
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -58,6 +59,10 @@ class RoleRoutingActivityTest {
     compose.onNodeWithTag(C.Tag.AUTH_EMAIL).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.AUTH_EXPLORER_CARD).performScrollTo().performClick()
+    awaitTag(C.Tag.PROFILE_SETUP_SCREEN)
+    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_NAME).performTextInput("Explorer")
+    compose.closeKeyboard()
+    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_CONTINUE).performClick()
     awaitTag(C.Tag.NAV_BAR)
     assertEquals(
         Role.EXPLORER,

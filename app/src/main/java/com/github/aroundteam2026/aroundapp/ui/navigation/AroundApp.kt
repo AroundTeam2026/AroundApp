@@ -18,6 +18,10 @@ import com.github.aroundteam2026.aroundapp.ui.completion.Completion
 import com.github.aroundteam2026.aroundapp.ui.completion.CompletionViewModel
 import com.github.aroundteam2026.aroundapp.ui.completion.completionDestination
 import com.github.aroundteam2026.aroundapp.ui.completion.navigateToCompletion
+import com.github.aroundteam2026.aroundapp.ui.joinparty.JoinParty
+import com.github.aroundteam2026.aroundapp.ui.joinparty.JoinPartyViewModel
+import com.github.aroundteam2026.aroundapp.ui.joinparty.joinPartyDestination
+import com.github.aroundteam2026.aroundapp.ui.joinparty.navigateToJoinParty
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
@@ -64,7 +68,10 @@ private val START_TAB = Tab.QUESTS
  *   any, its back action and what its "Submit proof" button opens; tests pass their own so the page
  *   doesn't read Firestore.
  * @param overview draws the Quests tab's overview, given what opens a quest's details on its
- *   venue's page; tests pass their own so the overview doesn't read Firestore.
+ *   venue's page and what opens the Join a party screen; tests pass their own so the overview
+ *   doesn't read Firestore.
+ * @param joinParty draws the screen where the explorer joins a party by its code, given what closes
+ *   it; tests pass their own so it doesn't read Firestore.
  * @param completion draws the screen where the explorer completes a reservation's quest, given the
  *   reservation's id, the venue's name and what closes it; tests pass their own so it doesn't read
  *   Firestore.
@@ -89,9 +96,18 @@ fun AroundApp(
         { reservationId, venueName, close ->
           Completion(venueName, close, CompletionViewModel.factory(reservationId, explorerUid))
         },
-    overview: @Composable (onOpenQuest: (venueId: String, questId: String) -> Unit) -> Unit = {
-      OverviewScreen(explorerUid, it)
+    joinParty: @Composable (close: () -> Unit) -> Unit = { close ->
+      JoinParty(close, JoinPartyViewModel.factory(explorerUid))
     },
+    overview:
+        @Composable
+        (
+            onOpenQuest: (venueId: String, questId: String) -> Unit,
+            onJoinParty: () -> Unit,
+        ) -> Unit =
+        { onOpenQuest, onJoinParty ->
+          OverviewScreen(explorerUid, onOpenQuest, onJoinParty, navController::navigateToCompletion)
+        },
     screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, onSignOut) },
 ) {
   BottomTabScaffold(
@@ -109,6 +125,7 @@ fun AroundApp(
         page = venuePage,
     )
     completionDestination(navController, screen = completion)
+    joinPartyDestination(navController, screen = joinParty)
   }
 }
 
@@ -133,22 +150,30 @@ internal fun NavHostController.openVenue(venueId: String, questId: String? = nul
 /**
  * The screen of [tab].
  *
- * @param navController opens a venue's page when its card on the map is tapped, and a quest's
- *   details on it when its row in the overview is.
- * @param overview draws the Quests tab's overview, given what opens a quest's details.
+ * @param navController opens a venue's page when its card on the map is tapped, a quest's details
+ *   on it when its row in the overview is, and the Join a party screen from the overview.
+ * @param overview draws the Quests tab's overview, given what opens a quest's details and the Join
+ *   a party screen.
  * @param onSignOut signs the user out from the Profile tab.
  */
 @Composable
 private fun TabScreen(
     tab: Tab,
     navController: NavHostController,
-    overview: @Composable (onOpenQuest: (venueId: String, questId: String) -> Unit) -> Unit,
+    overview:
+        @Composable
+        (
+            onOpenQuest: (venueId: String, questId: String) -> Unit,
+            onJoinParty: () -> Unit,
+        ) -> Unit,
     onSignOut: () -> Unit,
 ) =
     when (tab) {
       Tab.MAP -> MapScreen(onOpenVenue = navController::openVenueFromMap)
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS ->
-          Box(Modifier.fillMaxSize().testTag(tab.screenTag)) { overview(navController::openVenue) }
+          Box(Modifier.fillMaxSize().testTag(tab.screenTag)) {
+            overview(navController::openVenue, navController::navigateToJoinParty)
+          }
       Tab.PROFILE -> ProfileScreen(onSignOut)
     }

@@ -2,12 +2,19 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +28,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,18 +39,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.party.PARTY_CODE_LENGTH
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -69,7 +84,9 @@ import java.util.Date
  * then a card for each part of it, over a bar that stays in place to accept the quest or, once it
  * is accepted, to cancel the reservation after asking. Once the venue approved the reservation, the
  * bar offers to submit the proof, and once it is sent, a card under the title says where it stands.
- * The rows only fit part of a quest, so this is where the rest is read.
+ * The explorer who created the reservation finds its party code on the party card, to copy or share
+ * with friends while they can still join. The rows only fit part of a quest, so this is where the
+ * rest is read.
  *
  * @param state The venue's page, for the venue and how accepting and cancelling stand.
  * @param quest The quest to show.
@@ -118,7 +135,12 @@ fun QuestDetailsScreen(
       }
       if (quest.requirements.isNotBlank()) Requirements(quest.requirements)
       quest.reward?.let { RewardCard(it, clock) }
-      PartyCard(quest, joined = state.acceptedParties[quest.questId] ?: SOLO_PARTY)
+      PartyCard(
+          quest,
+          joined = state.acceptedParties[quest.questId] ?: SOLO_PARTY,
+          code = state.partyCode,
+          venueName = state.venueName,
+      )
       ProofCard(quest.proofType)
       RadiusCard(state, quest)
     }
@@ -327,10 +349,11 @@ private fun RewardCard(reward: Reward, clock: Clock) {
 
 /**
  * How many people [quest] takes, with a seat for each. A party bigger than the quest's minimum gets
- * a seat for everyone. Past the explorer's own seat, [joined] counts who else is in.
+ * a seat for everyone. Past the explorer's own seat, [joined] counts who else is in. With a [code],
+ * the party's code follows, for friends to join with; sharing it names the quest and [venueName].
  */
 @Composable
-private fun PartyCard(quest: VenuePageQuest, joined: Int) {
+private fun PartyCard(quest: VenuePageQuest, joined: Int, code: String?, venueName: String) {
   val seats = maxOf(quest.minPartySize, joined)
   val rule =
       if (quest.exactPartySize) R.plurals.quest_detail_party_exactly
@@ -369,7 +392,134 @@ private fun PartyCard(quest: VenuePageQuest, joined: Int) {
         )
       }
     }
+    code?.let {
+      PartyCodeBox(
+          it,
+          stringResource(
+              R.string.quest_detail_party_code_message,
+              quest.title,
+              venueName,
+              partyCodeShown(it),
+          ),
+      )
+    }
   }
+}
+
+/**
+ * The party's [code], as the Figma component "S5 · Party code": shown in two halves, with a button
+ * that copies it and one that opens the phone's share sheet with [message].
+ */
+@Composable
+private fun PartyCodeBox(code: String, message: String) {
+  val colors = MaterialTheme.colorScheme
+  val context = LocalContext.current
+  val copyLabel = stringResource(R.string.quest_detail_party_code_copy)
+  val shareTitle = stringResource(R.string.quest_detail_party_code_share)
+  Column(
+      Modifier.fillMaxWidth()
+          .clip(PARTY_CODE_SHAPE)
+          .background(colors.surface)
+          .drawBehind {
+            val width = PARTY_CODE_BORDER.toPx()
+            val dash = SEAT_DASH.toPx()
+            drawRoundRect(
+                colors.outline,
+                topLeft = Offset(width / 2, width / 2),
+                size = Size(size.width - width, size.height - width),
+                cornerRadius = CornerRadius(PARTY_CODE_CORNER.toPx()),
+                style =
+                    Stroke(width, pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash))),
+            )
+          }
+          .padding(AroundSpacing.InsetPadding),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+  ) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
+        Text(
+            stringResource(R.string.quest_detail_party_code).uppercase(currentLocale()),
+            color = colors.onSurfaceVariant,
+            style = AroundTextStyles.Label,
+        )
+        Text(
+            partyCodeShown(code),
+            Modifier.testTag(C.Tag.QUEST_DETAIL_PARTY_CODE),
+            color = colors.onSurface,
+            style = AroundTextStyles.PartyCode,
+        )
+      }
+      // A 40 dp circle, as in Figma, with Material's 48 dp touch target around it
+      FilledIconButton(
+          onClick = { copyPartyCode(context, copyLabel, code) },
+          colors =
+              IconButtonDefaults.filledIconButtonColors(
+                  containerColor = AroundTheme.colors.lavender,
+                  contentColor = AroundTheme.colors.accentText,
+              ),
+      ) {
+        Icon(
+            painterResource(R.drawable.ic_copy),
+            contentDescription = copyLabel,
+            Modifier.size(PARTY_CODE_COPY_ICON_SIZE),
+            // Purple on lavender, cream on dark lavender: primary stays purple in dark mode
+            tint = AroundTheme.colors.accentText,
+        )
+      }
+    }
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(PARTY_CODE_SHARE_SHAPE)
+            .background(colors.primary)
+            .clickable(role = Role.Button) { sharePartyCode(context, shareTitle, message) }
+            .padding(vertical = AroundSpacing.Medium)
+            .testTag(C.Tag.QUEST_DETAIL_PARTY_CODE_SHARE),
+        horizontalArrangement =
+            Arrangement.spacedBy(AroundSpacing.Small, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(
+          painterResource(R.drawable.ic_share),
+          contentDescription = null,
+          Modifier.size(PARTY_CODE_SHARE_ICON_SIZE),
+          tint = colors.onPrimary,
+      )
+      Text(shareTitle, color = colors.onPrimary, style = AroundTextStyles.Button)
+    }
+    Text(
+        stringResource(R.string.quest_detail_party_code_hint),
+        color = colors.onSurfaceVariant,
+        style = AroundTextStyles.Caption,
+    )
+  }
+}
+
+/**
+ * [code] as the party card shows it, in two halves so it is easier to read out: `7KQM42` becomes
+ * `7KQ M42`. Joining accepts it with or without the space.
+ */
+internal fun partyCodeShown(code: String): String = code.chunked(PARTY_CODE_HALF).joinToString(" ")
+
+/**
+ * Puts the party's [code] on the clipboard, under [label], as stored: without the space. Android 13
+ * and later confirm a copy themselves; earlier versions show nothing, so this says so with a toast.
+ */
+private fun copyPartyCode(context: Context, label: String, code: String) {
+  context
+      .getSystemService(ClipboardManager::class.java)
+      ?.setPrimaryClip(ClipData.newPlainText(label, code))
+  if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
+    Toast.makeText(context, R.string.quest_detail_party_code_copied, Toast.LENGTH_SHORT).show()
+  }
+}
+
+/** Opens the phone's share sheet, titled [title], with [message] to send to friends. */
+private fun sharePartyCode(context: Context, title: String, message: String) {
+  val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, message)
+  context.startActivity(Intent.createChooser(send, title))
 }
 
 /** The explorer's own seat. */
@@ -604,6 +754,14 @@ private val PROOF_STATUS_BORDER = 1.5.dp
 private val PROOF_STATUS_TILE_SIZE = 44.dp
 private val PROOF_STATUS_ICON_SIZE = 22.dp
 private val PROOF_STATUS_DOT_SIZE = 6.dp
+private val PARTY_CODE_CORNER = 16.dp
+private val PARTY_CODE_SHAPE = RoundedCornerShape(PARTY_CODE_CORNER)
+private val PARTY_CODE_BORDER = 1.dp
+private val PARTY_CODE_COPY_ICON_SIZE = 20.dp
+private val PARTY_CODE_SHARE_SHAPE = RoundedCornerShape(14.dp)
+private val PARTY_CODE_SHARE_ICON_SIZE = 18.dp
+/** How many characters each half of a shown party code has. */
+private const val PARTY_CODE_HALF = PARTY_CODE_LENGTH / 2
 private const val SAMPLE_QUEST_ID = "quest"
 private const val SAMPLE_RESERVATION_ID = "reservation"
 
@@ -638,10 +796,23 @@ internal fun QuestDetailsRejectedPreview() {
   )
 }
 
+@Preview(name = "Party code, light")
+@Preview(name = "Party code, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+internal fun QuestDetailsPartyCodePreview() {
+  QuestDetailsSample(
+      reservationIds = mapOf(SAMPLE_QUEST_ID to SAMPLE_RESERVATION_ID),
+      acceptedParties = mapOf(SAMPLE_QUEST_ID to 2),
+      partyCodes = mapOf(SAMPLE_RESERVATION_ID to "7KQM42"),
+  )
+}
+
 @Composable
 private fun QuestDetailsSample(
     reservationIds: Map<String, String> = emptyMap(),
     completions: Map<String, Completion> = emptyMap(),
+    acceptedParties: Map<String, Int> = emptyMap(),
+    partyCodes: Map<String, String> = emptyMap(),
 ) {
   val quest =
       VenuePageQuest(
@@ -666,6 +837,8 @@ private fun QuestDetailsSample(
             detailQuestId = quest.questId,
             reservationIds = reservationIds,
             completions = completions,
+            acceptedParties = acceptedParties,
+            partyCodes = partyCodes,
         ),
         quest,
         onBack = {},

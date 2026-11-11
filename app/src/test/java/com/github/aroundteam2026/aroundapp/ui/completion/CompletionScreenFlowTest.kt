@@ -1,11 +1,13 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Application
 import android.location.LocationManager
-import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -52,6 +55,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** The real screen and ViewModel, with repository fakes: UI actions must reach stored results. */
 @RunWith(RobolectricTestRunner::class)
@@ -76,10 +80,11 @@ class CompletionScreenFlowTest {
     compose.runOnIdle { store.clear() }
   }
 
+  /** Shows the form of a new approved reservation; returns that reservation's id. */
   private fun show(
       proofType: ProofType = ProofType.TEXT,
       expectedStatus: CompletionFormStatus = CompletionFormStatus.READY,
-  ) {
+  ): String {
     shadowOf(app).grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
     shadowOf(app.getSystemService(LocationManager::class.java)).setLocationEnabled(true)
     val reservationId = runBlocking {
@@ -113,6 +118,32 @@ class CompletionScreenFlowTest {
       }
     }
     compose.waitUntil { viewModel.uiState.value.status == expectedStatus }
+    return reservationId
+  }
+
+  // The venue approves a teammate's proof while the form is open: the screen says so and stays open
+  @Test
+  fun aTeammatesApprovedProofKeepsTheScreenOpenAndSaysSo() {
+    val reservationId = show()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("Mochi")
+
+    runBlocking {
+      val sent =
+          completions
+              .submit(reservationId, venue.id, "friend", Proof.Text("By the till"))
+              .getOrThrow()
+      completions.approve(sent).getOrThrow()
+    }
+
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_HINT)
+        .assertTextContains(app.getString(R.string.completion_sent_by_teammate))
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_SUBMIT)
+        .assertTextContains(app.getString(R.string.completion_sent))
+        .assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SCREEN).assertIsDisplayed()
+    assertEquals(emptyList<String>(), submitted)
   }
 
   @Test
@@ -125,12 +156,12 @@ class CompletionScreenFlowTest {
     assertEquals("  Mochi  ", viewModel.uiState.value.answer)
     assertEquals(
         emptyList<Any>(),
-        runBlocking { completions.observeForExplorer("explorer").first() },
+        runBlocking { completions.observeForVenue(venue.id).first() },
     )
     completions.forcedFailure = null
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertTextContains("Try again").performClick()
     compose.waitUntil { submitted.size == 1 }
-    val stored = runBlocking { completions.observeForExplorer("explorer").first().single() }
+    val stored = runBlocking { completions.observeForVenue(venue.id).first().single() }
     assertEquals(Proof.Text("Mochi"), stored.proof)
     assertEquals(listOf(stored.id), submitted)
     compose.runOnIdle { venueName = "Updated venue name" }
@@ -171,11 +202,14 @@ class CompletionScreenFlowTest {
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
   }
 
+  // A readable photo, decoded with native graphics: the picker retakes a photo it can't preview,
+  // in the background, which raced the tap on "Retake" (#393)
   @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
   fun photoRetakeClearsTheViewModelAndRequiresAnotherPhoto() {
     show(ProofType.PHOTO)
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_GALLERY).assertIsDisplayed()
-    compose.runOnIdle { viewModel.pickPhoto(Uri.parse("content://proof/picked")) }
+    compose.runOnIdle { viewModel.pickPhoto(testImage(app, 80, 60)) }
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_RETAKE).performClick()
     compose.runOnIdle { assertNull(viewModel.uiState.value.photo) }
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_GALLERY).assertIsDisplayed()

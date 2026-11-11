@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
@@ -26,9 +27,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Documents that cannot be mapped back to a [Completion] are logged and skipped: the `observe*`
  * flows leave them out, and [approve] and [reject] treat them as missing.
  *
- * The security rules let a joined member of an approved reservation create only their own pending
- * completion, and only the venue answer it. A submission refused within [confirmTimeoutMs] comes
- * back as a failure, and one refused later is only logged.
+ * The security rules let any joined member of an approved reservation create its party's pending
+ * completion, and replace it with a new proof while it is pending or rejected; the venue answers
+ * it. A submission refused within [confirmTimeoutMs] comes back as a failure, and one refused later
+ * is only logged. So when a member submits while offline and the venue approves the party's proof
+ * meanwhile, the write that reaches the server afterwards is refused and dropped, while the
+ * listeners show the approved one. Until then, their device's local copy holds their own write in
+ * place of the party's proof.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it
@@ -48,9 +53,9 @@ class CompletionRepositoryFirestore(
    * server's answer.
    *
    * A refusal in that time is returned as the Firestore exception, or as an [IllegalStateException]
-   * if the completion was already there. Without an answer in time, e.g. while offline, it returns
-   * success and a later refusal is only logged. Errors while issuing the write are returned as a
-   * failure too.
+   * if the completion was there and the rules refused to replace it, as when it is approved.
+   * Without an answer in time, e.g. while offline, it returns success and a later refusal is only
+   * logged. Errors while issuing the write are returned as a failure too.
    */
   override suspend fun submit(
       reservationId: String,
@@ -59,10 +64,10 @@ class CompletionRepositoryFirestore(
       proof: Proof,
   ): Result<String> =
       try {
-        val document = completions.document(completionId(reservationId, explorerUid))
+        val document = completions.document(completionId(reservationId))
         // A plain write, unlike a transaction, works offline, so it doesn't read first: the rules
-        // refuse a second submission as an update, and only then is the document read to tell
-        // that refusal apart from the others
+        // refuse replacing an approved completion, and only then is the document read to tell that
+        // refusal apart from the others
         val write =
             document.set(
                 mapOf(
@@ -80,7 +85,7 @@ class CompletionRepositoryFirestore(
           withTimeoutOrNull(confirmTimeoutMs) { write.await() }
         } catch (e: FirebaseFirestoreException) {
           if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED && isStored(document)) {
-            throw IllegalStateException("Completion ${document.id} was already submitted", e)
+            throw IllegalStateException("Completion ${document.id} can no longer be replaced", e)
           }
           throw e
         }
@@ -90,9 +95,6 @@ class CompletionRepositoryFirestore(
       } catch (e: Exception) {
         Result.failure(e)
       }
-
-  override fun observeForExplorer(uid: String): Flow<List<Completion>> =
-      completions.whereEqualTo(EXPLORER_UID, uid).observe()
 
   override fun observeForVenue(venueId: String): Flow<List<Completion>> =
       completions.whereEqualTo(VENUE_ID, venueId).observe()

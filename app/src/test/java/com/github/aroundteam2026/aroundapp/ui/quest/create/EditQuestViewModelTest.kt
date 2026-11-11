@@ -254,6 +254,38 @@ class EditQuestViewModelTest {
     assertEquals(quest.minPartySize + 1, state.minPartySize)
   }
 
+  // Approved explorers still submit the proof they reserved for
+  @Test
+  fun activeReservationsLockTheProofType() = runTest {
+    val id =
+        reservations
+            .createReservation(newPendingReservation(QUEST_ID, VENUE_ID, "Ana", 0), "explorer")
+            .getOrThrow()
+    reservations.updateStatus(id, ReservationStatus.APPROVED)
+    open()
+    assertTrue(state.proofTypeLocked)
+    assertFalse(state.partySizeLocked)
+    viewModel.updateProofType(ProofType.TEXT)
+    assertEquals(ProofType.PHOTO, state.proofType)
+
+    reservations.updateStatus(id, ReservationStatus.CANCELLED)
+    dispatcher.scheduler.advanceUntilIdle()
+    assertFalse(state.proofTypeLocked)
+    viewModel.updateProofType(ProofType.TEXT)
+    assertEquals(ProofType.TEXT, state.proofType)
+  }
+
+  @Test
+  fun aReservationArrivingPutsTheQuestsProofTypeBack() = runTest {
+    open()
+    viewModel.updateProofType(ProofType.TEXT)
+    reservations.createReservation(newPendingReservation(QUEST_ID, VENUE_ID, "Ana", 0), "explorer")
+    dispatcher.scheduler.advanceUntilIdle()
+
+    assertTrue(state.proofTypeLocked)
+    assertEquals(ProofType.PHOTO, state.proofType)
+  }
+
   @Test
   fun aReservationArrivingPutsTheQuestsPartySizeBack() = runTest {
     open()

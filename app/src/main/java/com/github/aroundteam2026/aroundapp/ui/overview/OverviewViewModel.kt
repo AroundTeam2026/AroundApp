@@ -45,11 +45,11 @@ import kotlinx.coroutines.launch
  * Holds the overview of the quests the explorer [explorerUid] accepted, for the Quests tab.
  *
  * It listens to the explorer's reservations and keeps the pending and approved ones, each with its
- * quest, read once, and its venue and party, which it listens to, as well as the explorer's
- * completions, which say where their proof stands. Rows follow the reservations, the venues, the
- * parties and the completions as they change. If anything fails, including the reservations'
- * listener after sign-out, the overview shows [OverviewStatus.FAILED] until [retry]. The explorer
- * can [cancel] a reservation.
+ * quest, read once, and its venue and party, which it listens to, as well as their completions,
+ * which say where the party's proof stands, whichever member sent it. Rows follow the reservations,
+ * the venues, the parties and the completions as they change. If anything fails, including the
+ * reservations' listener after sign-out, the overview shows [OverviewStatus.FAILED] until [retry].
+ * The explorer can [cancel] a reservation.
  */
 class OverviewViewModel(
     private val explorerUid: String,
@@ -135,10 +135,13 @@ class OverviewViewModel(
           }
           .flatMapLatest { booked ->
             val reservations = booked.map { (reservation, _) -> reservation }
+            // Only an approved party has a proof. The rules may also refuse listening to a party
+            // just joined, until the server has the membership, which an approved one always has
+            val approved = reservations.filter { it.status == ReservationStatus.APPROVED }
             combine(
                 venueRepository.observeVenues(reservations.map { it.venueId }.toSet()),
                 partyRepository.observeJoinedCounts(reservations.map { it.id }),
-                completionRepository.observeForExplorer(explorerUid),
+                completionRepository.observeForReservations(approved.map { it.id }),
             ) { venues, partySizes, completions ->
               overviewRows(booked, venues, partySizes, proofsOf(completions))
             }
@@ -202,8 +205,8 @@ internal fun activeReservations(reservations: List<Reservation>): List<Reservati
         )
 
 /**
- * Where the explorer's proof of each reservation stands, keyed by reservation id, from their
- * [completions]: one per reservation, since an explorer completes a reservation once.
+ * Where the party's proof of each reservation stands, keyed by reservation id, from the
+ * [completions] of the explorer's parties: one per reservation, whichever member sent it.
  */
 internal fun proofsOf(completions: List<Completion>): Map<String, CompletionStatus> =
     completions.associate {
@@ -212,10 +215,10 @@ internal fun proofsOf(completions: List<Completion>): Map<String, CompletionStat
 
 /**
  * The rows for the [booked] reservations and their quests, in their order, with the number of
- * joined members of each party from [partySizes] and where the explorer's proof stands from
- * [proofs], both keyed by reservation id. A reservation whose venue isn't among [venues], because
- * it no longer exists, has no row. A party missing from [partySizes] counts as just the explorer,
- * who is in every party they see here.
+ * joined members of each party from [partySizes] and where the party's proof stands from [proofs],
+ * both keyed by reservation id. A reservation whose venue isn't among [venues], because it no
+ * longer exists, has no row. A party missing from [partySizes] counts as just the explorer, who is
+ * in every party they see here.
  */
 internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,

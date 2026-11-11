@@ -72,9 +72,21 @@ class AcceptQuestBarTest {
   }
 
   @Test
-  fun onlyARejectedProofGetsTheNewProofButton() {
+  fun aPendingProofGetsTheNewProofButtonToo() {
+    var opened = 0
     compose.setContent {
-      AroundAppTheme { ProofBar(CompletionStatus.PENDING, onSendNewProof = {}) }
+      AroundAppTheme { ProofBar(CompletionStatus.PENDING, onSendNewProof = { opened++ }) }
+    }
+
+    compose.onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsEnabled().performClick()
+
+    assertEquals(1, opened)
+  }
+
+  @Test
+  fun anApprovedProofIsFinalSoItGetsNoNewProofButton() {
+    compose.setContent {
+      AroundAppTheme { ProofBar(CompletionStatus.APPROVED, onSendNewProof = {}) }
     }
 
     compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BAR).assertExists()

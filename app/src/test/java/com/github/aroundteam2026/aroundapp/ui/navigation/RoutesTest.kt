@@ -25,7 +25,9 @@ import com.github.aroundteam2026.aroundapp.ui.dashboard.navigateToDashboard
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestDestination
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
+import com.github.aroundteam2026.aroundapp.ui.quest.create.editQuestDestination
 import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToCreateQuest
+import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToEditQuest
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePageOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venuepage.navigateToVenuePage
 import org.junit.Assert.assertEquals
@@ -56,7 +58,7 @@ class RoutesTest {
           venuePage = { venueId, questId, onBack, onSubmitProof ->
             VenuePageOnFakes(venueId, onBack, onSubmitProof, arrivalQuestId = questId)
           },
-          overview = { OverviewOnFakes(it) },
+          overview = { onOpenQuest, onJoinParty -> OverviewOnFakes(onOpenQuest, onJoinParty) },
       )
     }
     composeTestRule.waitForIdle()
@@ -71,6 +73,10 @@ class RoutesTest {
         createQuestDestination(
             onClose = { navController.popBackStack() },
             factory = createQuestFactoryOnFakes(),
+        )
+        editQuestDestination(
+            onClose = { navController.popBackStack() },
+            factory = { createQuestFactoryOnFakes() },
         )
         dashboardDestination()
       }
@@ -205,6 +211,29 @@ class RoutesTest {
     launchVenueGraph()
     open { navigateToCreateQuest() }
     composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertIsDisplayed()
+  }
+
+  @Test
+  fun editQuestOpensTheFormInTheVenueGraph() {
+    launchVenueGraph()
+    open { navigateToEditQuest("quest/1?x") }
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SCREEN).assertIsDisplayed()
+    val questId = composeTestRule.runOnUiThread {
+      navController.currentBackStackEntry?.arguments?.getString(Routes.QUEST_ID)
+    }
+    assertEquals("quest/1?x", questId)
+  }
+
+  @Test
+  fun aBlankQuestIdEditsNothingInsteadOfCrashing() {
+    launchVenueGraph()
+    open { navigateToEditQuest(" ") }
+    composeTestRule.onNodeWithTag(VENUE_START).assertIsDisplayed()
+  }
+
+  @Test
+  fun theEditQuestRouteRefusesABlankId() {
+    assertThrows(IllegalArgumentException::class.java) { Routes.editQuest("") }
   }
 
   @Test

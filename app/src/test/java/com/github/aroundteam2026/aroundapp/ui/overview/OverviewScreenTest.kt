@@ -1,6 +1,11 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
+import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -11,7 +16,10 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -41,9 +49,13 @@ import org.robolectric.annotation.Config
 class OverviewScreenTest {
   @get:Rule val compose = createComposeRule()
 
+  private val app = ApplicationProvider.getApplicationContext<Application>()
+
   private val opened = mutableListOf<Pair<String, String>>()
   private var retries = 0
+  private var joinParty = 0
   private val cancelled = mutableListOf<String>()
+  private val newProofs = mutableListOf<Pair<String, String>>()
 
   private fun show(state: OverviewUiState) {
     compose.setContent {
@@ -53,6 +65,10 @@ class OverviewScreenTest {
             onOpenQuest = { venueId, questId -> opened += venueId to questId },
             onRetry = { retries++ },
             onCancel = { cancelled += it },
+            onJoinParty = { joinParty++ },
+            onSendNewProof = { reservationId, venueName ->
+              newProofs += reservationId to venueName
+            },
             clock = CLOCK,
         )
       }
@@ -61,6 +77,39 @@ class OverviewScreenTest {
 
   private fun loaded(vararg rows: OverviewRow) =
       OverviewUiState(OverviewStatus.LOADED, rows.toList())
+
+  @Test
+  fun everyStateOfTheOverviewOffersJoiningAParty() {
+    val states =
+        listOf(
+            OverviewUiState(),
+            OverviewUiState(OverviewStatus.FAILED),
+            loaded(),
+            loaded(row("reservation-1")),
+        )
+    var current by mutableStateOf(states.first())
+    compose.setContent {
+      AroundAppTheme {
+        OverviewContent(current, { _, _ -> }, {}, {}, {}, { _, _ -> }, clock = CLOCK)
+      }
+    }
+
+    for (shown in states) {
+      current = shown
+      compose.waitForIdle()
+      compose.onNodeWithTag(C.Tag.OVERVIEW_JOIN_PARTY).assertIsDisplayed()
+      compose.onNodeWithText(app.getString(R.string.overview_join_party)).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun theJoinAPartyButtonCallsOnJoinParty() {
+    show(loaded())
+
+    compose.onNodeWithTag(C.Tag.OVERVIEW_JOIN_PARTY).performClick()
+
+    assertEquals(1, joinParty)
+  }
 
   @Test
   fun loadingShowsTheHeaderTitleAndASpinner() {
@@ -129,6 +178,49 @@ class OverviewScreenTest {
     listOf("sent", "completed", "rejected").forEach { cancelButtonOf(it).assertDoesNotExist() }
   }
 
+  // Until the venue approves a proof, the party can send a new one, as in the Figma frame
+  @Test
+  fun aProofSentOrRejectedCanBeSentAgainButNotOnceApproved() {
+    show(
+        loaded(
+            row(id = "sent", status = OverviewRowStatus.PROOF_SENT),
+            row(id = "rejected", status = OverviewRowStatus.PROOF_REJECTED),
+            row(id = "completed", status = OverviewRowStatus.COMPLETED),
+        )
+    )
+
+    listOf("sent", "rejected").forEach { newProofButtonOf(it).assertExists() }
+    newProofButtonOf("completed").assertDoesNotExist()
+  }
+
+  @Test
+  fun aCardWithoutAProofHasNoNewProofButton() {
+    show(
+        loaded(
+            row(id = "waiting", status = OverviewRowStatus.WAITING),
+            row(id = "approved", status = OverviewRowStatus.APPROVED),
+        )
+    )
+
+    listOf("waiting", "approved").forEach { newProofButtonOf(it).assertDoesNotExist() }
+  }
+
+  @Test
+  fun theNewProofButtonOpensTheProofFormOfItsReservationNotItsQuest() {
+    show(
+        loaded(
+            row(id = "sent", status = OverviewRowStatus.PROOF_SENT),
+            row(id = "rejected", status = OverviewRowStatus.PROOF_REJECTED),
+        )
+    )
+
+    newProofButtonOf("rejected").performClick()
+    newProofButtonOf("sent").performClick()
+
+    assertEquals(listOf("rejected" to "Café Lumen", "sent" to "Café Lumen"), newProofs)
+    assertEquals(emptyList<Pair<String, String>>(), opened)
+  }
+
   @Test
   fun confirmingACancelCancelsThatCardsReservation() {
     show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
@@ -167,7 +259,16 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
+    compose.setContent {
+      AroundAppTheme {
+        OverviewScreen(
+            viewModel,
+            onOpenQuest = { _, _ -> },
+            onJoinParty = {},
+            onSendNewProof = { _, _ -> },
+        )
+      }
+    }
 
     compose.onNode(hasTestTag(C.Tag.CANCEL_RESERVATION), useUnmergedTree = true).performClick()
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
@@ -194,7 +295,16 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
         )
-    compose.setContent { AroundAppTheme { OverviewScreen(viewModel, onOpenQuest = { _, _ -> }) } }
+    compose.setContent {
+      AroundAppTheme {
+        OverviewScreen(
+            viewModel,
+            onOpenQuest = { _, _ -> },
+            onJoinParty = {},
+            onSendNewProof = { _, _ -> },
+        )
+      }
+    }
 
     compose.onNodeWithTag(C.Tag.OVERVIEW_LIST).assertIsDisplayed()
     compose
@@ -206,6 +316,14 @@ class OverviewScreenTest {
   private fun cancelButtonOf(reservationId: String) =
       compose.onNode(
           hasTestTag(C.Tag.CANCEL_RESERVATION) and
+              hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
+          useUnmergedTree = true,
+      )
+
+  /** The new proof button is a clickable of its own, so the card's merged node leaves it out. */
+  private fun newProofButtonOf(reservationId: String) =
+      compose.onNode(
+          hasTestTag(C.Tag.OVERVIEW_SEND_NEW_PROOF) and
               hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
           useUnmergedTree = true,
       )

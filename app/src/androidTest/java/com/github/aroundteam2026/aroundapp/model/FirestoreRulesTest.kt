@@ -25,6 +25,7 @@ import java.util.UUID
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
@@ -552,18 +553,34 @@ class FirestoreRulesTest {
     assertDenied(partyOf(reservation.id).get(Source.SERVER), "another reservation's party")
   }
 
+  // A member may only cancel, so cancelling a rejected one is refused by the transitions alone
   @Test
-  fun venueMovesAReservationAlongAllowedTransitionsOnly() {
+  fun reservationsMoveAlongAllowedTransitionsOnly() {
     val venue = newUser(Role.VENUE)
     val explorer = newUser(Role.EXPLORER)
-    val reservation = pendingReservationOf(explorer, venue)
+    val approved = pendingReservationOf(explorer, venue)
+    val rejected = pendingReservationOf(explorer, venue)
 
     signInAs(venue)
-    assertDenied(reservation.update(mapOf("status" to "APPROVED", "slotStart" to "changed")))
-    assertSucceeds(reservation.update("status", "APPROVED"))
-    assertDenied(reservation.update("status", "PENDING"))
-    assertSucceeds(reservation.update("status", "CANCELLED"))
-    assertDenied(reservation.update("status", "APPROVED"))
+    assertDenied(approved.update(mapOf("status" to "APPROVED", "slotStart" to "changed")))
+    assertSucceeds(approved.update("status", "APPROVED"))
+    assertSucceeds(rejected.update("status", "REJECTED"))
+    signInAs(explorer)
+    assertDenied(rejected.update("status", "CANCELLED"), "a member cancelling a rejected one")
+  }
+
+  // #475: cancelling after the proof would hide it from the explorer's Quests tab, the bug of #426
+  @Test
+  fun venueCancelsAPendingReservationButNeverAnApprovedOne() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val pending = pendingReservationOf(explorer, venue)
+    val approved = approvedReservationOf(explorer, venue)
+
+    signInAs(venue)
+    assertDenied(approved.update("status", "CANCELLED"), "the venue cancelling an approved one")
+    assertSucceeds(pending.update("status", "CANCELLED"))
+    assertDenied(pending.update("status", "APPROVED"), "a cancelled one reopened")
   }
 
   @Test
@@ -708,7 +725,7 @@ class FirestoreRulesTest {
     val venue = newUser(Role.VENUE)
     val explorer = newUser(Role.EXPLORER)
     val reservation = approvedReservationOf(explorer, venue)
-    val completion = completionOf(reservation, explorer)
+    val completion = completionOf(reservation)
     assertSucceeds(completion.set(completion(reservation.id, explorer, venue)))
 
     assertDenied(reservation.update("status", "CANCELLED"), "a pending proof")
@@ -937,9 +954,29 @@ class FirestoreRulesTest {
     signInAs(venue)
     assertSucceeds(reservation.update("status", "APPROVED"))
     signInAs(friend)
-    assertSucceeds(completionOf(reservation, friend).set(completion(reservation.id, friend, venue)))
+    assertSucceeds(completionOf(reservation).set(completion(reservation.id, friend, venue)))
 
     assertDenied(withdraw(reservation.id, friend), "a member who sent their proof withdrawing")
+  }
+
+  @Test
+  fun noMemberCancelsOrWithdrawsOnceAnotherSentThePartysProof() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val reservation = pendingReservationOf(explorer, venue, proofType = "TEXT")
+    val friend = newUser(Role.EXPLORER)
+    val sender = newUser(Role.EXPLORER)
+    joinAll(reservation, friend, sender)
+    signInAs(venue)
+    assertSucceeds(reservation.update("status", "APPROVED"))
+    signInAs(sender)
+    assertSucceeds(completionOf(reservation).set(completion(reservation.id, sender, venue)))
+
+    signInAs(friend)
+    assertDenied(withdraw(reservation.id, friend), "a member withdrawing")
+    assertDenied(reservation.update("status", "CANCELLED"), "a member cancelling")
+    signInAs(explorer)
+    assertDenied(reservation.update("status", "CANCELLED"), "the creator cancelling")
   }
 
   @Test
@@ -1106,7 +1143,7 @@ class FirestoreRulesTest {
   // ---- completions ----
 
   @Test
-  fun explorerSubmitsOnlyAsThemselvesUnderTheirCompletionId() {
+  fun explorerSubmitsOnlyAsThemselvesUnderTheReservationsId() {
     val explorer = newUser(Role.EXPLORER)
     val friend = newUser(Role.EXPLORER)
     val venue = newUser(Role.VENUE)
@@ -1114,16 +1151,19 @@ class FirestoreRulesTest {
     val valid = completion(reservation.id, explorer, venue)
 
     assertDenied(completions().document(UUID.randomUUID().toString()).set(valid), "a random id")
-    assertDenied(completionOf(reservation, friend).set(valid), "another explorer's id")
     assertDenied(
-        completionOf(reservation, explorer).set(valid + ("explorerUid" to friend.uid)),
+        completions().document("${reservation.id}_${explorer.uid}").set(valid),
+        "an id built from the explorer",
+    )
+    assertDenied(
+        completionOf(reservation).set(valid + ("explorerUid" to friend.uid)),
         "another explorer's uid",
     )
-    assertSucceeds(completionOf(reservation, explorer).set(valid))
+    assertSucceeds(completionOf(reservation).set(valid))
   }
 
   @Test
-  fun everyJoinedMemberSubmitsTheirOwnButNobodyElse() {
+  fun anyJoinedMemberSubmitsThePartysButNobodyElse() {
     val creator = newUser(Role.EXPLORER)
     val joined = newUser(Role.EXPLORER)
     val withdrawn = newUser(Role.EXPLORER)
@@ -1140,16 +1180,16 @@ class FirestoreRulesTest {
     assertSucceeds(withdraw(reservation.id, withdrawn))
 
     assertDenied(
-        completionOf(reservation, withdrawn).set(completion(reservation.id, withdrawn, venue)),
+        completionOf(reservation).set(completion(reservation.id, withdrawn, venue)),
         "a withdrawn member",
     )
     signInAs(stranger)
     assertDenied(
-        completionOf(reservation, stranger).set(completion(reservation.id, stranger, venue)),
+        completionOf(reservation).set(completion(reservation.id, stranger, venue)),
         "an explorer outside the party",
     )
     signInAs(joined)
-    assertSucceeds(completionOf(reservation, joined).set(completion(reservation.id, joined, venue)))
+    assertSucceeds(completionOf(reservation).set(completion(reservation.id, joined, venue)))
   }
 
   @Test
@@ -1159,9 +1199,7 @@ class FirestoreRulesTest {
     val reservation = approvedReservationOf(explorer, venue)
 
     signOut()
-    assertDenied(
-        completionOf(reservation, explorer).set(completion(reservation.id, explorer, venue))
-    )
+    assertDenied(completionOf(reservation).set(completion(reservation.id, explorer, venue)))
   }
 
   @Test
@@ -1171,20 +1209,20 @@ class FirestoreRulesTest {
 
     val pending = pendingReservationOf(explorer, venue, proofType = "TEXT")
     assertDenied(
-        completionOf(pending, explorer).set(completion(pending.id, explorer, venue)),
+        completionOf(pending).set(completion(pending.id, explorer, venue)),
         "a pending reservation",
     )
 
     val cancelled = approvedReservationOf(explorer, venue)
     assertSucceeds(cancelled.update("status", "CANCELLED"))
     assertDenied(
-        completionOf(cancelled, explorer).set(completion(cancelled.id, explorer, venue)),
+        completionOf(cancelled).set(completion(cancelled.id, explorer, venue)),
         "a cancelled reservation",
     )
 
     val missing = newReservation()
     assertDenied(
-        completionOf(missing, explorer).set(completion(missing.id, explorer, venue)),
+        completionOf(missing).set(completion(missing.id, explorer, venue)),
         "a missing reservation",
     )
   }
@@ -1197,7 +1235,7 @@ class FirestoreRulesTest {
     val valid = completion(reservation.id, explorer, venue)
 
     assertOnlyValidWriteSucceeds(
-        completionOf(reservation, explorer),
+        completionOf(reservation),
         valid,
         mapOf(
             "an unknown field" to valid + ("questId" to "quest-1"),
@@ -1218,7 +1256,7 @@ class FirestoreRulesTest {
     val text = approvedReservationOf(explorer, venue, proofType = "TEXT")
     val textCompletion = completion(text.id, explorer, venue)
     assertOnlyValidWriteSucceeds(
-        completionOf(text, explorer),
+        completionOf(text),
         textCompletion,
         mapOf(
             "no proof" to textCompletion - "textAnswer",
@@ -1234,7 +1272,7 @@ class FirestoreRulesTest {
     val photoCompletion =
         completion(photo.id, explorer, venue) - "textAnswer" + ("photoUrl" to PHOTO_URL)
     assertOnlyValidWriteSucceeds(
-        completionOf(photo, explorer),
+        completionOf(photo),
         photoCompletion,
         mapOf(
             "an answer instead" to completion(photo.id, explorer, venue),
@@ -1245,18 +1283,96 @@ class FirestoreRulesTest {
   }
 
   @Test
-  fun explorerSubmitsOnlyOnce() {
+  fun explorerCanSendANewProofWhilePendingAndAfterARejectionButNotOnceApproved() {
     val explorer = newUser(Role.EXPLORER)
     val venue = newUser(Role.VENUE)
     val completion = submittedCompletion(explorer, venue)
-    val again = assertSucceeds(completion.get(Source.SERVER)).data!!
+    val reservationId = assertSucceeds(completion.get(Source.SERVER)).getString("reservationId")!!
+    val again = completion(reservationId, explorer, venue)
 
-    assertDenied(completion.set(again), "a second submission")
+    assertSucceeds(completion.set(again + ("textAnswer" to "While pending")))
 
     signInAs(venue)
     assertSucceeds(completion.update(rejection()))
     signInAs(explorer)
-    assertDenied(completion.set(again), "a second submission after a rejection")
+    assertSucceeds(completion.set(again + ("textAnswer" to "After the rejection")))
+    val resent = assertSucceeds(completion.get(Source.SERVER))
+    assertEquals("PENDING", resent.getString("status"))
+    assertEquals("After the rejection", resent.getString("textAnswer"))
+    assertFalse("the old reason is gone", resent.contains("rejectReason"))
+
+    signInAs(venue)
+    assertSucceeds(completion.update("status", "APPROVED"))
+    signInAs(explorer)
+    assertDenied(completion.set(again), "a new proof for an approved one")
+  }
+
+  @Test
+  fun aNewProofIsAsValidAsTheFirstAndKeepsItsReservationAndVenue() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val otherVenue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+    val reservationId = assertSucceeds(completion.get(Source.SERVER)).getString("reservationId")!!
+    val valid = completion(reservationId, explorer, venue)
+    val otherApproved = approvedReservationOf(explorer, venue)
+
+    for ((name, invalid) in
+        mapOf(
+            "an unknown field" to valid + ("questId" to "quest-1"),
+            "no submittedAt" to valid - "submittedAt",
+            "already approved" to valid + ("status" to "APPROVED"),
+            "a reject reason" to valid + ("rejectReason" to "Blurry"),
+            "another venue" to valid + ("venueId" to otherVenue.uid),
+            "a reservation that doesn't exist" to valid + ("reservationId" to newReservation().id),
+            "another approved reservation of theirs" to
+                valid + ("reservationId" to otherApproved.id),
+            "a photo instead of the answer" to valid - "textAnswer" + ("photoUrl" to PHOTO_URL),
+            "both proofs" to valid + ("photoUrl" to PHOTO_URL),
+            "a blank answer" to valid + ("textAnswer" to " "),
+            "a too long answer" to valid + ("textAnswer" to "a".repeat(1001)),
+        )) {
+      assertDenied(completion.set(invalid), name)
+    }
+    assertSucceeds(completion.set(valid))
+  }
+
+  @Test
+  fun aNewProofComesFromAJoinedMemberAsThemselvesOnly() {
+    val explorer = newUser(Role.EXPLORER)
+    val friend = newUser(Role.EXPLORER)
+    val stranger = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val reservation = pendingReservationOf(explorer, venue, proofType = "TEXT")
+    joinAll(reservation, friend)
+    signInAs(venue)
+    assertSucceeds(reservation.update("status", "APPROVED"))
+    signInAs(explorer)
+    assertSucceeds(completionOf(reservation).set(completion(reservation.id, explorer, venue)))
+
+    signInAs(stranger)
+    assertDenied(
+        completionOf(reservation).set(completion(reservation.id, stranger, venue)),
+        "someone who isn't in the party",
+    )
+    signInAs(friend)
+    assertDenied(
+        completionOf(reservation).set(completion(reservation.id, explorer, venue)),
+        "a proof signed by another member",
+    )
+    assertDenied(
+        completions()
+            .document("${reservation.id}_${friend.uid}")
+            .set(completion(reservation.id, friend, venue)),
+        "an id built from their uid, which is not the party's",
+    )
+    assertSucceeds(
+        completionOf(reservation).set(completion(reservation.id, friend, venue)),
+    )
+    assertEquals(
+        friend.uid,
+        assertSucceeds(completionOf(reservation).get(Source.SERVER)).getString("explorerUid"),
+    )
   }
 
   @Test
@@ -1383,7 +1499,7 @@ class FirestoreRulesTest {
     signInAs(withdrawn)
     assertSucceeds(withdraw(reservation.id, withdrawn))
     signInAs(creator)
-    val completion = completionOf(reservation, creator)
+    val completion = completionOf(reservation)
     assertSucceeds(completion.set(completion(reservation.id, creator, venue)))
     val ofTheParty = completions().whereEqualTo("reservationId", reservation.id)
 
@@ -1596,8 +1712,8 @@ class FirestoreRulesTest {
 
   private fun completions() = db.collection("completions")
 
-  private fun completionOf(reservation: DocumentReference, user: TestUser) =
-      completions().document("${reservation.id}_${user.uid}")
+  /** The party's completion of [reservation], under the reservation's id. */
+  private fun completionOf(reservation: DocumentReference) = completions().document(reservation.id)
 
   /** A pending completion of [reservationId] by [explorer], for a `TEXT` quest of [venue]. */
   private fun completion(reservationId: String, explorer: TestUser, venue: TestUser) =
@@ -1616,7 +1732,7 @@ class FirestoreRulesTest {
    */
   private fun submittedCompletion(explorer: TestUser, venue: TestUser): DocumentReference {
     val reservation = approvedReservationOf(explorer, venue)
-    val completion = completionOf(reservation, explorer)
+    val completion = completionOf(reservation)
     assertSucceeds(completion.set(completion(reservation.id, explorer, venue)))
     return completion
   }

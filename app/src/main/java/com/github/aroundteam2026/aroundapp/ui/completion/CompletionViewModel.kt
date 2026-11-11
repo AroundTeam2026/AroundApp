@@ -22,6 +22,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepositoryProvider
@@ -44,15 +45,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Holds the completion of the reservation [reservationId] by the explorer [explorerUid]: its quest,
- * the proof it asks for, what the explorer filled in, and submitting it.
+ * Holds the completion of the reservation [reservationId], sent for its party by the member
+ * [explorerUid]: its quest, the proof it asks for, what the member filled in, and submitting it.
  *
  * The form is [CompletionFormStatus.READY] only while the reservation is approved, and
- * [SaveState.Saved] once the explorer's completion is stored, even if an earlier submit's answer
- * was lost. If loading the reservation fails, it is [CompletionFormStatus.FAILED] until [onRetry];
- * if listening to completions fails, it stays usable, as the repository refuses a second one. A
- * photo is uploaded through [proofPhotoRepository] first, and not again when only the submit
- * failed.
+ * [SaveState.Saved] once [explorerUid]'s proof is sent, even if the answer to the submit was lost,
+ * or once the venue approved their completion. A completion that is still waiting or was rejected,
+ * whoever sent it, doesn't close the form: submitting replaces it with a new proof. Once the venue
+ * approved another member's, the form is locked with [CompletionUiState.sentByTeammate] instead, so
+ * the screen says so rather than closing as if this member's proof was sent; a photo this member
+ * already uploaded stays in storage. If loading the reservation fails, it is
+ * [CompletionFormStatus.FAILED] until [onRetry]; if listening to completions fails, it stays
+ * usable, as the repository refuses to replace an approved one. A photo is uploaded through
+ * [proofPhotoRepository] first, and not again when only the submit failed.
  */
 class CompletionViewModel(
     private val reservationId: String,
@@ -111,6 +116,7 @@ class CompletionViewModel(
       when {
         locationError != null -> finishSubmit(SaveState.Idle, locationError)
         current.saveState is SaveState.Saved -> Unit
+        current.sentByTeammate -> finishSubmit(SaveState.Idle)
         // Approval may be withdrawn while the device is finding its position.
         current.status != CompletionFormStatus.READY -> finishSubmit(SaveState.Idle)
         else -> finishSubmit(submitProof(form, venueId))
@@ -137,13 +143,17 @@ class CompletionViewModel(
 
   /**
    * Ends a submit with [saveState] and [locationError]. The listener may have shown the completion
-   * as saved meanwhile, e.g. when the answer to an earlier submit was lost: this submit then fails
-   * as already stored, and a retry could only fail again, so what the listener showed stays.
+   * as saved meanwhile, e.g. when the answer to an earlier submit was lost, or as a teammate's:
+   * this submit then fails as already stored, and a retry could only fail again, so what the
+   * listener showed stays.
    */
   private fun finishSubmit(saveState: SaveState, locationError: CompletionLocationError? = null) {
     mutableUiState.update {
-      if (it.saveState is SaveState.Saved) it
-      else it.copy(saveState = saveState, locationError = locationError)
+      when {
+        it.saveState is SaveState.Saved -> it
+        it.sentByTeammate -> it.copy(saveState = SaveState.Idle, locationError = null)
+        else -> it.copy(saveState = saveState, locationError = locationError)
+      }
     }
   }
 
@@ -199,9 +209,9 @@ class CompletionViewModel(
   }
 
   /**
-   * Listens to the reservation and, apart from it, to the explorer's completions, until the
-   * ViewModel is cleared or listening to the reservation fails. The quest doesn't change, so it is
-   * read once per listening.
+   * Listens to the reservation and, apart from it, to the party's completion, until the ViewModel
+   * is cleared or listening to the reservation fails. The quest doesn't change, so it is read once
+   * per listening.
    */
   private fun listen() {
     listening?.cancel()
@@ -245,15 +255,22 @@ class CompletionViewModel(
   }
 
   /**
-   * Shows the reservation as completed once the explorer has a completion of it, whatever its
-   * status.
+   * Shows the reservation as completed once the venue approved its party's completion: as saved if
+   * [explorerUid] sent it, or as [CompletionUiState.sentByTeammate] if another member did. A
+   * completion still waiting or rejected doesn't lock the form: a new proof replaces it.
    */
   private suspend fun listenToCompletions() {
-    val id = completionId(reservationId, explorerUid)
+    val id = completionId(reservationId)
     try {
       completionRepository.observeForReservation(reservationId).collect { completions ->
-        if (completions.any { it.id == id }) {
-          mutableUiState.update { it.copy(saveState = SaveState.Saved(id)) }
+        val stored =
+            completions.find { it.id == id && it.status == CompletionStatus.APPROVED }
+                ?: return@collect
+        mutableUiState.update {
+          if (stored.explorerUid == explorerUid) it.copy(saveState = SaveState.Saved(id))
+          // A send in progress ends in finishSubmit; an earlier one's error no longer applies
+          else if (it.saveState == SaveState.Saving) it.copy(sentByTeammate = true)
+          else it.copy(sentByTeammate = true, saveState = SaveState.Idle, locationError = null)
         }
       }
     } catch (e: CancellationException) {

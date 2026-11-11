@@ -417,4 +417,25 @@ class VenuePageUiStateTest {
     assertEquals(0, state.copy(acceptedParties = mapOf("a" to 4)).morePeopleNeeded)
     assertEquals(0, state.copy(acceptedParties = mapOf("a" to 6)).morePeopleNeeded)
   }
+
+  @Test
+  fun partyCodeIsThePickedQuestsCodeWhileItsPartyHasRoom() {
+    val booked =
+        VenuePageUiState(
+            quests = listOf(quest("a").copy(partyCapacity = 2), quest("b")),
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1, "b" to 1),
+            reservationIds = mapOf("a" to "r", "b" to "s"),
+            partyCodes = mapOf("r" to "7KQM42"),
+        )
+
+    assertEquals("7KQM42", booked.partyCode)
+    // Full: no friend can join any more
+    assertNull(booked.copy(acceptedParties = mapOf("a" to 2)).partyCode)
+    // A reservation without a code to show, as one the explorer only joined
+    assertNull(booked.withQuestTapped("b").partyCode)
+    assertNull(booked.copy(selectedQuestId = null).partyCode)
+    // The reservations can't be read, so the page can't tell if friends can still join
+    assertNull(booked.copy(acceptAvailable = false).partyCode)
+  }
 }

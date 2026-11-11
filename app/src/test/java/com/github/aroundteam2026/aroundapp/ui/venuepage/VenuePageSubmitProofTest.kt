@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
@@ -127,7 +128,7 @@ class VenuePageSubmitProofTest {
   }
 
   @Test
-  fun sentProofsDoNotOfferAnotherSubmissionWhateverTheirStatus() {
+  fun onlyAnApprovedProofIsFinalWhileTheOthersOfferANewOne() {
     show(approved)
 
     CompletionStatus.entries.forEach { status ->
@@ -147,17 +148,20 @@ class VenuePageSubmitProofTest {
       compose.onNodeWithTag(C.Tag.SUBMIT_PROOF_BUTTON).assertDoesNotExist()
       compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertDoesNotExist()
       compose.onNodeWithText("Accepted, waiting for the venue").assertDoesNotExist()
-      if (status == CompletionStatus.REJECTED) {
+      if (status != CompletionStatus.APPROVED) {
         compose
             .onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON)
             .assertIsDisplayed()
             .assertTextEquals("Send new proof")
-            .assertIsNotEnabled()
+            .assertIsEnabled()
+            .performClick()
       } else {
         compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
         compose.onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON).assertDoesNotExist()
       }
     }
+    // The pending and the rejected proof each offered it, and it opened the party's reservation
+    assertEquals(listOf("reservation", "reservation"), submitted)
   }
 
   @Test

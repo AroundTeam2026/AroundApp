@@ -8,6 +8,13 @@ package com.github.aroundteam2026.aroundapp.resources
 object C {
   /** Test tags that UI tests use to find composables. */
   object Tag {
+    const val PROFILE_SETUP_LOADING = "profile_setup_loading"
+    const val PROFILE_SETUP_SCREEN = "profile_setup_screen"
+    const val PROFILE_SETUP_AVATAR = "profile_setup_avatar"
+    const val PROFILE_SETUP_ADD_PHOTO = "profile_setup_add_photo"
+    const val PROFILE_SETUP_NAME = "profile_setup_name"
+    const val PROFILE_SETUP_ERROR = "profile_setup_error"
+    const val PROFILE_SETUP_CONTINUE = "profile_setup_continue"
     const val ROLE_PROFILE_ERROR = "role_profile_error"
     const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
     const val ROLE_PROFILE_RETRY = "role_profile_retry"
@@ -40,6 +47,10 @@ object C {
     const val VENUE_QUESTS_LIST = "venue_quests_list"
     const val VENUE_QUEST_TITLE = "venue_quest_title"
     const val VENUE_QUEST_STATUS = "venue_quest_status"
+    const val VENUE_QUEST_EDIT = "venue_quest_edit"
+    const val VENUE_QUEST_ARCHIVE = "venue_quest_archive"
+    const val VENUE_QUEST_ARCHIVE_CONFIRM = "venue_quest_archive_confirm"
+    const val VENUE_QUEST_ARCHIVE_KEEP = "venue_quest_archive_keep"
     const val VENUE_QUESTS_EMPTY = "venue_quests_empty"
     const val VENUE_QUESTS_CREATE_FIRST = "venue_quests_create_first"
     const val VENUE_QUESTS_FAILED = "venue_quests_failed"
@@ -144,6 +155,8 @@ object C {
     const val QUEST_DETAIL_PARTY_RULE = "quest_detail_party_rule"
     const val QUEST_DETAIL_PARTY_JOINED = "quest_detail_party_joined"
     const val QUEST_DETAIL_PARTY_BIGGER = "quest_detail_party_bigger"
+    const val QUEST_DETAIL_PARTY_CODE = "quest_detail_party_code"
+    const val QUEST_DETAIL_PARTY_CODE_SHARE = "quest_detail_party_code_share"
     const val QUEST_DETAIL_SEAT_EMPTY = "quest_detail_seat_empty"
     const val QUEST_DETAIL_RADIUS = "quest_detail_radius"
     const val QUEST_DETAIL_RADIUS_MAP = "quest_detail_radius_map"
@@ -174,6 +187,12 @@ object C {
     const val CREATE_QUEST_SUBMIT = "create_quest_submit"
     const val CREATE_QUEST_VENUE_FAILED = "create_quest_venue_failed"
     const val CREATE_QUEST_VENUE_RETRY = "create_quest_venue_retry"
+    const val EDIT_QUEST_SAVING = "edit_quest_saving"
+    const val EDIT_QUEST_SAVE_ERROR = "edit_quest_save_error"
+    const val EDIT_QUEST_LOAD_FAILED = "edit_quest_load_failed"
+    const val EDIT_QUEST_RETRY = "edit_quest_retry"
+    const val CREATE_QUEST_PROOF_LOCKED = "create_quest_proof_locked"
+    const val CREATE_QUEST_PARTY_LOCKED = "create_quest_party_locked"
     const val CREATE_QUEST_TITLE = "create_quest_title"
     const val CREATE_QUEST_TITLE_COUNTER = "create_quest_title_counter"
     const val CREATE_QUEST_TITLE_ERROR = "create_quest_title_error"
@@ -224,9 +243,16 @@ object C {
     const val DASHBOARD_ROW_EXPLORER = "dashboard_row_explorer"
     const val DASHBOARD_ROW_LEADER = "dashboard_row_leader"
     const val DASHBOARD_ROW_PARTY = "dashboard_row_party"
+    /** On each party avatar showing a member's profile picture. */
+    const val DASHBOARD_ROW_PICTURE = "dashboard_row_picture"
+    /** On each party avatar showing a member's initials. */
+    const val DASHBOARD_ROW_INITIALS = "dashboard_row_initials"
+    /** The "+N" after the avatars, for the members without one. */
+    const val DASHBOARD_ROW_MORE = "dashboard_row_more"
     const val DASHBOARD_ROW_APPROVED = "dashboard_row_approved"
     const val DASHBOARD_ROW_DECLINE = "dashboard_row_decline"
     const val DASHBOARD_ROW_APPROVE = "dashboard_row_approve"
+    const val DASHBOARD_ROW_APPROVE_BLOCKED = "dashboard_row_approve_blocked"
     const val DASHBOARD_PROOFS = "dashboard_proofs"
     /** Followed by `_` and the completion's id, e.g. `dashboard_proof_row_r1_explorer`. */
     const val DASHBOARD_PROOF_ROW = "dashboard_proof_row"
@@ -249,6 +275,8 @@ object C {
     const val OVERVIEW_ROW_SLOT = "overview_row_slot"
     const val OVERVIEW_ROW_PARTY = "overview_row_party"
     const val OVERVIEW_ROW_STATUS = "overview_row_status"
+    const val OVERVIEW_JOIN_PARTY = "overview_join_party"
+    const val OVERVIEW_SEND_NEW_PROOF = "overview_send_new_proof"
     const val CANCEL_RESERVATION = "cancel_reservation"
     const val CANCEL_RESERVATION_FAILED = "cancel_reservation_failed"
     const val CANCEL_RESERVATION_DIALOG = "cancel_reservation_dialog"
@@ -281,6 +309,15 @@ object C {
     const val COMPLETION_SUBMIT = "completion_submit"
     const val COMPLETION_ANSWER = "completion_answer"
     const val COMPLETION_SAVE_ERROR = "completion_save_error"
+    const val COMPLETION_HINT = "completion_hint"
+
+    // Join a party screen
+    const val JOIN_PARTY_SCREEN = "join_party_screen"
+    const val JOIN_PARTY_CODE = "join_party_code"
+    const val JOIN_PARTY_LOOKING = "join_party_looking"
+    const val JOIN_PARTY_ERROR = "join_party_error"
+    const val JOIN_PARTY_FOUND = "join_party_found"
+    const val JOIN_PARTY_SUBMIT = "join_party_submit"
 
     // Proof photo picker
     const val PROOF_PHOTO = "proof_photo"

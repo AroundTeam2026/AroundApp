@@ -218,7 +218,7 @@ class CompletionScreenTest {
     compose.runOnIdle { state = state.copy(locationError = CompletionLocationError.UNAVAILABLE) }
     compose
         .onNodeWithText(
-            "Around cannot get a precise device or quest location, so it cannot check that you’re where the quest takes place. Check location access and try again."
+            "Around cannot get a precise device or quest location, so it cannot check that you’re where the quest takes place. Move somewhere with a clearer view of the sky, or check location access, then try again."
         )
         .assertIsDisplayed()
     compose.onNodeWithText("Check location access").performClick()

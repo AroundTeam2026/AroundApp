@@ -82,9 +82,9 @@ class PartyRepositoryFirestore(
    *
    * Fails with [NoSuchElementException] if the membership is malformed, with
    * [IllegalStateException] if it is already withdrawn, and with the Firestore exception if the
-   * rules refuse it, as for the creator or a member who sent their proof. A missing membership is
-   * refused too: the read rule cannot evaluate a missing document, so the server answers
-   * `PERMISSION_DENIED`.
+   * rules refuse it, as for the creator or a member whose party sent its proof. A missing
+   * membership is refused too: the read rule cannot evaluate a missing document, so the server
+   * answers `PERMISSION_DENIED`.
    */
   override suspend fun withdraw(reservationId: String, uid: String): Result<Unit> =
       try {

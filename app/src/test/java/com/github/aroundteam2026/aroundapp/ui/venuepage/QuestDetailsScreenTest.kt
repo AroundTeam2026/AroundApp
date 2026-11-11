@@ -1,7 +1,9 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -363,9 +365,10 @@ class QuestDetailsScreenTest {
     node(C.Tag.QUEST_DETAIL_PROOF_STATUS).assertDoesNotExist()
   }
 
-  // Figma's "Quest details · state · pending", without its button: a new proof needs a rejection
+  // Figma's "Quest details · state · pending", with "Send new proof" to fix a blurry photo or a
+  // typo
   @Test
-  fun aSentProofSaysTheVenueIsCheckingIt() {
+  fun aSentProofSaysTheVenueIsCheckingItAndCanBeSentAgain() {
     val quest = quest()
     show(quest, withProof(quest, CompletionStatus.PENDING))
 
@@ -376,7 +379,12 @@ class QuestDetailsScreenTest {
         .onNodeWithText("Café Lumen is checking it, usually within a few minutes.")
         .assertIsDisplayed()
     assertNoProofButtons()
-    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertDoesNotExist()
+    compose
+        .onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON)
+        .assertTextEquals("Send new proof")
+        .assertIsEnabled()
+        .performClick()
+    assertEquals(listOf("r"), proofsOpened)
   }
 
   // Figma's "Quest details · state · accepted", without "Show my reward", which no issue asks for
@@ -394,9 +402,9 @@ class QuestDetailsScreenTest {
     node(C.Tag.SEND_NEW_PROOF_BUTTON).assertDoesNotExist()
   }
 
-  // Figma's "Quest details · state · rejected"; the button's action comes with #427
+  // Figma's "Quest details · state · rejected"
   @Test
-  fun aRejectedProofShowsTheReasonAndADisabledNewProofButton() {
+  fun aRejectedProofShowsTheReasonAndANewProofButtonThatOpensTheForm() {
     val quest = quest()
     show(quest, withProof(quest, CompletionStatus.REJECTED, "Too dark to see the drink."))
 
@@ -407,15 +415,18 @@ class QuestDetailsScreenTest {
     compose
         .onNodeWithTag(C.Tag.SEND_NEW_PROOF_BUTTON)
         .assertTextEquals("Send new proof")
-        .assertIsNotEnabled()
+        .assertIsEnabled()
+        .performClick()
+    assertEquals(listOf("r"), proofsOpened)
   }
 
   @Test
-  fun aSentProofHasNoBarOnceTheReservationCantBeCancelled() {
+  fun aSentProofKeepsItsNewProofButtonOnceTheReservationCantBeCancelled() {
     val quest = quest()
     show(quest, withProof(quest, CompletionStatus.PENDING).copy(acceptAvailable = false))
 
-    node(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
+    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
   }
 
   @Test
@@ -437,7 +448,6 @@ class QuestDetailsScreenTest {
     show(quest, withProof(quest, CompletionStatus.PENDING))
 
     node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
-    node(C.Tag.ACCEPT_QUEST_BAR).assertDoesNotExist()
   }
 
   @Test
@@ -521,7 +531,7 @@ class QuestDetailsScreenTest {
     compose.setContent { QuestDetailsRejectedPreview() }
 
     node(C.Tag.QUEST_DETAIL_PROOF_STATUS).assertIsDisplayed()
-    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsNotEnabled()
+    node(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsDisplayed()
   }
 
   private companion object {

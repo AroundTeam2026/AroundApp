@@ -49,8 +49,9 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
 /**
  * The shared actions for the picked quest on its venue page and details screen. Before a proof is
- * sent, offers acceptance or proof submission; afterwards uses [ProofBar]. A pending or approved
- * proof needs no bar unless [footer] supplies another action, such as cancellation in the details.
+ * sent, offers acceptance or proof submission; afterwards uses [ProofBar], which lets the party
+ * send a new proof until the venue approves one. An approved proof needs no bar unless [footer]
+ * supplies another action, such as cancellation in the details.
  */
 @Composable
 internal fun QuestActionBar(
@@ -61,7 +62,8 @@ internal fun QuestActionBar(
     footer: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
   if (state.selectedQuest == null) return
-  val proofStatus = state.proof?.status
+  val proof = state.proof
+  val proofStatus = proof?.status
   when {
     proofStatus == null ->
         AcceptQuestBar(
@@ -71,8 +73,13 @@ internal fun QuestActionBar(
             onSubmitProof = state.completableReservationId?.let { id -> { onSubmitProof(id) } },
             footer = footer ?: {},
         )
-    proofStatus == CompletionStatus.REJECTED || footer != null ->
-        ProofBar(proofStatus, modifier, footer = footer ?: {})
+    proofStatus != CompletionStatus.APPROVED || footer != null ->
+        ProofBar(
+            proofStatus,
+            modifier,
+            onSendNewProof = { onSubmitProof(proof.reservationId) },
+            footer = footer ?: {},
+        )
   }
 }
 
@@ -130,9 +137,9 @@ fun AcceptQuestBar(
 }
 
 /**
- * The bar of the quest details once a proof is sent. A rejected proof gets "Send new proof", which
- * stays disabled without [onSendNewProof]; a proof sent or approved has no button. [footer] sits
- * under it.
+ * The bar of the quest details once a proof is sent. A pending or rejected proof gets "Send new
+ * proof", which stays disabled without [onSendNewProof]; an approved one is final and has no
+ * button. [footer] sits under it.
  *
  * @param status Where the proof stands.
  */
@@ -144,7 +151,7 @@ fun ProofBar(
     footer: @Composable ColumnScope.() -> Unit = {},
 ) {
   QuestBar(modifier) {
-    if (status == CompletionStatus.REJECTED) {
+    if (status != CompletionStatus.APPROVED) {
       Button(
           onClick = { onSendNewProof?.invoke() },
           enabled = onSendNewProof != null,
