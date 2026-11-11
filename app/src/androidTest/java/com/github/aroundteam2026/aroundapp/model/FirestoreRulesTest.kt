@@ -562,8 +562,21 @@ class FirestoreRulesTest {
     assertDenied(reservation.update(mapOf("status" to "APPROVED", "slotStart" to "changed")))
     assertSucceeds(reservation.update("status", "APPROVED"))
     assertDenied(reservation.update("status", "PENDING"))
-    assertSucceeds(reservation.update("status", "CANCELLED"))
-    assertDenied(reservation.update("status", "APPROVED"))
+    assertDenied(reservation.update("status", "REJECTED"))
+  }
+
+  // #475: cancelling after the proof would hide it from the explorer's Quests tab, the bug of #426
+  @Test
+  fun venueCancelsAPendingReservationButNeverAnApprovedOne() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val pending = pendingReservationOf(explorer, venue)
+    val approved = approvedReservationOf(explorer, venue)
+
+    signInAs(venue)
+    assertDenied(approved.update("status", "CANCELLED"), "the venue cancelling an approved one")
+    assertSucceeds(pending.update("status", "CANCELLED"))
+    assertDenied(pending.update("status", "APPROVED"), "a cancelled one reopened")
   }
 
   @Test
