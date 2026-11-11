@@ -1,9 +1,13 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map.marker
 
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
@@ -14,7 +18,6 @@ import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.ui.quest.ChipColors
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatarStyle
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChipStyle
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundFonts
 
 /**
@@ -158,26 +161,34 @@ data class MarkerDimensions(
     val chipVerticalPadding: Dp = 3.dp,
 )
 
-/** The markers' default style: the design's purple, teal and cream, in its fonts. */
+/** The markers' default style: the theme's colours, in the design's fonts. */
 object MarkerDefaults {
   /** The default sizes. */
   val dimensions = MarkerDimensions()
 
-  /** The default colours. */
-  fun colors(): MarkerColors =
-      MarkerColors(
-          accent = AroundColors.Purple,
-          onAccent = AroundColors.Cream,
-          secondary = AroundColors.Teal,
-          onSecondary = AroundColors.Paper,
-          pinRing = AroundColors.Teal,
-          pinSurface = AroundColors.Cream,
-          surface = AroundColors.Paper,
-          onSurface = AroundColors.Ink,
-          onSurfaceVariant = AroundColors.InkMuted,
-          outline = AroundColors.Line,
-          area = AroundColors.Purple.copy(alpha = 0.22f),
-      )
+  /**
+   * The default colours: the theme's roles, so markers follow light and dark mode, as the design's
+   * purple, teal and cream do in light mode.
+   */
+  @Composable
+  @ReadOnlyComposable
+  fun colors(): MarkerColors {
+    val scheme = MaterialTheme.colorScheme
+    return MarkerColors(
+        accent = scheme.primary,
+        onAccent = scheme.onPrimary,
+        secondary = scheme.tertiary,
+        onSecondary = scheme.onTertiary,
+        pinRing = scheme.tertiary,
+        // Cream in both modes, so the purple icon stays readable on the pin
+        pinSurface = scheme.onPrimary,
+        surface = scheme.surface,
+        onSurface = scheme.onSurface,
+        onSurfaceVariant = scheme.onSurfaceVariant,
+        outline = scheme.outline,
+        area = scheme.primary.copy(alpha = MARKER_AREA_ALPHA),
+    )
+  }
 
   /** The default text styles. */
   fun typography(): MarkerTypography =
@@ -209,9 +220,16 @@ object MarkerDefaults {
               ),
       )
 
-  /** The default style; pass any part to replace it. The shapes follow [dimensions]. */
+  /** The default style, in the theme's [colors]; pass any other part to replace it. */
+  @Composable
   fun style(
-      colors: MarkerColors = colors(),
+      typography: MarkerTypography = typography(),
+      dimensions: MarkerDimensions = this.dimensions,
+  ): MarkerStyle = style(colors(), typography, dimensions)
+
+  /** The style in [colors]; pass any other part to replace it. The shapes follow [dimensions]. */
+  fun style(
+      colors: MarkerColors,
       typography: MarkerTypography = typography(),
       dimensions: MarkerDimensions = this.dimensions,
   ): MarkerStyle =
@@ -226,3 +244,6 @@ object MarkerDefaults {
           chipShape = CircleShape,
       )
 }
+
+/** How visible the venue's area is on the map, over the colour it is drawn in. */
+internal const val MARKER_AREA_ALPHA = 0.22f

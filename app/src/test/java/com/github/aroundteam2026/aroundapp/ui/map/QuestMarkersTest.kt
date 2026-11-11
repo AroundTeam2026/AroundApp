@@ -42,7 +42,8 @@ class QuestMarkersTest {
 
   @Test
   fun theAreaIsACircleAtTheVenuesRealRadius() {
-    val area = pin.area(MarkerDefaults.style())
+    lateinit var area: PinArea
+    composeTestRule.setContent { area = pin.area(MarkerDefaults.style()) }
 
     assertEquals(LatLng(46.5220, 6.6330), area.center)
     assertEquals(120.0, area.radiusMeters, 0.0)
@@ -50,9 +51,13 @@ class QuestMarkersTest {
 
   @Test
   fun theAreaTakesTheStylesColour() {
-    val colors = MarkerDefaults.colors().copy(area = Color.Magenta)
+    lateinit var area: PinArea
+    composeTestRule.setContent {
+      val colors = MarkerDefaults.colors().copy(area = Color.Magenta)
+      area = pin.area(MarkerDefaults.style(colors = colors))
+    }
 
-    assertEquals(Color.Magenta, pin.area(MarkerDefaults.style(colors = colors)).fill)
+    assertEquals(Color.Magenta, area.fill)
   }
 
   @Test

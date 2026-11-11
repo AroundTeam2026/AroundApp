@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.theme
 
@@ -40,8 +41,14 @@ internal val DarkThemeColors =
 
 internal val LocalAroundThemeColors = staticCompositionLocalOf { LightThemeColors }
 
+internal val LocalAroundDarkTheme = staticCompositionLocalOf { false }
+
 /** Theme-aware design colors for the asset-import tasks that follow DS0. */
 object AroundTheme {
   val colors: AroundThemeColors
     @Composable @ReadOnlyComposable get() = LocalAroundThemeColors.current
+
+  /** Whether the theme is the dark one, which a screen forcing dark mode also sets. */
+  val isDark: Boolean
+    @Composable @ReadOnlyComposable get() = LocalAroundDarkTheme.current
 }

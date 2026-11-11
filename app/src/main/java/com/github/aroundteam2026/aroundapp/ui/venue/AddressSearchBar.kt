@@ -1,10 +1,10 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,9 +24,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -55,6 +57,7 @@ import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundFonts
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 // The Figma "Search" field and "Search results" card of the explorer search, in the second draft
 private val FIELD_HEIGHT = 44.dp
@@ -108,38 +111,28 @@ data class AddressSearchColors(
     val shadow: Color,
 )
 
-/** The address search's default colours: the Figma second draft's, light and dark. */
+/** The address search's default colours. */
 object AddressSearchDefaults {
-  // The light tokens the app's colours already hold; the tile's teal is the second draft's
-  // "tertiary", lighter than AroundColors.Teal, which came from the first draft
-  private val LIGHT =
-      AddressSearchColors(
-          surface = AroundColors.Paper,
-          outline = AroundColors.Purple,
-          ink = AroundColors.Ink,
-          muted = AroundColors.InkMuted,
-          line = AroundColors.Line,
-          avatar = AroundColors.Tertiary,
-          onAvatar = AroundColors.Cream,
-          highlight = AroundColors.Purple,
-          shadow = AroundColors.AddressShadow,
-      )
-
-  // Figma uses the dark mode's ink colour for its accent text.
-  private val DARK =
-      LIGHT.copy(
-          surface = AroundColors.DarkSurface,
-          ink = AroundColors.Cream,
-          muted = AroundColors.DarkMuted,
-          line = AroundColors.DarkLine,
-          highlight = AroundColors.Cream,
-      )
-
-  /** The colours for dark mode when [darkTheme], else for light mode. */
-  fun colors(darkTheme: Boolean): AddressSearchColors = if (darkTheme) DARK else LIGHT
-
-  /** The colours for the system's light or dark mode. */
-  @Composable fun colors(): AddressSearchColors = colors(isSystemInDarkTheme())
+  /**
+   * The theme's colours, light or dark: its surface, ink and accents. Figma uses the dark mode's
+   * ink colour for the accent text.
+   */
+  @Composable
+  @ReadOnlyComposable
+  fun colors(): AddressSearchColors {
+    val scheme = MaterialTheme.colorScheme
+    return AddressSearchColors(
+        surface = scheme.surface,
+        outline = scheme.primary,
+        ink = scheme.onSurface,
+        muted = scheme.onSurfaceVariant,
+        line = scheme.outline,
+        avatar = scheme.tertiary,
+        onAvatar = scheme.onTertiary,
+        highlight = AroundTheme.colors.accentText,
+        shadow = AroundColors.AddressShadow,
+    )
+  }
 }
 
 /**
