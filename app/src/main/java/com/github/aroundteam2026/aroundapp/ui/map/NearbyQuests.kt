@@ -23,8 +23,8 @@ import java.util.Locale
  * @property reward The quest's reward, or null when it has none.
  * @property minPartySize How many people the quest needs at least.
  * @property exactPartySize Whether the party must have exactly [minPartySize] people.
- * @property distanceMeters How far the venue is from the explorer, or null when their position is
- *   unknown.
+ * @property distanceMeters How far the quest's pin is from the explorer, or null when their
+ *   position is unknown.
  */
 data class NearbyQuest(
     val venueId: String,
@@ -42,9 +42,10 @@ data class NearbyQuest(
  * One row per quest valid at [now], by the same rule as the map's pins.
  *
  * Each row shows its venue as its pin does (see [shownVenue]); a venue missing from [venues] or
- * without a location has no rows. With the explorer's position [from], it lists the quests within
- * [NEARBY_RADIUS_METERS], nearest first; without it, every valid quest by venue name as [locale]
- * sorts them. A venue's quests stay together, newest first, then by smallest id.
+ * without a location has no rows, but for quests with their own. With the explorer's position
+ * [from], it lists the quests within [NEARBY_RADIUS_METERS], nearest first; without it, every valid
+ * quest by venue name as [locale] sorts them. A venue's quests stay together, newest first, then by
+ * smallest id.
  *
  * @param venues The known venues, by id.
  * @param from The explorer's position, or null when unknown.
@@ -63,8 +64,9 @@ fun nearbyQuests(
   val rows =
       quests
           .filter { it.isValidAt(now) }
-          .groupBy { it.venueId }
-          .flatMap { (venueId, own) ->
+          .groupBy(::pinKey)
+          .flatMap { (_, own) ->
+            val venueId = own.first().venueId
             val venue = venues[venueId] ?: return@flatMap emptyList()
             val shown = shownVenue(own, venue) ?: return@flatMap emptyList()
             val distance = from?.distanceTo(shown.location)
@@ -84,12 +86,14 @@ fun nearbyQuests(
               )
             }
           }
-  // A stable sort, so each venue's quests keep the newest-first order they were built in
   return if (from == null) {
+    // A quest away from its venue is a group of its own: rank keeps the venue's rows newest first
+    val rank = quests.sortedWith(NEWEST_FIRST).withIndex().associate { it.value.id to it.index }
     // Not by character code, which would put lower case and accented letters last
     rows.sortedWith(
         compareBy(Collator.getInstance(locale)) { row: NearbyQuest -> row.venueName }
             .thenBy { it.venueId }
+            .thenBy { rank[it.questId] }
     )
   } else {
     rows.sortedWith(compareBy<NearbyQuest> { it.distanceMeters }.thenBy { it.venueId })

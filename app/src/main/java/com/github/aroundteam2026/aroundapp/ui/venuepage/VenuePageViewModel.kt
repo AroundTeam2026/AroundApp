@@ -592,5 +592,6 @@ private fun Quest.toVenuePageQuest() =
         reward = reward,
         exactPartySize = exactPartySize,
         radiusMeters = radiusMeters,
+        location = location,
         partyCapacity = partyCapacity,
     )

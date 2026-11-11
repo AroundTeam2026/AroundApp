@@ -28,6 +28,7 @@ class QuestMarkersTest {
 
   private val pin =
       VenuePin(
+          key = "cafe",
           venueId = "cafe",
           venueName = "Café Lumen",
           location = Location(46.5220, 6.6330),

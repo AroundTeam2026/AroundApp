@@ -50,7 +50,8 @@ import kotlinx.coroutines.launch
  *   it is off. False until they answer.
  * @property pins The venues to mark: those on screen with valid quests, and the open one wherever
  *   it is.
- * @property selectedVenueId The venue whose card is open, or null when every pin is closed.
+ * @property selectedPinKey The [VenuePin.key] of the pin whose card is open, or null when every pin
+ *   is closed.
  * @property nearby The valid quests for the list: those within [MapViewModel.NEARBY_RADIUS_METERS]
  *   of the explorer, nearest first, or, while their position is unknown, every valid quest by venue
  *   name, with no distance. Only those that pass [filters] are listed.
@@ -67,7 +68,7 @@ data class MapUiState(
     val showsUserLocation: Boolean = false,
     val locationRefused: Boolean = false,
     val pins: List<VenuePin> = emptyList(),
-    val selectedVenueId: String? = null,
+    val selectedPinKey: String? = null,
     val nearby: List<NearbyQuest> = emptyList(),
     val showsNearby: Boolean = false,
     val filters: NearbyFilters = NearbyFilters(),
@@ -108,8 +109,8 @@ class MapViewModel(
   private val visibleArea = MutableStateFlow<GeoBounds?>(null)
   /** Where the explorer was located, which pins measure their distance from; null until then. */
   private val explorer = MutableStateFlow<Location?>(null)
-  /** The venue whose card the explorer opened, or null. */
-  private val selectedVenueId = MutableStateFlow<String?>(null)
+  /** The [VenuePin.key] of the pin whose card the explorer opened, or null. */
+  private val selectedPinKey = MutableStateFlow<String?>(null)
   /** The filters of the nearby list. */
   private val filters = MutableStateFlow(NearbyFilters())
   /** Bumped by [onRetry] when the quests failed: each new value listens to them again. */
@@ -141,16 +142,14 @@ class MapViewModel(
     viewModelScope.launch {
       // The venues on screen get a pin, and the open one keeps it wherever it is: the card is far
       // bigger than the pin, so it can still be on screen when its venue isn't
-      combine(content, visibleArea, selectedVenueId, filters, retryWaiting) {
+      combine(content, visibleArea, selectedPinKey, filters, retryWaiting) {
               (pins, nearby, questsFailed, venuesFailed),
               area,
               opened,
               chosen,
               waiting ->
-            val selected = opened?.takeIf { id -> pins.any { it.venueId == id } }
-            val shown = pins.filter {
-              (area != null && it.location in area) || it.venueId == selected
-            }
+            val selected = opened?.takeIf { id -> pins.any { it.key == id } }
+            val shown = pins.filter { (area != null && it.location in area) || it.key == selected }
             val listed = nearby.filter(chosen::matches)
             // One error for both: without quests there are no venues to load either
             val failed = questsFailed || venuesFailed
@@ -158,12 +157,12 @@ class MapViewModel(
           }
           .collect { (shown, opened, selected, nearby, chosen, failed, retrying) ->
             // A venue left without valid quests closes its card for good
-            if (selected == null && opened != null) selectedVenueId.compareAndSet(opened, null)
+            if (selected == null && opened != null) selectedPinKey.compareAndSet(opened, null)
             // One update, so the pins and the list always come from the same snapshot
             _uiState.update {
               it.copy(
                   pins = shown,
-                  selectedVenueId = selected,
+                  selectedPinKey = selected,
                   nearby = nearby,
                   filters = chosen,
                   loadFailed = failed,
@@ -207,25 +206,25 @@ class MapViewModel(
   }
 
   /**
-   * Called when the explorer taps the closed pin of [venueId]: opens its card, closing any other. A
-   * tap on a venue that no longer has valid quests changes nothing.
+   * Called when the explorer taps the closed pin [key] (see [VenuePin.key]): opens its card,
+   * closing any other. A tap on a pin that no longer has valid quests changes nothing.
    */
-  fun onPinClick(venueId: String) {
-    if (content.value.pins.none { it.venueId == venueId }) return
+  fun onPinClick(key: String) {
+    if (content.value.pins.none { it.key == key }) return
     picked = true
-    selectedVenueId.value = venueId
+    selectedPinKey.value = key
     // The card must stay in sight
     _uiState.update { it.copy(showsNearby = false) }
   }
 
   /** Called when the explorer taps the map itself: closes the open card, not the nearby quests. */
   fun onMapClick() {
-    selectedVenueId.value = null
+    selectedPinKey.value = null
   }
 
   /** Called when the explorer opens the nearby quests: shows them, closing the open card. */
   fun onNearbyOpen() {
-    selectedVenueId.value = null
+    selectedPinKey.value = null
     _uiState.update { it.copy(showsNearby = true) }
   }
 
@@ -257,15 +256,17 @@ class MapViewModel(
   }
 
   /**
-   * Called when the explorer taps the page of [quest] in the nearby quests: opens its venue's card
-   * in their place, as a tap on its pin does, and frames [VENUE_FRAME_RADIUS_METERS] around the
-   * venue. The venue is placed where its pin is. A page whose venue no longer has valid quests
-   * changes nothing.
+   * Called when the explorer taps the page of [quest] in the nearby quests: opens its pin's card in
+   * their place, as a tap on its pin does, and frames [VENUE_FRAME_RADIUS_METERS] around the pin:
+   * the quest's own, or else its venue's. A page whose venue no longer has valid quests changes
+   * nothing.
    */
   fun onNearbyQuestClick(quest: NearbyQuest) {
-    val pin = content.value.pins.find { it.venueId == quest.venueId } ?: return
+    val pins = content.value.pins
+    val pin =
+        pins.find { it.key == quest.questId } ?: pins.find { it.key == quest.venueId } ?: return
     picked = true
-    selectedVenueId.value = pin.venueId
+    selectedPinKey.value = pin.key
     _uiState.update {
       it.copy(
           areaToFrame = pin.location.boundsWithin(VENUE_FRAME_RADIUS_METERS),
@@ -277,8 +278,8 @@ class MapViewModel(
   /**
    * The active quests, their venues, the explorer's position and the time, again whenever quests or
    * their venues change, when a reward expires, and once the explorer is located. Without quests
-   * there are none; without venues there are none either, as each quest is shown at its venue's
-   * location, under its name. A failure to load the quests or the venues is logged and reported in
+   * there are none; without venues there are none either, as each quest is shown under its venue's
+   * name. A failure to load the quests or the venues is logged and reported in
    * [MapData.questsFailed] or [MapData.venuesFailed] until they load, on [onRetry] or, for the
    * venues, for a new set of venues.
    *

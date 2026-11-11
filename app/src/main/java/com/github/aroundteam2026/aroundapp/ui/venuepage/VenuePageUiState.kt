@@ -274,7 +274,8 @@ enum class VenuePageStatus {
  * @property minPartySize How many people the quest needs at least.
  * @property reward The quest's reward, or null when it has none.
  * @property exactPartySize Whether the party must have exactly [minPartySize] people.
- * @property radiusMeters How close to the venue explorers must be to send their proof.
+ * @property radiusMeters How close to [location] explorers must be to send their proof.
+ * @property location Where the quest takes place, or null when at the venue.
  * @property partyCapacity The most explorers its party can have, as `Quest.partyCapacity`.
  */
 data class VenuePageQuest(
@@ -287,5 +288,6 @@ data class VenuePageQuest(
     val reward: Reward?,
     val exactPartySize: Boolean = false,
     val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
+    val location: Location? = null,
     val partyCapacity: Int = MAX_PARTY_SIZE,
 )

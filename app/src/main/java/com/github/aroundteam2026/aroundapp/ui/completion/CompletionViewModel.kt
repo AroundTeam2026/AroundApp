@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
@@ -77,6 +78,8 @@ class CompletionViewModel(
   /** The venue of the reservation, once it is known to be approved. */
   private var venueId: String? = null
   private var questRadiusMeters: Int? = null
+  /** The quest's own location, or null when it takes place at its venue. */
+  private var questLocation: Location? = null
 
   /** The photo that was uploaded last, with the Storage location it was stored at. */
   private var uploaded: Pair<Uri, String>? = null
@@ -154,14 +157,17 @@ class CompletionViewModel(
     }
   }
 
-  /** Checks the venue's current marker and a fresh precise device fix on every submit attempt. */
+  /**
+   * Checks a fresh precise device fix against the quest's location, or else the venue's current
+   * marker, on every submit attempt.
+   */
   private suspend fun locationError(venueId: String, radiusMeters: Int): CompletionLocationError? =
       try {
-        val venueLocation = venueRepository.getVenue(venueId)?.location
-        val deviceLocation = venueLocation?.let { locationRepository.currentPreciseLocation() }
+        val target = questLocation ?: venueRepository.getVenue(venueId)?.location
+        val deviceLocation = target?.let { locationRepository.currentPreciseLocation() }
         when {
-          venueLocation == null || deviceLocation == null -> CompletionLocationError.UNAVAILABLE
-          deviceLocation.distanceTo(venueLocation) > radiusMeters -> CompletionLocationError.TOO_FAR
+          target == null || deviceLocation == null -> CompletionLocationError.UNAVAILABLE
+          deviceLocation.distanceTo(target) > radiusMeters -> CompletionLocationError.TOO_FAR
           else -> null
         }
       } catch (e: CancellationException) {
@@ -230,6 +236,7 @@ class CompletionViewModel(
           .collect { booked ->
             venueId = booked?.first?.venueId
             questRadiusMeters = booked?.second?.radiusMeters
+            questLocation = booked?.second?.location
             mutableUiState.update { state ->
               if (booked == null) {
                 state.copy(status = CompletionFormStatus.UNAVAILABLE)

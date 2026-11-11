@@ -105,11 +105,11 @@ class QuestMarkersDeviceTest {
   /** Waits for the card of [venueId] to be open, or for none to be when null. */
   private fun awaitSelected(venueId: String?) {
     try {
-      composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { state.selectedVenueId == venueId }
+      composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { state.selectedPinKey == venueId }
     } catch (e: Throwable) {
       val pins = state.pins.map { it.venueId to screenPoint(it.location) }
       throw AssertionError(
-          "Expected $venueId open, got ${state.selectedVenueId}; opened $opened; pins at $pins",
+          "Expected $venueId open, got ${state.selectedPinKey}; opened $opened; pins at $pins",
           e,
       )
     }
@@ -142,7 +142,7 @@ class QuestMarkersDeviceTest {
     val dimensions = MarkerDefaults.dimensions
     val pin =
         pointAbove(quest.location(), (dimensions.pointerHeight + dimensions.pinDiameter / 2).value)
-    composeTestRule.tapMapUntil(C.Tag.MAP, { pin }) { state.selectedVenueId == quest.venueId }
+    composeTestRule.tapMapUntil(C.Tag.MAP, { pin }) { state.selectedPinKey == quest.venueId }
     awaitSelected(quest.venueId)
   }
 
@@ -156,7 +156,7 @@ class QuestMarkersDeviceTest {
   fun tappingAPinOpensItsCard() {
     openCard(cafe)
 
-    assertEquals("cafe", state.selectedVenueId)
+    assertEquals("cafe", state.selectedPinKey)
   }
 
   @Test
@@ -178,7 +178,7 @@ class QuestMarkersDeviceTest {
 
     openCard(bar)
 
-    assertEquals("bar", state.selectedVenueId)
+    assertEquals("bar", state.selectedPinKey)
   }
 
   @Test

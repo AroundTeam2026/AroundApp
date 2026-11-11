@@ -29,8 +29,8 @@ import kotlinx.coroutines.flow.mapNotNull
 private const val OPEN_CARD_Z_INDEX = 1f
 
 /**
- * Marks each of [pins] on the map: a pin, or the card of the [selectedVenueId] venue, over the
- * venue's area. Tapping a pin calls [onPinClick] with its venue; tapping the card calls
+ * Marks each of [pins] on the map: a pin, or the card of the pin keyed [selectedPinKey], over its
+ * area. Tapping a pin calls [onPinClick] with its [VenuePin.key]; tapping the card calls
  * [onCardClick].
  *
  * Each marker is drawn as an image, which is redrawn only when what it shows changes: a pin's icon
@@ -40,14 +40,14 @@ private const val OPEN_CARD_Z_INDEX = 1f
 @GoogleMapComposable
 fun QuestMarkers(
     pins: List<VenuePin>,
-    selectedVenueId: String?,
+    selectedPinKey: String?,
     style: MarkerStyle,
-    onPinClick: (venueId: String) -> Unit,
+    onPinClick: (key: String) -> Unit,
     onCardClick: (VenuePin) -> Unit,
 ) {
   pins.forEach { pin ->
-    key(pin.venueId) {
-      val open = pin.venueId == selectedVenueId
+    key(pin.key) {
+      val open = pin.key == selectedPinKey
       // Real metres on the ground, so the area grows as the explorer zooms in
       val area = pin.area(style)
       Circle(
@@ -64,7 +64,7 @@ fun QuestMarkers(
           contentDescription = pin.description(),
           zIndex = if (open) OPEN_CARD_Z_INDEX else 0f,
           onClick = {
-            if (open) onCardClick(pin) else onPinClick(pin.venueId)
+            if (open) onCardClick(pin) else onPinClick(pin.key)
             // Handled: no info window, and the camera stays put
             true
           },
