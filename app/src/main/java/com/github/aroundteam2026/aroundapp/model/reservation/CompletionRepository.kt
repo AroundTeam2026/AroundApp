@@ -36,17 +36,6 @@ interface CompletionRepository {
   ): Result<String>
 
   /**
-   * Observes the completions an explorer submitted themselves, not those another member of their
-   * party sent. Emits the current list on collection, then again whenever one is added or changes.
-   *
-   * @param uid uid of the explorer.
-   * @return all of that explorer's completions, whatever their status, in unspecified order.
-   * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
-   *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
-   */
-  fun observeForExplorer(uid: String): Flow<List<Completion>>
-
-  /**
    * Observes the completions submitted for one venue's quests. Emits the current list on
    * collection, then again whenever one is added or changes.
    *
@@ -98,22 +87,23 @@ interface CompletionRepository {
    *   ([IllegalStateException]), or if the write failed.
    */
   suspend fun reject(id: String, reason: String): Result<Unit>
-}
 
-/**
- * Observes the completions of every reservation of [reservationIds], so a party member sees the
- * party's proof whichever member sent it. Emits once every reservation has been read, then again
- * whenever one changes.
- *
- * @return the completions of those reservations, in unspecified order; an empty list at once when
- *   there are none.
- * @throws Exception from the flow if the listener of any reservation fails, as
- *   [CompletionRepository.observeForReservation] does.
- */
-fun CompletionRepository.observeForReservations(
-    reservationIds: Collection<String>
-): Flow<List<Completion>> {
-  val ids = reservationIds.distinct()
-  if (ids.isEmpty()) return flowOf(emptyList())
-  return combine(ids.map(::observeForReservation)) { it.toList().flatten() }
+  /**
+   * Observes the completions of every reservation of [reservationIds], so a party member sees the
+   * party's proof whichever member sent it. Emits once every reservation has been read, then again
+   * whenever one changes.
+   *
+   * By default it combines [observeForReservation] for each reservation; an implementation may read
+   * them in fewer queries.
+   *
+   * @return the completions of those reservations, in unspecified order; an empty list at once when
+   *   there are none.
+   * @throws Exception from the flow if the listener of any reservation fails, as
+   *   [observeForReservation] does.
+   */
+  fun observeForReservations(reservationIds: Collection<String>): Flow<List<Completion>> {
+    val ids = reservationIds.distinct()
+    if (ids.isEmpty()) return flowOf(emptyList())
+    return combine(ids.map(::observeForReservation)) { it.toList().flatten() }
+  }
 }

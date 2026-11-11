@@ -203,7 +203,7 @@ class ProofJourneyTest : TestCase() {
         // so it never shows up below and the test times out
         Firebase.firestore.waitForPendingWrites().await()
         CompletionRepositoryFirestore(Firebase.firestore)
-            .observeForExplorer(explorerUid)
+            .observeForReservation(reservationId)
             .first { it.isNotEmpty() }
             .single()
       }

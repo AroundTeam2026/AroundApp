@@ -269,30 +269,6 @@ class CompletionRepositoryFirestoreTest {
     assertTrue(result.isFailure)
   }
 
-  /** Bug: observeForExplorer does not filter on the explorer, or also filters on the status. */
-  @Test
-  fun observeForExplorer_returnsEveryCompletionOfThatExplorerWhateverItsStatus() =
-      withTimeoutBlocking {
-        val answered = submit(approvedReservation())
-        venueRepository.approve(answered).getOrThrow()
-        val pending = submit(approvedReservation())
-        writeBypassingRules(
-            "$COMPLETIONS/${newId()}",
-            validFields() + ("explorerUid" to FRIEND_UID),
-        )
-
-        val ids =
-            explorerRepository
-                .observeForExplorer(explorerUid)
-                .first { list ->
-                  list.any { it.id == answered && it.status == CompletionStatus.APPROVED } &&
-                      list.any { it.id == pending }
-                }
-                .map { it.id }
-
-        assertEquals(setOf(answered, pending), ids.toSet())
-      }
-
   /** Bug: observeForVenue does not filter on the venue, or also filters on the status. */
   @Test
   fun observeForVenue_returnsEveryCompletionOfThatVenueWhateverItsStatus() = withTimeoutBlocking {
@@ -349,14 +325,15 @@ class CompletionRepositoryFirestoreTest {
     }
   }
 
-  /** Bug: the explorer's flow misses the venue's answer, so the overview keeps showing pending. */
+  /** Bug: the party's flow misses the venue's answer, so the overview keeps showing pending. */
   @Test
-  fun observeForExplorer_followsTheVenuesAnswer() = withTimeoutBlocking {
-    val id = submit(approvedReservation())
+  fun observeForReservation_followsTheVenuesAnswer() = withTimeoutBlocking {
+    val reservationId = approvedReservation()
+    val id = submit(reservationId)
     val emissions = Channel<List<Completion>>(Channel.UNLIMITED)
     val collector =
         launch(start = CoroutineStart.UNDISPATCHED) {
-          explorerRepository.observeForExplorer(explorerUid).collect(emissions::send)
+          explorerRepository.observeForReservation(reservationId).collect(emissions::send)
         }
     try {
       // The first emission proves the listener is attached before the write.
@@ -390,13 +367,8 @@ class CompletionRepositoryFirestoreTest {
 
     val forVenue =
         venueRepository.observeForVenue(venueId).first { list -> list.any { it.id == validId } }
-    val forExplorer =
-        explorerRepository.observeForExplorer(explorerUid).first { list ->
-          list.any { it.id == validId }
-        }
 
     assertEquals(listOf(validId), forVenue.map { it.id })
-    assertEquals(listOf(validId), forExplorer.map { it.id })
   }
 
   /** Bug: approve writes more than the status (the rules refuse that), or the wrong status. */

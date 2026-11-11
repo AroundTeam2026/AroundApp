@@ -68,11 +68,6 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     return Result.success(id)
   }
 
-  /** Emits every stored completion of [uid], and again whenever that list changes. */
-  override fun observeForExplorer(uid: String): Flow<List<Completion>> = observe {
-    it.explorerUid == uid
-  }
-
   /** Emits every stored completion of [venueId], and again whenever that list changes. */
   override fun observeForVenue(venueId: String): Flow<List<Completion>> = observe {
     it.venueId == venueId

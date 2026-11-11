@@ -401,17 +401,44 @@ class OverviewViewModelTest {
 
   @Test
   fun aFailingCompletionListenerShowsFailed() = test {
-    book("fox")
+    approvedReservation()
     val broken =
         object : CompletionRepository by completions {
-          override fun observeForReservation(reservationId: String): Flow<List<Completion>> = flow {
-            throw IOException("denied")
-          }
+          override fun observeForReservations(
+              reservationIds: Collection<String>
+          ): Flow<List<Completion>> = flow { throw IOException("denied") }
         }
     val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, party, broken)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
+  }
+
+  // Only an approved party has a proof, and the rules may refuse listening to the proof of a
+  // party just joined, before the server has the membership
+  @Test
+  fun onlyApprovedReservationsListenToTheirProof() = test {
+    val pending = book("fox")
+    val approved = approvedReservation("cake")
+    answer(book("bread", venueId = BAKERY), ReservationStatus.CANCELLED)
+    val listened = mutableSetOf<String>()
+    val recording =
+        object : CompletionRepository by completions {
+          override fun observeForReservations(
+              reservationIds: Collection<String>
+          ): Flow<List<Completion>> {
+            listened += reservationIds
+            return completions.observeForReservations(reservationIds)
+          }
+        }
+    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, party, recording)
+    runCurrent()
+
+    assertEquals(
+        setOf(pending, approved),
+        viewModel.uiState.value.rows.map { it.reservationId }.toSet(),
+    )
+    assertEquals(setOf(approved), listened)
   }
 
   // The venue answers the proof while the tab is open, and the row follows

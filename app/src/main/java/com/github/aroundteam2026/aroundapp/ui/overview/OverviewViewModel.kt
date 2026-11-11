@@ -22,7 +22,6 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
-import com.github.aroundteam2026.aroundapp.model.reservation.observeForReservations
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -136,10 +135,13 @@ class OverviewViewModel(
           }
           .flatMapLatest { booked ->
             val reservations = booked.map { (reservation, _) -> reservation }
+            // Only an approved party has a proof. The rules may also refuse listening to a party
+            // just joined, until the server has the membership, which an approved one always has
+            val approved = reservations.filter { it.status == ReservationStatus.APPROVED }
             combine(
                 venueRepository.observeVenues(reservations.map { it.venueId }.toSet()),
                 partyRepository.observeJoinedCounts(reservations.map { it.id }),
-                completionRepository.observeForReservations(reservations.map { it.id }),
+                completionRepository.observeForReservations(approved.map { it.id }),
             ) { venues, partySizes, completions ->
               overviewRows(booked, venues, partySizes, proofsOf(completions))
             }

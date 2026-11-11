@@ -15,7 +15,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-/** Tests [observeForReservations] on a [FakeCompletionRepository]. */
+/**
+ * Tests the default [CompletionRepository.observeForReservations] on a [FakeCompletionRepository].
+ */
 class ObserveForReservationsTest {
   private val completions = FakeCompletionRepository(now = { 0L })
 
@@ -77,6 +79,11 @@ class ObserveForReservationsTest {
           override fun observeForReservation(reservationId: String): Flow<List<Completion>> =
               if (reservationId == "r2") flow { throw failure }
               else completions.observeForReservation(reservationId)
+
+          // Delegation would hand this to completions, around the failing listener above
+          override fun observeForReservations(
+              reservationIds: Collection<String>
+          ): Flow<List<Completion>> = super.observeForReservations(reservationIds)
         }
 
     val thrown =

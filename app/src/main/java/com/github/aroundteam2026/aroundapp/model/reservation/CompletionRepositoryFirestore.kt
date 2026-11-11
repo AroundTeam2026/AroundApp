@@ -31,6 +31,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * comes back as a failure, and one refused later is only logged. So when two members submit while
  * offline, both get success, and the write that reaches the server second is refused and dropped:
  * that member's proof is lost, while the listeners show them the party's proof, the other member's.
+ * Until then, their device's local copy holds their own write in place of the party's proof, so
+ * their listeners show it as the party's: briefly while online, and until the next sync offline.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it
@@ -92,9 +94,6 @@ class CompletionRepositoryFirestore(
       } catch (e: Exception) {
         Result.failure(e)
       }
-
-  override fun observeForExplorer(uid: String): Flow<List<Completion>> =
-      completions.whereEqualTo(EXPLORER_UID, uid).observe()
 
   override fun observeForVenue(venueId: String): Flow<List<Completion>> =
       completions.whereEqualTo(VENUE_ID, venueId).observe()

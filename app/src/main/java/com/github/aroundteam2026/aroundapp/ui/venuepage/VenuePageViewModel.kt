@@ -25,7 +25,6 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
-import com.github.aroundteam2026.aroundapp.model.reservation.observeForReservations
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
@@ -39,12 +38,15 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -278,11 +280,19 @@ class VenuePageViewModel(
   private fun listen() {
     listening?.cancel()
     listening = viewModelScope.launch {
+      // One listener of the reservations for both uses below. Its failure is shared as a value,
+      // since a failing shareIn would fail this scope, and each use handles it on its own
+      val reservations =
+          reservationRepository
+              .observeForExplorer(explorerUid)
+              .map { Result.success(it) }
+              .catch { emit(Result.failure(it)) }
+              .shareIn(this, SharingStarted.Lazily, replay = 1)
       combine(
               venueRepository.observeVenue(venueId),
               questRepository.observeActiveQuestsByVenue(venueId),
-              reservationRepository
-                  .observeForExplorer(explorerUid)
+              reservations
+                  .map { it.getOrThrow() }
                   .flatMapLatest { reservations ->
                     // Only the parties acceptedPartiesOf counts, so an old reservation elsewhere
                     // can't make accepting unavailable here
@@ -294,13 +304,23 @@ class VenuePageViewModel(
                     Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
                     emit(null)
                   },
-              reservationRepository
-                  .observeForExplorer(explorerUid)
+              reservations
+                  .map { it.getOrThrow() }
                   .flatMapLatest { reservations ->
-                    // The party's proof, whichever member sent it, of each reservation here
-                    val ids = reservations.filter { it.venueId == venueId }.map { it.id }
+                    // The party's proof, whichever member sent it, of each reservation here. Only
+                    // an approved party has one, and the rules may refuse listening to a party
+                    // just joined until the server has the membership, which an approved one has
+                    val ids =
+                        reservations
+                            .filter {
+                              it.venueId == venueId && it.status == ReservationStatus.APPROVED
+                            }
+                            .map { it.id }
                     completionRepository.observeForReservations(ids)
                   }
+                  // A new list of the same proofs mustn't show the page again with older
+                  // reservations, which would end a refused accept's "failed" too early
+                  .distinctUntilChanged()
                   .map<List<Completion>, List<Completion>?> { it }
                   .catch {
                     Log.w(TAG, "Listening to the proofs of $explorerUid failed", it)

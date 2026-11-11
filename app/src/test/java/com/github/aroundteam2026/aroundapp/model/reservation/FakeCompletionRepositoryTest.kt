@@ -104,18 +104,6 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
-  fun observeForExplorer_returnsOnlyThatExplorersCompletions() =
-      runBlocking<Unit> {
-        val mine = submit()
-        submit(reservationId = OTHER_ID, explorerUid = OTHER_ID)
-
-        assertEquals(
-            listOf(mine),
-            repository.observeForExplorer(EXPLORER_UID).first().map { it.id },
-        )
-      }
-
-  @Test
   fun observeForReservation_returnsOnlyThatReservationsCompletion() =
       runBlocking<Unit> {
         val partyProof = submit()
