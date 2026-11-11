@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
 import android.net.Uri
@@ -9,6 +10,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,6 +52,7 @@ import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.completion.ProofPhotos
+import com.github.aroundteam2026.aroundapp.ui.navigation.ProfileError
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -57,12 +61,17 @@ import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 
-/** Holds Explorer home until the signed-in account has a saved display name. */
+/**
+ * Holds Explorer home until the signed-in account has a saved display name.
+ *
+ * @param onSignOut Called from the load-error state, the way out when the profile can't be read.
+ */
 @Composable
 fun ExplorerProfileSetupGate(
     uid: String,
     users: UserRepository,
     pictures: UserPictureRepository,
+    onSignOut: () -> Unit,
     home: @Composable () -> Unit,
 ) {
   val model: ProfileSetupViewModel =
@@ -73,21 +82,17 @@ fun ExplorerProfileSetupGate(
   val destination by model.destination.collectAsStateWithLifecycle()
   when (destination) {
     ProfileSetupDestination.LOADING ->
-        androidx.compose.foundation.layout.Box(
+        Box(
             Modifier.fillMaxSize().testTag(C.Tag.PROFILE_SETUP_LOADING),
             contentAlignment = Alignment.Center,
         ) {
-          androidx.compose.material3.CircularProgressIndicator()
+          CircularProgressIndicator()
         }
     ProfileSetupDestination.SETUP -> ProfileSetupScreen(model)
     ProfileSetupDestination.HOME -> home()
-    ProfileSetupDestination.ERROR ->
-        androidx.compose.foundation.layout.Box(
-            Modifier.fillMaxSize().testTag(C.Tag.PROFILE_SETUP_LOAD_ERROR),
-            contentAlignment = Alignment.Center,
-        ) {
-          Button(onClick = model::retry) { Text(stringResource(R.string.role_profile_retry)) }
-        }
+    // The same message, retry and sign-out as a failed role read: a missing profile can't be fixed
+    // by retrying, so signing out must stay possible
+    ProfileSetupDestination.ERROR -> ProfileError(model::retry, onSignOut)
   }
 }
 
@@ -162,7 +167,7 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
         horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-      androidx.compose.foundation.layout.Box(
+      Box(
           Modifier.size(64.dp)
               .clip(CircleShape)
               .background(MaterialTheme.colorScheme.primaryContainer)
@@ -173,7 +178,7 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
           Image(preview!!, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else {
           Image(
-              painterResource(R.drawable.ic_profile_setup_person),
+              painterResource(R.drawable.ic_profile),
               null,
               Modifier.size(28.dp),
               colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
@@ -203,7 +208,11 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
       }
     }
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
-    Text(stringResource(R.string.profile_setup_name), style = MaterialTheme.typography.labelLarge)
+    Text(
+        stringResource(R.string.profile_setup_name),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onBackground,
+    )
     Spacer(Modifier.height(AroundSpacing.Small))
     OutlinedTextField(
         value = form.name,

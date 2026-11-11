@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
 import androidx.activity.ComponentActivity
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
@@ -24,7 +26,10 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.DarkColorScheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,7 +49,7 @@ class ProfileSetupScreenTest {
     runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
     compose.setContent {
       AroundAppTheme {
-        ExplorerProfileSetupGate("explorer", users, FakeUserPictureRepository()) {
+        ExplorerProfileSetupGate("explorer", users, FakeUserPictureRepository(), onSignOut = {}) {
           Text("Explorer home", modifier = Modifier.testTag(C.Tag.APP))
         }
       }
@@ -73,7 +78,12 @@ class ProfileSetupScreenTest {
         }
     compose.setContent {
       AroundAppTheme {
-        ExplorerProfileSetupGate("explorer", refusing, FakeUserPictureRepository()) {
+        ExplorerProfileSetupGate(
+            "explorer",
+            refusing,
+            FakeUserPictureRepository(),
+            onSignOut = {},
+        ) {
           Text("Explorer home", modifier = Modifier.testTag(C.Tag.APP))
         }
       }
@@ -91,14 +101,44 @@ class ProfileSetupScreenTest {
   }
 
   @Test
+  fun loadErrorExplainsItselfAndOffersRetryAndSignOut() {
+    runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
+    var reads = 0
+    val flaky =
+        object : UserRepository by users {
+          override fun observeUser(uid: String): Flow<User?> =
+              if (reads++ == 0) flow { throw IllegalStateException("offline") }
+              else users.observeUser(uid)
+        }
+    var signOuts = 0
+    compose.setContent {
+      AroundAppTheme {
+        ExplorerProfileSetupGate(
+            "explorer",
+            flaky,
+            FakeUserPictureRepository(),
+            onSignOut = { signOuts++ },
+        ) {}
+      }
+    }
+    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_ERROR).assertIsDisplayed()
+    compose.onNodeWithText("Could not load your profile.").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_SIGN_OUT).performClick()
+    assertEquals(1, signOuts)
+
+    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_RETRY).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_SCREEN).assertIsDisplayed()
+  }
+
+  @Test
   fun firstTimeSetupUsesTheDarkThemeBackground() {
     runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
     compose.setContent {
       AroundAppTheme(darkTheme = true) {
-        ExplorerProfileSetupGate("explorer", users, FakeUserPictureRepository()) {}
+        ExplorerProfileSetupGate("explorer", users, FakeUserPictureRepository(), onSignOut = {}) {}
       }
     }
     val screen = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_SCREEN).captureToImage()
-    org.junit.Assert.assertEquals(DarkColorScheme.background, screen.toPixelMap()[0, 0])
+    assertEquals(DarkColorScheme.background, screen.toPixelMap()[0, 0])
   }
 }

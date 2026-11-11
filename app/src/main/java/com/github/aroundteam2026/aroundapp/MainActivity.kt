@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
             userRepository = users,
             pendingRoleStore = pendingRole,
             explorerScreen = { uid ->
-              ExplorerProfileSetupGate(uid, users, pictures) {
+              ExplorerProfileSetupGate(uid, users, pictures, profile::signOut) {
                 AroundApp(explorerUid = uid, onSignOut = profile::signOut)
               }
             },

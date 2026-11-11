@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
 import android.net.Uri
@@ -11,6 +12,8 @@ import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -67,6 +70,27 @@ class ProfileSetupViewModelTest {
         val model = ProfileSetupViewModel(uid, users, pictures)
         advanceUntilIdle()
         assertEquals(ProfileSetupDestination.ERROR, model.destination.value)
+      }
+
+  @Test
+  fun retryAfterAFailedReadReachesSetup() =
+      runTest(dispatcher) {
+        create()
+        var reads = 0
+        val flaky =
+            object : UserRepository by users {
+              override fun observeUser(uid: String): Flow<User?> =
+                  if (reads++ == 0) flow { throw IllegalStateException("offline") }
+                  else users.observeUser(uid)
+            }
+        val model = ProfileSetupViewModel(uid, flaky, pictures)
+        advanceUntilIdle()
+        assertEquals(ProfileSetupDestination.ERROR, model.destination.value)
+
+        model.retry()
+        advanceUntilIdle()
+        assertEquals(ProfileSetupDestination.SETUP, model.destination.value)
+        assertEquals(2, reads)
       }
 
   @Test

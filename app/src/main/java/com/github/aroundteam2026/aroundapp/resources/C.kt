@@ -9,7 +9,6 @@ object C {
   /** Test tags that UI tests use to find composables. */
   object Tag {
     const val PROFILE_SETUP_LOADING = "profile_setup_loading"
-    const val PROFILE_SETUP_LOAD_ERROR = "profile_setup_load_error"
     const val PROFILE_SETUP_SCREEN = "profile_setup_screen"
     const val PROFILE_SETUP_AVATAR = "profile_setup_avatar"
     const val PROFILE_SETUP_ADD_PHOTO = "profile_setup_add_photo"

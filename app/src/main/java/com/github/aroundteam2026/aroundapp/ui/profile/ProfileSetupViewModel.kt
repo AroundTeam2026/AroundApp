@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
 import android.net.Uri
@@ -37,6 +38,7 @@ data class ProfileSetupFormState(
     val error: ProfileSetupError? = null,
 )
 
+/** Why the form can't be saved yet, shown under the name field. */
 enum class ProfileSetupError {
   NAME_REQUIRED,
   NAME_TOO_LONG,
@@ -53,6 +55,11 @@ class ProfileSetupViewModel(
     private val pictures: UserPictureRepository,
 ) : ViewModel() {
   private val retries = MutableStateFlow(0)
+
+  /**
+   * Where the gate goes: [ProfileSetupDestination.ERROR] if the profile can't be read or is
+   * missing.
+   */
   val destination: StateFlow<ProfileSetupDestination> =
       retries
           .flatMapLatest {
@@ -70,13 +77,16 @@ class ProfileSetupViewModel(
           .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileSetupDestination.LOADING)
 
   private val mutableForm = MutableStateFlow(ProfileSetupFormState())
+  /** The form's name, picture, saving flag and error. */
   val form: StateFlow<ProfileSetupFormState> = mutableForm
   private var uploadedPhoto: Pair<Uri, String>? = null
 
+  /** Edits the name and clears the error; ignored while saving. */
   fun setName(name: String) {
     if (!form.value.saving) mutableForm.update { it.copy(name = name, error = null) }
   }
 
+  /** Picks a new picture, or none, to upload on the next save; ignored while saving. */
   fun setPhoto(photo: Uri?) {
     if (!form.value.saving) {
       uploadedPhoto = null
@@ -84,6 +94,7 @@ class ProfileSetupViewModel(
     }
   }
 
+  /** Reads the profile again after a load error. */
   fun retry() {
     retries.update { it + 1 }
   }
