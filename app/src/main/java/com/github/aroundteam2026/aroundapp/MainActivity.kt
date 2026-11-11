@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.RoleNavigation
 import com.github.aroundteam2026.aroundapp.ui.navigation.VenueEntry
 import com.github.aroundteam2026.aroundapp.ui.profile.ExplorerProfileSetupGate
+import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 
@@ -38,8 +39,12 @@ class MainActivity : ComponentActivity() {
             userRepository = users,
             pendingRoleStore = pendingRole,
             explorerScreen = { uid ->
-              ExplorerProfileSetupGate(uid, users, pictures, profile::signOut) {
-                AroundApp(explorerUid = uid, onSignOut = profile::signOut)
+              ExplorerProfileSetupGate(uid, users, pictures, profile::signOut) { setup ->
+                AroundApp(
+                    explorerUid = uid,
+                    onSignOut = profile::signOut,
+                    profileScreen = { ProfileScreen(profile::signOut, setup, pictures) },
+                )
               }
             },
             venueScreen = { uid ->

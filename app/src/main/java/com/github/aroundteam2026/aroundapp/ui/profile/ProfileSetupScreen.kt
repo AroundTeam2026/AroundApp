@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -23,14 +24,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -39,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -59,12 +64,15 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Holds Explorer home until the signed-in account has a saved display name.
  *
  * @param onSignOut Called from the load-error state, the way out when the profile can't be read.
+ * @param home Explorer home, given the profile's ViewModel so the Profile tab can edit it.
  */
 @Composable
 fun ExplorerProfileSetupGate(
@@ -72,7 +80,7 @@ fun ExplorerProfileSetupGate(
     users: UserRepository,
     pictures: UserPictureRepository,
     onSignOut: () -> Unit,
-    home: @Composable () -> Unit,
+    home: @Composable (ProfileSetupViewModel) -> Unit,
 ) {
   val model: ProfileSetupViewModel =
       viewModel(
@@ -88,36 +96,29 @@ fun ExplorerProfileSetupGate(
         ) {
           CircularProgressIndicator()
         }
-    ProfileSetupDestination.SETUP -> ProfileSetupScreen(model)
-    ProfileSetupDestination.HOME -> home()
+    ProfileSetupDestination.SETUP -> ProfileForm(model, pictures)
+    ProfileSetupDestination.HOME -> home(model)
     // The same message, retry and sign-out as a failed role read: a missing profile can't be fixed
     // by retrying, so signing out must stay possible
     ProfileSetupDestination.ERROR -> ProfileError(model::retry, onSignOut)
   }
 }
 
-/** The first-time profile form from the light and dark Sprint 5 setup frames. */
+/** The shared setup and edit form from the light and dark Sprint 5 frames. */
 @Composable
-private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
+internal fun ProfileForm(
+    model: ProfileSetupViewModel,
+    pictures: UserPictureRepository,
+    editing: Boolean = false,
+    onBack: () -> Unit = {},
+) {
   val form by model.form.collectAsStateWithLifecycle()
+  val profile by model.profile.collectAsStateWithLifecycle()
   val context = LocalContext.current.applicationContext
   val photos = remember(context) { ProofPhotos(context) }
   val scope = rememberCoroutineScope()
   var preparingPhoto by remember { mutableStateOf(false) }
   var photoError by remember { mutableStateOf(false) }
-  var preview by remember { mutableStateOf<ImageBitmap?>(null) }
-  LaunchedEffect(form.photo) {
-    preview =
-        form.photo?.let {
-          try {
-            photos.preview(it)
-          } catch (cancelled: CancellationException) {
-            throw cancelled
-          } catch (_: Exception) {
-            null
-          }
-        }
-  }
   val picker =
       rememberLauncherForActivityResult(PickVisualMedia()) { source: Uri? ->
         if (source != null) {
@@ -150,15 +151,29 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
           )
           .testTag(C.Tag.PROFILE_SETUP_SCREEN),
   ) {
-    Spacer(Modifier.height(80.dp))
+    if (editing) {
+      IconButton(
+          onClick = onBack,
+          enabled = !form.saving,
+          modifier = Modifier.testTag(C.Tag.PROFILE_EDIT_BACK),
+      ) {
+        Icon(
+            painterResource(R.drawable.ic_chevron_left),
+            stringResource(R.string.profile_edit_back),
+        )
+      }
+      Spacer(Modifier.height(36.dp))
+    } else Spacer(Modifier.height(80.dp))
     Text(
-        stringResource(R.string.profile_setup_title),
+        stringResource(if (editing) R.string.profile_edit_title else R.string.profile_setup_title),
         style = AroundTextStyles.SetupTitle,
         color = MaterialTheme.colorScheme.onBackground,
     )
     Spacer(Modifier.height(AroundSpacing.Small))
     Text(
-        stringResource(R.string.profile_setup_description),
+        stringResource(
+            if (editing) R.string.profile_edit_description else R.string.profile_setup_description
+        ),
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -167,24 +182,12 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
         horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-      Box(
-          Modifier.size(64.dp)
-              .clip(CircleShape)
-              .background(MaterialTheme.colorScheme.primaryContainer)
-              .testTag(C.Tag.PROFILE_SETUP_AVATAR),
-          contentAlignment = Alignment.Center,
-      ) {
-        if (preview != null) {
-          Image(preview!!, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
-          Image(
-              painterResource(R.drawable.ic_profile),
-              null,
-              Modifier.size(28.dp),
-              colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
-          )
-        }
-      }
+      ProfileAvatar(
+          if (editing && !form.removePhoto) profile?.pictureUrl else null,
+          form.photo,
+          pictures,
+          Modifier.testTag(C.Tag.PROFILE_SETUP_AVATAR),
+      )
       Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedButton(
             onClick = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
@@ -198,13 +201,31 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
                 ),
             modifier = Modifier.height(44.dp).testTag(C.Tag.PROFILE_SETUP_ADD_PHOTO),
         ) {
-          Text(stringResource(R.string.profile_setup_add_photo))
+          Text(
+              stringResource(
+                  if (editing) R.string.profile_edit_change_photo
+                  else R.string.profile_setup_add_photo
+              )
+          )
         }
-        Text(
-            stringResource(R.string.profile_setup_photo_optional),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (editing && (form.photo != null || (!form.removePhoto && profile?.pictureUrl != null))) {
+          TextButton(
+              onClick = model::removePhoto,
+              enabled = !form.saving,
+              modifier = Modifier.testTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO),
+          ) {
+            Text(
+                stringResource(R.string.profile_edit_remove_photo),
+                color = MaterialTheme.colorScheme.error,
+            )
+          }
+        } else if (!editing) {
+          Text(
+              stringResource(R.string.profile_setup_photo_optional),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
       }
     }
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
@@ -231,7 +252,8 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
         when (form.error) {
           ProfileSetupError.NAME_REQUIRED -> R.string.profile_setup_name_required
           ProfileSetupError.NAME_TOO_LONG -> R.string.profile_setup_name_too_long
-          ProfileSetupError.SAVE_FAILED -> R.string.profile_setup_save_failed
+          ProfileSetupError.SAVE_FAILED ->
+              if (editing) R.string.profile_edit_save_failed else R.string.profile_setup_save_failed
           null -> if (photoError) R.string.profile_setup_photo_failed else null
         }
     if (errorText != null) {
@@ -251,9 +273,58 @@ private fun ProfileSetupScreen(model: ProfileSetupViewModel) {
     ) {
       Text(
           stringResource(
-              if (form.saving) R.string.profile_setup_saving else R.string.profile_setup_continue
+              if (form.saving) R.string.profile_setup_saving
+              else if (editing) R.string.profile_edit_save else R.string.profile_setup_continue
           )
       )
     }
+  }
+}
+
+/**
+ * Shows a selected local picture or the saved Storage picture, with the same fallback in both
+ * forms.
+ */
+@Composable
+internal fun ProfileAvatar(
+    pictureUrl: String?,
+    photo: Uri?,
+    pictures: UserPictureRepository,
+    modifier: Modifier = Modifier,
+) {
+  val context = LocalContext.current.applicationContext
+  val photos = remember(context) { ProofPhotos(context) }
+  val preview by
+      produceState<ImageBitmap?>(null, pictureUrl, photo) {
+        value =
+            try {
+              when {
+                photo != null -> photos.preview(photo)
+                pictureUrl != null ->
+                    withContext(Dispatchers.IO) {
+                      val bytes = pictures.download(pictureUrl).getOrThrow()
+                      BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                    }
+                else -> null
+              }
+            } catch (cancelled: CancellationException) {
+              throw cancelled
+            } catch (_: Exception) {
+              null
+            }
+      }
+  Box(
+      modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+      contentAlignment = Alignment.Center,
+  ) {
+    if (preview != null)
+        Image(preview!!, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    else
+        Image(
+            painterResource(R.drawable.ic_profile),
+            null,
+            Modifier.size(28.dp),
+            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+        )
   }
 }

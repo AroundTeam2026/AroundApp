@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import kotlin.coroutines.cancellation.CancellationException
@@ -34,6 +35,7 @@ enum class ProfileSetupDestination {
 data class ProfileSetupFormState(
     val name: String = "",
     val photo: Uri? = null,
+    val removePhoto: Boolean = false,
     val saving: Boolean = false,
     val error: ProfileSetupError? = null,
 )
@@ -55,6 +57,14 @@ class ProfileSetupViewModel(
     private val pictures: UserPictureRepository,
 ) : ViewModel() {
   private val retries = MutableStateFlow(0)
+  private val mutableProfile = MutableStateFlow<User?>(null)
+
+  /** The saved profile as last read, or null while loading or after a load error. */
+  val profile: StateFlow<User?> = mutableProfile
+  private val mutableEditing = MutableStateFlow(false)
+
+  /** Whether the edit form is open over the Profile tab. */
+  val editing: StateFlow<Boolean> = mutableEditing
 
   /**
    * Where the gate goes: [ProfileSetupDestination.ERROR] if the profile can't be read or is
@@ -66,13 +76,17 @@ class ProfileSetupViewModel(
             users
                 .observeUser(uid)
                 .map { profile ->
+                  mutableProfile.value = profile
                   when {
                     profile == null -> ProfileSetupDestination.ERROR
                     profile.displayName.isBlank() -> ProfileSetupDestination.SETUP
                     else -> ProfileSetupDestination.HOME
                   }
                 }
-                .catch { emit(ProfileSetupDestination.ERROR) }
+                .catch {
+                  mutableProfile.value = null
+                  emit(ProfileSetupDestination.ERROR)
+                }
           }
           .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileSetupDestination.LOADING)
 
@@ -90,8 +104,30 @@ class ProfileSetupViewModel(
   fun setPhoto(photo: Uri?) {
     if (!form.value.saving) {
       uploadedPhoto = null
-      mutableForm.update { it.copy(photo = photo, error = null) }
+      mutableForm.update { it.copy(photo = photo, removePhoto = false, error = null) }
     }
+  }
+
+  /** Marks the picture for removal on the next save; ignored while saving. */
+  fun removePhoto() {
+    if (!form.value.saving) {
+      uploadedPhoto = null
+      mutableForm.update { it.copy(photo = null, removePhoto = true, error = null) }
+    }
+  }
+
+  /** Opens the edit form with the saved name; only once the profile is complete. */
+  fun startEditing() {
+    val saved = profile.value ?: return
+    if (destination.value != ProfileSetupDestination.HOME) return
+    uploadedPhoto = null
+    mutableForm.value = ProfileSetupFormState(name = saved.displayName)
+    mutableEditing.value = true
+  }
+
+  /** Closes the edit form and drops the draft; ignored while saving. */
+  fun cancelEditing() {
+    if (!form.value.saving) mutableEditing.value = false
   }
 
   /** Reads the profile again after a load error. */
@@ -102,7 +138,8 @@ class ProfileSetupViewModel(
   /** A second tap cannot start another upload or profile write while the first save is pending. */
   fun save() {
     val current = form.value
-    if (current.saving || destination.value != ProfileSetupDestination.SETUP) return
+    val isEditing = editing.value
+    if (current.saving || (destination.value != ProfileSetupDestination.SETUP && !isEditing)) return
     val name = current.name.trim()
     val validation =
         when {
@@ -118,11 +155,18 @@ class ProfileSetupViewModel(
     viewModelScope.launch {
       try {
         val location =
-            current.photo?.let { photo ->
-              uploadedPhoto?.takeIf { it.first == photo }?.second
-                  ?: pictures.upload(uid, photo).getOrThrow().also { uploadedPhoto = photo to it }
+            when {
+              current.removePhoto -> null
+              current.photo != null -> {
+                val photo = current.photo
+                uploadedPhoto?.takeIf { it.first == photo }?.second
+                    ?: pictures.upload(uid, photo).getOrThrow().also { uploadedPhoto = photo to it }
+              }
+              else -> profile.value?.pictureUrl
             }
         users.updateProfile(uid, name, location).getOrThrow()
+        mutableProfile.update { it?.copy(displayName = name, pictureUrl = location) }
+        if (isEditing) mutableEditing.value = false
       } catch (cancelled: CancellationException) {
         throw cancelled
       } catch (_: Exception) {
