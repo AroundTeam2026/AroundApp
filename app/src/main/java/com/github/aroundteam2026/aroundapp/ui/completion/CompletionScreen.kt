@@ -134,8 +134,9 @@ fun CompletionContent(
               verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
           ) {
             Text(
-                stringResource(R.string.completion_review_hint, venueName),
-                Modifier.fillMaxWidth(),
+                if (state.sentByTeammate) stringResource(R.string.completion_sent_by_teammate)
+                else stringResource(R.string.completion_review_hint, venueName),
+                Modifier.fillMaxWidth().testTag(C.Tag.COMPLETION_HINT),
                 style = AroundTextStyles.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -167,7 +168,7 @@ fun CompletionContent(
               Text(
                   stringResource(
                       if (saving) R.string.completion_sending
-                      else if (saved) R.string.completion_sent
+                      else if (saved || state.sentByTeammate) R.string.completion_sent
                       else if (state.saveState == SaveState.Failed) R.string.completion_retry
                       else R.string.completion_send
                   ),

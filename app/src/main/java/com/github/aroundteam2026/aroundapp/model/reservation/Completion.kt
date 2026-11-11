@@ -6,14 +6,15 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 
 /**
- * An explorer's proof that they completed a quest, which the venue approves or rejects. The quest
- * is the one the reservation [reservationId] names, so it isn't repeated here.
+ * A party's proof that it completed a quest, which the venue approves or rejects. One member sends
+ * it for the whole party, and every member reads it and its result. The quest is the one the
+ * reservation [reservationId] names, so it isn't repeated here.
  *
- * @property id Document id, assigned by the repository.
+ * @property id Document id, assigned by the repository: the reservation's, see [completionId].
  * @property reservationId Id of the approved reservation this proof belongs to.
  * @property venueId Id of the venue that owns the quest; the venue's rules check it.
- * @property explorerUid Uid of the explorer who submitted the proof.
- * @property proof What the explorer submitted, of the quest's [ProofType].
+ * @property explorerUid Uid of the party member who submitted the proof.
+ * @property proof What the member submitted, of the quest's [ProofType].
  * @property status Lifecycle state; see [canTransition] for the allowed changes.
  * @property rejectReason Why the venue rejected the proof; required when [status] is
  *   [CompletionStatus.REJECTED], and null otherwise.
@@ -91,15 +92,16 @@ enum class CompletionStatus {
   PENDING,
   /** Accepted by the venue. Final. */
   APPROVED,
-  /** Declined by the venue, which can still approve it. The explorer can't submit again. */
+  /** Declined by the venue, which can still approve it. The party can't submit again. */
   REJECTED,
 }
 
 /**
- * The id of [explorerUid]'s completion of the reservation [reservationId]. Built from both, so a
- * retried submission writes the same document and an explorer can't complete a reservation twice.
+ * The id of the party's completion of the reservation [reservationId]: the reservation's own id, so
+ * a retried submission writes the same document and a party, whichever member sends it, can't
+ * complete a reservation twice.
  */
-fun completionId(reservationId: String, explorerUid: String) = "${reservationId}_$explorerUid"
+fun completionId(reservationId: String) = reservationId
 
 /** The longest reason a venue can give for rejecting a proof: the security rules refuse longer. */
 const val MAX_REJECT_REASON_LENGTH = 300

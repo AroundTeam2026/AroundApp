@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -29,10 +30,18 @@ import org.robolectric.annotation.Config
 class VenueQuestsScreenTest {
   @get:Rule val compose = createComposeRule()
   private var formsOpened = 0
+  private val questsEdited = mutableListOf<String>()
 
   private fun show(state: VenueQuestsUiState) {
     compose.setContent {
-      AroundAppTheme { VenueQuestsContent(state, onCreateQuest = { formsOpened++ }, onRetry = {}) }
+      AroundAppTheme {
+        VenueQuestsContent(
+            state,
+            onCreateQuest = { formsOpened++ },
+            onRetry = {},
+            onEditQuest = { questsEdited += it },
+        )
+      }
     }
   }
 
@@ -65,6 +74,28 @@ class VenueQuestsScreenTest {
     )
     compose.onNodeWithTag(C.Tag.VENUE_NEW_QUEST).performClick()
     assertEquals(1, formsOpened)
+  }
+
+  @Test
+  fun aQuestsPencilEditsIt() {
+    show(VenueQuestsUiState.Loaded(listOf(testQuest(id = "a"), testQuest(id = "b"))))
+
+    compose.onAllNodesWithTag(C.Tag.VENUE_QUEST_EDIT)[1].performClick()
+
+    assertEquals(listOf("b"), questsEdited)
+  }
+
+  // TalkBack names the quest each pencil edits
+  @Test
+  fun thePencilNamesItsQuest() {
+    show(VenueQuestsUiState.Loaded(listOf(testQuest(title = "Fox"))))
+
+    compose
+        .onNodeWithTag(C.Tag.VENUE_QUEST_EDIT)
+        .assertContentDescriptionEquals(
+            ApplicationProvider.getApplicationContext<Context>()
+                .getString(R.string.venue_quests_edit, "Fox")
+        )
   }
 
   @Test

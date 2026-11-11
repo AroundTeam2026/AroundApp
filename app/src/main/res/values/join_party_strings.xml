@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The Join a party screen, opened from the Quests tab -->
+    <string name="join_party_back">Back</string>
+    <string name="join_party_title">Join a party</string>
+    <string name="join_party_body">Ask a friend for the code on their quest page. You join their reservation and go together.</string>
+    <string name="join_party_code_label">Party code</string>
+    <string name="join_party_you_are_joining">YOU\'RE JOINING</string>
+    <string name="join_party_looking">Looking for the party</string>
+    <string name="join_party_join">Join party</string>
+    <string name="join_party_joining">Joining…</string>
+    <string name="join_party_not_found">No party has this code. Check it with your friend.</string>
+    <plurals name="join_party_full">
+        <item quantity="one">This party is full: %1$d of %2$d joined.</item>
+        <item quantity="other">This party is full: %1$d of %2$d joined.</item>
+    </plurals>
+    <string name="join_party_ended">This reservation has ended.</string>
+    <string name="join_party_closed">The venue already approved this party, so it takes no one else.</string>
+    <string name="join_party_already_joined">You\'re already in this party.</string>
+    <string name="join_party_left">You left this party, so you can\'t join it again.</string>
+    <string name="join_party_offline">You\'re offline. Joining needs a connection.</string>
+    <string name="join_party_failed">Couldn\'t join this party. Try again.</string>
+</resources>

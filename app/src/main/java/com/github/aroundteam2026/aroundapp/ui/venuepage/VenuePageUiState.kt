@@ -45,9 +45,10 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   page can't tell what they accepted and so doesn't book anything.
  * @property approvedIds Ids of the explorer's reservations the venue approved, whose quest they can
  *   now complete.
- * @property completions The proofs the explorer sent, by reservation id.
- * @property proofsAvailable False once the explorer's proofs can't be read, since then the page
- *   can't tell if one was sent and so doesn't offer to send one.
+ * @property completions The proofs of the explorer's parties, whichever member sent them, by
+ *   reservation id.
+ * @property proofsAvailable False once those proofs can't be read, since then the page can't tell
+ *   if one was sent and so doesn't offer to send one.
  * @property partyCodes The party codes of the reservations the explorer created and friends can
  *   still join, by reservation id.
  */
@@ -97,9 +98,9 @@ data class VenuePageUiState(
 
   /**
    * The reservation the explorer can cancel for the picked quest, or null when there is none. Once
-   * they sent its proof, whatever the proof's status, it can't be cancelled, as on the Quests tab
-   * and as the rules enforce. While the reservations can't be read it is null too, since the page
-   * can't tell if it still stands.
+   * any member of its party sent its proof, whatever the proof's status, it can't be cancelled, as
+   * on the Quests tab and as the rules enforce. While the reservations can't be read it is null
+   * too, since the page can't tell if it still stands.
    */
   val cancellableReservationId: String?
     get() =

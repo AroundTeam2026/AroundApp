@@ -166,7 +166,7 @@ private fun Dashboard(
           state.proofsToReview.size,
           C.Tag.DASHBOARD_PROOFS,
       )
-      items(state.proofsToReview, key = DashboardProof::completionId) {
+      items(state.proofsToReview, key = { PROOF_KEY_PREFIX + it.completionId }) {
         DashboardProofRow(it, onOpen = { onOpenProof(it.completionId) }, clock = clock)
       }
       section(R.string.dashboard_needs_answer, state.needsAnswer.size, C.Tag.DASHBOARD_NEEDS_ANSWER)
@@ -361,6 +361,12 @@ private fun LoadFailed(onRetry: () -> Unit) {
 internal const val PENDING_SHOWN_FIRST = 3
 /** The weekday, day and month, in the order of the device's language. */
 private const val DAY_SKELETON = "EEEdMMM"
+
+/**
+ * Starts the list key of a proof row. A proof's completion id is its reservation's id, which also
+ * keys the reservation's row, and keys must be unique in the list.
+ */
+private const val PROOF_KEY_PREFIX = "proof:"
 private val TEXT_GAP = 2.dp
 private val STAT_SHAPE = RoundedCornerShape(18.dp)
 // Figma's counts are 26 sp, between the app's page and sheet titles

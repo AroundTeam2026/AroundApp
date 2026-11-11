@@ -404,15 +404,50 @@ class VenuePageAcceptTest {
     assertNull(state.proof)
   }
 
+  // One proof stands for the whole party, and the rules refuse cancelling once it is sent
   @Test
-  fun anotherExplorersProofDoesntShow() = test {
+  fun aProofSentByAnotherMemberShowsAndEndsCompletingAndCancelling() = test {
     val id = storeFor("a")
     fake.updateStatus(id, ReservationStatus.APPROVED)
     completions.submit(id, VENUE_ID, "friend", Proof.Photo("gs://proofs/fox"))
     openAndPick("a")
 
-    assertNull(state.proof)
-    assertEquals(id, state.completableReservationId)
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertNull(state.completableReservationId)
+    assertNull(state.cancellableReservationId)
+  }
+
+  // Only an approved party has a proof, and the rules may refuse listening to the proof of a
+  // party just joined, before the server has the membership
+  @Test
+  fun onlyApprovedReservationsAtThisVenueListenToTheirProof() = test {
+    val approved = storeFor("a")
+    fake.updateStatus(approved, ReservationStatus.APPROVED)
+    storeFor("b")
+    val cancelled = storeFor("a")
+    fake.updateStatus(cancelled, ReservationStatus.CANCELLED)
+    val elsewhere =
+        fake
+            .createReservation(
+                newPendingReservation(OTHER_QUEST_ID, OTHER_VENUE_ID, NAME, START),
+                EXPLORER,
+            )
+            .getOrThrow()
+    fake.updateStatus(elsewhere, ReservationStatus.APPROVED)
+    val listened = mutableSetOf<String>()
+    completionRepository =
+        object : CompletionRepository by completions {
+          override fun observeForReservations(
+              reservationIds: Collection<String>
+          ): Flow<List<Completion>> {
+            listened += reservationIds
+            return completions.observeForReservations(reservationIds)
+          }
+        }
+    openAndPick("a")
+
+    assertTrue(state.proofsAvailable)
+    assertEquals(setOf(approved), listened)
   }
 
   // Failing to read the proofs mustn't take the page or accepting with it, nor offer a second proof
@@ -433,7 +468,7 @@ class VenuePageAcceptTest {
   @Test
   fun aProofShownBeforeTheListenerBrokeStaysShown() = test {
     val proof = storeWithProof("a")
-    val sent = completions.observeForExplorer(EXPLORER).first()
+    val sent = completions.observeForReservation(proof).first()
     assertEquals(proof, sent.single().id)
     completionRepository = FailingCompletionsRepository(completions, shownFirst = sent)
     openAndPick("a")
@@ -929,8 +964,30 @@ class VenuePageAcceptTest {
     assertFalse(state.acceptAvailable)
   }
 
+  // On Firestore each listener of the reservations also listens to every reservation, so the
+  // parties and the proofs share one
+  @Test
+  fun thePageListensToTheReservationsOnce() = test {
+    var listeners = 0
+    reservationRepository =
+        object : ReservationRepository by fake {
+          override fun observeForExplorer(uid: String): Flow<List<Reservation>> {
+            listeners++
+            return fake.observeForExplorer(uid)
+          }
+        }
+    openAndPick("a")
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertTrue(state.acceptAvailable)
+    assertTrue(state.proofsAvailable)
+    assertEquals(1, listeners)
+  }
+
   private companion object {
     const val VENUE_ID = "cafe"
+    const val OTHER_VENUE_ID = "bakery"
+    const val OTHER_QUEST_ID = "bread"
     const val EXPLORER = "explorer"
     const val NAME = TEST_EXPLORER_NAME
     const val START = 1_800_000_000_000L
@@ -1022,12 +1079,13 @@ private fun <T> failingAfter(shownFirst: List<T>?): Flow<List<T>> = flow {
   throw IOException("denied")
 }
 
-/** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */
+/** Delegates to [inner], but its reservations' listener is [failingAfter] [shownFirst]. */
 private class FailingCompletionsRepository(
     private val inner: CompletionRepository,
     private val shownFirst: List<Completion>?,
 ) : CompletionRepository by inner {
-  override fun observeForExplorer(uid: String): Flow<List<Completion>> = failingAfter(shownFirst)
+  override fun observeForReservations(reservationIds: Collection<String>): Flow<List<Completion>> =
+      failingAfter(shownFirst)
 }
 
 /** Delegates to [inner], but its explorer listener is [failingAfter] [shownFirst]. */

@@ -26,7 +26,7 @@ interface PartyRepository {
    * sets its `updatedAt`. The membership is kept.
    *
    * The security rules only let an explorer withdraw themselves, while the reservation is pending
-   * or approved and before they sent their proof. The creator can't withdraw and cancels the
+   * or approved and before their party sent its proof. The creator can't withdraw and cancels the
    * reservation instead. Withdrawing can take an approved party below the size its quest asks for
    * ([meetsPartySize]); the reservation stays approved.
    *
@@ -49,11 +49,11 @@ interface PartyRepository {
 }
 
 /**
- * Observes the memberships of the party of each reservation of [reservationIds], joined or
- * withdrawn. Emits once every party has been read, then again whenever one changes.
+ * Observes the party of each reservation of [reservationIds], joined and withdrawn members alike.
+ * Emits once every party has been read, then again whenever one changes.
  *
- * @return the memberships, keyed by reservation id, with every id of [reservationIds]; an empty map
- *   at once when there are none.
+ * @return every membership of each party, keyed by reservation id, with every id of
+ *   [reservationIds]; an empty map at once when there are none.
  * @throws Exception from the flow if the listener of any party fails, as [observeMembers] does.
  */
 fun PartyRepository.observeParties(
@@ -66,16 +66,14 @@ fun PartyRepository.observeParties(
 
 /**
  * Observes how many explorers are [PartyMemberStatus.JOINED] in the party of each reservation of
- * [reservationIds]. Emits once every party has been read, then again whenever one changes.
+ * [reservationIds]; emits and fails as [observeParties] does.
  *
  * @return the number of joined members, keyed by reservation id, with every id of [reservationIds];
  *   an empty map at once when there are none.
- * @throws Exception from the flow if the listener of any party fails, as [observeMembers] does.
  */
 fun PartyRepository.observeJoinedCounts(
     reservationIds: Collection<String>
 ): Flow<Map<String, Int>> =
-    observeParties(reservationIds).map { it.mapValues { (_, party) -> party.joinedCount() } }
-
-/** How many of these memberships are [PartyMemberStatus.JOINED]. */
-fun List<PartyMember>.joinedCount(): Int = count { it.status == PartyMemberStatus.JOINED }
+    observeParties(reservationIds).map { parties ->
+      parties.mapValues { (_, members) -> members.count { it.isJoined } }
+    }

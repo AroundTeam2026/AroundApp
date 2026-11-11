@@ -44,11 +44,22 @@ object Routes {
    */
   const val COMPLETE_QUEST = "$COMPLETE_QUEST_PREFIX/{$RESERVATION_ID}?$VENUE_NAME={$VENUE_NAME}"
 
+  /** The screen where an explorer types a party code to join the party it leads to. */
+  const val JOIN_PARTY = "join_party"
+
   /** The venue's home, with its tabs ([VenueHome]). */
   const val VENUE_HOME = "venue_home"
 
   /** The form where a venue creates a quest. */
   const val CREATE_QUEST = "create_quest"
+
+  private const val EDIT_QUEST_PREFIX = "edit_quest"
+
+  /**
+   * The form where a venue edits its quest [QUEST_ID]. Build the route to one quest with
+   * [editQuest].
+   */
+  const val EDIT_QUEST = "$EDIT_QUEST_PREFIX/{$QUEST_ID}"
 
   /** The venue's dashboard. */
   const val DASHBOARD = "venue_dashboard"
@@ -62,10 +73,10 @@ object Routes {
   const val REVIEW_PROOF = "$REVIEW_PROOF_PREFIX/{$COMPLETION_ID}"
 
   /** Routes of the explorer's screens, registered in [AroundApp]. */
-  val EXPLORER = listOf(VENUE_PAGE, COMPLETE_QUEST)
+  val EXPLORER = listOf(VENUE_PAGE, COMPLETE_QUEST, JOIN_PARTY)
 
   /** Routes of the venue's screens, for the venue's own NavHost. */
-  val VENUE = listOf(VENUE_HOME, CREATE_QUEST, DASHBOARD, REVIEW_PROOF)
+  val VENUE = listOf(VENUE_HOME, CREATE_QUEST, EDIT_QUEST, DASHBOARD, REVIEW_PROOF)
 
   /** Every route above. */
   val ALL = EXPLORER + VENUE
@@ -82,6 +93,17 @@ object Routes {
     require(venueId.isNotBlank()) { "A venue page needs a venue id" }
     val page = "$VENUE_PAGE_PREFIX/${Uri.encode(venueId)}"
     return if (questId == null) page else "$page?$QUEST_ID=${Uri.encode(questId)}"
+  }
+
+  /**
+   * The route to the form editing one quest.
+   *
+   * @param questId id of the quest; it is encoded, so it may contain any character.
+   * @throws IllegalArgumentException if [questId] is blank, which no route could match.
+   */
+  fun editQuest(questId: String): String {
+    require(questId.isNotBlank()) { "Editing a quest needs a quest id" }
+    return "$EDIT_QUEST_PREFIX/${Uri.encode(questId)}"
   }
 
   /**

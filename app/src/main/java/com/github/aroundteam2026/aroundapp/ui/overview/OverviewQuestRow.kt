@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
@@ -70,7 +71,7 @@ import java.util.TimeZone
  * the venue's page. With [onCancel], it ends with a button to cancel the reservation.
  *
  * @param row The accepted quest to draw.
- * @param onClick Opens the venue's page.
+ * @param onClick Opens the venue's page, or null for a card that can't be tapped.
  * @param clock Tells which day is today, and the time zone the slot is written in.
  * @param cancelStatus How cancelling this reservation stands, which the cancel button shows.
  * @param onCancel Cancels the reservation, or null to draw no cancel button.
@@ -78,7 +79,7 @@ import java.util.TimeZone
 @Composable
 fun OverviewQuestRow(
     row: OverviewRow,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
     cancelStatus: CancelStatus = CancelStatus.NONE,
@@ -96,10 +97,14 @@ fun OverviewQuestRow(
           )
           .clip(CARD_SHAPE)
           .background(colors.surface)
-          .clickable(
-              onClickLabel = stringResource(R.string.overview_open_venue, row.venueName),
-              role = Role.Button,
-              onClick = onClick,
+          .then(
+              if (onClick == null) Modifier
+              else
+                  Modifier.clickable(
+                      onClickLabel = stringResource(R.string.overview_open_venue, row.venueName),
+                      role = Role.Button,
+                      onClick = onClick,
+                  )
           )
           .padding(AroundSpacing.Large)
           .testTag("${C.Tag.OVERVIEW_ROW}_${row.reservationId}"),
