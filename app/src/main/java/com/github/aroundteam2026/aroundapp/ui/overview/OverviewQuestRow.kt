@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -54,6 +53,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
@@ -98,11 +98,11 @@ fun OverviewQuestRow(
           .fillMaxWidth()
           .shadow(
               CARD_ELEVATION,
-              CARD_SHAPE,
+              AroundShapes.extraLarge,
               ambientColor = AroundColors.CardShadow,
               spotColor = AroundColors.CardShadow,
           )
-          .clip(CARD_SHAPE)
+          .clip(AroundShapes.extraLarge)
           .background(colors.surface)
           .then(
               if (onClick == null) Modifier
@@ -337,7 +337,6 @@ private const val DAY_SKELETON = "EEEdMMM"
 private const val HOURS_24 = "Hm"
 private const val HOURS_12 = "hm"
 private const val TITLE_MAX_LINES = 2
-private val CARD_SHAPE = RoundedCornerShape(28.dp)
 private val CARD_ELEVATION = 10.dp
 private val AVATAR_SIZE = 52.dp
 private val INFO_SPACING = 3.dp

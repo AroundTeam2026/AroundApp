@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -60,6 +59,7 @@ import com.github.aroundteam2026.aroundapp.ui.map.ReportVisibleArea
 import com.github.aroundteam2026.aroundapp.ui.map.RequestLocationPermission
 import com.github.aroundteam2026.aroundapp.ui.map.rememberMapCamera
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
@@ -277,7 +277,7 @@ private fun AreaPanel(
     onBack: () -> Unit,
 ) {
   val radiusMeters = state.radiusMeters
-  Surface(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), shadowElevation = 8.dp) {
+  Surface(shape = AroundCorners.TopSheet, shadowElevation = 8.dp) {
     Column(Modifier.fillMaxWidth().padding(24.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(

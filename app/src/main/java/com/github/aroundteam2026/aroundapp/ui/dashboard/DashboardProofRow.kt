@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -176,7 +177,7 @@ private fun ProofIcon(type: ProofType) {
   val tint = if (photo) colors.onPrimary else colors.onSurface
   Box(
       Modifier.size(PROOF_TILE_SIZE)
-          .background(background, PROOF_TILE_SHAPE)
+          .background(background, AroundCorners.InsetField)
           .testTag(C.Tag.DASHBOARD_PROOF_ICON),
       contentAlignment = Alignment.Center,
   ) {
@@ -187,7 +188,6 @@ private fun ProofIcon(type: ProofType) {
 private val TEXT_GAP = 2.dp
 private val AVATAR_SIZE = 40.dp
 private val PROOF_TILE_SIZE = 48.dp
-private val PROOF_TILE_SHAPE = RoundedCornerShape(12.dp)
 private val PROOF_ICON_SIZE = 22.dp
 private val CHEVRON_SIZE = 20.dp
 

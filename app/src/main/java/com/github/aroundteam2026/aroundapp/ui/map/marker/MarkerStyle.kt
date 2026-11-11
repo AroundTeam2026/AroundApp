@@ -11,14 +11,13 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.ui.quest.ChipColors
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatarStyle
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChipStyle
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundFonts
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
 /**
  * Everything that decides how quest markers look. The pin and the card read only this, so following
@@ -190,34 +189,14 @@ object MarkerDefaults {
     )
   }
 
-  /** The default text styles. */
+  /** The default text styles: the shared ones, with the markers' own line heights. */
   fun typography(): MarkerTypography =
       MarkerTypography(
-          questTitle =
-              TextStyle(
-                  fontFamily = AroundFonts.Body,
-                  fontWeight = FontWeight.SemiBold,
-                  fontSize = 16.sp,
-                  lineHeight = 20.sp,
-              ),
-          venueName =
-              TextStyle(fontFamily = AroundFonts.Body, fontSize = 13.sp, lineHeight = 17.sp),
-          chip =
-              TextStyle(
-                  fontFamily = AroundFonts.Body,
-                  fontWeight = FontWeight.SemiBold,
-                  fontSize = 12.sp,
-                  lineHeight = 16.sp,
-              ),
-          moreQuests =
-              TextStyle(fontFamily = AroundFonts.Body, fontSize = 12.sp, lineHeight = 16.sp),
-          initials =
-              TextStyle(
-                  fontFamily = AroundFonts.Title,
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 16.sp,
-                  lineHeight = 16.sp,
-              ),
+          questTitle = AroundTextStyles.RowTitle.copy(lineHeight = 20.sp),
+          venueName = AroundTextStyles.Caption.copy(lineHeight = 17.sp),
+          chip = AroundTextStyles.Badge.copy(lineHeight = 16.sp),
+          moreQuests = AroundTextStyles.Small.copy(lineHeight = 16.sp),
+          initials = AroundTextStyles.AvatarLarge.copy(fontSize = 16.sp, lineHeight = 16.sp),
       )
 
   /** The default style, in the theme's [colors]; pass any other part to replace it. */

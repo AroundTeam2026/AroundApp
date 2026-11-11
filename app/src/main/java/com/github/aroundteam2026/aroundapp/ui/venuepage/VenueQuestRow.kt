@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +36,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
@@ -64,7 +65,7 @@ fun VenueQuestRow(
       modifier
           .fillMaxWidth()
           .testTag(C.Tag.VENUE_QUEST_ROW)
-          .clip(PICKED_SHAPE)
+          .clip(AroundShapes.small)
           .background(if (selected) colors.background else Color.Transparent)
           .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
           .padding(
@@ -153,7 +154,6 @@ internal fun venueQuestChipStyle(): QuestChipStyle {
 
 private const val TITLE_MAX_LINES = 2
 private const val DESCRIPTION_MAX_LINES = 3
-private val PICKED_SHAPE = RoundedCornerShape(14.dp)
 private val PICKED_INSET = AroundSpacing.Small
 private val OUTLINE_WIDTH = 1.dp
 private val CHIP_SPACING = 6.dp

@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
@@ -36,11 +37,11 @@ fun AroundHeader(modifier: Modifier = Modifier) {
           .fillMaxWidth()
           .shadow(
               HEADER_ELEVATION,
-              HEADER_SHAPE,
+              AroundCorners.Header,
               ambientColor = AroundColors.HeaderShadow,
               spotColor = AroundColors.HeaderShadow,
           )
-          .background(AroundTheme.colors.panel, HEADER_SHAPE)
+          .background(AroundTheme.colors.panel, AroundCorners.Header)
           .padding(horizontal = HORIZONTAL_PADDING, vertical = AroundSpacing.Medium)
           .height(ROW_HEIGHT)
           .testTag(C.Tag.AROUND_HEADER),
@@ -55,7 +56,6 @@ fun AroundHeader(modifier: Modifier = Modifier) {
   }
 }
 
-private val HEADER_SHAPE = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
 private val HEADER_ELEVATION = 8.dp
 private val HORIZONTAL_PADDING = 20.dp
 private val ROW_HEIGHT = 44.dp
