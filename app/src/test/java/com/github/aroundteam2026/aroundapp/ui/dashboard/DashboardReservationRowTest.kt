@@ -178,12 +178,47 @@ class DashboardReservationRowTest {
   fun aPartyNamesItsOtherMembersAndHowManyJoined() {
     show(
         pending(partySize = 3)
-            .copy(members = members("Yusuf S.", "Lea M.", "Max K."), groupSize = 4)
+            .copy(
+                members = members("Yusuf S.", "Lea M.", "Max K."),
+                groupSize = 4,
+                exactGroupSize = true,
+            )
     )
 
     assertEquals("with Lea M., Max K. · 3 of 4 joined", node(C.Tag.DASHBOARD_ROW_PARTY).text())
     assertEquals(3, count(C.Tag.DASHBOARD_ROW_INITIALS))
     node(C.Tag.DASHBOARD_ROW_MORE).assertDoesNotExist()
+  }
+
+  @Test
+  fun aQuestForAtLeastAGroupSaysHowManyJoinedAndItsMinimum() {
+    show(
+        pending(partySize = 6)
+            .copy(
+                members = members("Nora B.", "Elif T.", "Sam R.", "Ana P.", "Tom L.", "Ida K."),
+                groupSize = 4,
+            )
+    )
+
+    // Not "6 of 4 joined": more can still join
+    assertEquals(
+        "with Elif T., Sam R. +3 · 6 joined · at least 4",
+        node(C.Tag.DASHBOARD_ROW_PARTY).text(),
+    )
+  }
+
+  @Test
+  fun othersWithoutANameAreStillCounted() {
+    show(
+        pending()
+            .copy(
+                members = listOf(DashboardMember("Yusuf S."), DashboardMember(null)),
+                groupSize = 4,
+                exactGroupSize = true,
+            )
+    )
+
+    assertEquals("with +1 · 2 of 4 joined", node(C.Tag.DASHBOARD_ROW_PARTY).text())
   }
 
   @Test
@@ -236,7 +271,7 @@ class DashboardReservationRowTest {
   fun aLoneExplorerOfAGroupQuestShowsHowManyJoined() {
     show(pending(partySize = 1).copy(members = members("Yusuf S."), groupSize = 4))
 
-    assertEquals("1 of 4 joined", node(C.Tag.DASHBOARD_ROW_PARTY).text())
+    assertEquals("1 joined · at least 4", node(C.Tag.DASHBOARD_ROW_PARTY).text())
     node(C.Tag.DASHBOARD_ROW_LEADER).assertDoesNotExist()
   }
 

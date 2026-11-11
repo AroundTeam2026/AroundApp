@@ -35,8 +35,16 @@
     <string name="dashboard_more_explorers">+%d</string>
     <!-- The party's other members, e.g. "with Lea M., Max K." -->
     <string name="dashboard_party_with">with %1$s</string>
-    <!-- How many have joined a party whose quest asks for a size, e.g. "3 of 4 joined" -->
-    <string name="dashboard_party_joined">%1$d of %2$d joined</string>
+    <!-- How many have joined a party whose quest takes exactly that many, e.g. "3 of 4 joined" -->
+    <plurals name="dashboard_party_joined_of">
+        <item quantity="one">%1$d of %2$d joined</item>
+        <item quantity="other">%1$d of %2$d joined</item>
+    </plurals>
+    <!-- How many have joined a party whose quest takes at least that many, e.g. "6 joined · at least 4" -->
+    <plurals name="dashboard_party_joined_at_least">
+        <item quantity="one">%1$d joined · at least %2$d</item>
+        <item quantity="other">%1$d joined · at least %2$d</item>
+    </plurals>
     <!-- The party's other members, then its size, e.g. "with Lea M. · 3 of 4 joined" -->
     <string name="dashboard_party_with_size">%1$s · %2$s</string>
     <string name="dashboard_decline">Decline</string>

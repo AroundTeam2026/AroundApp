@@ -69,8 +69,10 @@ data class VenueDashboardUiState(
  *   reservation has one; Decline stays available whatever it is.
  * @property members The party's joined members, the explorer who reserved first, then in the order
  *   they joined. Empty while the party can't be read.
- * @property groupSize The party size the quest asks for, for "3 of 4 joined", or null if it takes
- *   explorers alone as well, or was deleted.
+ * @property groupSize The party size the quest asks for, or null if it takes explorers alone as
+ *   well, or was deleted.
+ * @property exactGroupSize Whether the quest takes exactly [groupSize] explorers, "3 of 4 joined",
+ *   rather than at least that many, "6 joined · at least 4".
  */
 data class DashboardReservation(
     val reservationId: String,
@@ -82,6 +84,7 @@ data class DashboardReservation(
     val approveBlock: ApproveBlock? = null,
     val members: List<DashboardMember> = emptyList(),
     val groupSize: Int? = null,
+    val exactGroupSize: Boolean = false,
 )
 
 /**

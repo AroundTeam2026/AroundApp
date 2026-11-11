@@ -70,7 +70,8 @@ import kotlinx.coroutines.withContext
  *
  * Each party lists its joined members with their profiles' names and pictures. A picture is
  * downloaded once, the first time a member has it, and decoded with [decode]; until then, or if
- * that fails, the member shows initials.
+ * that fails, the member shows initials. A failed download is tried again on the next change to the
+ * members' profiles, or on [retry].
  *
  * It keeps up with changes while the dashboard is watched; if listening fails, it shows
  * [VenueDashboardStatus.FAILED] until [retry]. [approve] and [decline] answer a pending reservation
@@ -223,7 +224,9 @@ class VenueDashboardViewModel(
 
   /**
    * Downloads each picture of [locations] not asked for yet, and adds it to [pictures] once
-   * decoded. A failure is only logged: the member keeps their initials.
+   * decoded. A failure is logged and the member keeps their initials; the location is forgotten, so
+   * the next call tries it again, since a download mostly fails for a passing reason such as no
+   * network.
    */
   private fun loadPictures(locations: List<String>) {
     for (location in locations) {
@@ -233,7 +236,10 @@ class VenueDashboardViewModel(
             .download(location)
             .mapCatching { checkNotNull(decode(it)) { "Not an image" } }
             .onSuccess { picture -> pictures.update { it + (location to picture) } }
-            .onFailure { Log.w(TAG, "Showing the profile picture $location failed", it) }
+            .onFailure {
+              requestedPictures.remove(location)
+              Log.w(TAG, "Showing the profile picture $location failed", it)
+            }
       }
     }
   }
@@ -398,6 +404,7 @@ private fun Reservation.toDashboardReservation(
         approveBlock = approveBlock,
         members = members,
         groupSize = quest?.minPartySize?.takeIf { it > 1 },
+        exactGroupSize = quest?.exactPartySize == true,
     )
 
 private fun Completion.toDashboardProof(

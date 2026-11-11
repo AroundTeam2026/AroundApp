@@ -235,8 +235,9 @@ private fun Party(reservation: DashboardReservation) {
 
 /**
  * Who else is in the party and its size: "with Lea M., Max K. +2 · 5 of 6 joined", naming at most
- * [NAMED_OTHERS] members after the leader, then "Party of 5" for a quest that takes explorers alone
- * too, or "Solo visit · Party of 1" for a lone explorer.
+ * [NAMED_OTHERS] members after the leader and counting the rest, those without a name included. The
+ * size is "6 joined · at least 4" for a quest that takes at least a group, "Party of 5" for one
+ * that takes explorers alone too, or "Solo visit · Party of 1" for a lone explorer.
  */
 @Composable
 private fun partyText(reservation: DashboardReservation): String {
@@ -244,20 +245,23 @@ private fun partyText(reservation: DashboardReservation): String {
   val named = others.mapNotNull { it.name }.take(NAMED_OTHERS)
   val unnamed = others.size - named.size
   val with =
-      if (named.isEmpty()) null
+      if (others.isEmpty()) null
       else {
         val more =
-            if (unnamed > 0) " " + stringResource(R.string.dashboard_more_explorers, unnamed)
-            else ""
-        stringResource(R.string.dashboard_party_with, named.joinToString(", ") + more)
+            if (unnamed > 0) stringResource(R.string.dashboard_more_explorers, unnamed) else ""
+        // "with +1" when none of the others can be named
+        stringResource(R.string.dashboard_party_with, "${named.joinToString(", ")} $more".trim())
       }
+  val group = reservation.groupSize
   val size =
       when {
-        reservation.groupSize != null ->
-            stringResource(
-                R.string.dashboard_party_joined,
+        group != null ->
+            pluralStringResource(
+                if (reservation.exactGroupSize) R.plurals.dashboard_party_joined_of
+                else R.plurals.dashboard_party_joined_at_least,
                 reservation.partySize,
-                reservation.groupSize,
+                reservation.partySize,
+                group,
             )
         reservation.partySize == 1 -> stringResource(R.string.dashboard_party_solo)
         else ->
@@ -500,6 +504,7 @@ internal fun DashboardReservationRowPreview() {
               approved = false,
               members = membersNamed("Nora B.", "Elif T.", "Sam R.", "Ana P.", "Tom L.", "Ida K."),
               groupSize = 6,
+              exactGroupSize = true,
           ),
           onDecline = {},
           onApprove = {},

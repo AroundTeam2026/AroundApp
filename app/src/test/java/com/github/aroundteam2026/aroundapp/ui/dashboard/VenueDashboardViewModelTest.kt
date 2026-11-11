@@ -747,11 +747,13 @@ class VenueDashboardViewModelTest {
 
   @Test
   fun aQuestForAGroupGivesItsRowsTheGroupSize() = test {
-    reserve(questId = sizedQuest(4), partySize = 3, requestedAt = NOW - 1)
+    reserve(questId = sizedQuest(4), partySize = 3, requestedAt = NOW - 2)
+    reserve(questId = sizedQuest(3, exact = true), partySize = 3, requestedAt = NOW - 1)
     reserve(requestedAt = NOW)
     watch()
 
-    assertEquals(listOf(4, null), state.needsAnswer.map { it.groupSize })
+    assertEquals(listOf(4, 3, null), state.needsAnswer.map { it.groupSize })
+    assertEquals(listOf(false, true, false), state.needsAnswer.map { it.exactGroupSize })
   }
 
   @Test

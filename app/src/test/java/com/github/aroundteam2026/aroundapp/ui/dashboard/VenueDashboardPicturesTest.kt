@@ -130,6 +130,19 @@ class VenueDashboardPicturesTest {
   }
 
   @Test
+  fun aPictureThatFailedIsTriedAgainOnRetry() = test {
+    pictures.failure = IOException("offline")
+    reserveWithPicture(PICTURE)
+    watch()
+
+    pictures.failure = null
+    viewModel.retry()
+
+    assertSame(decoded, members.single().picture)
+    assertEquals(listOf(PICTURE, PICTURE), pictures.downloaded)
+  }
+
+  @Test
   fun decodeAvatarShrinksABigPictureToTheAvatarsSize() = test {
     val big = Bitmap.createBitmap(1024, 512, Bitmap.Config.ARGB_8888)
     val png = ByteArrayOutputStream().also { big.compress(Bitmap.CompressFormat.PNG, 100, it) }
