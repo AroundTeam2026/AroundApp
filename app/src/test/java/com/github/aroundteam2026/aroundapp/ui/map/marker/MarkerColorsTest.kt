@@ -44,7 +44,7 @@ class MarkerColorsTest {
   }
 
   @Test
-  fun inDarkModeTheCardAndThePinTakeTheDarkSurfacesAndInk() {
+  fun inDarkModeTheCardTakesTheDarkSurfacesAndThePinStaysCream() {
     assertEquals(
         MarkerColors(
             accent = AroundColors.Purple,
@@ -52,7 +52,7 @@ class MarkerColorsTest {
             secondary = AroundColors.Tertiary,
             onSecondary = AroundColors.Cream,
             pinRing = AroundColors.Tertiary,
-            pinSurface = AroundColors.Ink,
+            pinSurface = AroundColors.Cream,
             surface = AroundColors.DarkSurface,
             onSurface = AroundColors.Cream,
             onSurfaceVariant = AroundColors.DarkMuted,

@@ -180,7 +180,8 @@ object MarkerDefaults {
         secondary = scheme.tertiary,
         onSecondary = scheme.onTertiary,
         pinRing = scheme.tertiary,
-        pinSurface = scheme.background,
+        // Cream in both modes, so the purple icon stays readable on the pin
+        pinSurface = scheme.onPrimary,
         surface = scheme.surface,
         onSurface = scheme.onSurface,
         onSurfaceVariant = scheme.onSurfaceVariant,
