@@ -6,6 +6,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
+import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -105,6 +107,44 @@ class QuestDetailsPartyMembersTest {
     show(state(creator.copy(name = ""), me))
 
     assertEquals(listOf("An explorer", "You"), texts(C.Tag.QUEST_DETAIL_MEMBER_NAME))
+  }
+
+  @Test
+  fun withoutItsReservationNobodyIsTheCreator() {
+    fun member(uid: String, joinedAt: Long, status: PartyMemberStatus = PartyMemberStatus.JOINED) =
+        PartyMember(RESERVATION, uid, status, joinedAt, joinedAt)
+
+    val members =
+        partyMembersOf(
+                reservations = emptyList(),
+                parties =
+                    mapOf(
+                        RESERVATION to
+                            listOf(
+                                member("me", 2),
+                                member("bea", 1),
+                                member("cleo", 0, PartyMemberStatus.WITHDRAWN),
+                            )
+                    ),
+                profiles = emptyMap(),
+                me = "me",
+                pictureOf = { null },
+            )
+            .getValue(RESERVATION)
+
+    assertEquals(listOf("bea", "me"), members.map { it.uid })
+    assertEquals(listOf(false, false), members.map { it.isCreator })
+    assertEquals(listOf(false, true), members.map { it.isMe })
+  }
+
+  @Test
+  fun thePreviewShowsThreeMembers() {
+    compose.setContent { PartyMembersPreview() }
+
+    assertEquals(
+        listOf("Bea Smith", "You", "Cleo Martin"),
+        texts(C.Tag.QUEST_DETAIL_MEMBER_NAME),
+    )
   }
 
   private companion object {
