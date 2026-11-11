@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -48,6 +49,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   reservation id.
  * @property proofsAvailable False once those proofs can't be read, since then the page can't tell
  *   if one was sent and so doesn't offer to send one.
+ * @property partyCodes The party codes of the reservations the explorer created and friends can
+ *   still join, by reservation id.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -71,6 +74,7 @@ data class VenuePageUiState(
     val approvedIds: Set<String> = emptySet(),
     val completions: Map<String, Completion> = emptyMap(),
     val proofsAvailable: Boolean = true,
+    val partyCodes: Map<String, String> = emptyMap(),
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -118,6 +122,20 @@ data class VenuePageUiState(
   /** The proof the explorer sent for the picked quest, or null when there is none. */
   val proof: Completion?
     get() = selectedQuestId?.let(reservationIds::get)?.let(completions::get)
+
+  /**
+   * The code the explorer shares so friends can join their party for the picked quest: only for a
+   * reservation they created, while friends can join it, so while it is pending and its party isn't
+   * full. Null otherwise, and while the reservations can't be read.
+   */
+  val partyCode: String?
+    get() {
+      val quest = selectedQuest?.takeIf { acceptAvailable } ?: return null
+      val party = acceptedParties[quest.questId] ?: SOLO_PARTY
+      return reservationIds[quest.questId]?.let(partyCodes::get)?.takeIf {
+        party < quest.partyCapacity
+      }
+    }
 
   /** How cancelling the picked quest's reservation stands; [CancelStatus.NONE] when none is. */
   val cancelStatus: CancelStatus
@@ -257,6 +275,7 @@ enum class VenuePageStatus {
  * @property reward The quest's reward, or null when it has none.
  * @property exactPartySize Whether the party must have exactly [minPartySize] people.
  * @property radiusMeters How close to the venue explorers must be to send their proof.
+ * @property partyCapacity The most explorers its party can have, as `Quest.partyCapacity`.
  */
 data class VenuePageQuest(
     val questId: String,
@@ -268,4 +287,5 @@ data class VenuePageQuest(
     val reward: Reward?,
     val exactPartySize: Boolean = false,
     val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
+    val partyCapacity: Int = MAX_PARTY_SIZE,
 )

@@ -8,9 +8,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
-import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
+import com.github.aroundteam2026.aroundapp.model.party.createdParty
+import com.github.aroundteam2026.aroundapp.model.party.isJoined
+import com.github.aroundteam2026.aroundapp.model.party.observeParties
+import com.github.aroundteam2026.aroundapp.model.party.partyCapacity
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
@@ -96,10 +100,18 @@ class VenuePageViewModel(
   private class Write(val questId: String, var shown: Boolean = false)
 
   /**
-   * The explorer's [reservations] and the number of joined members of the pending and approved ones
-   * at this venue, by reservation id.
+   * The explorer's [reservations] and the memberships of the parties of the pending and approved
+   * ones at this venue, by reservation id.
    */
-  private data class Booked(val reservations: List<Reservation>, val partySizes: Map<String, Int>)
+  private data class Booked(
+      val reservations: List<Reservation>,
+      val parties: Map<String, List<PartyMember>>,
+  ) {
+    /** The number of joined members of each party of [parties], by reservation id. */
+    val partySizes: Map<String, Int> = parties.mapValues { (_, party) ->
+      party.count { it.isJoined }
+    }
+  }
 
   /**
    * The quests whose reservation this page is creating and the backend hasn't answered yet.
@@ -297,7 +309,7 @@ class VenuePageViewModel(
                     // Only the parties acceptedPartiesOf counts, so an old reservation elsewhere
                     // can't make accepting unavailable here
                     val ids = reservations.filter { it.acceptsAQuestOf(venueId) }.map { it.id }
-                    partyRepository.observeJoinedCounts(ids).map { Booked(reservations, it) }
+                    partyRepository.observeParties(ids).map { Booked(reservations, it) }
                   }
                   .map<Booked, Booked?> { it }
                   .catch {
@@ -361,17 +373,20 @@ class VenuePageViewModel(
    */
   private fun show() {
     val (venue, quests, booked, completions) = latest ?: return
-    val accepted = booked?.let {
-      acceptedPartiesOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
+    val view = booked?.let {
+      BookedView(
+          accepted =
+              acceptedPartiesOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing,
+          reservationIds =
+              acceptedReservationsOf(it.reservations, it.partySizes, venueId) -
+                  unconfirmed -
+                  refusing,
+          approved = it.reservations.approvedIds(),
+          codes = partyCodesOf(it.reservations, it.parties, explorerUid, venueId),
+      )
     }
-    val reservationIds = booked?.let {
-      acceptedReservationsOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
-    }
-    val approved = booked?.reservations?.approvedIds()
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
-    mutableUiState.update {
-      it.showing(venue, quests, accepted, reservationIds, approved, refused, completions)
-    }
+    mutableUiState.update { it.showing(venue, quests, view, refused, completions) }
     arriving?.let { questId ->
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
@@ -479,6 +494,28 @@ internal fun acceptedReservationsOf(
         .groupBy { it.questId }
         .mapValues { (_, same) -> same.maxBy { partySizes[it.id] ?: 1 }.id }
 
+/**
+ * The party code of each reservation at the venue [venueId] that [explorerUid] created and friends
+ * can still join, keyed by reservation id. Friends join only while a reservation is
+ * [ReservationStatus.PENDING], and only the creator, whose membership in [parties] says so, is
+ * shown the code; a reservation made before party codes has none.
+ */
+internal fun partyCodesOf(
+    reservations: List<Reservation>,
+    parties: Map<String, List<PartyMember>>,
+    explorerUid: String,
+    venueId: String,
+): Map<String, String> =
+    reservations
+        .filter { it.venueId == venueId && it.status == ReservationStatus.PENDING }
+        .filter { reservation ->
+          parties[reservation.id].orEmpty().any {
+            it.uid == explorerUid && it.createdParty(reservation)
+          }
+        }
+        .mapNotNull { reservation -> reservation.partyCode?.let { reservation.id to it } }
+        .toMap()
+
 /** The ids of the reservations among these that the venue approved. */
 private fun List<Reservation>.approvedIds(): Set<String> = filter {
   it.status == ReservationStatus.APPROVED
@@ -490,20 +527,32 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
     this.venueId == venueId && status.isActive
 
 /**
- * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
- * [accepted] ones, with the explorer's [approved] reservations and the proofs in [completions], or
- * "not found" when [venue] is null. A quest being accepted that is now accepted is done accepting,
- * a reservation no longer listed is done cancelling, and a quest in [refused] failed. A null
- * [accepted] means the reservations can't be read: the page keeps what it knew and stops offering
- * to accept, cancel or complete. Null [completions] likewise mean the proofs can't be read, so it
- * stops offering to complete.
+ * What the page shows of the explorer's reservations at this venue.
+ *
+ * @property accepted The party size of each accepted quest, by quest id.
+ * @property reservationIds The reservation of each accepted quest, by quest id.
+ * @property approved Ids of the reservations the venue approved.
+ * @property codes The party codes the explorer can share, by reservation id.
+ */
+private data class BookedView(
+    val accepted: Map<String, Int>,
+    val reservationIds: Map<String, String>,
+    val approved: Set<String>,
+    val codes: Map<String, String>,
+)
+
+/**
+ * This page showing [venue], its valid [quests] and what [booked] says about the explorer's
+ * reservations, with the proofs in [completions], or "not found" when [venue] is null. A quest
+ * being accepted that is now accepted is done accepting, a reservation no longer listed is done
+ * cancelling, and a quest in [refused] failed. A null [booked] means the reservations can't be
+ * read: the page keeps what it knew and stops offering to accept, cancel, complete or share a code.
+ * Null [completions] likewise mean the proofs can't be read, so it stops offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
     quests: List<VenuePageQuest>,
-    accepted: Map<String, Int>?,
-    reservationIds: Map<String, String>?,
-    approved: Set<String>?,
+    booked: BookedView?,
     refused: Set<String>,
     completions: List<Completion>?,
 ): VenuePageUiState =
@@ -516,17 +565,18 @@ private fun VenuePageUiState.showing(
               avatar = INITIALS_AVATAR(venue, venue.name),
               address = venue.address,
               venueLocation = venue.location,
-              acceptedParties = accepted ?: acceptedParties,
-              reservationIds = reservationIds ?: this.reservationIds,
+              acceptedParties = booked?.accepted ?: acceptedParties,
+              reservationIds = booked?.reservationIds ?: this.reservationIds,
               acceptingQuestIds =
-                  if (accepted == null) emptySet() else acceptingQuestIds - accepted.keys,
-              failedQuestIds = failedQuestIds - (accepted?.keys ?: emptySet()) + refused,
-              cancellingIds = cancellingIds.intersect(reservationIds?.values.orEmpty()),
-              failedCancelIds = failedCancelIds.intersect(reservationIds?.values.orEmpty()),
-              acceptAvailable = accepted != null,
-              approvedIds = approved ?: approvedIds,
+                  if (booked == null) emptySet() else acceptingQuestIds - booked.accepted.keys,
+              failedQuestIds = failedQuestIds - booked?.accepted?.keys.orEmpty() + refused,
+              cancellingIds = cancellingIds.intersect(booked?.reservationIds?.values.orEmpty()),
+              failedCancelIds = failedCancelIds.intersect(booked?.reservationIds?.values.orEmpty()),
+              acceptAvailable = booked != null,
+              approvedIds = booked?.approved ?: approvedIds,
               completions = completions?.associateBy { it.reservationId } ?: this.completions,
               proofsAvailable = completions != null,
+              partyCodes = booked?.codes ?: partyCodes,
           )
           .withQuests(quests)
     }
@@ -542,4 +592,5 @@ private fun Quest.toVenuePageQuest() =
         reward = reward,
         exactPartySize = exactPartySize,
         radiusMeters = radiusMeters,
+        partyCapacity = partyCapacity,
     )
