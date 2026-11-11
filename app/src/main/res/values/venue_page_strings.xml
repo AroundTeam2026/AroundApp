@@ -56,7 +56,7 @@
     <string name="quest_detail_proof_pending_title">Proof sent</string>
     <string name="quest_detail_proof_pending_text">%1$s is checking it, usually within a few minutes.</string>
     <!-- Instead of the two above, once another member of the party sent its proof -->
-    <string name="quest_detail_proof_pending_title_by">%1$s sent your party’s proof</string>
+    <string name="quest_detail_proof_pending_title_by">%1$s sent your party\'s proof</string>
     <string name="quest_detail_proof_pending_text_by">%1$s is checking it, usually within a few minutes. Anyone in the party can send a new one until then.</string>
     <string name="quest_detail_proof_approved_label">Completed</string>
     <string name="quest_detail_proof_approved_title">Quest complete!</string>
