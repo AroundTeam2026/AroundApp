@@ -148,7 +148,7 @@ Encoded in `canTransition(from, to)`, which has one overload per status enum. Th
 | Entity | From | To |
 |---|---|---|
 | Reservation | `PENDING` | `APPROVED`, `REJECTED`, `CANCELLED` |
-| Reservation | `APPROVED` | `CANCELLED`, by a `JOINED` member only |
+| Reservation | `APPROVED` | `CANCELLED` |
 | Reservation | `REJECTED`, `CANCELLED` | none |
 | Party member | `JOINED` | `WITHDRAWN` |
 | Party member | `WITHDRAWN` | none |
@@ -194,4 +194,4 @@ Decided in #259, from the review of #25 and from R2 (#274). The tables above des
 - **Ids copied into `completions`: only `questId` is dropped, done in #272 (F5).** The completion's reservation already names its quest. `venueId` and `explorerUid` stay, and the rules check them against the reservation and its memberships on creation. They never change afterwards, so unlike the venue fields in quests they can't go stale. The venue's list of completions to review and the explorer's history filter on them, and the rules can only allow a query that filters on the documents' own fields.
 - **Text proof: adopted, done in #272 (F5).** `proofUrl` couldn't tell a typed answer from an uploaded photo, so a completion holds `photoUrl` for a `PHOTO` quest or `textAnswer` for a `TEXT` quest, never both.
 - **The explorer's name copied into `reservations`: kept, in #274 (R2).** A user can read only their own `users/{uid}`, so the venue has no other way to show who reserved. The copy is the name at booking time, which is what the venue needs for a short-lived reservation.
-- **A venue cancelling an approved reservation: refused, in #475.** After an approval the party may send its proof, and cancelling then would hide that proof from the explorer's Quests tab, the bug #426 fixed for the explorer. A rule can't cheaply check for the proof, since a reservation doesn't store its explorer's uid, so the venue never cancels an approved reservation, proof or not. It still cancels a pending one. No venue screen cancels today.
+- **A venue cancelling an approved reservation: refused, in #475.** After an approval the party may send its proof, and cancelling then would hide that proof from the explorer's Quests tab, the bug #426 fixed for the explorer. The rule could allow it until the proof is sent, as it does for members (`!exists(partyCompletion(reservationId))`, one read since #494), but no venue screen cancels today, so the venue never cancels an approved reservation, proof or not, which is the simpler rule. It still cancels a pending one. Clearing a party that never shows up (V22) would loosen it to "until the proof is sent".
