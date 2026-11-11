@@ -147,6 +147,10 @@ class EditQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXACTLY).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_LOCKED).assertExists()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_LOCKED).assertExists()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER)
+        .assertIsDisplayed()
+        .assertTextContains("Explorers will see your edits", substring = true)
   }
 
   @Test
@@ -157,6 +161,7 @@ class EditQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).assertIsEnabled()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_LOCKED).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_LOCKED).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER).assertDoesNotExist()
   }
 
   // A network blip mustn't close the form

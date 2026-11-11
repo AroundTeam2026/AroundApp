@@ -151,9 +151,7 @@ class CreateQuestScreenTest {
   fun showsTheDefaultCompletionRules() {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_PHOTO).performScrollTo().assertIsSelected()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_TEXT).assertIsNotSelected()
-    compose
-        .onNodeWithTag(C.Tag.CREATE_QUEST_EXPLORER_PREVIEW)
-        .assertTextContains("Will come back to this once explorer view is done", substring = true)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER).assertDoesNotExist()
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS)
         .performScrollTo()

@@ -41,11 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -89,8 +85,6 @@ fun QuestCompletionRules(state: CreateQuestUiState, actions: QuestCompletionActi
     Spacer(Modifier.height(AroundSpacing.CompactGap))
     ProofOptions(state.proofType, actions.onProofTypeChange, enabled = !state.proofTypeLocked)
     if (state.proofTypeLocked) LockedNote(C.Tag.CREATE_QUEST_PROOF_LOCKED)
-    Spacer(Modifier.height(AroundSpacing.Small))
-    ExplorerPreview()
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
     if (state.venueLocation != null) {
       QuestLocationFields(state, actions.location)
@@ -214,39 +208,6 @@ private fun SelectionMark(selected: Boolean) {
         border = BorderStroke(RING_BORDER, MaterialTheme.colorScheme.outline),
         modifier = Modifier.size(SELECTION_MARK_SIZE),
     ) {}
-  }
-}
-
-/** What explorers will read about the proof; a placeholder until their quest view exists. */
-@Composable
-private fun ExplorerPreview() {
-  val muted = MaterialTheme.colorScheme.onSurfaceVariant
-  Row(
-      Modifier.fillMaxWidth()
-          .background(AroundTheme.colors.panel, AroundCorners.InsetField)
-          .padding(horizontal = AroundSpacing.Medium, vertical = AroundSpacing.CompactGap)
-          // TalkBack reads the label and the preview as one sentence
-          .semantics(mergeDescendants = true) {}
-          .testTag(C.Tag.CREATE_QUEST_EXPLORER_PREVIEW),
-      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
-  ) {
-    Icon(
-        painterResource(R.drawable.ic_eye),
-        contentDescription = null,
-        tint = muted,
-        modifier = Modifier.size(SMALL_ICON_SIZE),
-    )
-    val label = stringResource(R.string.create_quest_explorers_see)
-    val preview = stringResource(R.string.create_quest_explorer_preview)
-    Text(
-        buildAnnotatedString {
-          withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = muted)) { append(label) }
-          append(" ")
-          append(preview)
-        },
-        style = AroundTextStyles.Caption,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
   }
 }
 
