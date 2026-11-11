@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -538,6 +539,26 @@ class VenuePageAcceptTest {
 
     assertFalse(state.proofsAvailable)
     assertEquals(CompletionStatus.PENDING, state.proof?.status)
+  }
+
+  // A profile can take a while offline: the proof shows at once, as a member's, and names them
+  // once it arrives
+  @Test
+  fun theProofDoesntWaitForItsSendersProfile() = test {
+    val lea = MutableSharedFlow<User?>(extraBufferCapacity = 1)
+    userRepository =
+        object : UserRepository by users {
+          override fun observeUser(uid: String): Flow<User?> =
+              if (uid == FRIEND) lea else users.observeUser(uid)
+        }
+    proofOfAnApprovedQuestBy(FRIEND)
+    openAndPick("a")
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertEquals(ProofSender(null), state.proofSender)
+
+    lea.tryEmit(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L))
+    runCurrent()
+    assertEquals(ProofSender("Lea"), state.proofSender)
   }
 
   // The proof stays shown while its listener is down, so its sender stays named with it

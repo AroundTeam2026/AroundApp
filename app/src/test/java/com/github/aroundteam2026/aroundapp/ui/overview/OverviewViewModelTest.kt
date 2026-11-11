@@ -546,7 +546,7 @@ class OverviewViewModelTest {
     val viewModel = viewModelWithProfileOf(FRIEND, lea)
     runCurrent()
     assertEquals(OverviewRowStatus.PROOF_SENT, viewModel.uiState.value.rows.single().status)
-    assertNull(viewModel.uiState.value.rows.single().proofSender)
+    assertEquals(ProofSender(null), viewModel.uiState.value.rows.single().proofSender)
 
     lea.tryEmit(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L))
     runCurrent()

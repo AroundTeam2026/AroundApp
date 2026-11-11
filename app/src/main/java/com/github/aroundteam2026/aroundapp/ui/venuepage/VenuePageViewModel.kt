@@ -37,7 +37,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
-import com.github.aroundteam2026.aroundapp.ui.proof.observeProofSenders
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -85,6 +85,9 @@ class VenuePageViewModel(
   val uiState: StateFlow<VenuePageUiState> = mutableUiState.asStateFlow()
 
   private var listening: Job? = null
+
+  /** Who sent the proofs; the page doesn't wait for their profiles to show the proofs. */
+  private val proofSenders = ProofSenders(userRepository, explorerUid)
 
   /**
    * The quest whose details the page opens the first time it shows the venue; null afterwards. Kept
@@ -337,9 +340,7 @@ class VenuePageViewModel(
                   .distinctUntilChanged()
                   // A proof another member sent names them, as the Figma frame does
                   .flatMapLatest { completions ->
-                    userRepository.observeProofSenders(completions, explorerUid).map {
-                      Proofs(completions, it)
-                    }
+                    proofSenders.observe(completions).map { Proofs(completions, it) }
                   }
                   .distinctUntilChanged()
                   .map<Proofs, Proofs?> { it }

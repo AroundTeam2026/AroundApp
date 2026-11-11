@@ -7,6 +7,8 @@ import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.observeProfiles
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 
 /**
  * Who sent a party's proof, when another member did rather than the explorer looking at it: the
@@ -44,3 +46,32 @@ internal fun UserRepository.observeProofSenders(
     observeProfiles(completions.map { it.explorerUid }.filter { it != explorerUid }).map {
       proofSendersOf(completions, explorerUid, it)
     }
+
+/**
+ * Who sent the proofs [explorerUid] sees, as [observeProofSenders] gives them, without holding a
+ * screen back for the senders' profiles, which can take a while offline. Until a profile is read,
+ * its sender keeps the name given before, or is a member not named yet: never the explorer.
+ *
+ * Not thread-safe: use it from one thread, as a ViewModel's listener does.
+ */
+internal class ProofSenders(private val users: UserRepository, private val explorerUid: String) {
+  /** The senders named so far, by uid. */
+  private val named = mutableMapOf<String, ProofSender>()
+
+  /** Observes who sent each of [completions] other than the explorer, by reservation id. */
+  fun observe(completions: List<Completion>): Flow<Map<String, ProofSender>> =
+      users
+          .observeProofSenders(completions, explorerUid)
+          .onEach { senders ->
+            completions.forEach { proof ->
+              senders[proof.reservationId]?.let { named[proof.explorerUid] = it }
+            }
+          }
+          .onStart {
+            emit(
+                completions
+                    .filter { it.explorerUid != explorerUid }
+                    .associate { it.reservationId to (named[it.explorerUid] ?: ProofSender(null)) }
+            )
+          }
+}

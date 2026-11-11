@@ -29,7 +29,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
-import com.github.aroundteam2026.aroundapp.ui.proof.observeProofSenders
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -42,8 +42,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -72,6 +70,9 @@ class OverviewViewModel(
   val uiState: StateFlow<OverviewUiState> = mutableUiState.asStateFlow()
 
   private var listening: Job? = null
+
+  /** Who sent the proofs; the rows don't wait for their profiles to name them. */
+  private val proofSenders = ProofSenders(userRepository, explorerUid)
 
   init {
     listen()
@@ -130,9 +131,6 @@ class OverviewViewModel(
   private fun listen() {
     listening?.cancel()
     val quests = mutableMapOf<String, Quest?>()
-    // The proofs' senders named so far, by uid. The rows don't wait for a sender's profile, which
-    // can take a while offline: until it is read, they name the sender as before, or no one
-    val named = mutableMapOf<String, ProofSender>()
     listening = viewModelScope.launch {
       reservationRepository
           .observeForExplorer(explorerUid)
@@ -154,23 +152,7 @@ class OverviewViewModel(
                 partyRepository.observeJoinedCounts(reservations.map { it.id }),
                 completionRepository.observeForReservations(approved.map { it.id }).flatMapLatest {
                     completions ->
-                  userRepository
-                      .observeProofSenders(completions, explorerUid)
-                      .onEach { senders ->
-                        completions.forEach { proof ->
-                          senders[proof.reservationId]?.let { named[proof.explorerUid] = it }
-                        }
-                      }
-                      .onStart {
-                        emit(
-                            completions
-                                .mapNotNull { proof ->
-                                  named[proof.explorerUid]?.let { proof.reservationId to it }
-                                }
-                                .toMap()
-                        )
-                      }
-                      .map { completions to it }
+                  proofSenders.observe(completions).map { completions to it }
                 },
             ) { venues, partySizes, (completions, senders) ->
               overviewRows(booked, venues, partySizes, proofsOf(completions), senders)
