@@ -42,6 +42,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -128,6 +130,9 @@ class OverviewViewModel(
   private fun listen() {
     listening?.cancel()
     val quests = mutableMapOf<String, Quest?>()
+    // The proofs' senders named so far, by uid. The rows don't wait for a sender's profile, which
+    // can take a while offline: until it is read, they name the sender as before, or no one
+    val named = mutableMapOf<String, ProofSender>()
     listening = viewModelScope.launch {
       reservationRepository
           .observeForExplorer(explorerUid)
@@ -149,9 +154,23 @@ class OverviewViewModel(
                 partyRepository.observeJoinedCounts(reservations.map { it.id }),
                 completionRepository.observeForReservations(approved.map { it.id }).flatMapLatest {
                     completions ->
-                  userRepository.observeProofSenders(completions, explorerUid).map {
-                    completions to it
-                  }
+                  userRepository
+                      .observeProofSenders(completions, explorerUid)
+                      .onEach { senders ->
+                        completions.forEach { proof ->
+                          senders[proof.reservationId]?.let { named[proof.explorerUid] = it }
+                        }
+                      }
+                      .onStart {
+                        emit(
+                            completions
+                                .mapNotNull { proof ->
+                                  named[proof.explorerUid]?.let { proof.reservationId to it }
+                                }
+                                .toMap()
+                        )
+                      }
+                      .map { completions to it }
                 },
             ) { venues, partySizes, (completions, senders) ->
               overviewRows(booked, venues, partySizes, proofsOf(completions), senders)

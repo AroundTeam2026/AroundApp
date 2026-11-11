@@ -24,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.User
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
@@ -33,6 +34,7 @@ import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -523,6 +525,63 @@ class OverviewViewModelTest {
 
     assertEquals(OverviewStatus.LOADED, state.status)
     assertEquals(ProofSender(null), state.rows.single().proofSender)
+  }
+
+  // A blank name would read "Proof sent by ", so it counts as no name
+  @Test
+  fun aSenderWithABlankNameIsLeftUnnamed() = test {
+    users.createUser(User(FRIEND, " ", Role.EXPLORER, createdAt = 0L)).getOrThrow()
+    sendProof(approvedReservation(), sender = FRIEND)
+    viewModel
+    runCurrent()
+
+    assertEquals(ProofSender(null), state.rows.single().proofSender)
+  }
+
+  // A profile can take a while offline: the rows show at once, and name the sender once it arrives
+  @Test
+  fun theRowsDontWaitForTheSendersProfile() = test {
+    val lea = MutableSharedFlow<User?>(extraBufferCapacity = 1)
+    sendProof(approvedReservation(), sender = FRIEND)
+    val viewModel = viewModelWithProfileOf(FRIEND, lea)
+    runCurrent()
+    assertEquals(OverviewRowStatus.PROOF_SENT, viewModel.uiState.value.rows.single().status)
+    assertNull(viewModel.uiState.value.rows.single().proofSender)
+
+    lea.tryEmit(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L))
+    runCurrent()
+    assertEquals(ProofSender("Lea"), viewModel.uiState.value.rows.single().proofSender)
+  }
+
+  // Waiting for the profile again after another proof mustn't drop the name already shown
+  @Test
+  fun aNamedSenderStaysNamedWhenTheProofsChange() = test {
+    val lea = MutableSharedFlow<User?>(extraBufferCapacity = 1)
+    val id = approvedReservation()
+    val other = approvedReservation("cake")
+    sendProof(id, sender = FRIEND)
+    val viewModel = viewModelWithProfileOf(FRIEND, lea)
+    runCurrent()
+    lea.tryEmit(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L))
+    runCurrent()
+
+    sendProof(other)
+    runCurrent()
+
+    val row = viewModel.uiState.value.rows.single { it.reservationId == id }
+    assertEquals(ProofSender("Lea"), row.proofSender)
+  }
+
+  /**
+   * The ViewModel, with the profile of [sender] coming only from [profile], which never replays.
+   */
+  private fun viewModelWithProfileOf(sender: String, profile: Flow<User?>): OverviewViewModel {
+    val slow =
+        object : UserRepository by users {
+          override fun observeUser(uid: String): Flow<User?> =
+              if (uid == sender) profile else users.observeUser(uid)
+        }
+    return OverviewViewModel(EXPLORER, listener, questRepository, venues, party, completions, slow)
   }
 
   // Every member sees the venue's answer to the party's proof, whoever sent it
