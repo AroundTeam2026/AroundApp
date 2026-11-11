@@ -32,6 +32,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -148,19 +149,48 @@ class CompletionRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: a retry replaces the first proof, or comes back as a plain refusal that the ViewModel
-   * can't tell from any other. It must fail with [IllegalStateException] and keep the first.
+   * Bug: a new proof is refused, or is stored next to the first, or keeps a rejection's reason, so
+   * the venue reviews the old proof or sees it as rejected.
    */
   @Test
-  fun submit_twice_failsWithIllegalStateAndKeepsTheFirst() = withTimeoutBlocking {
+  fun submit_overAPendingAndARejectedCompletion_replacesItWithANewPendingOne() =
+      withTimeoutBlocking {
+        val reservationId = approvedReservation()
+        val id = submit(reservationId)
+
+        explorerRepository
+            .submit(reservationId, venueId, explorerUid, Proof.Text("While pending"))
+            .getOrThrow()
+        assertEquals(Proof.Text("While pending"), fetchAsVenue(id).proof)
+
+        venueRepository.reject(id, REASON).getOrThrow()
+        explorerRepository
+            .submit(reservationId, venueId, explorerUid, Proof.Text("After the rejection"))
+            .getOrThrow()
+
+        val resent = fetchAsVenue(id)
+        assertEquals(Proof.Text("After the rejection"), resent.proof)
+        assertEquals(CompletionStatus.PENDING, resent.status)
+        assertNull(resent.rejectReason)
+        assertEquals(1, venueRepository.observeForVenue(venueId).first().size)
+      }
+
+  /**
+   * Bug: a new proof replaces an approved one, or comes back as a plain refusal that the ViewModel
+   * can't tell from any other. It must fail with [IllegalStateException] and keep the approved one.
+   */
+  @Test
+  fun submit_overAnApprovedCompletion_failsWithIllegalStateAndKeepsIt() = withTimeoutBlocking {
     val reservationId = approvedReservation()
     val id = submit(reservationId)
+    venueRepository.approve(id).getOrThrow()
 
     val result =
         explorerRepository.submit(reservationId, venueId, explorerUid, Proof.Text("Another answer"))
 
     assertTrue(result.exceptionOrNull() is IllegalStateException)
     assertEquals(TEXT_PROOF.answer, stored(id).getString("textAnswer"))
+    assertEquals("APPROVED", stored(id).getString("status"))
   }
 
   /** Bug: another explorer's submission goes through, or isn't reported as the refusal it is. */
@@ -206,24 +236,21 @@ class CompletionRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: a second member's proof replaces the party's, or comes back as a plain refusal that the
-   * ViewModel can't tell from any other. It must fail with [IllegalStateException] and keep the
-   * first.
+   * Bug: a member can't fix a teammate's proof, or the new proof keeps the teammate's uid, so the
+   * party's completion names the wrong sender.
    */
   @Test
-  fun submit_byAnotherMemberAfterThePartysProof_failsWithIllegalStateAndKeepsTheFirst() =
-      withTimeoutBlocking {
-        val reservationId = approvedReservationWithFriend()
-        val id = submit(reservationId)
+  fun submit_byAnotherMemberOverThePartysProof_replacesItAsTheirs() = withTimeoutBlocking {
+    val reservationId = approvedReservationWithFriend()
+    val id = submit(reservationId)
 
-        val result =
-            friendRepository()
-                .submit(reservationId, venueId, friendUid, Proof.Text("Another answer"))
+    friendRepository()
+        .submit(reservationId, venueId, friendUid, Proof.Text("Another answer"))
+        .getOrThrow()
 
-        assertTrue(result.exceptionOrNull() is IllegalStateException)
-        assertEquals(explorerUid, stored(id).getString("explorerUid"))
-        assertEquals(TEXT_PROOF.answer, stored(id).getString("textAnswer"))
-      }
+    assertEquals(friendUid, stored(id).getString("explorerUid"))
+    assertEquals("Another answer", stored(id).getString("textAnswer"))
+  }
 
   /** Bug: a completion of a reservation the venue hasn't approved is reported as stored. */
   @Test

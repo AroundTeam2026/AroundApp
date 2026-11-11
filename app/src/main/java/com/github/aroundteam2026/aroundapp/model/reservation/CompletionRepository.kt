@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
@@ -9,12 +10,13 @@ import kotlinx.coroutines.flow.flowOf
 /** Reads and writes [Completion]s. ViewModels depend on this interface only. */
 interface CompletionRepository {
   /**
-   * Stores a new pending completion of the reservation [reservationId] under [completionId], with
-   * its submission time set by the repository. It is the proof of the whole party.
+   * Stores the party's pending completion of the reservation [reservationId] under [completionId],
+   * with its submission time set by the repository. It is the proof of the whole party.
    *
-   * A party submits at most one completion per reservation, whichever member sends it: if one is
-   * already stored, whatever its status, this fails and changes nothing, so neither a retry nor a
-   * second member can create a second one.
+   * A party has one completion per reservation, whichever member sends it. If one is already stored
+   * and still pending or rejected, this replaces it with the new proof: it becomes pending again,
+   * without a reject reason, and [explorerUid] is the member who sent this one. An approved one is
+   * final: this fails and changes nothing.
    *
    * Waits a bounded time for the backend. A refusal by the security rules in that time is returned
    * as a failure. Without an answer, e.g. while offline, the write stays queued and this returns
@@ -24,7 +26,7 @@ interface CompletionRepository {
    * @param venueId id of the venue that owns the reservation's quest.
    * @param explorerUid uid of the party member submitting the proof.
    * @param proof what the member submits.
-   * @return the new completion's id, or a failure if one is already stored under it
+   * @return the completion's id, or a failure if the one stored under it is approved
    *   ([IllegalStateException]), if the write could not be issued, or if the backend refused it in
    *   time.
    */

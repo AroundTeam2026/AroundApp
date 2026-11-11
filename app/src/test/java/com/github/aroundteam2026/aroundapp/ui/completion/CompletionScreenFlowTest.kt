@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
@@ -120,14 +121,18 @@ class CompletionScreenFlowTest {
     return reservationId
   }
 
-  // A teammate's proof arrives while the form is open: the screen says so and stays open
+  // The venue approves a teammate's proof while the form is open: the screen says so and stays open
   @Test
-  fun aTeammatesProofKeepsTheScreenOpenAndSaysSo() {
+  fun aTeammatesApprovedProofKeepsTheScreenOpenAndSaysSo() {
     val reservationId = show()
     compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("Mochi")
 
     runBlocking {
-      completions.submit(reservationId, venue.id, "friend", Proof.Text("By the till")).getOrThrow()
+      val sent =
+          completions
+              .submit(reservationId, venue.id, "friend", Proof.Text("By the till"))
+              .getOrThrow()
+      completions.approve(sent).getOrThrow()
     }
 
     compose

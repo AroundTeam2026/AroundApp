@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
@@ -74,16 +75,18 @@ enum class OverviewStatus {
  *
  * @property cancellable Whether the explorer can still cancel the reservation: not once their party
  *   sent its proof.
+ * @property proofReplaceable Whether the party can send a new proof: while the venue hasn't
+ *   answered it, and after it rejected it.
  */
-enum class OverviewRowStatus(val cancellable: Boolean) {
+enum class OverviewRowStatus(val cancellable: Boolean, val proofReplaceable: Boolean = false) {
   /** Pending: the venue hasn't answered yet. */
   WAITING(cancellable = true),
   /** The venue approved it, and the party hasn't sent a proof yet. */
   APPROVED(cancellable = true),
   /** A member of the party sent the proof; the venue hasn't answered it yet. */
-  PROOF_SENT(cancellable = false),
+  PROOF_SENT(cancellable = false, proofReplaceable = true),
   /** The venue approved the proof: the quest is done. */
   COMPLETED(cancellable = false),
   /** The venue rejected the proof. */
-  PROOF_REJECTED(cancellable = false),
+  PROOF_REJECTED(cancellable = false, proofReplaceable = true),
 }

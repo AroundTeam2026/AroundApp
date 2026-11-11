@@ -276,6 +276,7 @@ object C {
     const val OVERVIEW_ROW_PARTY = "overview_row_party"
     const val OVERVIEW_ROW_STATUS = "overview_row_status"
     const val OVERVIEW_JOIN_PARTY = "overview_join_party"
+    const val OVERVIEW_SEND_NEW_PROOF = "overview_send_new_proof"
     const val CANCEL_RESERVATION = "cancel_reservation"
     const val CANCEL_RESERVATION_FAILED = "cancel_reservation_failed"
     const val CANCEL_RESERVATION_DIALOG = "cancel_reservation_dialog"

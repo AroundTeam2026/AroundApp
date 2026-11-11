@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
@@ -230,7 +231,7 @@ class CompletionDestinationTest {
 
   /**
    * Shows [Completion] for an approved reservation, on fakes, counting its closes in [closes]. With
-   * [alreadySent], the explorer's proof of it is stored before the screen opens.
+   * [alreadySent], the explorer's proof of it is stored and approved before the screen opens.
    */
   private fun showCompletion(alreadySent: Boolean = false) {
     val reservations = FakeReservationRepository()
@@ -246,7 +247,9 @@ class CompletionDestinationTest {
               .getOrThrow()
       reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
       if (alreadySent) {
-        completions.submit(id, venue.id, EXPLORER, Proof.Text("By the window")).getOrThrow()
+        val sent =
+            completions.submit(id, venue.id, EXPLORER, Proof.Text("By the window")).getOrThrow()
+        completions.approve(sent).getOrThrow()
       }
       id
     }
@@ -282,9 +285,9 @@ class CompletionDestinationTest {
     assertEquals(1, closes)
   }
 
-  // Opened again after the proof was sent, the screen has nothing left to do
+  // Opened again after the venue approved the proof, the screen has nothing left to do
   @Test
-  fun anAlreadySentProofClosesTheAppsScreen() {
+  fun anApprovedProofClosesTheAppsScreen() {
     showCompletion(alreadySent = true)
 
     compose.waitUntil { closes == 1 }

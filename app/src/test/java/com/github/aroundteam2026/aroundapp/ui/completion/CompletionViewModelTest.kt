@@ -459,7 +459,10 @@ class CompletionViewModelTest {
     runCurrent()
 
     val id =
-        fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier")).getOrThrow()
+        fakeCompletions
+            .submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier"))
+            .getOrThrow()
+            .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
     gate.complete(Unit)
     runCurrent()
@@ -477,7 +480,10 @@ class CompletionViewModelTest {
     runCurrent()
 
     val id =
-        fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier")).getOrThrow()
+        fakeCompletions
+            .submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier"))
+            .getOrThrow()
+            .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
     gate.complete(Unit)
     runCurrent()
@@ -673,9 +679,12 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun aCompletionAlreadySubmittedShowsSubmittedWhenTheFormOpens() = test {
+  fun anApprovedCompletionShowsSubmittedWhenTheFormOpens() = test {
     reservationId = book("fox")
-    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    fakeCompletions
+        .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
+        .getOrThrow()
+        .also { fakeCompletions.approve(it).getOrThrow() }
     viewModel
     runCurrent()
 
@@ -687,7 +696,7 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun aRejectedCompletionStillCountsAsSubmitted() = test {
+  fun aRejectedCompletionCanBeAnsweredWithANewProof() = test {
     reservationId = book("fox")
     val id =
         fakeCompletions
@@ -696,9 +705,35 @@ class CompletionViewModelTest {
     fakeCompletions.reject(id, "Not the right fox").getOrThrow()
     viewModel
     runCurrent()
+    assertEquals(SaveState.Idle, state.saveState)
+    assertTrue(state.isEditable)
+
+    viewModel.updateAnswer("The right fox")
+    viewModel.submit()
+    runCurrent()
 
     assertEquals(SaveState.Saved(id), state.saveState)
-    assertEquals(CompletionStatus.REJECTED, stored().single().status)
+    assertEquals(Proof.Text("The right fox"), stored().single().proof)
+    assertEquals(CompletionStatus.PENDING, stored().single().status)
+  }
+
+  // The party has one proof: a member can send a new one over a teammate's that is still waiting
+  @Test
+  fun aTeammatesPendingProofCanBeReplacedByANewProof() = test {
+    reservationId = book("fox")
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("Blurry")).getOrThrow()
+    viewModel
+    runCurrent()
+    assertFalse(state.sentByTeammate)
+    assertTrue(state.isEditable)
+
+    viewModel.updateAnswer("Sharp")
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+    assertEquals(EXPLORER, stored().single().explorerUid)
+    assertEquals(Proof.Text("Sharp"), stored().single().proof)
   }
 
   @Test
@@ -711,11 +746,14 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun aCompletionThatAppearsWhileTheFormIsOpenShowsSubmitted() = test {
+  fun anApprovedCompletionThatAppearsWhileTheFormIsOpenShowsSubmitted() = test {
     open("fox")
     assertEquals(SaveState.Idle, state.saveState)
 
-    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    fakeCompletions
+        .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
+        .getOrThrow()
+        .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
 
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
@@ -725,7 +763,10 @@ class CompletionViewModelTest {
   @Test
   fun aTeammatesCompletionOfTheSameReservationShowsSentByTeammate() = test {
     reservationId = book("fox")
-    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("By the till")).getOrThrow()
+    fakeCompletions
+        .submit(reservationId, CAFE, FRIEND, Proof.Text("By the till"))
+        .getOrThrow()
+        .also { fakeCompletions.approve(it).getOrThrow() }
     viewModel
     runCurrent()
 
@@ -740,7 +781,10 @@ class CompletionViewModelTest {
     viewModel.updateAnswer("By the till")
     assertTrue(state.canSubmit)
 
-    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    fakeCompletions
+        .submit(reservationId, CAFE, FRIEND, Proof.Text("At the door"))
+        .getOrThrow()
+        .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
 
     assertTrue(state.sentByTeammate)
@@ -764,7 +808,10 @@ class CompletionViewModelTest {
     assertEquals(SaveState.Failed, state.saveState)
 
     fakeCompletions.forcedFailure = null
-    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    fakeCompletions
+        .submit(reservationId, CAFE, FRIEND, Proof.Text("At the door"))
+        .getOrThrow()
+        .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
 
     assertTrue(state.sentByTeammate)
@@ -782,7 +829,10 @@ class CompletionViewModelTest {
     runCurrent()
     assertEquals(SaveState.Saving, state.saveState)
 
-    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    fakeCompletions
+        .submit(reservationId, CAFE, FRIEND, Proof.Text("At the door"))
+        .getOrThrow()
+        .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
     assertEquals(SaveState.Saving, state.saveState)
     submitGate.complete(Unit)
@@ -797,7 +847,10 @@ class CompletionViewModelTest {
   fun aSubmitRefusedAsAlreadyStoredDoesNotUndoSubmitted() = test {
     reservationId = book("fox")
     // Completed earlier, but the listener's first answer is still on its way
-    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    fakeCompletions
+        .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
+        .getOrThrow()
+        .also { fakeCompletions.approve(it).getOrThrow() }
     val listenerGate = CompletableDeferred<Unit>().also { completions.listenerGate = it }
     val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
     viewModel

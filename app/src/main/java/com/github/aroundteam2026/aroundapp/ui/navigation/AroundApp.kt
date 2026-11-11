@@ -106,7 +106,7 @@ fun AroundApp(
             onJoinParty: () -> Unit,
         ) -> Unit =
         { onOpenQuest, onJoinParty ->
-          OverviewScreen(explorerUid, onOpenQuest, onJoinParty)
+          OverviewScreen(explorerUid, onOpenQuest, onJoinParty, navController::navigateToCompletion)
         },
     screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, onSignOut) },
 ) {

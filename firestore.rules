@@ -327,6 +327,19 @@ service cloud.firestore {
                   && isFilledText(after.rejectReason, 300)));
     }
 
+    // A joined member's new proof for the party: it replaces the pending or rejected completion
+    // [before] with a pending one, signed by the member, of the same reservation, which also keeps
+    // the venue. An approved completion is final. Costs the reads of isProofOfApprovedReservation
+    // and one more.
+    function isNewProof(before, after) {
+      return before.status in ['PENDING', 'REJECTED']
+          && isValidCompletion(after)
+          && after.reservationId == before.reservationId
+          && after.explorerUid == request.auth.uid
+          && isJoinedMember(after.reservationId)
+          && isProofOfApprovedReservation(after);
+    }
+
     // Signed-in users get profiles by uid for names and pictures, but cannot list all users.
     // The role is write-once: it can be chosen while null, then never changed.
     match /users/{uid} {
@@ -470,9 +483,9 @@ service cloud.firestore {
     // One completion per reservation, under the reservation's id: one proof for the whole party.
     // Any joined member of an approved reservation submits it, pending, as themselves, with the
     // proof its quest asks for; only explorer accounts join parties, so that needs no role check.
-    // It can only be created, so a second submission, by the same member or another, is refused
-    // whatever the first one's status. Only the venue answers it, and can still approve what it
-    // rejected, but an approval is final. The member who sent it, the party's joined members and
+    // A joined member can replace it with a new proof, which makes it pending again, while it is
+    // pending or rejected (see isNewProof); an approval is final. Only the venue answers it, and
+    // can still approve what it rejected. The member who sent it, the party's joined members and
     // the venue read it. Anyone signed in may find that an id has no completion, which is how an
     // answer to an unknown id reports it. Completions are never deleted.
     match /completions/{completionId} {
@@ -491,8 +504,9 @@ service cloud.firestore {
           && completionId == request.resource.data.reservationId
           && isJoinedMember(request.resource.data.reservationId)
           && isProofOfApprovedReservation(request.resource.data);
-      allow update: if isUser(resource.data.venueId)
-          && isCompletionAnswer(resource.data, request.resource.data);
+      allow update: if (isUser(resource.data.venueId)
+              && isCompletionAnswer(resource.data, request.resource.data))
+          || isNewProof(resource.data, request.resource.data);
     }
   }
 }

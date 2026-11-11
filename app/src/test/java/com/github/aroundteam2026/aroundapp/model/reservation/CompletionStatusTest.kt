@@ -14,7 +14,15 @@ import org.junit.Test
 
 /** Tests [canTransition] and the construction rules of [Completion] and its [Proof]. */
 class CompletionStatusTest {
-  private val allowed = setOf(PENDING to APPROVED, PENDING to REJECTED, REJECTED to APPROVED)
+  private val allowed =
+      setOf(
+          PENDING to APPROVED,
+          PENDING to REJECTED,
+          REJECTED to APPROVED,
+          // A new proof, from the explorer: it replaces a waiting one, and answers a rejection
+          PENDING to PENDING,
+          REJECTED to PENDING,
+      )
 
   /** Builds a completion with the given [status] and [rejectReason]; other fields are fixed. */
   private fun completion(status: CompletionStatus, rejectReason: String?) =

@@ -7,6 +7,7 @@ import android.icu.text.DateFormat as IcuDateFormat
 import android.icu.util.TimeZone as IcuTimeZone
 import android.text.format.DateFormat
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,11 +15,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -68,13 +71,16 @@ import java.util.TimeZone
  * One accepted quest in the overview, as the Figma card `Overview/Quest card` (after the active
  * quest card of F3): where the reservation stands and its slot, then the venue's avatar, the
  * quest's title, the venue's name and address, the party size and the reward chip. Tapping it opens
- * the venue's page. With [onCancel], it ends with a button to cancel the reservation.
+ * the venue's page. With [onCancel], it ends with a button to cancel the reservation, and with
+ * [onSendNewProof], with one to send a new proof.
  *
  * @param row The accepted quest to draw.
  * @param onClick Opens the venue's page, or null for a card that can't be tapped.
  * @param clock Tells which day is today, and the time zone the slot is written in.
  * @param cancelStatus How cancelling this reservation stands, which the cancel button shows.
  * @param onCancel Cancels the reservation, or null to draw no cancel button.
+ * @param onSendNewProof Opens the proof form to replace the party's proof, or null to draw no
+ *   button.
  */
 @Composable
 fun OverviewQuestRow(
@@ -84,6 +90,7 @@ fun OverviewQuestRow(
     clock: Clock = Clock.systemDefaultZone(),
     cancelStatus: CancelStatus = CancelStatus.NONE,
     onCancel: (() -> Unit)? = null,
+    onSendNewProof: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
   Column(
@@ -158,7 +165,27 @@ fun OverviewQuestRow(
           tint = colors.onSurfaceVariant,
       )
     }
+    if (onSendNewProof != null) NewProofButton(onSendNewProof)
     if (onCancel != null) CancelReservationAction(cancelStatus, row.venueName, onCancel)
+  }
+}
+
+/** The outlined pill at the foot of a card whose proof the party can still replace. */
+@Composable
+private fun NewProofButton(onClick: () -> Unit) {
+  OutlinedButton(
+      onClick,
+      Modifier.fillMaxWidth()
+          .heightIn(min = NEW_PROOF_MIN_HEIGHT)
+          .testTag(C.Tag.OVERVIEW_SEND_NEW_PROOF),
+      shape = AroundPillShape,
+      border = BorderStroke(NEW_PROOF_BORDER, MaterialTheme.colorScheme.onPrimaryContainer),
+  ) {
+    Text(
+        stringResource(R.string.send_new_proof),
+        style = AroundTextStyles.Button,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
   }
 }
 
@@ -321,6 +348,8 @@ private val CHECK_SIZE = 12.dp
 private val SLOT_VERTICAL_PADDING = 6.dp
 private val SLOT_ICON_SIZE = 14.dp
 private val DETAIL_ICON_SIZE = 13.dp
+private val NEW_PROOF_MIN_HEIGHT = 52.dp
+private val NEW_PROOF_BORDER = 1.dp
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
