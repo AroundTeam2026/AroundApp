@@ -169,6 +169,12 @@ class ProfileSetupScreenTest {
     return Uri.fromFile(file)
   }
 
+  /**
+   * The shrunk copies ProofPhotos keeps in its cache folder ("proofs") until they are discarded.
+   */
+  private fun preparedCopies(): List<File> =
+      File(compose.activity.cacheDir, "proofs").listFiles()?.toList().orEmpty()
+
   /** Whether the avatar's centre is mostly red, as the test photo is, rather than the fallback. */
   private fun SemanticsNodeInteraction.showsRed(): Boolean {
     val image = captureToImage()
@@ -212,9 +218,11 @@ class ProfileSetupScreenTest {
     val avatar = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_AVATAR)
     // The shrinking runs off the main thread, so wait for its preview
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
-    compose.waitUntil(5_000) { avatar.showsRed() }
-    // A second pick replaces the first, whose copy is discarded
+    compose.waitUntil(5_000) { avatar.showsRed() && preparedCopies().size == 1 }
+    val first = preparedCopies().single()
+    // A second pick makes a new copy and discards the first, so only the new one is left
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
+    compose.waitUntil(5_000) { preparedCopies().let { it.size == 1 && it.single() != first } }
     compose.waitUntil(5_000) { avatar.showsRed() }
 
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_NAME).performTextInput("Ada")
