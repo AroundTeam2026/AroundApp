@@ -154,6 +154,16 @@ class DashboardReservationRowTest {
   }
 
   @Test
+  fun thePreviewShowsAPartyBelowItsSize() {
+    compose.setContent { DashboardReservationRowPreview() }
+
+    assertEquals(
+        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_more, 2, 2),
+        node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
+    )
+  }
+
+  @Test
   fun anApprovedRowShowsItsPillButNoButtons() {
     show(pending().copy(approved = true))
 

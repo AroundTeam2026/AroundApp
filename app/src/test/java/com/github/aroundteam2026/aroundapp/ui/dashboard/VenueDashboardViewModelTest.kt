@@ -596,6 +596,47 @@ class VenueDashboardViewModelTest {
   }
 
   @Test
+  fun approvingFindsTheReservationAmongOthers() = test {
+    reserve(questId = sizedQuest(3), requestedAt = NOW - 1)
+    val approvable = reserve(requestedAt = NOW)
+    watch()
+
+    viewModel.approve(approvable)
+
+    assertEquals(1, gated.calls)
+    assertEquals(ReservationStatus.APPROVED, gated.lastStatus)
+  }
+
+  @Test
+  fun approvingAReservationTheDashboardDoesntShowIsLeftToTheRepository() = test {
+    watch()
+
+    viewModel.approve("unknown")
+
+    // Nothing on the dashboard blocks it, so the repository answers, here with "missing"
+    assertEquals(1, gated.calls)
+  }
+
+  @Test
+  fun aPendingReservationWithoutItsPartyCountsAsEmpty() {
+    val reservation =
+        newPendingReservation("owl", VENUE_ID, "Ada", slotStart = NOW).copy(id = "unread")
+
+    val dashboard =
+        dashboardOf(
+            listOf(reservation),
+            partySizes = emptyMap(),
+            quests = listOf(testQuest(id = "owl", venueId = VENUE_ID, minPartySize = 2)),
+            venue = null,
+            completions = emptyList(),
+        )
+
+    val row = dashboard.needsAnswer.single()
+    assertEquals(0, row.partySize)
+    assertEquals(ApproveBlock.TooFew(2), row.approveBlock)
+  }
+
+  @Test
   fun aPartyBelowItsSizeCanStillBeDeclined() = test {
     val id = reserve(questId = sizedQuest(3), partySize = 2)
     watch()
