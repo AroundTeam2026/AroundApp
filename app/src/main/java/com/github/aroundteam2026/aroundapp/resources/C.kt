@@ -154,6 +154,10 @@ object C {
     const val QUEST_DETAIL_RADIUS = "quest_detail_radius"
     const val QUEST_DETAIL_RADIUS_MAP = "quest_detail_radius_map"
     const val QUEST_DETAIL_RADIUS_NOTE = "quest_detail_radius_note"
+    const val QUEST_DETAIL_MEMBER = "quest_detail_member"
+    const val QUEST_DETAIL_MEMBER_NAME = "quest_detail_member_name"
+    const val QUEST_DETAIL_MEMBER_PICTURE = "quest_detail_member_picture"
+    const val QUEST_DETAIL_MEMBER_INITIALS = "quest_detail_member_initials"
 
     const val NEARBY_COUNTER = "nearby_counter"
     const val NEARBY_LOCATION_HINT = "nearby_location_hint"
