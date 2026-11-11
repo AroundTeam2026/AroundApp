@@ -814,12 +814,38 @@ internal fun QuestDetailsPartyCodePreview() {
   )
 }
 
+@Preview(name = "Proof sent by a member, light")
+@Preview(name = "Proof sent by a member, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+internal fun QuestDetailsSentByMemberPreview() {
+  QuestDetailsSample(
+      reservationIds = mapOf(SAMPLE_QUEST_ID to SAMPLE_RESERVATION_ID),
+      completions =
+          mapOf(
+              SAMPLE_RESERVATION_ID to
+                  Completion(
+                      id = "completion",
+                      reservationId = SAMPLE_RESERVATION_ID,
+                      venueId = "venue",
+                      explorerUid = "lea",
+                      proof = Proof.Photo("gs://proofs/fox.jpg"),
+                      status = CompletionStatus.PENDING,
+                      rejectReason = null,
+                      submittedAt = 0L,
+                  )
+          ),
+      acceptedParties = mapOf(SAMPLE_QUEST_ID to 3),
+      proofSenders = mapOf(SAMPLE_RESERVATION_ID to ProofSender("Lea")),
+  )
+}
+
 @Composable
 private fun QuestDetailsSample(
     reservationIds: Map<String, String> = emptyMap(),
     completions: Map<String, Completion> = emptyMap(),
     acceptedParties: Map<String, Int> = emptyMap(),
     partyCodes: Map<String, String> = emptyMap(),
+    proofSenders: Map<String, ProofSender> = emptyMap(),
 ) {
   val quest =
       VenuePageQuest(
@@ -846,6 +872,7 @@ private fun QuestDetailsSample(
             completions = completions,
             acceptedParties = acceptedParties,
             partyCodes = partyCodes,
+            proofSenders = proofSenders,
         ),
         quest,
         onBack = {},

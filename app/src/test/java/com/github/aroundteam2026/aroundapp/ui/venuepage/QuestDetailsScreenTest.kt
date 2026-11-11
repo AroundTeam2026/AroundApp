@@ -582,6 +582,15 @@ class QuestDetailsScreenTest {
     node(C.Tag.SEND_NEW_PROOF_BUTTON).assertIsDisplayed()
   }
 
+  @Test
+  fun theSentByAMemberPreviewNamesTheSender() {
+    compose.setContent { QuestDetailsSentByMemberPreview() }
+
+    compose
+        .onNodeWithText(app.getString(R.string.quest_detail_proof_pending_title_by, "Lea"))
+        .assertIsDisplayed()
+  }
+
   private companion object {
     const val QUEST = "fox"
   }
