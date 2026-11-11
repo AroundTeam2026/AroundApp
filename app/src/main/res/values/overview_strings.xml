@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
 <resources>
     <!-- The Quests tab: the quests the explorer accepted -->
     <string name="overview_title">My quests</string>
+    <string name="overview_join_party">Join a party</string>
     <plurals name="overview_count">
         <item quantity="one">%1$d accepted</item>
         <item quantity="other">%1$d accepted</item>

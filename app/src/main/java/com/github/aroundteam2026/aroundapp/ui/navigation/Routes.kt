@@ -44,6 +44,9 @@ object Routes {
    */
   const val COMPLETE_QUEST = "$COMPLETE_QUEST_PREFIX/{$RESERVATION_ID}?$VENUE_NAME={$VENUE_NAME}"
 
+  /** The screen where an explorer types a party code to join the party it leads to. */
+  const val JOIN_PARTY = "join_party"
+
   /** The venue's home, with its tabs ([VenueHome]). */
   const val VENUE_HOME = "venue_home"
 
@@ -70,7 +73,7 @@ object Routes {
   const val REVIEW_PROOF = "$REVIEW_PROOF_PREFIX/{$COMPLETION_ID}"
 
   /** Routes of the explorer's screens, registered in [AroundApp]. */
-  val EXPLORER = listOf(VENUE_PAGE, COMPLETE_QUEST)
+  val EXPLORER = listOf(VENUE_PAGE, COMPLETE_QUEST, JOIN_PARTY)
 
   /** Routes of the venue's screens, for the venue's own NavHost. */
   val VENUE = listOf(VENUE_HOME, CREATE_QUEST, EDIT_QUEST, DASHBOARD, REVIEW_PROOF)

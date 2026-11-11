@@ -58,7 +58,7 @@ class RoutesTest {
           venuePage = { venueId, questId, onBack, onSubmitProof ->
             VenuePageOnFakes(venueId, onBack, onSubmitProof, arrivalQuestId = questId)
           },
-          overview = { OverviewOnFakes(it) },
+          overview = { onOpenQuest, onJoinParty -> OverviewOnFakes(onOpenQuest, onJoinParty) },
       )
     }
     composeTestRule.waitForIdle()

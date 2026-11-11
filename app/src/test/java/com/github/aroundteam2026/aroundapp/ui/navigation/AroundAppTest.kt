@@ -51,7 +51,11 @@ class AroundAppTest {
 
   private fun launch(
       app: @Composable () -> Unit = {
-        AroundApp(explorerUid = "explorer", onSignOut = {}, overview = { OverviewOnFakes(it) })
+        AroundApp(
+            explorerUid = "explorer",
+            onSignOut = {},
+            overview = { onOpenQuest, onJoinParty -> OverviewOnFakes(onOpenQuest, onJoinParty) },
+        )
       }
   ) = composeTestRule.setContent(app)
 
@@ -179,12 +183,13 @@ class AroundAppTest {
                 arrivalQuestId = questId,
             )
           },
-          overview = { onOpenQuest ->
+          overview = { onOpenQuest, onJoinParty ->
             OverviewContent(
                 OverviewUiState(OverviewStatus.LOADED, listOf(overviewRow())),
                 onOpenQuest,
                 onRetry = {},
                 onCancel = {},
+                onJoinParty = onJoinParty,
             )
           },
       )
