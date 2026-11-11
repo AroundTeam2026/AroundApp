@@ -46,5 +46,8 @@ class JoinPartyOnFakes {
   companion object {
     const val CODE = "7KQM42"
     const val EXPLORER = "explorer"
+
+    /** The code as an explorer might type it: lowercase, with a space in the middle. */
+    val TYPED = CODE.lowercase().let { "${it.take(3)} ${it.drop(3)}" }
   }
 }

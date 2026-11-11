@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
@@ -96,7 +97,9 @@ class JoinPartyNavigationTest {
     openJoinParty()
     composeTestRule.onNodeWithTag(C.Tag.JOIN_PARTY_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(Tab.QUESTS.tabTag).assertIsSelected()
-    composeTestRule.onNodeWithContentDescription("Back").performClick()
+    composeTestRule
+        .onNodeWithContentDescription(composeTestRule.activity.getString(R.string.join_party_back))
+        .performClick()
     assertBackOnTheOverview()
 
     openJoinParty()
@@ -128,7 +131,7 @@ class JoinPartyNavigationTest {
   fun joiningAPartyClosesTheScreenAndItsQuestShowsOnTheQuestsTab() {
     launch()
     openJoinParty()
-    composeTestRule.onNodeWithTag(C.Tag.JOIN_PARTY_CODE).performTextInput("7kq m42")
+    composeTestRule.onNodeWithTag(C.Tag.JOIN_PARTY_CODE).performTextInput(JoinPartyOnFakes.TYPED)
     composeTestRule.waitUntil(WAIT_MS) { shown(C.Tag.JOIN_PARTY_FOUND) }
 
     composeTestRule.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()

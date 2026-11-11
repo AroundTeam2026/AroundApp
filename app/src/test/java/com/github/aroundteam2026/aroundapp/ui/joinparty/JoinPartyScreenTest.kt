@@ -189,7 +189,7 @@ class JoinPartyScreenTest {
     compose.setContent {
       AroundAppTheme { JoinPartyScreen(viewModel, onBack = {}, onJoined = onJoined) }
     }
-    compose.onNodeWithTag(C.Tag.JOIN_PARTY_CODE).performTextInput("7kq m42")
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_CODE).performTextInput(JoinPartyOnFakes.TYPED)
     compose.waitUntil {
       compose.onAllNodes(hasTestTag(C.Tag.JOIN_PARTY_FOUND)).fetchSemanticsNodes().size == 1
     }
