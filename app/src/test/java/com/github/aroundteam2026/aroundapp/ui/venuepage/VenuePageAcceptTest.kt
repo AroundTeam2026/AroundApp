@@ -540,6 +540,22 @@ class VenuePageAcceptTest {
     assertEquals(CompletionStatus.PENDING, state.proof?.status)
   }
 
+  // The proof stays shown while its listener is down, so its sender stays named with it
+  @Test
+  fun theSenderOfAProofShownBeforeTheListenerBrokeStaysNamed() = test {
+    users.createUser(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L)).getOrThrow()
+    val proof = proofOfAnApprovedQuestBy(FRIEND)
+    val sent = completions.observeForReservation(proof).first()
+    completionRepository = FailingCompletionsRepository(completions, shownFirst = sent)
+    openAndPick("a")
+    assertEquals(ProofSender("Lea"), state.proofSender)
+
+    advanceTimeBy(FAILS_AFTER_MS + 1)
+
+    assertFalse(state.proofsAvailable)
+    assertEquals(ProofSender("Lea"), state.proofSender)
+  }
+
   @Test
   fun aReservationWithAProofIsNotCancelled() = test {
     storeWithProof("a")
