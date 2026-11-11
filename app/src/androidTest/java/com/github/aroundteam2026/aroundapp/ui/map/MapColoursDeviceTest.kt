@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlin.math.abs
 import org.json.JSONArray
 import org.junit.AfterClass
@@ -37,7 +38,9 @@ class MapColoursDeviceTest {
   fun theMapIsDrawnInTheAppsColours() {
     // Lausanne: the town and the lake fill the screen, in the style's land and water colours
     val viewModel = MapViewModel(LocatedAt(LAUSANNE), FakeQuestRepository(), FakeVenueRepository())
-    composeTestRule.setContent { MapScreen(viewModel, onOpenVenue = { _, _ -> }) }
+    composeTestRule.setContent {
+      AroundAppTheme { MapScreen(viewModel, onOpenVenue = { _, _ -> }) }
+    }
 
     composeTestRule.awaitMapColours(lightPalette, "the light style's land and water") { pixels ->
       pixels.share { it.isOneOf(lightPalette.land) } >= 0.15 &&
@@ -63,7 +66,9 @@ class DarkMapColoursDeviceTest {
   fun inDarkModeTheMapIsDrawnInTheNightColours() {
     // A style draws on every Maps renderer, so this runs on CI's legacy renderer too
     val viewModel = MapViewModel(LocatedAt(LAUSANNE), FakeQuestRepository(), FakeVenueRepository())
-    composeTestRule.setContent { MapScreen(viewModel, onOpenVenue = { _, _ -> }) }
+    composeTestRule.setContent {
+      AroundAppTheme { MapScreen(viewModel, onOpenVenue = { _, _ -> }) }
+    }
 
     composeTestRule.awaitMapColours(
         darkPalette,
