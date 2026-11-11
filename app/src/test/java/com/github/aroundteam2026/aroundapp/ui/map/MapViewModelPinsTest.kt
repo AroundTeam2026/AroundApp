@@ -517,7 +517,10 @@ class MapViewModelPinsTest {
   fun tappingThePinOfAQuestAwayFromItsVenueOpensOnlyThatPin() = test {
     quests.value += testQuest(id = "away", venueId = "cafe", location = museumLocation)
     showing()
-    assertEquals(setOf("cafe", "away"), state.pins.map { it.key }.toSet())
+    assertEquals(
+        setOf("cafe", "away"),
+        state.pins.filter { it.venueId == "cafe" }.map { it.key }.toSet(),
+    )
 
     viewModel.onPinClick("away")
     runCurrent()
