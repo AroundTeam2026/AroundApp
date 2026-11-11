@@ -3,12 +3,14 @@ package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.Context
 import android.text.format.DateUtils
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -25,9 +27,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
+// Draws the pictures of the avatars
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DashboardReservationRowTest {
   @get:Rule val compose = createComposeRule()
 
@@ -60,6 +65,12 @@ class DashboardReservationRowTest {
 
   private fun SemanticsNodeInteraction.text() =
       fetchSemanticsNode().config[SemanticsProperties.Text].joinToString()
+
+  /** How many nodes are tagged [tag]. */
+  private fun count(tag: String) =
+      compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().size
+
+  private fun members(vararg names: String) = names.map { DashboardMember(it) }
 
   @Test
   fun aPendingRowShowsItsQuestPartyAndButtons() {
@@ -158,9 +169,75 @@ class DashboardReservationRowTest {
     compose.setContent { DashboardReservationRowPreview() }
 
     assertEquals(
-        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_more, 2, 2),
+        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_more, 1, 1),
         node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
     )
+  }
+
+  @Test
+  fun aPartyNamesItsOtherMembersAndHowManyJoined() {
+    show(
+        pending(partySize = 3)
+            .copy(members = members("Yusuf S.", "Lea M.", "Max K."), groupSize = 4)
+    )
+
+    assertEquals("with Lea M., Max K. · 3 of 4 joined", node(C.Tag.DASHBOARD_ROW_PARTY).text())
+    assertEquals(3, count(C.Tag.DASHBOARD_ROW_INITIALS))
+    node(C.Tag.DASHBOARD_ROW_MORE).assertDoesNotExist()
+  }
+
+  @Test
+  fun aBigPartyShowsThreeAvatarsAndCountsTheRest() {
+    show(
+        pending(partySize = 6)
+            .copy(members = members("Nora B.", "Elif T.", "Sam R.", "Ana P.", "Tom L.", "Ida K."))
+    )
+
+    assertEquals("with Elif T., Sam R. +3 · Party of 6", node(C.Tag.DASHBOARD_ROW_PARTY).text())
+    assertEquals(3, count(C.Tag.DASHBOARD_ROW_INITIALS))
+    assertEquals("+3", node(C.Tag.DASHBOARD_ROW_MORE).text())
+  }
+
+  @Test
+  fun membersWithoutANameAreCountedNotNamed() {
+    show(
+        pending(partySize = 3)
+            .copy(
+                members =
+                    listOf(
+                        DashboardMember("Yusuf S."),
+                        DashboardMember(null),
+                        DashboardMember("Lea M."),
+                    )
+            )
+    )
+
+    assertEquals("with Lea M. +1 · Party of 3", node(C.Tag.DASHBOARD_ROW_PARTY).text())
+  }
+
+  @Test
+  fun aMemberWithAPictureShowsItInsteadOfInitials() {
+    show(
+        pending()
+            .copy(
+                members =
+                    listOf(
+                        DashboardMember("Yusuf S."),
+                        DashboardMember("Lea M.", ImageBitmap(2, 2)),
+                    )
+            )
+    )
+
+    assertEquals(1, count(C.Tag.DASHBOARD_ROW_PICTURE))
+    assertEquals(1, count(C.Tag.DASHBOARD_ROW_INITIALS))
+  }
+
+  @Test
+  fun aLoneExplorerOfAGroupQuestShowsHowManyJoined() {
+    show(pending(partySize = 1).copy(members = members("Yusuf S."), groupSize = 4))
+
+    assertEquals("1 of 4 joined", node(C.Tag.DASHBOARD_ROW_PARTY).text())
+    node(C.Tag.DASHBOARD_ROW_LEADER).assertDoesNotExist()
   }
 
   @Test

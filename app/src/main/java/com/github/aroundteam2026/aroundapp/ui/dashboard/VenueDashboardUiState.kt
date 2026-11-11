@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
+import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
@@ -59,13 +60,17 @@ data class VenueDashboardUiState(
  *
  * @property reservationId Id of the reservation, which approve and decline take.
  * @property questTitle Title of the reserved quest, or null if the venue deleted it.
- * @property explorerName Display name of the explorer who reserved, or null for a reservation made
- *   before names were stored.
+ * @property explorerName Display name of the explorer who reserved, from their profile or else as
+ *   stored with the reservation, or null if neither has one.
  * @property partySize How many explorers the party has.
  * @property requestedAt When the explorer made the reservation, in epoch milliseconds.
  * @property approved Whether the venue approved it; a pending one shows Decline and Approve.
  * @property approveBlock Why the venue can't approve it yet, or null if it can. Only a pending
  *   reservation has one; Decline stays available whatever it is.
+ * @property members The party's joined members, the explorer who reserved first, then in the order
+ *   they joined. Empty while the party can't be read.
+ * @property groupSize The party size the quest asks for, for "3 of 4 joined", or null if it takes
+ *   explorers alone as well, or was deleted.
  */
 data class DashboardReservation(
     val reservationId: String,
@@ -75,7 +80,18 @@ data class DashboardReservation(
     val requestedAt: Long,
     val approved: Boolean,
     val approveBlock: ApproveBlock? = null,
+    val members: List<DashboardMember> = emptyList(),
+    val groupSize: Int? = null,
 )
+
+/**
+ * One explorer in a reservation's party.
+ *
+ * @property name Their display name, or null if their profile can't be read.
+ * @property picture Their profile picture, or null if they have none or it isn't downloaded yet:
+ *   their initials show instead.
+ */
+data class DashboardMember(val name: String?, val picture: ImageBitmap? = null)
 
 /**
  * Why a pending reservation can't be approved: the rules only approve a party that has the size its

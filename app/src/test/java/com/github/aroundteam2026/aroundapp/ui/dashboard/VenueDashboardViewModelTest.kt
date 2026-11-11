@@ -18,6 +18,10 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.Role
+import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
@@ -69,6 +73,9 @@ class VenueDashboardViewModelTest {
 
   private val completions = FakeCompletionRepository { createdAt }
 
+  /** The explorers' profiles, which name the party's members. */
+  private val users = FakeUserRepository()
+
   /** How many party listeners the dashboard opened, per reservation id. */
   private val partyReads = mutableMapOf<String, Int>()
 
@@ -82,7 +89,16 @@ class VenueDashboardViewModelTest {
       }
 
   private val viewModel by lazy {
-    VenueDashboardViewModel(auth, reservations, quests, venues, parties, completions)
+    VenueDashboardViewModel(
+        auth,
+        reservations,
+        quests,
+        venues,
+        parties,
+        completions,
+        users,
+        FakeUserPictureRepository(),
+    )
   }
 
   private val state
@@ -246,6 +262,8 @@ class VenueDashboardViewModelTest {
             partySize = 3,
             requestedAt = NOW - HOUR,
             approved = false,
+            // Their profiles aren't stored, so they're unnamed
+            members = List(3) { DashboardMember(null) },
         ),
         state.needsAnswer.single(),
     )
@@ -491,7 +509,16 @@ class VenueDashboardViewModelTest {
               flow<List<Completion>> { throw IOException("denied") }
         }
     val failingViewModel =
-        VenueDashboardViewModel(auth, reservations, quests, venues, party, failing)
+        VenueDashboardViewModel(
+            auth,
+            reservations,
+            quests,
+            venues,
+            party,
+            failing,
+            users,
+            FakeUserPictureRepository(),
+        )
     backgroundScope.launch { failingViewModel.uiState.collect {} }
 
     assertEquals(VenueDashboardStatus.FAILED, failingViewModel.uiState.value.status)
@@ -627,7 +654,7 @@ class VenueDashboardViewModelTest {
     val dashboard =
         dashboardOf(
             listOf(reservation),
-            partySizes = emptyMap(),
+            parties = emptyMap(),
             quests = listOf(testQuest(id = "owl", venueId = VENUE_ID, minPartySize = 2)),
             venue = null,
             completions = emptyList(),
@@ -659,6 +686,72 @@ class VenueDashboardViewModelTest {
 
     assertEquals(1, state.upcoming.single().partySize)
     assertNull(state.upcoming.single().approveBlock)
+  }
+
+  /** Stores the profile of the explorer [uid], named [name]. */
+  private suspend fun profile(uid: String, name: String) =
+      users.createUser(User(uid, name, Role.EXPLORER, createdAt = 0L)).getOrThrow()
+
+  private val names
+    get() = state.needsAnswer.single().members.map { it.name }
+
+  @Test
+  fun aRowListsItsMembersLeaderFirstThenInTheOrderTheyJoined() = test {
+    profile("explorer", "Ada L.")
+    profile("al", "Al B.")
+    profile("bea", "Bea C.")
+    val id = reserve()
+    createdAt = NOW + 2
+    party.join(id, "bea").getOrThrow()
+    createdAt = NOW + 1
+    party.join(id, "al").getOrThrow()
+    watch()
+
+    assertEquals(listOf("Ada L.", "Al B.", "Bea C."), names)
+    assertEquals("Ada L.", state.needsAnswer.single().explorerName)
+    assertEquals(3, state.needsAnswer.single().partySize)
+  }
+
+  @Test
+  fun aMemberWhoJoinsOrLeavesShowsUpLive() = test {
+    profile("explorer", "Ada L.")
+    profile("al", "Al B.")
+    val id = reserve()
+    watch()
+
+    createdAt = NOW + 1
+    party.join(id, "al").getOrThrow()
+    assertEquals(listOf("Ada L.", "Al B."), names)
+
+    party.withdraw(id, "al").getOrThrow()
+    assertEquals(listOf("Ada L."), names)
+  }
+
+  @Test
+  fun aRenamedLeaderShowsTheirProfilesName() = test {
+    profile("explorer", "Ada Lovelace")
+    reserve(name = "Ada")
+    watch()
+
+    assertEquals("Ada Lovelace", state.needsAnswer.single().explorerName)
+  }
+
+  @Test
+  fun membersWithoutAProfileAreUnnamedAndTheLeaderKeepsTheStoredName() = test {
+    reserve(name = "Ada", partySize = 2)
+    watch()
+
+    assertEquals("Ada", state.needsAnswer.single().explorerName)
+    assertEquals(listOf(null, null), names)
+  }
+
+  @Test
+  fun aQuestForAGroupGivesItsRowsTheGroupSize() = test {
+    reserve(questId = sizedQuest(4), partySize = 3, requestedAt = NOW - 1)
+    reserve(requestedAt = NOW)
+    watch()
+
+    assertEquals(listOf(4, null), state.needsAnswer.map { it.groupSize })
   }
 
   @Test

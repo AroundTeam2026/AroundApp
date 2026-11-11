@@ -31,8 +31,14 @@
         <item quantity="one">Party of %d</item>
         <item quantity="other">Party of %d</item>
     </plurals>
-    <!-- On the avatar after the leader's: the rest of the party, e.g. "+2" -->
+    <!-- After the avatars, or the names, of a party: the members not shown, e.g. "+2" -->
     <string name="dashboard_more_explorers">+%d</string>
+    <!-- The party's other members, e.g. "with Lea M., Max K." -->
+    <string name="dashboard_party_with">with %1$s</string>
+    <!-- How many have joined a party whose quest asks for a size, e.g. "3 of 4 joined" -->
+    <string name="dashboard_party_joined">%1$d of %2$d joined</string>
+    <!-- The party's other members, then its size, e.g. "with Lea M. · 3 of 4 joined" -->
+    <string name="dashboard_party_with_size">%1$s · %2$s</string>
     <string name="dashboard_decline">Decline</string>
     <string name="dashboard_approve">Approve</string>
     <string name="dashboard_approved">Approved</string>

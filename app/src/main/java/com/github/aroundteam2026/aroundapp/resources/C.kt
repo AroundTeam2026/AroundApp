@@ -224,6 +224,12 @@ object C {
     const val DASHBOARD_ROW_EXPLORER = "dashboard_row_explorer"
     const val DASHBOARD_ROW_LEADER = "dashboard_row_leader"
     const val DASHBOARD_ROW_PARTY = "dashboard_row_party"
+    /** On each party avatar showing a member's profile picture. */
+    const val DASHBOARD_ROW_PICTURE = "dashboard_row_picture"
+    /** On each party avatar showing a member's initials. */
+    const val DASHBOARD_ROW_INITIALS = "dashboard_row_initials"
+    /** The "+N" after the avatars, for the members without one. */
+    const val DASHBOARD_ROW_MORE = "dashboard_row_more"
     const val DASHBOARD_ROW_APPROVED = "dashboard_row_approved"
     const val DASHBOARD_ROW_DECLINE = "dashboard_row_decline"
     const val DASHBOARD_ROW_APPROVE = "dashboard_row_approve"
