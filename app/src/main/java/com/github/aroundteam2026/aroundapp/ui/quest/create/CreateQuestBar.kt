@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,13 +49,18 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
  * The sticky bar under the quest form: a one-line summary of the quest's rules, and the "Create
  * quest" button, enabled when the quest [CreateQuestUiState.canSave], which shows progress while it
  * is saved. If the venue couldn't be read, it says why the button is disabled and offers
- * [onRetryVenue]. The keyboard covers it.
+ * [onRetryVenue]; likewise [onRetryQuest] for a quest to edit. The keyboard covers it.
+ *
+ * When [CreateQuestUiState.editing], the button says "Save changes", and "Saving…" while saving.
+ * The summary then gives way to "Saving your changes…" while saving, or to why the last save
+ * failed.
  */
 @Composable
 internal fun CreateQuestBar(
     state: CreateQuestUiState,
     onSubmit: () -> Unit,
     onRetryVenue: () -> Unit,
+    onRetryQuest: () -> Unit = {},
 ) {
   Column(
       Modifier.fillMaxWidth()
@@ -69,37 +75,91 @@ internal fun CreateQuestBar(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
   ) {
-    if (state.venueLoadFailed) VenueLoadFailed(onRetryVenue, retrying = state.retryingVenue)
-    Text(
-        questSummary(state),
-        style = AroundTextStyles.Small,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.testTag(C.Tag.CREATE_QUEST_SUMMARY),
-    )
+    if (state.venueLoadFailed) {
+      LoadFailed(
+          R.string.create_quest_venue_failed,
+          C.Tag.CREATE_QUEST_VENUE_FAILED,
+          C.Tag.CREATE_QUEST_VENUE_RETRY,
+          onRetryVenue,
+          retrying = state.retryingVenue,
+      )
+    }
+    if (state.questLoadFailed) {
+      LoadFailed(
+          R.string.edit_quest_load_failed,
+          C.Tag.EDIT_QUEST_LOAD_FAILED,
+          C.Tag.EDIT_QUEST_RETRY,
+          onRetryQuest,
+      )
+    }
     val saving = state.saveState == SaveState.Saving
+    when {
+      state.editing && saving ->
+          Text(
+              stringResource(R.string.edit_quest_saving_line),
+              style = AroundTextStyles.Small,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.testTag(C.Tag.EDIT_QUEST_SAVING),
+          )
+      state.editing && state.saveState == SaveState.Failed ->
+          Text(
+              stringResource(R.string.edit_quest_save_failed),
+              style = AroundTextStyles.Small,
+              color = MaterialTheme.colorScheme.error,
+              textAlign = TextAlign.Center,
+              // TalkBack reads it out as it appears
+              modifier =
+                  Modifier.testTag(C.Tag.EDIT_QUEST_SAVE_ERROR).semantics {
+                    liveRegion = LiveRegionMode.Polite
+                  },
+          )
+      else ->
+          Text(
+              questSummary(state),
+              style = AroundTextStyles.Small,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.testTag(C.Tag.CREATE_QUEST_SUMMARY),
+          )
+    }
     val savingLabel = stringResource(R.string.create_quest_saving)
     Button(
         onClick = onSubmit,
         enabled = state.canSave,
         shape = MaterialTheme.shapes.medium,
+        // While changes are saved, the button stays purple, faded, as in Figma
+        colors =
+            if (saving && state.editing) {
+              ButtonDefaults.buttonColors(
+                  disabledContainerColor =
+                      MaterialTheme.colorScheme.primary.copy(alpha = SAVING_BUTTON_ALPHA),
+                  disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+              )
+            } else ButtonDefaults.buttonColors(),
         modifier =
             Modifier.fillMaxWidth()
                 .height(BUTTON_HEIGHT)
                 .testTag(C.Tag.CREATE_QUEST_SUBMIT)
                 // On the button, not the spinner: the spinner's semantics aren't merged into the
                 // button, so TalkBack would read an unlabelled button while it has no text
-                .semantics { if (saving) contentDescription = savingLabel },
+                .semantics { if (saving && !state.editing) contentDescription = savingLabel },
     ) {
-      if (saving) {
+      if (saving && state.editing) {
+        Text(stringResource(R.string.edit_quest_saving), style = AroundTextStyles.Button)
+      } else if (saving) {
         CircularProgressIndicator(
             color = LocalContentColor.current,
             strokeWidth = PROGRESS_STROKE,
             modifier = Modifier.size(PROGRESS_SIZE),
         )
       } else {
-        Text(stringResource(R.string.create_quest_submit), style = AroundTextStyles.Button)
+        Text(
+            stringResource(
+                if (state.editing) R.string.edit_quest_submit else R.string.create_quest_submit
+            ),
+            style = AroundTextStyles.Button,
+        )
       }
     }
   }
@@ -110,22 +170,25 @@ internal fun CreateQuestBar(
  * while [retrying].
  */
 @Composable
-private fun VenueLoadFailed(onRetry: () -> Unit, retrying: Boolean) {
+private fun LoadFailed(
+    @StringRes message: Int,
+    messageTag: String,
+    retryTag: String,
+    onRetry: () -> Unit,
+    retrying: Boolean = false,
+) {
   Text(
-      stringResource(R.string.create_quest_venue_failed),
+      stringResource(message),
       style = AroundTextStyles.Caption,
       color = MaterialTheme.colorScheme.error,
       textAlign = TextAlign.Center,
       // Announced by TalkBack, as it appears after the screen, to say why saving is disabled
-      modifier =
-          Modifier.testTag(C.Tag.CREATE_QUEST_VENUE_FAILED).semantics {
-            liveRegion = LiveRegionMode.Polite
-          },
+      modifier = Modifier.testTag(messageTag).semantics { liveRegion = LiveRegionMode.Polite },
   )
   TextButton(
       onClick = onRetry,
       enabled = !retrying,
-      modifier = Modifier.testTag(C.Tag.CREATE_QUEST_VENUE_RETRY),
+      modifier = Modifier.testTag(retryTag),
       // The default primary colour is unreadable on the dark background
       colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
   ) {
@@ -168,5 +231,7 @@ private fun questSummary(state: CreateQuestUiState): String {
 private const val SUMMARY_SEPARATOR = " · "
 
 private val BUTTON_HEIGHT = 54.dp
+/** How opaque the button is while a quest's changes are saved, from Figma. */
+private const val SAVING_BUTTON_ALPHA = 0.6f
 private val PROGRESS_SIZE = 22.dp
 private val PROGRESS_STROKE = 2.dp

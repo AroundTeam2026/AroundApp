@@ -27,6 +27,8 @@
     <string name="completion_sending">Sending…</string>
     <string name="completion_sent">Proof sent</string>
     <string name="completion_review_hint">%1$s checks your proof, usually within a few minutes.</string>
+    <!-- Instead of the review hint, once another member of the party sent its proof -->
+    <string name="completion_sent_by_teammate">A teammate already sent your party\'s proof.</string>
     <string name="completion_requirements">WHAT TO DO</string>
     <string name="completion_answer">Your answer</string>
     <string name="completion_answer_hint">Write your answer here</string>

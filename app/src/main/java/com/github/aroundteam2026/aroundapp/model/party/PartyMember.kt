@@ -32,6 +32,10 @@ enum class PartyMemberStatus {
   WITHDRAWN,
 }
 
+/** Whether this member is still in the party. */
+val PartyMember.isJoined: Boolean
+  get() = status == PartyMemberStatus.JOINED
+
 /** Whether a membership may change from [from] to [to]: a member can only withdraw. */
 fun canTransition(from: PartyMemberStatus, to: PartyMemberStatus): Boolean =
     from == PartyMemberStatus.JOINED && to == PartyMemberStatus.WITHDRAWN

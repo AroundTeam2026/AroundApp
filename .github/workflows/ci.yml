@@ -70,6 +70,9 @@ jobs:
   instrumented:
     name: Instrumented tests (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
+    # A shard takes 5 to 7 minutes, and at worst about 35 with a new snapshot and both settle steps
+    # waiting their full 10 minutes. Without a limit, a hang runs to GitHub's 6 hours.
+    timeout-minutes: 40
 
     # One job per shard. AndroidJUnitRunner gives each test to one shard by a hash of its name, so
     # the shards hold about as many tests each; the test runner reads how many there are from the
@@ -145,12 +148,27 @@ jobs:
 
       # Installed and started in the background this early, so the emulators boot while the caches
       # below are restored and the app is assembled; the instrumented tests wait for them before
-      # they start, and print this log if they never come up.
+      # they start, and print this log if they never come up. The required script keeps the
+      # emulators' idle connections open (see it for why).
       - name: Install the Firebase CLI and start the emulators
         run: |
           export JAVA_HOME="$JAVA_HOME_21_X64"
           export PATH="$JAVA_HOME/bin:$PATH"
-          (npm install -g firebase-tools && firebase emulators:start --only auth,firestore,storage --project demo-project) > firebase-emulators.log 2>&1 &
+          (npm install -g firebase-tools && NODE_OPTIONS="--require $PWD/.github/scripts/keep-emulator-connections.cjs" firebase emulators:start --only auth,firestore,storage --project demo-project) > firebase-emulators.log 2>&1 &
+
+      # android-emulator-runner downloads the latest emulator in every job, and a download that comes
+      # back broken fails the job ("Error reading Zip content", 4 jobs since 4 Nov; #393). Installed
+      # here first, with retries 10 s apart, the emulator is up to date when the action checks, so
+      # it downloads nothing. This uses the runner's own command-line tools, which the next step
+      # removes. sdkmanager prints its errors on stderr, so each failed attempt still shows why.
+      - name: Install the Android emulator
+        run: |
+          for attempt in 1 2 3; do
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install emulator --channel=0 > /dev/null && exit 0
+            echo "Downloading the emulator failed (attempt $attempt)"
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
+          done
+          exit 1
 
       # The runner's command-line tools (12.0) predate the pixel_9 profile, so avdmanager rejects it.
       # When the runner has none, android-emulator-runner installs the newer ones it bundles. That
@@ -161,7 +179,8 @@ jobs:
           rm -rf "$ANDROID_HOME/cmdline-tools"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
-      # Cache the Emulator, if the cache does not hit, create the emulator
+      # Cache the Emulator, if the cache does not hit, create the emulator. "settled" marks snapshots
+      # taken by settle-emulator.sh; the earlier ones were taken at sys.boot_completed.
       - name: AVD cache
         uses: actions/cache@v4
         id: avd-cache
@@ -169,7 +188,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores
+          key: avd-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-${{ env.AVD_PROFILE }}-${{ env.AVD_CORES }}cores-settled
 
       # The AVD cache holds the AVD and its snapshot, not the system image it boots, which lives in the
       # SDK. Without this cache, both emulator steps download the image again (about a minute); with
@@ -180,6 +199,8 @@ jobs:
           path: ${{ env.ANDROID_HOME }}/system-images/android-${{ env.AVD_API_LEVEL }}/${{ env.AVD_TARGET }}/x86_64
           key: system-image-${{ env.AVD_API_LEVEL }}-${{ env.AVD_TARGET }}-x86_64
 
+      # The snapshot is saved when the script ends, so it waits until the emulator finished booting:
+      # every test run resumes this snapshot, and one saved mid-boot resumes mid-boot.
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2.38.0
@@ -192,7 +213,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
+          script: sh .github/scripts/settle-emulator.sh
 
       # Builds the app before the emulator boots, so a build error fails here, on its own.
       - name: Assemble
@@ -202,14 +223,20 @@ jobs:
           # To run the CI with debug information, add --info
           ./gradlew assembleDebug --parallel --build-cache
 
+      # Then checks the emulators loaded keep-emulator-connections.cjs, which logs a line
       - name: Wait for the Firebase emulators
-        run: npx wait-on -t 120000 tcp:9099 tcp:8080 tcp:9199 || { cat firebase-emulators.log; exit 1; }
+        run: |
+          npx wait-on -t 120000 tcp:9099 tcp:8080 tcp:9199 || { cat firebase-emulators.log; exit 1; }
+          grep -m1 keep-emulator-connections firebase-emulators.log
 
-      # Run this shard of the connected (instrumented) tests on the emulator. When they fail, print
-      # the device's crash log and its process deaths before the emulator shuts down: Gradle can't
-      # fetch the logcat of a test whose process crashed, so this is the only trace of why. The log
-      # is cleared first, so it only holds this run, not the snapshot's boot. The action runs the
-      # script one line at a time, so the Gradle command stays on one line.
+      # Run this shard of the connected (instrumented) tests on the emulator, once settled: the
+      # action only waits for sys.boot_completed (see the script). When they fail, print the
+      # device's crash log and its process deaths, low-memory kills included, before the emulator
+      # shuts down: Gradle can't fetch the logcat of a test whose process crashed or was killed, so
+      # this is the only trace of why. The log is cleared first, so it only holds this run, not the
+      # snapshot's boot. Each read gives up after 30 s: when the emulator itself died, adb waits for
+      # it forever. The action runs the script one line at a time, so the Gradle command stays on
+      # one line.
       - name: Run instrumented tests
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
@@ -225,8 +252,9 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            sh .github/scripts/settle-emulator.sh
             adb logcat -c
-            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { adb logcat -d -b crash; adb logcat -d -b system | grep -E 'has died|Killing|lmkd|ANR in'; exit 1; }
+            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { timeout 30 adb logcat -d -b crash; timeout 30 adb logcat -d -b main -b system | grep -E 'has died|Killing|lowmemorykiller|ANR in'; exit 1; }
 
       # When the instrumented tests fail, show what the Maps SDK saw. Google rejects a build whose key
       # or signing certificate isn't registered, and the map then never moves: the device log names
@@ -275,10 +303,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fail when a job this depends on failed
-        if: ${{ contains(needs.*.result, 'failure') }}
+      # A job that ran out of time ends cancelled, not failed, while the run itself goes on
+      - name: Fail when a job this depends on failed or timed out
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo "::error::A job this report depends on failed; see the checks and instrumented jobs."
+          echo "::error::A job this report depends on failed or timed out; see the checks and instrumented jobs."
           exit 1
 
       - name: Checkout

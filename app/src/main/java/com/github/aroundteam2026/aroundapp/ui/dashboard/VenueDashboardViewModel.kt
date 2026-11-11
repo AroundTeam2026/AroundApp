@@ -11,6 +11,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
 import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
@@ -54,7 +55,8 @@ import kotlinx.coroutines.flow.update
  * It keeps up with changes while the dashboard is watched; if listening fails, it shows
  * [VenueDashboardStatus.FAILED] until [retry]. [approve] and [decline] answer a pending reservation
  * through an [AnswerSaver]; a failure sets [VenueDashboardUiState.updateFailed] until
- * [clearUpdateError]. Proofs are reviewed on their own screen.
+ * [clearUpdateError]. A pending reservation whose party doesn't have its quest's size has an
+ * [ApproveBlock], and [approve] ignores it. Proofs are reviewed on their own screen.
  */
 class VenueDashboardViewModel(
     authRepository: AuthRepository,
@@ -92,8 +94,15 @@ class VenueDashboardViewModel(
               VenueDashboardUiState(),
           )
 
-  /** Approves the pending reservation [reservationId]; see [answer]. */
-  fun approve(reservationId: String) = answer(reservationId, ReservationStatus.APPROVED)
+  /**
+   * Approves the pending reservation [reservationId]; see [answer]. Does nothing while the
+   * dashboard shows it with an [ApproveBlock], since the rules would refuse it.
+   */
+  fun approve(reservationId: String) {
+    val shown = uiState.value.needsAnswer.find { it.reservationId == reservationId }
+    if (shown?.approveBlock != null) return
+    answer(reservationId, ReservationStatus.APPROVED)
+  }
 
   /** Declines the pending reservation [reservationId]; see [answer]. */
   fun decline(reservationId: String) = answer(reservationId, ReservationStatus.REJECTED)
@@ -201,7 +210,8 @@ private fun partyIdsOf(reservations: List<Reservation>, completions: List<Comple
  * Pending reservations need an answer and approved ones are upcoming, each oldest request first,
  * ties going to the smallest id; rejected and cancelled ones are left out. The proofs to review
  * follow the same order. A missing party counts as empty, and an unreadable [venue] leaves the
- * header empty. Reservations have no visit time yet, so nothing is sorted or filtered by slot.
+ * header empty. Each pending reservation gets its [ApproveBlock] from its quest and party.
+ * Reservations have no visit time yet, so nothing is sorted or filtered by slot.
  */
 internal fun dashboardOf(
     reservations: List<Reservation>,
@@ -210,13 +220,13 @@ internal fun dashboardOf(
     venue: Venue?,
     completions: List<Completion>,
 ): VenueDashboardUiState {
-  val titles = quests.associate { it.id to it.title }
+  val questsById = quests.associateBy { it.id }
   val reservationsById = reservations.associateBy { it.id }
   fun withStatus(status: ReservationStatus) =
       reservations
           .filter { it.status == status }
           .sortedWith(compareBy<Reservation> { it.createdAt }.thenBy { it.id })
-          .map { it.toDashboardReservation(titles, partySizes[it.id] ?: 0) }
+          .map { it.toDashboardReservation(questsById, partySizes.getOrDefault(it.id, 0)) }
   return VenueDashboardUiState(
       status = VenueDashboardStatus.LOADED,
       venueName = venue?.name.orEmpty(),
@@ -231,35 +241,49 @@ internal fun dashboardOf(
               .map {
                 it.toDashboardProof(
                     reservationsById[it.reservationId],
-                    titles,
+                    questsById,
                     partySizes[it.reservationId] ?: 0,
                 )
               },
   )
 }
 
-private fun Reservation.toDashboardReservation(
-    titles: Map<String, String>,
-    partySize: Int,
-) =
+/**
+ * Why a pending party of [joined] explorers can't be approved for [quest], or null if it has the
+ * size [quest] asks for, as [meetsPartySize] tells. A null [quest] was deleted.
+ */
+internal fun approveBlockOf(quest: Quest?, joined: Int): ApproveBlock? =
+    when {
+      quest == null -> ApproveBlock.QuestMissing
+      quest.meetsPartySize(joined) -> null
+      joined < quest.minPartySize -> ApproveBlock.TooFew(quest.minPartySize - joined)
+      else -> ApproveBlock.TooMany(joined, quest.minPartySize)
+    }
+
+/** Only a pending reservation gets an [ApproveBlock]: an approved one has nothing to approve. */
+private fun Reservation.toDashboardReservation(questsById: Map<String, Quest>, partySize: Int) =
     DashboardReservation(
         reservationId = id,
-        questTitle = titles[questId],
+        questTitle = questsById[questId]?.title,
         explorerName = explorerName.ifBlank { null },
         partySize = partySize,
         requestedAt = createdAt,
         approved = status == ReservationStatus.APPROVED,
+        approveBlock =
+            approveBlockOf(questsById[questId], partySize).takeIf {
+              status == ReservationStatus.PENDING
+            },
     )
 
 private fun Completion.toDashboardProof(
     reservation: Reservation?,
-    titles: Map<String, String>,
+    questsById: Map<String, Quest>,
     partySize: Int,
 ) =
     DashboardProof(
         completionId = id,
         explorerName = reservation?.explorerName?.ifBlank { null },
-        questTitle = reservation?.let { titles[it.questId] },
+        questTitle = reservation?.let { questsById[it.questId]?.title },
         partySize = partySize,
         proofType = proof.type,
         sentAt = submittedAt,

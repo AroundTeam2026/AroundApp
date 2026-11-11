@@ -177,4 +177,57 @@ class RewardFormStateTest {
     assertFalse(other.copy(expiryInPast = true).isValid)
     assertTrue(RewardFormState(expiryInPast = true).isValid)
   }
+
+  @Test
+  fun fromRewardFillsEachTypeAndRoundTrips() {
+    val rewards =
+        listOf(
+            Reward.Discount(15.0, DiscountUnit.PERCENT, "Hot drinks"),
+            Reward.Discount(2.5, DiscountUnit.CHF, null),
+            Reward.FreeItem("Coffee", "Any size"),
+            Reward.Other("A tour"),
+            null,
+        )
+    rewards.forEach {
+      val form = RewardFormState.fromReward(it, ZoneOffset.UTC, TODAY)
+      assertTrue(form.isValid)
+      assertEquals(it, form.toReward(ZoneOffset.UTC))
+    }
+  }
+
+  // "15", not "15.0" or "1.5E1", as the venue would type it
+  @Test
+  fun fromRewardShowsTheAmountAsTyped() {
+    val form =
+        RewardFormState.fromReward(
+            Reward.Discount(15.0, DiscountUnit.PERCENT, null),
+            ZoneOffset.UTC,
+            TODAY,
+        )
+    assertEquals("15", form.discountAmount)
+  }
+
+  @Test
+  fun fromRewardShowsTheLastDayAndRoundTripsTheExpiry() {
+    val lastDay = LocalDate.of(2026, 12, 31)
+    val expiresAt = other.copy(expiryDate = lastDay).toReward(ZoneOffset.UTC)!!.expiresAt
+    val form = RewardFormState.fromReward(Reward.Other("A tour", expiresAt), ZoneOffset.UTC, TODAY)
+
+    assertEquals(lastDay, form.expiryDate)
+    assertFalse(form.expiryInPast)
+    assertEquals(expiresAt, form.toReward(ZoneOffset.UTC)?.expiresAt)
+  }
+
+  @Test
+  fun fromRewardFlagsAnExpiryThatHasPassed() {
+    val expiresAt = other.copy(expiryDate = TODAY.minusDays(1)).toReward(ZoneOffset.UTC)!!.expiresAt
+    val form = RewardFormState.fromReward(Reward.Other("A tour", expiresAt), ZoneOffset.UTC, TODAY)
+
+    assertTrue(form.expiryInPast)
+    assertFalse(form.isValid)
+  }
+
+  private companion object {
+    val TODAY: LocalDate = LocalDate.of(2026, 11, 9)
+  }
 }

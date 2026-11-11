@@ -49,7 +49,7 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
     forcedFailure?.let {
       return Result.failure(it)
     }
-    val id = completionId(reservationId, explorerUid)
+    val id = completionId(reservationId)
     if (id in completions.value) {
       return Result.failure(IllegalStateException("Completion $id was already submitted"))
     }
@@ -66,11 +66,6 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
         )
     completions.update { it + (id to stored) }
     return Result.success(id)
-  }
-
-  /** Emits every stored completion of [uid], and again whenever that list changes. */
-  override fun observeForExplorer(uid: String): Flow<List<Completion>> = observe {
-    it.explorerUid == uid
   }
 
   /** Emits every stored completion of [venueId], and again whenever that list changes. */

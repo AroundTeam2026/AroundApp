@@ -57,9 +57,11 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * The Dashboard tab shows the venue's reservations and the proofs to review (see
  * [VenueDashboardScreen]); tapping a proof calls [onOpenProof]. The Quests tab lists the venue's
  * quests (see [VenueQuestsScreen]); its "New quest" buttons call [onCreateQuest], so the venue's
- * NavHost opens the create-quest form full screen above the home (see [venueDestinations]).
+ * NavHost opens the create-quest form full screen above the home (see [venueDestinations]). Tapping
+ * a quest calls [onEditQuest], which opens the same form to edit it.
  *
  * @param onCreateQuest opens the form where the venue creates a quest.
+ * @param onEditQuest opens the form editing the quest of an id.
  * @param onSignOut signs the venue out, from the Profile tab.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
@@ -73,6 +75,7 @@ fun VenueHome(
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
     onOpenProof: (String) -> Unit = {},
+    onEditQuest: (String) -> Unit = {},
     navController: NavHostController = rememberNavController(),
     screen: @Composable (VenueTab) -> Unit = {
       VenueTabScreen(
@@ -82,6 +85,7 @@ fun VenueHome(
           venueQuestsFactory,
           dashboardFactory,
           onOpenProof,
+          onEditQuest,
       )
     },
 ) {
@@ -104,6 +108,7 @@ private fun VenueTabScreen(
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
     onOpenProof: (String) -> Unit,
+    onEditQuest: (String) -> Unit,
 ) =
     when (tab) {
       VenueTab.DASHBOARD ->
@@ -117,6 +122,7 @@ private fun VenueTabScreen(
               viewModel(factory = venueQuestsFactory),
               onCreateQuest,
               Modifier.testTag(tab.screenTag),
+              onEditQuest = onEditQuest,
           )
       VenueTab.PROFILE -> ProfileScreen(onSignOut)
     }

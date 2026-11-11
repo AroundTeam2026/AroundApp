@@ -49,11 +49,6 @@ class VenueDashboardViewModelTest {
   /** When the fake stores a reservation; tests move it to order requests. */
   private var createdAt = NOW
 
-  private val party = FakePartyRepository { createdAt }
-  private val fake = FakeReservationRepository({ createdAt }, party)
-  private val gated = GatedReservationRepository(fake)
-  private var reservations: ReservationRepository = gated
-  private val auth = FakeAuthRepository(VENUE_ID)
   private val quests =
       FakeQuestRepository(
           initialQuests =
@@ -63,6 +58,12 @@ class VenueDashboardViewModelTest {
                   testQuest(id = "old", venueId = VENUE_ID, status = QuestStatus.ARCHIVED),
               )
       )
+  private val party = FakePartyRepository { createdAt }
+  // Given the quests, approving checks the party's size, as the rules do
+  private val fake = FakeReservationRepository({ createdAt }, party, quests)
+  private val gated = GatedReservationRepository(fake)
+  private var reservations: ReservationRepository = gated
+  private val auth = FakeAuthRepository(VENUE_ID)
   private var venues: VenueRepository =
       FakeVenueRepository(listOf(testVenue(id = VENUE_ID, name = "Café Lumière")))
 
@@ -396,12 +397,12 @@ class VenueDashboardViewModelTest {
             partySize = 3,
             status = ReservationStatus.APPROVED,
         )
-    val newer = sendProof(reservation, explorerUid = "grace", sentAt = NOW - HOUR)
+    val newer = sendProof(reserve(status = ReservationStatus.APPROVED), sentAt = NOW - HOUR)
     val older =
         sendProof(
             reservation,
-            explorerUid = "friend",
-            proof = Proof.Photo("gs://proofs/friend.jpg"),
+            explorerUid = "grace",
+            proof = Proof.Photo("gs://proofs/grace.jpg"),
             sentAt = NOW - 2 * HOUR,
         )
     watch()
@@ -423,10 +424,11 @@ class VenueDashboardViewModelTest {
 
   @Test
   fun proofsSentAtTheSameTimeGoSmallestIdFirst() = test {
-    val reservation = reserve(status = ReservationStatus.APPROVED)
-    // Stored first, but its id ("<reservation>_zoe") is the larger one
-    val larger = sendProof(reservation, explorerUid = "zoe")
-    val smaller = sendProof(reservation, explorerUid = "amy")
+    val first = reserve(status = ReservationStatus.APPROVED)
+    val second = reserve(status = ReservationStatus.APPROVED)
+    // Stored first, but its id, its reservation's, is the larger one
+    val larger = sendProof(second)
+    val smaller = sendProof(first)
     watch()
 
     assertTrue(smaller < larger)
@@ -445,9 +447,10 @@ class VenueDashboardViewModelTest {
 
   @Test
   fun reviewedProofsAndOtherVenuesProofsAreLeftOut() = test {
-    val reservation = reserve(status = ReservationStatus.APPROVED)
-    completions.approve(sendProof(reservation, explorerUid = "a")).getOrThrow()
-    completions.reject(sendProof(reservation, explorerUid = "b"), "Blurry").getOrThrow()
+    val approved = reserve(status = ReservationStatus.APPROVED)
+    val rejected = reserve(status = ReservationStatus.APPROVED)
+    completions.approve(sendProof(approved)).getOrThrow()
+    completions.reject(sendProof(rejected), "Blurry").getOrThrow()
     sendProof("elsewhere", venueId = "other-venue")
     watch()
 
@@ -520,6 +523,137 @@ class VenueDashboardViewModelTest {
     assertEquals(1, state.needsAnswer.single().partySize)
     // Its party of 1 is read before the dashboard shows it, never as an empty party
     assertTrue(shown.flatMap { it.needsAnswer + it.upcoming }.none { it.partySize == 0 })
+  }
+
+  /** Stores an active quest of the venue for parties of [minPartySize], or exactly that. */
+  private suspend fun sizedQuest(minPartySize: Int, exact: Boolean = false): String =
+      quests
+          .createQuest(
+              testQuest(venueId = VENUE_ID, minPartySize = minPartySize)
+                  .copy(exactPartySize = exact)
+          )
+          .getOrThrow()
+
+  @Test
+  fun aPartyOfItsQuestsSizeCanBeApproved() = test {
+    val atLeast = reserve(questId = sizedQuest(3), partySize = 4)
+    val exactly = reserve(questId = sizedQuest(2, exact = true), partySize = 2)
+    watch()
+
+    assertEquals(listOf(atLeast, exactly), ids(state.needsAnswer))
+    assertTrue(state.needsAnswer.all { it.approveBlock == null })
+  }
+
+  @Test
+  fun aPartyBelowItsQuestsSizeSaysHowManyMoreItNeeds() = test {
+    reserve(questId = sizedQuest(4), partySize = 1)
+    watch()
+
+    assertEquals(ApproveBlock.TooFew(3), state.needsAnswer.single().approveBlock)
+  }
+
+  @Test
+  fun aPartyAboveAnExactSizeSaysTheSize() = test {
+    val questId = sizedQuest(2)
+    reserve(questId = questId, partySize = 3)
+    watch()
+    assertNull(state.needsAnswer.single().approveBlock)
+
+    // The venue makes the size exact while the party is bigger
+    quests.updateQuest(quests.getQuest(questId)!!.copy(exactPartySize = true)).getOrThrow()
+
+    assertEquals(ApproveBlock.TooMany(3, 2), state.needsAnswer.single().approveBlock)
+  }
+
+  @Test
+  fun aReservationOfADeletedQuestCantBeApproved() = test {
+    reserve(questId = "deleted")
+    watch()
+
+    assertEquals(ApproveBlock.QuestMissing, state.needsAnswer.single().approveBlock)
+  }
+
+  @Test
+  fun aPartyThatReachesItsSizeCanBeApprovedLive() = test {
+    val id = reserve(questId = sizedQuest(2))
+    watch()
+    assertEquals(ApproveBlock.TooFew(1), state.needsAnswer.single().approveBlock)
+
+    party.join(id, "friend").getOrThrow()
+
+    assertNull(state.needsAnswer.single().approveBlock)
+  }
+
+  @Test
+  fun approvingAPartyBelowItsSizeSavesNothing() = test {
+    val id = reserve(questId = sizedQuest(3), partySize = 2)
+    watch()
+
+    viewModel.approve(id)
+
+    assertEquals(0, gated.calls)
+    assertTrue(state.savingIds.isEmpty())
+    assertFalse(state.updateFailed)
+    assertEquals(listOf(id), ids(state.needsAnswer))
+  }
+
+  @Test
+  fun approvingFindsTheReservationAmongOthers() = test {
+    reserve(questId = sizedQuest(3), requestedAt = NOW - 1)
+    val approvable = reserve(requestedAt = NOW)
+    watch()
+
+    viewModel.approve(approvable)
+
+    assertEquals(1, gated.calls)
+    assertEquals(ReservationStatus.APPROVED, gated.lastStatus)
+  }
+
+  @Test
+  fun approvingAReservationTheDashboardDoesntShowIsLeftToTheRepository() = test {
+    watch()
+
+    viewModel.approve("unknown")
+
+    // Nothing on the dashboard blocks it, so the repository answers, here with "missing"
+    assertEquals(1, gated.calls)
+  }
+
+  @Test
+  fun aPartyBelowItsSizeCanStillBeDeclined() = test {
+    val id = reserve(questId = sizedQuest(3), partySize = 2)
+    watch()
+
+    viewModel.decline(id)
+
+    assertEquals(ReservationStatus.REJECTED, gated.lastStatus)
+    assertTrue(state.isEmpty)
+  }
+
+  @Test
+  fun anApprovedPartyHasNoApproveBlockEvenBelowItsSize() = test {
+    val id = reserve(questId = sizedQuest(2), partySize = 2, status = ReservationStatus.APPROVED)
+    watch()
+
+    // A member may leave an approved party: it stays approved, with nothing to approve
+    party.withdraw(id, "friend-0").getOrThrow()
+
+    assertEquals(1, state.upcoming.single().partySize)
+    assertNull(state.upcoming.single().approveBlock)
+  }
+
+  @Test
+  fun approveBlockOfFollowsTheQuestsSize() {
+    val atLeastTwo = testQuest(minPartySize = 2)
+    val exactlyTwo = atLeastTwo.copy(exactPartySize = true)
+
+    assertEquals(ApproveBlock.QuestMissing, approveBlockOf(null, 5))
+    assertEquals(ApproveBlock.TooFew(2), approveBlockOf(atLeastTwo, 0))
+    assertNull(approveBlockOf(atLeastTwo, 2))
+    assertNull(approveBlockOf(atLeastTwo, 7))
+    assertEquals(ApproveBlock.TooFew(1), approveBlockOf(exactlyTwo, 1))
+    assertNull(approveBlockOf(exactlyTwo, 2))
+    assertEquals(ApproveBlock.TooMany(3, 2), approveBlockOf(exactlyTwo, 3))
   }
 
   private companion object {

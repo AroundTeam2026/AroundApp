@@ -64,6 +64,8 @@ data class VenueDashboardUiState(
  * @property partySize How many explorers the party has.
  * @property requestedAt When the explorer made the reservation, in epoch milliseconds.
  * @property approved Whether the venue approved it; a pending one shows Decline and Approve.
+ * @property approveBlock Why the venue can't approve it yet, or null if it can. Only a pending
+ *   reservation has one; Decline stays available whatever it is.
  */
 data class DashboardReservation(
     val reservationId: String,
@@ -72,7 +74,27 @@ data class DashboardReservation(
     val partySize: Int,
     val requestedAt: Long,
     val approved: Boolean,
+    val approveBlock: ApproveBlock? = null,
 )
+
+/**
+ * Why a pending reservation can't be approved: the rules only approve a party that has the size its
+ * quest asks for, at least or exactly [com.github.aroundteam2026.aroundapp.model.quest.Quest]'s
+ * `minPartySize`, so the dashboard disables Approve and says why rather than fail on tap.
+ */
+sealed interface ApproveBlock {
+  /** The party needs [missing] more explorers, at least one. */
+  data class TooFew(val missing: Int) : ApproveBlock
+
+  /**
+   * The quest takes exactly [size] explorers and [joined] of them, more than [size], joined: some
+   * have to leave.
+   */
+  data class TooMany(val joined: Int, val size: Int) : ApproveBlock
+
+  /** The venue deleted the quest, so there is no size to check and the rules refuse approving. */
+  data object QuestMissing : ApproveBlock
+}
 
 /**
  * One proof to review on the dashboard, as the Figma row `S4 · Proof row`: opening it shows the

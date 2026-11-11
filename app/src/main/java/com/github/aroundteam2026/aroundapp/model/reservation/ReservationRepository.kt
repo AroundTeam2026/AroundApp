@@ -43,6 +43,18 @@ interface ReservationRepository {
   suspend fun findReservationIdByCode(code: String): Result<String>
 
   /**
+   * Reads the reservation with [reservationId] and its number of joined members, as an explorer who
+   * hasn't joined its party sees it. Asks the backend, never a cache, so a party is read only
+   * online. The security rules let an explorer read any reservation whose id they know, and a venue
+   * its own.
+   *
+   * @param reservationId id of the reservation, e.g. from [findReservationIdByCode].
+   * @return the [PartyPreview], or a [NoSuchElementException] if there is no such reservation or it
+   *   can't be mapped, or another failure if the backend couldn't be asked, e.g. offline.
+   */
+  suspend fun getPartyPreview(reservationId: String): Result<PartyPreview>
+
+  /**
    * Observes the reservations made for one venue's quests. Emits the current list on collection,
    * then again whenever one is added or changes.
    *
@@ -68,10 +80,10 @@ interface ReservationRepository {
   /**
    * Moves a reservation to [status], changing nothing else.
    *
-   * The security rules let the venue that owns the reservation make any change, and a joined member
-   * of the party only cancel it (E21). The Firestore implementation therefore fails when an
-   * explorer asks for any other status, even though the fake allows it. The rules also refuse to
-   * approve a party without the size its quest asks for ([meetsPartySize]).
+   * The security rules let the venue that owns the reservation make any change while it is pending,
+   * and a joined member of the party only cancel it (E21). The Firestore implementation therefore
+   * fails when an explorer asks for any other status, even though the fake allows it. The rules
+   * also refuse to approve a party without the size its quest asks for ([meetsPartySize]).
    *
    * @param id id of the reservation.
    * @param status the new status; the change must be allowed by [canTransition].

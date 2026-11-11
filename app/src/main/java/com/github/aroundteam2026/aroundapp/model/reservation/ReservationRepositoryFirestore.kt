@@ -163,6 +163,33 @@ class ReservationRepositoryFirestore(
         Result.failure(e)
       }
 
+  /**
+   * Reads the reservation's document from the server, with the `joinedCount` it stores. A missing
+   * or malformed document, one without its `joinedCount` included, is a [NoSuchElementException]; a
+   * read that fails, e.g. offline, is the Firestore exception.
+   */
+  override suspend fun getPartyPreview(reservationId: String): Result<PartyPreview> =
+      try {
+        val document = reservations.document(reservationId).get(Source.SERVER).await()
+        val reservation =
+            document.toReservation()
+                ?: throw NoSuchElementException("No reservation with id $reservationId")
+        Result.success(
+            PartyPreview(
+                reservation,
+                // A party always has its creator, so a missing count is malformed, like any field
+                document.getLong(PartyUserFirestore.JOINED_COUNT)?.toInt()
+                    ?: throw NoSuchElementException(
+                        "Reservation $reservationId has no joinedCount"
+                    ),
+            )
+        )
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
+
   override fun observeForVenue(venueId: String): Flow<List<Reservation>> =
       reservations.whereEqualTo(VENUE_ID, venueId).observe { it.toReservation() }
 
@@ -199,8 +226,9 @@ class ReservationRepositoryFirestore(
    *
    * Fails with [NoSuchElementException] if the reservation is missing or malformed, with
    * [IllegalStateException] if [canTransition] forbids the change, and with the Firestore exception
-   * if the rules refuse it, which they do for everyone but the venue and, to cancel, a joined
-   * member of the party, and when approving a party without the size its quest asks for.
+   * if the rules refuse it, which they do for everyone but the venue while it is pending and, to
+   * cancel, a joined member of the party, and when approving a party without the size its quest
+   * asks for.
    */
   override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> =
       try {

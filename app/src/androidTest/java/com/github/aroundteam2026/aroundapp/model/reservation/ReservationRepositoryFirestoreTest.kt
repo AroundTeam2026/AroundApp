@@ -25,7 +25,9 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -458,6 +460,108 @@ class ReservationRepositoryFirestoreTest {
         assertTrue("Expected a failure but got $error", error != null)
         assertFalse(error is PartyCodeNotFoundException)
       }
+
+  /**
+   * Bug: an explorer who hasn't joined the party can't read its reservation, or the count of joined
+   * members is not the stored one, so joining by a party code can't show who they would join.
+   */
+  @Test
+  fun getPartyPreview_byAnExplorerOutsideTheParty_returnsTheReservationAndItsJoinedCount() =
+      withTimeoutBlocking {
+        val id = createAndSync()
+        val friendUid = signInNewUser(FRIEND_APP, Role.EXPLORER)
+        val friendDb = emulatorClient(FRIEND_APP)
+        val friendRepository = ReservationRepositoryFirestore(friendDb)
+
+        val alone = friendRepository.getPartyPreview(id).getOrThrow()
+        PartyRepositoryFirestore(friendDb).join(id, friendUid).getOrThrow()
+        friendDb.waitForPendingWrites().await()
+        val together = venueRepository.getPartyPreview(id).getOrThrow()
+
+        assertEquals(fetchAsVenue(id), alone.reservation)
+        assertEquals(1, alone.joinedCount)
+        assertEquals(2, together.joinedCount)
+      }
+
+  /** Bug: an unknown id fails like being offline, or finds some reservation. */
+  @Test
+  fun getPartyPreview_forAnUnknownId_failsWithNoSuchElement() = withTimeoutBlocking {
+    val error = explorerRepository.getPartyPreview("missing").exceptionOrNull()
+
+    assertTrue("Expected NoSuchElementException but got $error", error is NoSuchElementException)
+  }
+
+  /**
+   * Bug: a reservation without its joinedCount reads as an empty party, so the join screen shows "0
+   * joined" for a party that always has its creator.
+   */
+  @Test
+  fun getPartyPreview_forAReservationWithoutAJoinedCount_failsWithNoSuchElement() =
+      withTimeoutBlocking {
+        val id = explorerDb.collection(RESERVATIONS).document().id
+        writeBypassingRules(
+            "$RESERVATIONS/$id",
+            mapOf(
+                "questId" to questId,
+                "venueId" to venueId,
+                "slotStart" to Timestamp(1_800_000_000L, 0),
+                "status" to "PENDING",
+                "createdAt" to Timestamp(1_700_000_000L, 0),
+                "explorerName" to EXPLORER_NAME,
+            ),
+        )
+
+        val error = explorerRepository.getPartyPreview(id).exceptionOrNull()
+
+        assertTrue(
+            "Expected NoSuchElementException but got $error",
+            error is NoSuchElementException,
+        )
+      }
+
+  /**
+   * Bug: cancelling the read is reported as a failed one, so the caller goes on with an error it
+   * never asked for, instead of the cancellation reaching it.
+   */
+  @Test
+  fun getPartyPreview_whenCancelled_rethrowsTheCancellationInsteadOfReturningIt() =
+      withTimeoutBlocking {
+        val id = createAndSync()
+        var returned: Result<PartyPreview>? = null
+        val read =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+              returned = explorerRepository.getPartyPreview(id)
+            }
+
+        read.cancelAndJoin()
+
+        assertNull("The cancelled read returned $returned", returned)
+      }
+
+  /** Bug: offline, the party is reported unknown, or read from the cache rather than the server. */
+  @Test
+  fun getPartyPreview_whileOffline_failsWithAnotherErrorThanNoSuchElement() = withTimeoutBlocking {
+    val id = createAndSync()
+    // A listener keeps the document in the memory cache, so a read allowed to use the cache would
+    // succeed offline
+    val cached = CompletableDeferred<Unit>()
+    val registration =
+        explorerDb.collection(RESERVATIONS).document(id).addSnapshotListener { snapshot, _ ->
+          if (snapshot?.exists() == true) cached.complete(Unit)
+        }
+    val error =
+        try {
+          cached.await()
+          explorerDb.disableNetwork().await()
+          explorerRepository.getPartyPreview(id).exceptionOrNull()
+        } finally {
+          registration.remove()
+          explorerDb.enableNetwork().await()
+        }
+
+    assertTrue("Expected a failure but got $error", error != null)
+    assertFalse(error is NoSuchElementException)
+  }
 
   /** Bug: observeForVenue does not filter on the venue, or also filters on the status. */
   @Test

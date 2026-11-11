@@ -36,6 +36,18 @@
     <string name="dashboard_decline">Decline</string>
     <string name="dashboard_approve">Approve</string>
     <string name="dashboard_approved">Approved</string>
+    <!-- Under a pending row's buttons when Approve is disabled: the party is below its quest's size -->
+    <plurals name="dashboard_approve_needs_more">
+        <item quantity="one">Needs %d more explorer before you can approve</item>
+        <item quantity="other">Needs %d more explorers before you can approve</item>
+    </plurals>
+    <!-- Approve is disabled: %1$d explorers joined, more than the %2$d the quest takes exactly -->
+    <plurals name="dashboard_approve_too_many">
+        <item quantity="one">%1$d explorer joined, but this quest takes exactly %2$d</item>
+        <item quantity="other">%1$d explorers joined, but this quest takes exactly %2$d</item>
+    </plurals>
+    <!-- Approve is disabled: the venue deleted the quest -->
+    <string name="dashboard_approve_quest_missing">This quest was deleted, so it can\'t be approved</string>
     <string name="dashboard_show_all">Show all %d</string>
     <string name="dashboard_empty_title">No reservations yet</string>
     <string name="dashboard_empty_body">When explorers accept your quests, their requests show up here.</string>
