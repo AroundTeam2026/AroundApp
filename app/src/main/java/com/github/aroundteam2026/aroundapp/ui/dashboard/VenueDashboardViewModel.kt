@@ -220,23 +220,13 @@ internal fun dashboardOf(
     venue: Venue?,
     completions: List<Completion>,
 ): VenueDashboardUiState {
-  val titles = quests.associate { it.id to it.title }
   val questsById = quests.associateBy { it.id }
   val reservationsById = reservations.associateBy { it.id }
   fun withStatus(status: ReservationStatus) =
       reservations
           .filter { it.status == status }
           .sortedWith(compareBy<Reservation> { it.createdAt }.thenBy { it.id })
-          .map {
-            val joined = partySizes[it.id] ?: 0
-            val block =
-                if (status == ReservationStatus.PENDING) {
-                  approveBlockOf(questsById[it.questId], joined)
-                } else {
-                  null
-                }
-            it.toDashboardReservation(titles, joined, block)
-          }
+          .map { it.toDashboardReservation(questsById, partySizes.getOrDefault(it.id, 0)) }
   return VenueDashboardUiState(
       status = VenueDashboardStatus.LOADED,
       venueName = venue?.name.orEmpty(),
@@ -251,7 +241,7 @@ internal fun dashboardOf(
               .map {
                 it.toDashboardProof(
                     reservationsById[it.reservationId],
-                    titles,
+                    questsById,
                     partySizes[it.reservationId] ?: 0,
                 )
               },
@@ -267,33 +257,33 @@ internal fun approveBlockOf(quest: Quest?, joined: Int): ApproveBlock? =
       quest == null -> ApproveBlock.QuestMissing
       quest.meetsPartySize(joined) -> null
       joined < quest.minPartySize -> ApproveBlock.TooFew(quest.minPartySize - joined)
-      else -> ApproveBlock.TooMany(quest.minPartySize)
+      else -> ApproveBlock.TooMany(joined, quest.minPartySize)
     }
 
-private fun Reservation.toDashboardReservation(
-    titles: Map<String, String>,
-    partySize: Int,
-    approveBlock: ApproveBlock?,
-) =
+/** Only a pending reservation gets an [ApproveBlock]: an approved one has nothing to approve. */
+private fun Reservation.toDashboardReservation(questsById: Map<String, Quest>, partySize: Int) =
     DashboardReservation(
         reservationId = id,
-        questTitle = titles[questId],
+        questTitle = questsById[questId]?.title,
         explorerName = explorerName.ifBlank { null },
         partySize = partySize,
         requestedAt = createdAt,
         approved = status == ReservationStatus.APPROVED,
-        approveBlock = approveBlock,
+        approveBlock =
+            approveBlockOf(questsById[questId], partySize).takeIf {
+              status == ReservationStatus.PENDING
+            },
     )
 
 private fun Completion.toDashboardProof(
     reservation: Reservation?,
-    titles: Map<String, String>,
+    questsById: Map<String, Quest>,
     partySize: Int,
 ) =
     DashboardProof(
         completionId = id,
         explorerName = reservation?.explorerName?.ifBlank { null },
-        questTitle = reservation?.let { titles[it.questId] },
+        questTitle = reservation?.let { questsById[it.questId]?.title },
         partySize = partySize,
         proofType = proof.type,
         sentAt = submittedAt,

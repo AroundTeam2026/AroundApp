@@ -41,10 +41,10 @@
         <item quantity="one">Needs %d more explorer before you can approve</item>
         <item quantity="other">Needs %d more explorers before you can approve</item>
     </plurals>
-    <!-- Approve is disabled: the quest takes exactly this many and the party has more -->
-    <plurals name="dashboard_approve_needs_exactly">
-        <item quantity="one">This quest takes exactly %d explorer</item>
-        <item quantity="other">This quest takes exactly %d explorers</item>
+    <!-- Approve is disabled: %1$d explorers joined, more than the %2$d the quest takes exactly -->
+    <plurals name="dashboard_approve_too_many">
+        <item quantity="one">%1$d explorer joined, but this quest takes exactly %2$d</item>
+        <item quantity="other">%1$d explorers joined, but this quest takes exactly %2$d</item>
     </plurals>
     <!-- Approve is disabled: the venue deleted the quest -->
     <string name="dashboard_approve_quest_missing">This quest was deleted, so it can\'t be approved</string>

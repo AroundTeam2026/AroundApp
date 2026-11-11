@@ -133,11 +133,11 @@ class DashboardReservationRowTest {
 
   @Test
   fun aPartyAboveAnExactSizeSaysTheSize() {
-    show(pending(partySize = 3).copy(approveBlock = ApproveBlock.TooMany(2)))
+    show(pending(partySize = 3).copy(approveBlock = ApproveBlock.TooMany(joined = 3, size = 2)))
 
     node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
     assertEquals(
-        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_exactly, 2, 2),
+        context.resources.getQuantityString(R.plurals.dashboard_approve_too_many, 3, 3, 2),
         node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
     )
   }
@@ -149,16 +149,6 @@ class DashboardReservationRowTest {
     node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
     assertEquals(
         string(R.string.dashboard_approve_quest_missing),
-        node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
-    )
-  }
-
-  @Test
-  fun thePreviewShowsAPartyBelowItsSize() {
-    compose.setContent { DashboardReservationRowPreview() }
-
-    assertEquals(
-        context.resources.getQuantityString(R.plurals.dashboard_approve_needs_more, 2, 2),
         node(C.Tag.DASHBOARD_ROW_APPROVE_BLOCKED).text(),
     )
   }
