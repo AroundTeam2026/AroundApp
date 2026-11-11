@@ -8,6 +8,14 @@ package com.github.aroundteam2026.aroundapp.resources
 object C {
   /** Test tags that UI tests use to find composables. */
   object Tag {
+    const val PROFILE_SETUP_LOADING = "profile_setup_loading"
+    const val PROFILE_SETUP_LOAD_ERROR = "profile_setup_load_error"
+    const val PROFILE_SETUP_SCREEN = "profile_setup_screen"
+    const val PROFILE_SETUP_AVATAR = "profile_setup_avatar"
+    const val PROFILE_SETUP_ADD_PHOTO = "profile_setup_add_photo"
+    const val PROFILE_SETUP_NAME = "profile_setup_name"
+    const val PROFILE_SETUP_ERROR = "profile_setup_error"
+    const val PROFILE_SETUP_CONTINUE = "profile_setup_continue"
     const val ROLE_PROFILE_ERROR = "role_profile_error"
     const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
     const val ROLE_PROFILE_RETRY = "role_profile_retry"
