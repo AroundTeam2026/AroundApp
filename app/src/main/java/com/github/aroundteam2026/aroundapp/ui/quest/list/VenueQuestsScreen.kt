@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.list
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -21,15 +22,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,11 +54,13 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
  * status. The heading's + button calls [onCreateQuest]; while the venue has no quests, the empty
- * state's button does instead. A quest's pencil calls [onEditQuest] with its id.
+ * state's button does instead. A quest's pencil calls [onEditQuest] with its id; its box archives
+ * it, once confirmed, or unarchives an archived one.
  */
 @Composable
 fun VenueQuestsScreen(
@@ -61,10 +70,20 @@ fun VenueQuestsScreen(
     onEditQuest: (String) -> Unit = {},
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  VenueQuestsContent(state, onCreateQuest, viewModel::retry, modifier, onEditQuest)
+  VenueQuestsContent(
+      state,
+      onCreateQuest,
+      viewModel::retry,
+      modifier,
+      onEditQuest,
+      viewModel::setArchived,
+  )
 }
 
-/** Stateless Quests tab showing [state]; [onRetry] listens to the quests again after a failure. */
+/**
+ * Stateless Quests tab showing [state]; [onRetry] listens to the quests again after a failure, and
+ * [onSetArchived] archives a quest (true) or makes it active again (false).
+ */
 @Composable
 internal fun VenueQuestsContent(
     state: VenueQuestsUiState,
@@ -72,6 +91,7 @@ internal fun VenueQuestsContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     onEditQuest: (String) -> Unit = {},
+    onSetArchived: (Quest, Boolean) -> Unit = { _, _ -> },
 ) {
   val empty = state is VenueQuestsUiState.Loaded && state.quests.isEmpty()
   Column(modifier.fillMaxSize().padding(AroundSpacing.ScreenHorizontal)) {
@@ -99,27 +119,43 @@ internal fun VenueQuestsContent(
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_QUESTS_LOADING)) }
       VenueQuestsUiState.Failed -> Centered { LoadFailed(onRetry) }
       is VenueQuestsUiState.Loaded ->
-          if (empty) Centered { NoQuests(onCreateQuest) } else QuestList(state.quests, onEditQuest)
+          if (empty) Centered { NoQuests(onCreateQuest) }
+          else QuestList(state.quests, onEditQuest, onSetArchived)
     }
   }
 }
 
-/** The quests as cards, below the heading; a card's pencil calls [onEditQuest] with its id. */
+/**
+ * The quests as cards, below the heading; a card's pencil calls [onEditQuest] with its id, and its
+ * box [onSetArchived] with the quest and whether to archive it.
+ */
 @Composable
-private fun QuestList(quests: List<Quest>, onEditQuest: (String) -> Unit) {
+private fun QuestList(
+    quests: List<Quest>,
+    onEditQuest: (String) -> Unit,
+    onSetArchived: (Quest, Boolean) -> Unit,
+) {
   LazyColumn(
       Modifier.fillMaxSize().testTag(C.Tag.VENUE_QUESTS_LIST),
       contentPadding = PaddingValues(vertical = AroundSpacing.ExtraLarge),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
-    items(quests, key = Quest::id) { quest -> QuestCard(quest) { onEditQuest(quest.id) } }
+    items(quests, key = Quest::id) { quest ->
+      QuestCard(quest, { onEditQuest(quest.id) }, { onSetArchived(quest, it) })
+    }
   }
 }
 
-/** A quest's title, status and a pencil that calls [onEdit]; a quest that isn't active is muted. */
+/**
+ * A quest's title, status, a pencil that calls [onEdit] and a box that calls [onSetArchived]: true
+ * after the venue confirms archiving, false at once for an archived quest. A quest that isn't
+ * active is muted.
+ */
 @Composable
-private fun QuestCard(quest: Quest, onEdit: () -> Unit) {
+private fun QuestCard(quest: Quest, onEdit: () -> Unit, onSetArchived: (Boolean) -> Unit) {
   val active = quest.status == QuestStatus.ACTIVE
+  val archived = quest.status == QuestStatus.ARCHIVED
+  var asking by rememberSaveable { mutableStateOf(false) }
   val colors = MaterialTheme.colorScheme
   val shape = MaterialTheme.shapes.large
   Row(
@@ -143,27 +179,82 @@ private fun QuestCard(quest: Quest, onEdit: () -> Unit) {
         background = if (active) colors.tertiary else colors.outline,
         content = if (active) colors.onTertiary else colors.onSurfaceVariant,
     )
-    EditButton(quest.title, onEdit)
+    CardButton(
+        R.drawable.ic_edit,
+        stringResource(R.string.venue_quests_edit, quest.title),
+        C.Tag.VENUE_QUEST_EDIT,
+        onEdit,
+    )
+    // Only archiving asks first, since it hides the quest from explorers
+    CardButton(
+        R.drawable.ic_archive,
+        stringResource(
+            if (archived) R.string.venue_quests_unarchive else R.string.venue_quests_archive,
+            quest.title,
+        ),
+        C.Tag.VENUE_QUEST_ARCHIVE,
+    ) {
+      if (archived) onSetArchived(false) else asking = true
+    }
   }
+  if (asking) ArchiveDialog(quest.title, { asking = false }) { onSetArchived(true) }
 }
 
-/** Figma's round pencil button; TalkBack reads "Edit <title>". */
+/** Asks before archiving the quest [title]: [onArchive] once confirmed; both buttons [onClose]. */
 @Composable
-private fun EditButton(title: String, onEdit: () -> Unit) {
+private fun ArchiveDialog(title: String, onClose: () -> Unit, onArchive: () -> Unit) {
+  AlertDialog(
+      onDismissRequest = onClose,
+      confirmButton = {
+        TextButton(
+            onClick = {
+              onClose()
+              onArchive()
+            },
+            colors =
+                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.testTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM),
+        ) {
+          Text(stringResource(R.string.venue_quests_archive_confirm))
+        }
+      },
+      dismissButton = {
+        TextButton(
+            onClick = onClose,
+            // The default primary colour is unreadable on the dark background
+            colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
+            modifier = Modifier.testTag(C.Tag.VENUE_QUEST_ARCHIVE_KEEP),
+        ) {
+          Text(stringResource(R.string.venue_quests_archive_keep))
+        }
+      },
+      title = { Text(stringResource(R.string.venue_quests_archive_title)) },
+      text = { Text(stringResource(R.string.venue_quests_archive_text, title)) },
+  )
+}
+
+/** One of Figma's round card buttons, showing [icon]; TalkBack reads [description]. */
+@Composable
+private fun CardButton(
+    @DrawableRes icon: Int,
+    description: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
   FilledIconButton(
-      onClick = onEdit,
+      onClick = onClick,
       shape = AroundPillShape,
       colors =
           IconButtonDefaults.filledIconButtonColors(
               containerColor = MaterialTheme.colorScheme.primaryContainer,
               contentColor = MaterialTheme.colorScheme.onSurface,
           ),
-      modifier = Modifier.size(EDIT_BUTTON_SIZE).testTag(C.Tag.VENUE_QUEST_EDIT),
+      modifier = Modifier.size(CARD_BUTTON_SIZE).testTag(tag),
   ) {
     Icon(
-        painterResource(R.drawable.ic_edit),
-        contentDescription = stringResource(R.string.venue_quests_edit, title),
-        modifier = Modifier.size(EDIT_ICON_SIZE),
+        painterResource(icon),
+        contentDescription = description,
+        modifier = Modifier.size(CARD_ICON_SIZE),
     )
   }
 }
@@ -253,8 +344,8 @@ private fun ColumnScope.Centered(content: @Composable () -> Unit) {
 }
 
 private val CARD_BORDER = 1.dp
-private val EDIT_BUTTON_SIZE = 28.dp
-private val EDIT_ICON_SIZE = 16.dp
+private val CARD_BUTTON_SIZE = 28.dp
+private val CARD_ICON_SIZE = 16.dp
 private val BUTTON_HEIGHT = 52.dp
 /** The width of the empty state's text and button in Figma. */
 private val EMPTY_STATE_WIDTH = 260.dp
