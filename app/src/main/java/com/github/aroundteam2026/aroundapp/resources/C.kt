@@ -281,6 +281,7 @@ object C {
     const val COMPLETION_SUBMIT = "completion_submit"
     const val COMPLETION_ANSWER = "completion_answer"
     const val COMPLETION_SAVE_ERROR = "completion_save_error"
+    const val COMPLETION_HINT = "completion_hint"
 
     // Proof photo picker
     const val PROOF_PHOTO = "proof_photo"

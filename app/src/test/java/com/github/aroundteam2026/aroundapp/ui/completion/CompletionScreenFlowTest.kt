@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -76,10 +78,11 @@ class CompletionScreenFlowTest {
     compose.runOnIdle { store.clear() }
   }
 
+  /** Shows the form of a new approved reservation; returns that reservation's id. */
   private fun show(
       proofType: ProofType = ProofType.TEXT,
       expectedStatus: CompletionFormStatus = CompletionFormStatus.READY,
-  ) {
+  ): String {
     shadowOf(app).grantPermissions(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
     shadowOf(app.getSystemService(LocationManager::class.java)).setLocationEnabled(true)
     val reservationId = runBlocking {
@@ -113,6 +116,28 @@ class CompletionScreenFlowTest {
       }
     }
     compose.waitUntil { viewModel.uiState.value.status == expectedStatus }
+    return reservationId
+  }
+
+  // A teammate's proof arrives while the form is open: the screen says so and stays open
+  @Test
+  fun aTeammatesProofKeepsTheScreenOpenAndSaysSo() {
+    val reservationId = show()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("Mochi")
+
+    runBlocking {
+      completions.submit(reservationId, venue.id, "friend", Proof.Text("By the till")).getOrThrow()
+    }
+
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_HINT)
+        .assertTextContains(app.getString(R.string.completion_sent_by_teammate))
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_SUBMIT)
+        .assertTextContains(app.getString(R.string.completion_sent))
+        .assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SCREEN).assertIsDisplayed()
+    assertEquals(emptyList<String>(), submitted)
   }
 
   @Test
@@ -125,12 +150,12 @@ class CompletionScreenFlowTest {
     assertEquals("  Mochi  ", viewModel.uiState.value.answer)
     assertEquals(
         emptyList<Any>(),
-        runBlocking { completions.observeForExplorer("explorer").first() },
+        runBlocking { completions.observeForVenue(venue.id).first() },
     )
     completions.forcedFailure = null
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertTextContains("Try again").performClick()
     compose.waitUntil { submitted.size == 1 }
-    val stored = runBlocking { completions.observeForExplorer("explorer").first().single() }
+    val stored = runBlocking { completions.observeForVenue(venue.id).first().single() }
     assertEquals(Proof.Text("Mochi"), stored.proof)
     assertEquals(listOf(stored.id), submitted)
     compose.runOnIdle { venueName = "Updated venue name" }

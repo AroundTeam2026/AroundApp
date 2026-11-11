@@ -137,7 +137,7 @@ class CompletionViewModelTest {
     runCurrent()
   }
 
-  private suspend fun stored() = fakeCompletions.observeForExplorer(EXPLORER).first()
+  private suspend fun stored() = fakeCompletions.observeForReservation(reservationId).first()
 
   /** Where the fake stores the [upload]th photo of the reservation. */
   private fun location(upload: Int) = "gs://fake-bucket/proofs/$reservationId/photo-$upload"
@@ -721,15 +721,76 @@ class CompletionViewModelTest {
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
+  // Not saved, so the screen doesn't close as if this member's proof was sent
   @Test
-  fun aPartyMembersCompletionOfTheSameReservationShowsSubmitted() = test {
+  fun aTeammatesCompletionOfTheSameReservationShowsSentByTeammate() = test {
     reservationId = book("fox")
-    fakeCompletions.submit(reservationId, CAFE, "friend", Proof.Text("By the till")).getOrThrow()
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("By the till")).getOrThrow()
     viewModel
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+    assertTrue(state.sentByTeammate)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertFalse(state.isEditable)
+  }
+
+  @Test
+  fun aTeammateSendingWhileTheFormIsOpenLocksItWithoutSaving() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    assertTrue(state.canSubmit)
+
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    runCurrent()
+
+    assertTrue(state.sentByTeammate)
+    assertEquals(SaveState.Idle, state.saveState)
     assertFalse(state.canSubmit)
+    viewModel.updateAnswer("Changed")
+    assertEquals("By the till", state.answer)
+    viewModel.submit()
+    runCurrent()
+    assertEquals(0, completions.calls)
+  }
+
+  // The teammate's proof clears an earlier send's error, which no longer applies
+  @Test
+  fun aTeammatesProofAfterAFailedSendClearsTheError() = test {
+    fakeCompletions.forcedFailure = IOException("offline")
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    viewModel.submit()
+    runCurrent()
+    assertEquals(SaveState.Failed, state.saveState)
+
+    fakeCompletions.forcedFailure = null
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    runCurrent()
+
+    assertTrue(state.sentByTeammate)
+    assertEquals(SaveState.Idle, state.saveState)
+  }
+
+  // Both members send at once and the teammate's arrives first: this member's send then fails as
+  // already stored, and the form shows the teammate's proof rather than an error to retry
+  @Test
+  fun aSendBeatenByATeammateEndsAsSentByTeammate() = test {
+    open("fox")
+    val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
+    viewModel.updateAnswer("By the till")
+    viewModel.submit()
+    runCurrent()
+    assertEquals(SaveState.Saving, state.saveState)
+
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    runCurrent()
+    assertEquals(SaveState.Saving, state.saveState)
+    submitGate.complete(Unit)
+    runCurrent()
+
+    assertTrue(state.sentByTeammate)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(FRIEND, stored().single().explorerUid)
   }
 
   @Test
@@ -803,6 +864,7 @@ class CompletionViewModelTest {
   private companion object {
     const val CAFE = "cafe"
     const val EXPLORER = "explorer"
+    const val FRIEND = "friend"
     const val NOW = 1_800_000_000_000L
     val VENUE_LOCATION = Location(46.5220, 6.6330)
     val PHOTO: Uri = Uri.parse("content://media/photos/1")
