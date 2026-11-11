@@ -61,7 +61,12 @@ class JoinPartyNavigationTest {
           onSignOut = {},
           navController = navController,
           overview = { onOpenQuest, onJoinParty ->
-            OverviewScreen(overviewViewModel, onOpenQuest, onJoinParty)
+            OverviewScreen(
+                overviewViewModel,
+                onOpenQuest,
+                onJoinParty,
+                onSendNewProof = { _, _ -> },
+            )
           },
           joinParty = { close ->
             closeScreen = close

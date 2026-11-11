@@ -21,8 +21,9 @@ import com.github.aroundteam2026.aroundapp.ui.SaveState
  * @property saveState Where submitting stands: [SaveState.Saved] once the proof is submitted, also
  *   when it was submitted earlier.
  * @property locationError Why the last location check blocked submission, or null otherwise.
- * @property sentByTeammate Whether another member of the party sent its proof: the form is locked,
- *   and [saveState] doesn't become [SaveState.Saved], which is kept for a proof this explorer sent.
+ * @property sentByTeammate Whether the venue approved the proof another member of the party sent:
+ *   the form is locked, and [saveState] doesn't become [SaveState.Saved], which is kept for a proof
+ *   this explorer sent.
  */
 data class CompletionUiState(
     val status: CompletionFormStatus = CompletionFormStatus.LOADING,

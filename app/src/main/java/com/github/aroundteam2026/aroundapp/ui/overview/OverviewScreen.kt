@@ -56,17 +56,21 @@ import java.time.Clock
  *
  * @param onOpenQuest Opens the details of this quest on its venue's page, when its card is tapped.
  * @param onJoinParty Opens the screen where the explorer joins a friend's party by its code.
+ * @param onSendNewProof Opens the proof form of the reservation with this id, at the venue with
+ *   this name, to replace the party's proof.
  */
 @Composable
 fun OverviewScreen(
     explorerUid: String,
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     onJoinParty: () -> Unit,
+    onSendNewProof: (reservationId: String, venueName: String) -> Unit,
 ) =
     OverviewScreen(
         viewModel(factory = OverviewViewModel.factory(explorerUid)),
         onOpenQuest,
         onJoinParty,
+        onSendNewProof,
     )
 
 /** The overview showing what [viewModel] holds; see the other [OverviewScreen]. */
@@ -75,10 +79,19 @@ fun OverviewScreen(
     viewModel: OverviewViewModel,
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     onJoinParty: () -> Unit,
+    onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  OverviewContent(state, onOpenQuest, viewModel::retry, viewModel::cancel, onJoinParty, modifier)
+  OverviewContent(
+      state,
+      onOpenQuest,
+      viewModel::retry,
+      viewModel::cancel,
+      onJoinParty,
+      onSendNewProof,
+      modifier,
+  )
 }
 
 /**
@@ -91,6 +104,8 @@ fun OverviewScreen(
  * @param onCancel Cancels the reservation with this id, once the explorer has confirmed on its
  *   card.
  * @param onJoinParty Called when the explorer taps "Join a party", beside the title.
+ * @param onSendNewProof Called with the reservation's id and its venue's name when the explorer
+ *   taps "Send new proof" on a card whose proof the venue hasn't approved.
  * @param clock Tells which day is today, and the time zone the slots are written in.
  */
 @Composable
@@ -100,6 +115,7 @@ fun OverviewContent(
     onRetry: () -> Unit,
     onCancel: (reservationId: String) -> Unit,
     onJoinParty: () -> Unit,
+    onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
 ) {
@@ -112,7 +128,7 @@ fun OverviewContent(
       OverviewStatus.FAILED -> Centered { Failed(onRetry) }
       OverviewStatus.LOADED ->
           if (state.rows.isEmpty()) Centered { Empty() }
-          else Rows(state, onOpenQuest, onCancel, clock)
+          else Rows(state, onOpenQuest, onCancel, onSendNewProof, clock)
     }
   }
 }
@@ -195,6 +211,7 @@ private fun Rows(
     state: OverviewUiState,
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     onCancel: (reservationId: String) -> Unit,
+    onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     clock: Clock,
 ) {
   LazyColumn(
@@ -216,6 +233,10 @@ private fun Rows(
           cancelStatus = state.cancelStatusOf(row.reservationId),
           // Once the proof is sent, the quest is done on the explorer's side
           onCancel = if (row.status.cancellable) ({ onCancel(row.reservationId) }) else null,
+          onSendNewProof =
+              if (row.status.proofReplaceable)
+                  ({ onSendNewProof(row.reservationId, row.venueName) })
+              else null,
       )
     }
   }
@@ -300,6 +321,6 @@ private val JOIN_ICON_SIZE = 18.dp
 @Composable
 private fun OverviewPreview() {
   AroundAppTheme {
-    OverviewContent(OverviewUiState(OverviewStatus.LOADED), { _, _ -> }, {}, {}, {})
+    OverviewContent(OverviewUiState(OverviewStatus.LOADED), { _, _ -> }, {}, {}, {}, { _, _ -> })
   }
 }

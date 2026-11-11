@@ -12,6 +12,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -23,10 +24,14 @@ import org.junit.Test
 class FakeCompletionRepositoryTest {
   private lateinit var repository: FakeCompletionRepository
 
+  /** What the repository's clock says now: [FIXED_NOW] until a test moves it. */
+  private var clockNow = FIXED_NOW
+
   /** Gives every test a fresh, empty repository whose clock always returns [FIXED_NOW]. */
   @Before
   fun setUp() {
-    repository = FakeCompletionRepository(now = { FIXED_NOW })
+    clockNow = FIXED_NOW
+    repository = FakeCompletionRepository(now = { clockNow })
   }
 
   /** Submits a completion with [PROOF] and returns its id. */
@@ -59,27 +64,63 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
-  fun submit_twiceForTheSameReservationAndExplorer_failsAndKeepsTheFirst() =
+  fun submit_overAPendingCompletion_replacesTheProofAndKeepsItPending() =
       runBlocking<Unit> {
         submit()
-        val first = stored()
+
+        clockNow = FIXED_NOW + 1_000L
+        val id = repository.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, OTHER_PROOF).getOrThrow()
+
+        assertEquals(COMPLETION_ID, id)
+        assertEquals(
+            Completion(
+                COMPLETION_ID,
+                RESERVATION_ID,
+                VENUE_ID,
+                EXPLORER_UID,
+                OTHER_PROOF,
+                CompletionStatus.PENDING,
+                rejectReason = null,
+                submittedAt = FIXED_NOW + 1_000L,
+            ),
+            stored(),
+        )
+      }
+
+  // The party has one proof, so a teammate's new proof is the party's, and is signed by them
+  @Test
+  fun submit_byAnotherMemberOverAPendingCompletion_replacesItAsTheirs() =
+      runBlocking<Unit> {
+        submit()
+
+        repository.submit(RESERVATION_ID, VENUE_ID, OTHER_ID, OTHER_PROOF).getOrThrow()
+
+        assertEquals(OTHER_ID, stored().explorerUid)
+        assertEquals(OTHER_PROOF, stored().proof)
+      }
+
+  @Test
+  fun submit_overARejectedCompletion_makesItPendingWithoutItsReason() =
+      runBlocking<Unit> {
+        repository.reject(submit(), REASON).getOrThrow()
+
+        repository.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, OTHER_PROOF).getOrThrow()
+
+        assertEquals(CompletionStatus.PENDING, stored().status)
+        assertNull(stored().rejectReason)
+        assertEquals(OTHER_PROOF, stored().proof)
+      }
+
+  @Test
+  fun submit_overAnApprovedCompletion_failsAndKeepsIt() =
+      runBlocking<Unit> {
+        repository.approve(submit()).getOrThrow()
+        val approved = stored()
 
         val result = repository.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, OTHER_PROOF)
 
         assertTrue(result.exceptionOrNull() is IllegalStateException)
-        assertEquals(first, stored())
-      }
-
-  @Test
-  fun submit_byAnotherMemberOfTheParty_failsAndKeepsTheFirst() =
-      runBlocking<Unit> {
-        submit()
-        val first = stored()
-
-        val result = repository.submit(RESERVATION_ID, VENUE_ID, OTHER_ID, OTHER_PROOF)
-
-        assertTrue(result.exceptionOrNull() is IllegalStateException)
-        assertEquals(first, stored())
+        assertEquals(approved, stored())
       }
 
   @Test

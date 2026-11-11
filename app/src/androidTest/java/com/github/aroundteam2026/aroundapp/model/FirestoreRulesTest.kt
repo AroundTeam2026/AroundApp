@@ -25,6 +25,7 @@ import java.util.UUID
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
@@ -1266,24 +1267,65 @@ class FirestoreRulesTest {
   }
 
   @Test
-  fun explorerSubmitsOnlyOnce() {
+  fun explorerCanSendANewProofWhilePendingAndAfterARejectionButNotOnceApproved() {
     val explorer = newUser(Role.EXPLORER)
     val venue = newUser(Role.VENUE)
     val completion = submittedCompletion(explorer, venue)
-    val again = assertSucceeds(completion.get(Source.SERVER)).data!!
+    val reservationId = assertSucceeds(completion.get(Source.SERVER)).getString("reservationId")!!
+    val again = completion(reservationId, explorer, venue)
 
-    assertDenied(completion.set(again), "a second submission")
+    assertSucceeds(completion.set(again + ("textAnswer" to "While pending")))
 
     signInAs(venue)
     assertSucceeds(completion.update(rejection()))
     signInAs(explorer)
-    assertDenied(completion.set(again), "a second submission after a rejection")
+    assertSucceeds(completion.set(again + ("textAnswer" to "After the rejection")))
+    val resent = assertSucceeds(completion.get(Source.SERVER))
+    assertEquals("PENDING", resent.getString("status"))
+    assertEquals("After the rejection", resent.getString("textAnswer"))
+    assertFalse("the old reason is gone", resent.contains("rejectReason"))
+
+    signInAs(venue)
+    assertSucceeds(completion.update("status", "APPROVED"))
+    signInAs(explorer)
+    assertDenied(completion.set(again), "a new proof for an approved one")
   }
 
   @Test
-  fun anotherMemberCannotSubmitOnceThePartysProofIsSent() {
+  fun aNewProofIsAsValidAsTheFirstAndKeepsItsReservationAndVenue() {
+    val explorer = newUser(Role.EXPLORER)
+    val venue = newUser(Role.VENUE)
+    val otherVenue = newUser(Role.VENUE)
+    val completion = submittedCompletion(explorer, venue)
+    val reservationId = assertSucceeds(completion.get(Source.SERVER)).getString("reservationId")!!
+    val valid = completion(reservationId, explorer, venue)
+    val otherApproved = approvedReservationOf(explorer, venue)
+
+    for ((name, invalid) in
+        mapOf(
+            "an unknown field" to valid + ("questId" to "quest-1"),
+            "no submittedAt" to valid - "submittedAt",
+            "already approved" to valid + ("status" to "APPROVED"),
+            "a reject reason" to valid + ("rejectReason" to "Blurry"),
+            "another venue" to valid + ("venueId" to otherVenue.uid),
+            "a reservation that doesn't exist" to valid + ("reservationId" to newReservation().id),
+            "another approved reservation of theirs" to
+                valid + ("reservationId" to otherApproved.id),
+            "a photo instead of the answer" to valid - "textAnswer" + ("photoUrl" to PHOTO_URL),
+            "both proofs" to valid + ("photoUrl" to PHOTO_URL),
+            "a blank answer" to valid + ("textAnswer" to " "),
+            "a too long answer" to valid + ("textAnswer" to "a".repeat(1001)),
+        )) {
+      assertDenied(completion.set(invalid), name)
+    }
+    assertSucceeds(completion.set(valid))
+  }
+
+  @Test
+  fun aNewProofComesFromAJoinedMemberAsThemselvesOnly() {
     val explorer = newUser(Role.EXPLORER)
     val friend = newUser(Role.EXPLORER)
+    val stranger = newUser(Role.EXPLORER)
     val venue = newUser(Role.VENUE)
     val reservation = pendingReservationOf(explorer, venue, proofType = "TEXT")
     joinAll(reservation, friend)
@@ -1292,16 +1334,28 @@ class FirestoreRulesTest {
     signInAs(explorer)
     assertSucceeds(completionOf(reservation).set(completion(reservation.id, explorer, venue)))
 
+    signInAs(stranger)
+    assertDenied(
+        completionOf(reservation).set(completion(reservation.id, stranger, venue)),
+        "someone who isn't in the party",
+    )
     signInAs(friend)
     assertDenied(
-        completionOf(reservation).set(completion(reservation.id, friend, venue)),
-        "another member's proof",
+        completionOf(reservation).set(completion(reservation.id, explorer, venue)),
+        "a proof signed by another member",
     )
     assertDenied(
         completions()
             .document("${reservation.id}_${friend.uid}")
             .set(completion(reservation.id, friend, venue)),
-        "another member's proof under an id built from their uid",
+        "an id built from their uid, which is not the party's",
+    )
+    assertSucceeds(
+        completionOf(reservation).set(completion(reservation.id, friend, venue)),
+    )
+    assertEquals(
+        friend.uid,
+        assertSucceeds(completionOf(reservation).get(Source.SERVER)).getString("explorerUid"),
     )
   }
 
