@@ -19,6 +19,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationToken
 import com.google.android.gms.tasks.TaskCompletionSource
 import com.google.android.gms.tasks.Tasks
+import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -55,6 +56,19 @@ class FusedLocationRepositoryTest {
 
   private fun clientReturns(location: android.location.Location?) {
     every { client.getCurrentLocation(any<Int>(), any()) } returns Tasks.forResult(location)
+  }
+
+  /**
+   * Makes every location request, approximate or precise, wait for a fix that never comes, and
+   * returns the cancellation token the request gets, to check that it was cancelled.
+   */
+  private fun pendingFix(): CapturingSlot<CancellationToken> {
+    val token = slot<CancellationToken>()
+    every { client.getCurrentLocation(any<Int>(), capture(token)) } returns
+        TaskCompletionSource<android.location.Location>().task
+    every { client.getCurrentLocation(any<CurrentLocationRequest>(), capture(token)) } returns
+        TaskCompletionSource<android.location.Location>().task
+    return token
   }
 
   /** A repository built from a screen's context, and a weak reference to that context. */
@@ -141,9 +155,7 @@ class FusedLocationRepositoryTest {
   fun cancellingTheCallerCancelsTheLocationRequest() = runTest {
     // Leaving the map while it locates must not keep the location hardware running
     grant(ACCESS_FINE_LOCATION)
-    val token = slot<CancellationToken>()
-    every { client.getCurrentLocation(any<Int>(), capture(token)) } returns
-        TaskCompletionSource<android.location.Location>().task
+    val token = pendingFix()
 
     val call = launch { repository.currentLocation() }
     runCurrent()
@@ -206,9 +218,7 @@ class FusedLocationRepositoryTest {
   fun preciseLocationGivesUpAndStopsTheGpsWhenNoFixComesInTime() = runTest {
     // Indoors, Play services may look for a fix for as long as it is asked to
     grant(ACCESS_FINE_LOCATION)
-    val token = slot<CancellationToken>()
-    every { client.getCurrentLocation(any<CurrentLocationRequest>(), capture(token)) } returns
-        TaskCompletionSource<android.location.Location>().task
+    val token = pendingFix()
 
     val position = async { repository.currentPreciseLocation() }
     advanceTimeBy(PRECISE_FIX_TIMEOUT_MS - 1)
@@ -238,9 +248,7 @@ class FusedLocationRepositoryTest {
   @Test
   fun cancellingThePreciseCallerCancelsTheGpsRequest() = runTest {
     grant(ACCESS_FINE_LOCATION)
-    val token = slot<CancellationToken>()
-    every { client.getCurrentLocation(any<CurrentLocationRequest>(), capture(token)) } returns
-        TaskCompletionSource<android.location.Location>().task
+    val token = pendingFix()
 
     val call = launch { repository.currentPreciseLocation() }
     runCurrent()

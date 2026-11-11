@@ -79,6 +79,8 @@ class FusedLocationRepository(
 
 /**
  * How long [FusedLocationRepository.currentPreciseLocation] waits for a fresh fix before it gives
- * up: long enough for GPS to get one outdoors, short enough that the explorer isn't left waiting.
+ * up: long enough for GPS to get one outdoors, short enough that the explorer isn't left waiting. A
+ * starting value, not measured on a device: a cold first fix can take longer, and trying again then
+ * usually works, as GPS is warm by then.
  */
 internal const val PRECISE_FIX_TIMEOUT_MS = 15_000L
