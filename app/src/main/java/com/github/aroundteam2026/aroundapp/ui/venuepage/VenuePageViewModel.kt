@@ -373,18 +373,20 @@ class VenuePageViewModel(
    */
   private fun show() {
     val (venue, quests, booked, completions) = latest ?: return
-    val accepted = booked?.let {
-      acceptedPartiesOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
+    val view = booked?.let {
+      BookedView(
+          accepted =
+              acceptedPartiesOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing,
+          reservationIds =
+              acceptedReservationsOf(it.reservations, it.partySizes, venueId) -
+                  unconfirmed -
+                  refusing,
+          approved = it.reservations.approvedIds(),
+          codes = partyCodesOf(it.reservations, it.parties, explorerUid, venueId),
+      )
     }
-    val reservationIds = booked?.let {
-      acceptedReservationsOf(it.reservations, it.partySizes, venueId) - unconfirmed - refusing
-    }
-    val approved = booked?.reservations?.approvedIds()
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
-    val codes = booked?.let { partyCodesOf(it.reservations, it.parties, explorerUid, venueId) }
-    mutableUiState.update {
-      it.showing(venue, quests, accepted, reservationIds, approved, refused, completions, codes)
-    }
+    mutableUiState.update { it.showing(venue, quests, view, refused, completions) }
     arriving?.let { questId ->
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
@@ -525,23 +527,34 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
     this.venueId == venueId && status.isActive
 
 /**
- * This page showing [venue], its valid [quests] and the parties and [reservationIds] of the
- * [accepted] ones, with the explorer's [approved] reservations, the proofs in [completions] and the
- * party [codes] they can share, or "not found" when [venue] is null. A quest being accepted that is
- * now accepted is done accepting, a reservation no longer listed is done cancelling, and a quest in
- * [refused] failed. A null [accepted] means the reservations can't be read: the page keeps what it
- * knew and stops offering to accept, cancel, complete or share a code. Null [completions] likewise
- * mean the proofs can't be read, so it stops offering to complete.
+ * What the page shows of the explorer's reservations at this venue.
+ *
+ * @property accepted The party size of each accepted quest, by quest id.
+ * @property reservationIds The reservation of each accepted quest, by quest id.
+ * @property approved Ids of the reservations the venue approved.
+ * @property codes The party codes the explorer can share, by reservation id.
+ */
+private data class BookedView(
+    val accepted: Map<String, Int>,
+    val reservationIds: Map<String, String>,
+    val approved: Set<String>,
+    val codes: Map<String, String>,
+)
+
+/**
+ * This page showing [venue], its valid [quests] and what [booked] says about the explorer's
+ * reservations, with the proofs in [completions], or "not found" when [venue] is null. A quest
+ * being accepted that is now accepted is done accepting, a reservation no longer listed is done
+ * cancelling, and a quest in [refused] failed. A null [booked] means the reservations can't be
+ * read: the page keeps what it knew and stops offering to accept, cancel, complete or share a code.
+ * Null [completions] likewise mean the proofs can't be read, so it stops offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
     quests: List<VenuePageQuest>,
-    accepted: Map<String, Int>?,
-    reservationIds: Map<String, String>?,
-    approved: Set<String>?,
+    booked: BookedView?,
     refused: Set<String>,
     completions: List<Completion>?,
-    codes: Map<String, String>?,
 ): VenuePageUiState =
     if (venue == null) {
       VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
@@ -552,18 +565,18 @@ private fun VenuePageUiState.showing(
               avatar = INITIALS_AVATAR(venue, venue.name),
               address = venue.address,
               venueLocation = venue.location,
-              acceptedParties = accepted ?: acceptedParties,
-              reservationIds = reservationIds ?: this.reservationIds,
+              acceptedParties = booked?.accepted ?: acceptedParties,
+              reservationIds = booked?.reservationIds ?: this.reservationIds,
               acceptingQuestIds =
-                  if (accepted == null) emptySet() else acceptingQuestIds - accepted.keys,
-              failedQuestIds = failedQuestIds - (accepted?.keys ?: emptySet()) + refused,
-              cancellingIds = cancellingIds.intersect(reservationIds?.values.orEmpty()),
-              failedCancelIds = failedCancelIds.intersect(reservationIds?.values.orEmpty()),
-              acceptAvailable = accepted != null,
-              approvedIds = approved ?: approvedIds,
+                  if (booked == null) emptySet() else acceptingQuestIds - booked.accepted.keys,
+              failedQuestIds = failedQuestIds - booked?.accepted?.keys.orEmpty() + refused,
+              cancellingIds = cancellingIds.intersect(booked?.reservationIds?.values.orEmpty()),
+              failedCancelIds = failedCancelIds.intersect(booked?.reservationIds?.values.orEmpty()),
+              acceptAvailable = booked != null,
+              approvedIds = booked?.approved ?: approvedIds,
               completions = completions?.associateBy { it.reservationId } ?: this.completions,
               proofsAvailable = completions != null,
-              partyCodes = codes ?: partyCodes,
+              partyCodes = booked?.codes ?: partyCodes,
           )
           .withQuests(quests)
     }
