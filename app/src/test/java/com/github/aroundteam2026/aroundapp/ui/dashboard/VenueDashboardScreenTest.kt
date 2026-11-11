@@ -235,6 +235,16 @@ class VenueDashboardScreenTest {
     assertEquals(listOf("p2"), opened)
   }
 
+  // A party's proof has its reservation's id, so the two rows must not share a list key
+  @Test
+  fun aProofAndItsReservationShowSideBySide() {
+    show(loaded(upcoming = listOf(pending("a").copy(approved = true)), proofs = listOf(proof("a"))))
+
+    proofRow("a").assertIsDisplayed()
+    scrollTo("${C.Tag.DASHBOARD_ROW}_a")
+    row("a").assertIsDisplayed()
+  }
+
   @Test
   fun onlyProofsShowNoEmptyState() {
     show(loaded(proofs = listOf(proof("p1"))))

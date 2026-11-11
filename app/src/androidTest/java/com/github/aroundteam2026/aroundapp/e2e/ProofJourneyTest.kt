@@ -81,7 +81,7 @@ class ProofJourneyTest : TestCase() {
 
   /** The id of the explorer's proof, which the dashboard tags its row with. */
   private val proofId
-    get() = completionId(reservationId, explorerUid)
+    get() = completionId(reservationId)
 
   /**
    * Puts the device at [HERE], inside the quest's radius, and seeds the venue, its quest asking for
@@ -203,7 +203,7 @@ class ProofJourneyTest : TestCase() {
         // so it never shows up below and the test times out
         Firebase.firestore.waitForPendingWrites().await()
         CompletionRepositoryFirestore(Firebase.firestore)
-            .observeForExplorer(explorerUid)
+            .observeForReservation(reservationId)
             .first { it.isNotEmpty() }
             .single()
       }

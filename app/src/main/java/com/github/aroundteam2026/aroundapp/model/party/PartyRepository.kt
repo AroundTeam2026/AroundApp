@@ -26,7 +26,7 @@ interface PartyRepository {
    * sets its `updatedAt`. The membership is kept.
    *
    * The security rules only let an explorer withdraw themselves, while the reservation is pending
-   * or approved and before they sent their proof. The creator can't withdraw and cancels the
+   * or approved and before their party sent its proof. The creator can't withdraw and cancels the
    * reservation instead. Withdrawing can take an approved party below the size its quest asks for
    * ([meetsPartySize]); the reservation stays approved.
    *
