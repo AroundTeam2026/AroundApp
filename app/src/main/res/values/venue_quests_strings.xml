@@ -13,7 +13,7 @@
     <string name="venue_quests_archive">Archive %1$s</string>
     <string name="venue_quests_unarchive">Unarchive %1$s</string>
     <string name="venue_quests_archive_title">Archive this quest?</string>
-    <string name="venue_quests_archive_text">Explorers won\'t see %1$s anymore. Reservations already made still work.</string>
+    <string name="venue_quests_archive_text">Explorers won\'t see “%1$s” anymore. Reservations already made still work.</string>
     <string name="venue_quests_archive_confirm">Archive</string>
     <string name="venue_quests_archive_keep">Keep it</string>
 </resources>
