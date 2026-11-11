@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -105,7 +107,12 @@ private fun ExplorerProfile(
       ProfileAvatar(user?.pictureUrl, null, pictures)
       Column {
         Text(user?.displayName.orEmpty(), style = MaterialTheme.typography.titleLarge)
-        val since = user?.createdAt?.let { SimpleDateFormat("MMMM yyyy", locale).format(Date(it)) }
+        // The month and year in the order and form this locale writes them
+        val since =
+            user?.createdAt?.let {
+              SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, "MMMMyyyy"), locale)
+                  .format(Date(it))
+            }
         if (since != null) {
           Text(
               stringResource(R.string.profile_explorer_since, since),
@@ -116,7 +123,8 @@ private fun ExplorerProfile(
       }
     }
     ProfileCard(
-        Modifier.testTag(C.Tag.PROFILE_EDIT_ACTION).clickable(onClick = model::startEditing)
+        Modifier.testTag(C.Tag.PROFILE_EDIT_ACTION)
+            .clickable(role = Role.Button, onClick = model::startEditing)
     ) {
       Icon(painterResource(R.drawable.ic_profile), null, Modifier.size(ROW_ICON_SIZE))
       Column(Modifier.weight(1f)) {
@@ -132,7 +140,9 @@ private fun ExplorerProfile(
       }
       Icon(painterResource(R.drawable.ic_chevron_right), null)
     }
-    ProfileCard(Modifier.testTag(C.Tag.PROFILE_SIGN_OUT).clickable(onClick = onSignOut)) {
+    ProfileCard(
+        Modifier.testTag(C.Tag.PROFILE_SIGN_OUT).clickable(role = Role.Button, onClick = onSignOut)
+    ) {
       Icon(
           painterResource(R.drawable.ic_profile_logout),
           null,

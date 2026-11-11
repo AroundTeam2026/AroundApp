@@ -2,10 +2,20 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
+import android.graphics.Bitmap
+import android.graphics.Color.RED
+import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.Role as SemanticsRole
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -19,18 +29,42 @@ import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ProfileEditScreenTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val users = FakeUserRepository()
-  private val pictures = FakeUserPictureRepository()
+  // Every uploaded picture is a red square, so the avatar's colour tells it from the placeholder
+  private val pictures = FakeUserPictureRepository { redPhoto() }
+
+  private fun redPhoto(): ByteArray {
+    val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(RED) }
+    return ByteArrayOutputStream().use {
+      bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+      it.toByteArray()
+    }
+  }
+
+  /** A saved picture, as a profile holds it. */
+  private fun savedPicture(): String = runBlocking {
+    pictures.upload("explorer", Uri.parse("content://photos/saved")).getOrThrow()
+  }
+
+  /** Whether the edit form's avatar shows the red picture rather than the placeholder. */
+  private fun avatarShowsThePicture(): Boolean {
+    val image = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_AVATAR).captureToImage()
+    val centre = image.toPixelMap()[image.width / 2, image.height / 2].toArgb()
+    return android.graphics.Color.red(centre) > 200 && android.graphics.Color.green(centre) < 60
+  }
 
   private fun launch(
       repository: UserRepository = users,
@@ -99,5 +133,34 @@ class ProfileEditScreenTest {
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_CONTINUE).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).assertIsDisplayed()
     assertEquals(null, runBlocking { users.getUser("explorer")?.pictureUrl })
+  }
+
+  @Test
+  fun removePhotoShowsThePlaceholderAtOnce() {
+    launch(pictureUrl = savedPicture())
+    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).performClick()
+    compose.waitUntil(5_000) { avatarShowsThePicture() }
+
+    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO).performClick()
+    compose.waitUntil(5_000) { !avatarShowsThePicture() }
+    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO).assertDoesNotExist()
+  }
+
+  @Test
+  fun removePhotoIsOnlyOfferedWithAPicture() {
+    launch()
+    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).performClick()
+    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_NAME).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO).assertDoesNotExist()
+  }
+
+  @Test
+  fun theProfileCardsAreAnnouncedAsButtons() {
+    launch()
+    for (tag in listOf(C.Tag.PROFILE_EDIT_ACTION, C.Tag.PROFILE_SIGN_OUT)) {
+      compose
+          .onNodeWithTag(tag)
+          .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, SemanticsRole.Button))
+    }
   }
 }

@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,6 +65,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -151,83 +153,17 @@ internal fun ProfileForm(
           )
           .testTag(C.Tag.PROFILE_SETUP_SCREEN),
   ) {
-    if (editing) {
-      IconButton(
-          onClick = onBack,
-          enabled = !form.saving,
-          modifier = Modifier.testTag(C.Tag.PROFILE_EDIT_BACK),
-      ) {
-        Icon(
-            painterResource(R.drawable.ic_chevron_left),
-            stringResource(R.string.profile_edit_back),
-        )
-      }
-      Spacer(Modifier.height(36.dp))
-    } else Spacer(Modifier.height(80.dp))
-    Text(
-        stringResource(if (editing) R.string.profile_edit_title else R.string.profile_setup_title),
-        style = AroundTextStyles.SetupTitle,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
-    Spacer(Modifier.height(AroundSpacing.Small))
-    Text(
-        stringResource(
-            if (editing) R.string.profile_edit_description else R.string.profile_setup_description
-        ),
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    FormHeader(editing, backEnabled = !form.saving, onBack)
     Spacer(Modifier.height(AroundSpacing.SetupGap))
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-      ProfileAvatar(
-          if (editing && !form.removePhoto) profile?.pictureUrl else null,
-          form.photo,
-          pictures,
-          Modifier.testTag(C.Tag.PROFILE_SETUP_AVATAR),
-      )
-      Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        OutlinedButton(
-            onClick = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
-            enabled = !form.saving && !preparingPhoto,
-            shape = AroundShapes.medium,
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
-            colors =
-                ButtonDefaults.outlinedButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = AroundTheme.colors.accentText,
-                ),
-            modifier = Modifier.height(44.dp).testTag(C.Tag.PROFILE_SETUP_ADD_PHOTO),
-        ) {
-          Text(
-              stringResource(
-                  if (editing) R.string.profile_edit_change_photo
-                  else R.string.profile_setup_add_photo
-              )
-          )
-        }
-        if (editing && (form.photo != null || (!form.removePhoto && profile?.pictureUrl != null))) {
-          TextButton(
-              onClick = model::removePhoto,
-              enabled = !form.saving,
-              modifier = Modifier.testTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO),
-          ) {
-            Text(
-                stringResource(R.string.profile_edit_remove_photo),
-                color = MaterialTheme.colorScheme.error,
-            )
-          }
-        } else if (!editing) {
-          Text(
-              stringResource(R.string.profile_setup_photo_optional),
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-      }
-    }
+    PhotoRow(
+        form,
+        savedPicture = profile?.pictureUrl?.takeIf { editing && !form.removePhoto },
+        editing,
+        pickEnabled = !form.saving && !preparingPhoto,
+        pictures,
+        onPick = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
+        onRemove = model::removePhoto,
+    )
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
     Text(
         stringResource(R.string.profile_setup_name),
@@ -248,15 +184,7 @@ internal fun ProfileForm(
         shape = AroundShapes.extraSmall,
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.PROFILE_SETUP_NAME),
     )
-    val errorText =
-        when (form.error) {
-          ProfileSetupError.NAME_REQUIRED -> R.string.profile_setup_name_required
-          ProfileSetupError.NAME_TOO_LONG -> R.string.profile_setup_name_too_long
-          ProfileSetupError.SAVE_FAILED ->
-              if (editing) R.string.profile_edit_save_failed else R.string.profile_setup_save_failed
-          null -> if (photoError) R.string.profile_setup_photo_failed else null
-        }
-    if (errorText != null) {
+    errorTextOf(form.error, editing, photoError)?.let { errorText ->
       Spacer(Modifier.height(AroundSpacing.Small))
       Text(
           stringResource(errorText),
@@ -269,21 +197,137 @@ internal fun ProfileForm(
         onClick = model::save,
         enabled = !form.saving && !preparingPhoto,
         shape = AroundShapes.medium,
-        modifier = Modifier.fillMaxWidth().height(54.dp).testTag(C.Tag.PROFILE_SETUP_CONTINUE),
+        modifier =
+            Modifier.fillMaxWidth().height(CONTINUE_HEIGHT).testTag(C.Tag.PROFILE_SETUP_CONTINUE),
     ) {
-      Text(
-          stringResource(
-              if (form.saving) R.string.profile_setup_saving
-              else if (editing) R.string.profile_edit_save else R.string.profile_setup_continue
-          )
-      )
+      Text(stringResource(continueLabelOf(form.saving, editing)))
     }
   }
 }
 
+/** The title and copy of the form; in edit mode, with a back arrow above them. */
+@Composable
+private fun FormHeader(editing: Boolean, backEnabled: Boolean, onBack: () -> Unit) {
+  if (editing) {
+    IconButton(
+        onClick = onBack,
+        enabled = backEnabled,
+        modifier = Modifier.testTag(C.Tag.PROFILE_EDIT_BACK),
+    ) {
+      Icon(painterResource(R.drawable.ic_chevron_left), stringResource(R.string.profile_edit_back))
+    }
+    Spacer(Modifier.height(EDIT_TITLE_GAP))
+  } else {
+    Spacer(Modifier.height(SETUP_TITLE_GAP))
+  }
+  Text(
+      stringResource(if (editing) R.string.profile_edit_title else R.string.profile_setup_title),
+      style = AroundTextStyles.SetupTitle,
+      color = MaterialTheme.colorScheme.onBackground,
+  )
+  Spacer(Modifier.height(AroundSpacing.Small))
+  Text(
+      stringResource(
+          if (editing) R.string.profile_edit_description else R.string.profile_setup_description
+      ),
+      style = MaterialTheme.typography.bodyLarge,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+}
+
+/**
+ * The avatar beside the photo actions. It shows the picked photo, else [savedPicture]; "Remove
+ * photo" appears in edit mode while there is either to remove, and the setup form says the photo is
+ * optional instead.
+ */
+@Composable
+private fun PhotoRow(
+    form: ProfileSetupFormState,
+    savedPicture: String?,
+    editing: Boolean,
+    pickEnabled: Boolean,
+    pictures: UserPictureRepository,
+    onPick: () -> Unit,
+    onRemove: () -> Unit,
+) {
+  Row(
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    ProfileAvatar(
+        savedPicture,
+        form.photo,
+        pictures,
+        Modifier.testTag(C.Tag.PROFILE_SETUP_AVATAR),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(PHOTO_ACTIONS_GAP)) {
+      OutlinedButton(
+          onClick = onPick,
+          enabled = pickEnabled,
+          shape = AroundShapes.medium,
+          border = BorderStroke(PHOTO_BUTTON_BORDER, MaterialTheme.colorScheme.primary),
+          colors =
+              ButtonDefaults.outlinedButtonColors(
+                  containerColor = MaterialTheme.colorScheme.surface,
+                  contentColor = AroundTheme.colors.accentText,
+              ),
+          modifier = Modifier.height(PHOTO_BUTTON_HEIGHT).testTag(C.Tag.PROFILE_SETUP_ADD_PHOTO),
+      ) {
+        Text(
+            stringResource(
+                if (editing) R.string.profile_edit_change_photo
+                else R.string.profile_setup_add_photo
+            )
+        )
+      }
+      when {
+        editing && (form.photo != null || savedPicture != null) ->
+            TextButton(
+                onClick = onRemove,
+                enabled = !form.saving,
+                modifier = Modifier.testTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO),
+            ) {
+              Text(
+                  stringResource(R.string.profile_edit_remove_photo),
+                  color = MaterialTheme.colorScheme.error,
+              )
+            }
+        !editing ->
+            Text(
+                stringResource(R.string.profile_setup_photo_optional),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+      }
+    }
+  }
+}
+
+/** The message under the name field for [error], or for a photo that couldn't be prepared. */
+@StringRes
+internal fun errorTextOf(error: ProfileSetupError?, editing: Boolean, photoError: Boolean): Int? =
+    when (error) {
+      ProfileSetupError.NAME_REQUIRED -> R.string.profile_setup_name_required
+      ProfileSetupError.NAME_TOO_LONG -> R.string.profile_setup_name_too_long
+      ProfileSetupError.SAVE_FAILED ->
+          if (editing) R.string.profile_edit_save_failed else R.string.profile_setup_save_failed
+      null -> if (photoError) R.string.profile_setup_photo_failed else null
+    }
+
+/** The label of the form's main button. */
+@StringRes
+internal fun continueLabelOf(saving: Boolean, editing: Boolean): Int =
+    when {
+      saving -> R.string.profile_setup_saving
+      editing -> R.string.profile_edit_save
+      else -> R.string.profile_setup_continue
+    }
+
 /**
  * Shows a selected local picture or the saved Storage picture, with the same fallback in both
  * forms.
+ *
+ * @param io Where the saved picture is downloaded and decoded, off the main thread.
  */
 @Composable
 internal fun ProfileAvatar(
@@ -291,6 +335,7 @@ internal fun ProfileAvatar(
     photo: Uri?,
     pictures: UserPictureRepository,
     modifier: Modifier = Modifier,
+    io: CoroutineDispatcher = Dispatchers.IO,
 ) {
   val context = LocalContext.current.applicationContext
   val photos = remember(context) { ProofPhotos(context) }
@@ -301,7 +346,7 @@ internal fun ProfileAvatar(
               when {
                 photo != null -> photos.preview(photo)
                 pictureUrl != null ->
-                    withContext(Dispatchers.IO) {
+                    withContext(io) {
                       val bytes = pictures.download(pictureUrl).getOrThrow()
                       BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
                     }
@@ -314,17 +359,31 @@ internal fun ProfileAvatar(
             }
       }
   Box(
-      modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+      modifier
+          .size(AVATAR_SIZE)
+          .clip(CircleShape)
+          .background(MaterialTheme.colorScheme.primaryContainer),
       contentAlignment = Alignment.Center,
   ) {
-    if (preview != null)
-        Image(preview!!, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-    else
-        Image(
-            painterResource(R.drawable.ic_profile),
-            null,
-            Modifier.size(28.dp),
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
-        )
+    if (preview != null) {
+      Image(preview!!, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    } else {
+      Image(
+          painterResource(R.drawable.ic_profile),
+          null,
+          Modifier.size(AVATAR_ICON_SIZE),
+          colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+      )
+    }
   }
 }
+
+// The form's own geometry, from the Figma setup and edit frames
+private val SETUP_TITLE_GAP = 80.dp
+private val EDIT_TITLE_GAP = 36.dp
+private val PHOTO_ACTIONS_GAP = 6.dp
+private val PHOTO_BUTTON_HEIGHT = 44.dp
+private val PHOTO_BUTTON_BORDER = 1.5.dp
+private val CONTINUE_HEIGHT = 54.dp
+private val AVATAR_SIZE = 64.dp
+private val AVATAR_ICON_SIZE = 28.dp
