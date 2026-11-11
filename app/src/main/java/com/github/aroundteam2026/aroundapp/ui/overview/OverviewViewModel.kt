@@ -22,10 +22,14 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
+import com.github.aroundteam2026.aroundapp.ui.proof.observeProofSenders
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -46,8 +50,9 @@ import kotlinx.coroutines.launch
  *
  * It listens to the explorer's reservations and keeps the pending and approved ones, each with its
  * quest, read once, and its venue and party, which it listens to, as well as their completions,
- * which say where the party's proof stands, whichever member sent it. Rows follow the reservations,
- * the venues, the parties and the completions as they change. If anything fails, including the
+ * which say where the party's proof stands, whichever member sent it, and the profile of a member
+ * other than the explorer who sent one, to name them. Rows follow the reservations, the venues, the
+ * parties, the completions and those profiles as they change. If anything fails, including the
  * reservations' listener after sign-out, the overview shows [OverviewStatus.FAILED] until [retry].
  * The explorer can [cancel] a reservation.
  */
@@ -58,6 +63,7 @@ class OverviewViewModel(
     private val venueRepository: VenueRepository,
     private val partyRepository: PartyRepository,
     private val completionRepository: CompletionRepository,
+    private val userRepository: UserRepository,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(OverviewUiState())
   /** What the overview shows now; the screen observes it. */
@@ -141,9 +147,14 @@ class OverviewViewModel(
             combine(
                 venueRepository.observeVenues(reservations.map { it.venueId }.toSet()),
                 partyRepository.observeJoinedCounts(reservations.map { it.id }),
-                completionRepository.observeForReservations(approved.map { it.id }),
-            ) { venues, partySizes, completions ->
-              overviewRows(booked, venues, partySizes, proofsOf(completions))
+                completionRepository.observeForReservations(approved.map { it.id }).flatMapLatest {
+                    completions ->
+                  userRepository.observeProofSenders(completions, explorerUid).map {
+                    completions to it
+                  }
+                },
+            ) { venues, partySizes, (completions, senders) ->
+              overviewRows(booked, venues, partySizes, proofsOf(completions), senders)
             }
           }
           .catch {
@@ -185,6 +196,7 @@ class OverviewViewModel(
             VenueRepositoryProvider.repository,
             PartyRepositoryProvider.repository,
             CompletionRepositoryProvider.repository,
+            UserRepositoryProvider.repository,
         )
       }
     }
@@ -215,16 +227,17 @@ internal fun proofsOf(completions: List<Completion>): Map<String, CompletionStat
 
 /**
  * The rows for the [booked] reservations and their quests, in their order, with the number of
- * joined members of each party from [partySizes] and where the party's proof stands from [proofs],
- * both keyed by reservation id. A reservation whose venue isn't among [venues], because it no
- * longer exists, has no row. A party missing from [partySizes] counts as just the explorer, who is
- * in every party they see here.
+ * joined members of each party from [partySizes], where the party's proof stands from [proofs], and
+ * who sent it from [senders] when another member did, all keyed by reservation id. A reservation
+ * whose venue isn't among [venues], because it no longer exists, has no row. A party missing from
+ * [partySizes] counts as just the explorer, who is in every party they see here.
  */
 internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,
     venues: List<Venue>,
     partySizes: Map<String, Int>,
     proofs: Map<String, CompletionStatus>,
+    senders: Map<String, ProofSender> = emptyMap(),
 ): List<OverviewRow> {
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
@@ -232,6 +245,7 @@ internal fun overviewRows(
       // A safety net only: observeJoinedCounts gives the size of every party it is asked for
       val partySize = partySizes[reservation.id] ?: 1
       overviewRow(reservation, quest, venue, partySize, rowStatus(reservation, proofs))
+          .copy(proofSender = senders[reservation.id])
     }
   }
 }

@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 
 /**
@@ -28,6 +29,7 @@ fun OverviewOnFakes(
         FakeVenueRepository(),
         party,
         FakeCompletionRepository(),
+        FakeUserRepository(),
     )
   }
   OverviewScreen(viewModel, onOpenQuest, onJoinParty, onSendNewProof = { _, _ -> })

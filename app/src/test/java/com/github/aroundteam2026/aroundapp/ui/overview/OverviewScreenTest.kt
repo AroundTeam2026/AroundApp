@@ -29,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepo
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
@@ -258,6 +259,7 @@ class OverviewScreenTest {
             FakeVenueRepository(listOf(testVenue(id = CAFE))),
             party,
             FakeCompletionRepository(),
+            FakeUserRepository(),
         )
     compose.setContent {
       AroundAppTheme {
@@ -294,6 +296,7 @@ class OverviewScreenTest {
             FakeVenueRepository(listOf(testVenue(id = CAFE))),
             party,
             FakeCompletionRepository(),
+            FakeUserRepository(),
         )
     compose.setContent {
       AroundAppTheme {

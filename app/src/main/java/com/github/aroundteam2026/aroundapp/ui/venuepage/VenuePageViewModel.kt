@@ -36,6 +36,8 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
+import com.github.aroundteam2026.aroundapp.ui.proof.observeProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -131,12 +133,12 @@ class VenuePageViewModel(
   /** What the page last heard from its listeners, so it can be shown again; null when failed. */
   private var latest: Heard<VenuePageQuest>? = null
 
-  /** What the listeners sent; [booked] or [completions] is null once its listener failed. */
+  /** What the listeners sent; [booked] or [proofs] is null once its listener failed. */
   private data class Heard<Q>(
       val venue: Venue?,
       val quests: List<Q>,
       val booked: Booked?,
-      val completions: List<Completion>?,
+      val proofs: Proofs?,
   )
 
   init {
@@ -333,7 +335,14 @@ class VenuePageViewModel(
                   // A new list of the same proofs mustn't show the page again with older
                   // reservations, which would end a refused accept's "failed" too early
                   .distinctUntilChanged()
-                  .map<List<Completion>, List<Completion>?> { it }
+                  // A proof another member sent names them, as the Figma frame does
+                  .flatMapLatest { completions ->
+                    userRepository.observeProofSenders(completions, explorerUid).map {
+                      Proofs(completions, it)
+                    }
+                  }
+                  .distinctUntilChanged()
+                  .map<Proofs, Proofs?> { it }
                   .catch {
                     Log.w(TAG, "Listening to the proofs of $explorerUid failed", it)
                     emit(null)
@@ -372,7 +381,7 @@ class VenuePageViewModel(
    * doesn't count as accepted: it stays "accepting", or "failed", whatever Firestore lists.
    */
   private fun show() {
-    val (venue, quests, booked, completions) = latest ?: return
+    val (venue, quests, booked, proofs) = latest ?: return
     val view = booked?.let {
       BookedView(
           accepted =
@@ -386,7 +395,7 @@ class VenuePageViewModel(
       )
     }
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
-    mutableUiState.update { it.showing(venue, quests, view, refused, completions) }
+    mutableUiState.update { it.showing(venue, quests, view, refused, proofs) }
     arriving?.let { questId ->
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
@@ -542,19 +551,28 @@ private data class BookedView(
 )
 
 /**
+ * The parties' [completions] at this venue, with the other members who sent some of them, by
+ * reservation id.
+ */
+private data class Proofs(
+    val completions: List<Completion>,
+    val senders: Map<String, ProofSender>,
+)
+
+/**
  * This page showing [venue], its valid [quests] and what [booked] says about the explorer's
- * reservations, with the proofs in [completions], or "not found" when [venue] is null. A quest
- * being accepted that is now accepted is done accepting, a reservation no longer listed is done
+ * reservations, with the parties' [proofs], or "not found" when [venue] is null. A quest being
+ * accepted that is now accepted is done accepting, a reservation no longer listed is done
  * cancelling, and a quest in [refused] failed. A null [booked] means the reservations can't be
  * read: the page keeps what it knew and stops offering to accept, cancel, complete or share a code.
- * Null [completions] likewise mean the proofs can't be read, so it stops offering to complete.
+ * Null [proofs] likewise mean the proofs can't be read, so it stops offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
     quests: List<VenuePageQuest>,
     booked: BookedView?,
     refused: Set<String>,
-    completions: List<Completion>?,
+    proofs: Proofs?,
 ): VenuePageUiState =
     if (venue == null) {
       VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
@@ -574,8 +592,10 @@ private fun VenuePageUiState.showing(
               failedCancelIds = failedCancelIds.intersect(booked?.reservationIds?.values.orEmpty()),
               acceptAvailable = booked != null,
               approvedIds = booked?.approved ?: approvedIds,
-              completions = completions?.associateBy { it.reservationId } ?: this.completions,
-              proofsAvailable = completions != null,
+              completions =
+                  proofs?.completions?.associateBy { it.reservationId } ?: this.completions,
+              proofSenders = proofs?.senders ?: proofSenders,
+              proofsAvailable = proofs != null,
               partyCodes = booked?.codes ?: partyCodes,
           )
           .withQuests(quests)
