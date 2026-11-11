@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
@@ -44,6 +45,8 @@ data class OverviewUiState(
  * @property slotStart Start of the booked slot, in epoch milliseconds.
  * @property partySize How many explorers the party has, the explorer included.
  * @property status Whether the venue has approved the reservation yet, and then the proof.
+ * @property proofSender Who sent the party's proof, when another member did; null when the explorer
+ *   did, or there is none.
  */
 data class OverviewRow(
     val reservationId: String,
@@ -57,6 +60,7 @@ data class OverviewRow(
     val slotStart: Long,
     val partySize: Int,
     val status: OverviewRowStatus,
+    val proofSender: ProofSender? = null,
 )
 
 /** Where the overview stands. */

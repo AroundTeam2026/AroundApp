@@ -65,6 +65,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.overview.slotFormat
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
@@ -129,7 +130,7 @@ fun QuestDetailsScreen(
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
       Header(state, quest)
-      state.proof?.let { ProofStatusCard(it, state.venueName) }
+      state.proof?.let { ProofStatusCard(it, state.venueName, state.proofSender) }
       if (quest.description.isNotBlank()) {
         Card(R.drawable.ic_info, R.string.quest_detail_about) {
           CardText(quest.description, C.Tag.QUEST_DETAIL_DESCRIPTION)
@@ -206,10 +207,12 @@ private fun Header(state: VenuePageUiState, quest: VenuePageQuest) {
 
 /**
  * Where [proof] stands, as the Figma frames "Quest details · state": waiting for [venueName], or
- * its answer, with the reason of a rejection.
+ * its answer, with the reason of a rejection. A waiting proof another member sent names its
+ * [sender], as the frame "Quest details · proof sent by a member" does, and says anyone in the
+ * party can still send a new one.
  */
 @Composable
-private fun ProofStatusCard(proof: Completion, venueName: String) {
+private fun ProofStatusCard(proof: Completion, venueName: String, sender: ProofSender?) {
   val colors = MaterialTheme.colorScheme
   val theme = AroundTheme.colors
   val look =
@@ -218,8 +221,12 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
             ProofStatusLook(
                 R.drawable.ic_clock,
                 R.string.quest_detail_proof_pending_label,
-                R.string.quest_detail_proof_pending_title,
-                stringResource(R.string.quest_detail_proof_pending_text, venueName),
+                sender?.name?.let {
+                  stringResource(R.string.quest_detail_proof_pending_title_by, it)
+                } ?: stringResource(R.string.quest_detail_proof_pending_title),
+                if (sender == null)
+                    stringResource(R.string.quest_detail_proof_pending_text, venueName)
+                else stringResource(R.string.quest_detail_proof_pending_text_by, venueName),
                 tile = theme.lavender,
                 icon = theme.accentText,
                 dot = theme.accentText,
@@ -230,7 +237,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
             ProofStatusLook(
                 R.drawable.ic_check,
                 R.string.quest_detail_proof_approved_label,
-                R.string.quest_detail_proof_approved_title,
+                stringResource(R.string.quest_detail_proof_approved_title),
                 stringResource(R.string.quest_detail_proof_approved_text, venueName),
                 tile = theme.sage,
                 icon = colors.surface,
@@ -242,7 +249,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
             ProofStatusLook(
                 R.drawable.ic_proof_rejected,
                 R.string.quest_detail_proof_rejected_label,
-                R.string.quest_detail_proof_rejected_title,
+                stringResource(R.string.quest_detail_proof_rejected_title),
                 proof.rejectReason.orEmpty(),
                 tile = theme.panel,
                 icon = colors.error,
@@ -287,7 +294,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
         )
       }
       Text(
-          stringResource(look.titleRes),
+          look.title,
           Modifier.semantics { heading() },
           color = colors.onSurface,
           style = AroundTextStyles.CardHeading,
@@ -301,7 +308,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
 private class ProofStatusLook(
     @param:DrawableRes val iconRes: Int,
     @param:StringRes val labelRes: Int,
-    @param:StringRes val titleRes: Int,
+    val title: String,
     val text: String,
     val tile: Color,
     val icon: Color,
@@ -808,12 +815,38 @@ internal fun QuestDetailsPartyCodePreview() {
   )
 }
 
+@Preview(name = "Proof sent by a member, light")
+@Preview(name = "Proof sent by a member, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+internal fun QuestDetailsSentByMemberPreview() {
+  QuestDetailsSample(
+      reservationIds = mapOf(SAMPLE_QUEST_ID to SAMPLE_RESERVATION_ID),
+      completions =
+          mapOf(
+              SAMPLE_RESERVATION_ID to
+                  Completion(
+                      id = "completion",
+                      reservationId = SAMPLE_RESERVATION_ID,
+                      venueId = "venue",
+                      explorerUid = "lea",
+                      proof = Proof.Photo("gs://proofs/fox.jpg"),
+                      status = CompletionStatus.PENDING,
+                      rejectReason = null,
+                      submittedAt = 0L,
+                  )
+          ),
+      acceptedParties = mapOf(SAMPLE_QUEST_ID to 3),
+      proofSenders = mapOf(SAMPLE_RESERVATION_ID to ProofSender("Lea")),
+  )
+}
+
 @Composable
 private fun QuestDetailsSample(
     reservationIds: Map<String, String> = emptyMap(),
     completions: Map<String, Completion> = emptyMap(),
     acceptedParties: Map<String, Int> = emptyMap(),
     partyCodes: Map<String, String> = emptyMap(),
+    proofSenders: Map<String, ProofSender> = emptyMap(),
 ) {
   val quest =
       VenuePageQuest(
@@ -840,6 +873,7 @@ private fun QuestDetailsSample(
             completions = completions,
             acceptedParties = acceptedParties,
             partyCodes = partyCodes,
+            proofSenders = proofSenders,
         ),
         quest,
         onBack = {},

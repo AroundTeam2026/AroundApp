@@ -19,6 +19,8 @@
     <!-- Where the explorer's proof stands, once the reservation is approved -->
     <!-- Figma says "Proof sent · waiting for review", which doesn't fit next to the slot -->
     <string name="overview_status_proof_sent">Proof sent</string>
+    <!-- Once another member of the party sent its proof; Figma adds "· waiting for review" -->
+    <string name="overview_status_proof_sent_by">Proof sent by %1$s</string>
     <string name="overview_status_completed">Completed</string>
     <string name="overview_status_proof_rejected">Proof rejected</string>
     <!-- A reservation's slot: the day, e.g. "Today" or "Sun 2 Nov", then the time -->

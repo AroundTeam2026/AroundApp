@@ -43,6 +43,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
@@ -121,7 +122,7 @@ fun OverviewQuestRow(
         horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-      Status(row.status, Modifier.weight(1f))
+      Status(row.status, row.proofSender, Modifier.weight(1f))
       Slot(row.slotStart, clock)
     }
     Row(
@@ -192,11 +193,11 @@ private fun NewProofButton(onClick: () -> Unit) {
 /**
  * Where the reservation stands, in small capitals, as in the Figma frames of the Quests tab: a
  * muted dot and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then,
- * for the proof, an accent dot and "Proof sent", a check and "Completed", or a red dot and "Proof
- * rejected".
+ * for the proof, an accent dot and "Proof sent", or "Proof sent by Lea" when [sender] Lea sent the
+ * party's proof, a check and "Completed", or a red dot and "Proof rejected".
  */
 @Composable
-private fun Status(status: OverviewRowStatus, modifier: Modifier) {
+private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Modifier) {
   val colors = MaterialTheme.colorScheme
   Row(
       modifier.testTag(C.Tag.OVERVIEW_ROW_STATUS),
@@ -207,27 +208,30 @@ private fun Status(status: OverviewRowStatus, modifier: Modifier) {
         when (status) {
           OverviewRowStatus.WAITING -> {
             Dot(colors.onSurfaceVariant)
-            R.string.overview_status_waiting to colors.onSurfaceVariant
+            stringResource(R.string.overview_status_waiting) to colors.onSurfaceVariant
           }
           OverviewRowStatus.APPROVED -> {
             Check()
-            R.string.overview_status_approved to colors.onSurface
+            stringResource(R.string.overview_status_approved) to colors.onSurface
           }
           OverviewRowStatus.PROOF_SENT -> {
             Dot(AroundTheme.colors.accentText)
-            R.string.overview_status_proof_sent to colors.onSurfaceVariant
+            val sent =
+                sender?.name?.let { stringResource(R.string.overview_status_proof_sent_by, it) }
+                    ?: stringResource(R.string.overview_status_proof_sent)
+            sent to colors.onSurfaceVariant
           }
           OverviewRowStatus.COMPLETED -> {
             Check()
-            R.string.overview_status_completed to colors.onSurface
+            stringResource(R.string.overview_status_completed) to colors.onSurface
           }
           OverviewRowStatus.PROOF_REJECTED -> {
             Dot(colors.error)
-            R.string.overview_status_proof_rejected to colors.error
+            stringResource(R.string.overview_status_proof_rejected) to colors.error
           }
         }
     Text(
-        stringResource(text).uppercase(currentLocale()),
+        text.uppercase(currentLocale()),
         color = color,
         style = AroundTextStyles.Label,
         maxLines = 1,
