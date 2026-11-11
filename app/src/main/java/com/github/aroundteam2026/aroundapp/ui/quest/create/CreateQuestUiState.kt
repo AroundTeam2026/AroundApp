@@ -97,7 +97,9 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
  * @property questLoadFailed Whether reading the quest being edited failed, so the form offers to
  *   read it again.
  * @property partySizeLocked Whether the party size can't change, as the quest being edited has
- *   pending reservations; locked until they are known.
+ *   pending reservations.
+ * @property proofTypeLocked Whether the proof type can't change, as the quest being edited has
+ *   reservations explorers made for it.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -123,7 +125,8 @@ data class CreateQuestUiState(
     val editing: Boolean = false,
     val questUnavailable: Boolean = false,
     val questLoadFailed: Boolean = false,
-    val partySizeLocked: Boolean = editing,
+    val partySizeLocked: Boolean = false,
+    val proofTypeLocked: Boolean = false,
 ) {
   /**
    * This form filled in with [quest], its fields untouched, so it opens without errors. The quest

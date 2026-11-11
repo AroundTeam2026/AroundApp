@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,16 +51,17 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
  * status. The heading's + button calls [onCreateQuest]; while the venue has no quests, the empty
- * state's button does instead.
+ * state's button does instead. A quest's pencil calls [onEditQuest] with its id.
  */
 @Composable
 fun VenueQuestsScreen(
     viewModel: VenueQuestsViewModel,
     onCreateQuest: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditQuest: (String) -> Unit = {},
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  VenueQuestsContent(state, onCreateQuest, viewModel::retry, modifier)
+  VenueQuestsContent(state, onCreateQuest, viewModel::retry, modifier, onEditQuest)
 }
 
 /** Stateless Quests tab showing [state]; [onRetry] listens to the quests again after a failure. */
@@ -68,6 +71,7 @@ internal fun VenueQuestsContent(
     onCreateQuest: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditQuest: (String) -> Unit = {},
 ) {
   val empty = state is VenueQuestsUiState.Loaded && state.quests.isEmpty()
   Column(modifier.fillMaxSize().padding(AroundSpacing.ScreenHorizontal)) {
@@ -95,26 +99,26 @@ internal fun VenueQuestsContent(
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_QUESTS_LOADING)) }
       VenueQuestsUiState.Failed -> Centered { LoadFailed(onRetry) }
       is VenueQuestsUiState.Loaded ->
-          if (empty) Centered { NoQuests(onCreateQuest) } else QuestList(state.quests)
+          if (empty) Centered { NoQuests(onCreateQuest) } else QuestList(state.quests, onEditQuest)
     }
   }
 }
 
-/** The quests as cards, below the heading. */
+/** The quests as cards, below the heading; a card's pencil calls [onEditQuest] with its id. */
 @Composable
-private fun QuestList(quests: List<Quest>) {
+private fun QuestList(quests: List<Quest>, onEditQuest: (String) -> Unit) {
   LazyColumn(
       Modifier.fillMaxSize().testTag(C.Tag.VENUE_QUESTS_LIST),
       contentPadding = PaddingValues(vertical = AroundSpacing.ExtraLarge),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
-    items(quests, key = Quest::id) { QuestCard(it) }
+    items(quests, key = Quest::id) { quest -> QuestCard(quest) { onEditQuest(quest.id) } }
   }
 }
 
-/** A quest's title and status; a quest that isn't active is muted. */
+/** A quest's title, status and a pencil that calls [onEdit]; a quest that isn't active is muted. */
 @Composable
-private fun QuestCard(quest: Quest) {
+private fun QuestCard(quest: Quest, onEdit: () -> Unit) {
   val active = quest.status == QuestStatus.ACTIVE
   val colors = MaterialTheme.colorScheme
   val shape = MaterialTheme.shapes.large
@@ -138,6 +142,28 @@ private fun QuestCard(quest: Quest) {
         statusLabel(quest.status),
         background = if (active) colors.tertiary else colors.outline,
         content = if (active) colors.onTertiary else colors.onSurfaceVariant,
+    )
+    EditButton(quest.title, onEdit)
+  }
+}
+
+/** Figma's round pencil button; TalkBack reads "Edit <title>". */
+@Composable
+private fun EditButton(title: String, onEdit: () -> Unit) {
+  FilledIconButton(
+      onClick = onEdit,
+      shape = AroundPillShape,
+      colors =
+          IconButtonDefaults.filledIconButtonColors(
+              containerColor = MaterialTheme.colorScheme.primaryContainer,
+              contentColor = MaterialTheme.colorScheme.onSurface,
+          ),
+      modifier = Modifier.size(EDIT_BUTTON_SIZE).testTag(C.Tag.VENUE_QUEST_EDIT),
+  ) {
+    Icon(
+        painterResource(R.drawable.ic_edit),
+        contentDescription = stringResource(R.string.venue_quests_edit, title),
+        modifier = Modifier.size(EDIT_ICON_SIZE),
     )
   }
 }
@@ -227,6 +253,8 @@ private fun ColumnScope.Centered(content: @Composable () -> Unit) {
 }
 
 private val CARD_BORDER = 1.dp
+private val EDIT_BUTTON_SIZE = 28.dp
+private val EDIT_ICON_SIZE = 16.dp
 private val BUTTON_HEIGHT = 52.dp
 /** The width of the empty state's text and button in Figma. */
 private val EMPTY_STATE_WIDTH = 260.dp

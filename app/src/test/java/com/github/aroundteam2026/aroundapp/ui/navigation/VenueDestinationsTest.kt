@@ -5,10 +5,12 @@ package com.github.aroundteam2026.aroundapp.ui.navigation
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
@@ -18,12 +20,15 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -31,7 +36,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Tests [venueDestinations]: the venue home, and the create-quest form it opens full screen. */
+/**
+ * Tests [venueDestinations]: the venue home, and the create- and edit-quest forms it opens full
+ * screen.
+ */
 @RunWith(AndroidJUnit4::class)
 class VenueDestinationsTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
@@ -41,13 +49,8 @@ class VenueDestinationsTest {
   private val auth = FakeAuthRepository(VENUE_ID)
   /** Shared by the form and the Quests tab, so a saved quest reaches the list. */
   private val quests = FakeQuestRepository()
-  private val form =
-      CreateQuestViewModel(
-          auth,
-          FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
-          quests,
-          FakeAddressSearchRepository(),
-      )
+  private val venues = FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))
+  private val form = CreateQuestViewModel(auth, venues, quests, FakeAddressSearchRepository())
 
   /** A venue NavHost that opens on the home of a placed venue without quests, on fakes. */
   @Before
@@ -62,6 +65,20 @@ class VenueDestinationsTest {
             venueQuestsFactory =
                 viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
             dashboardFactory = venueDashboardFactoryOnFakes(VENUE_ID),
+            editQuestFactory = { id ->
+              viewModelFactory {
+                initializer {
+                  CreateQuestViewModel(
+                      auth,
+                      venues,
+                      quests,
+                      FakeAddressSearchRepository(),
+                      questId = id,
+                      reservationRepository = FakeReservationRepository(),
+                  )
+                }
+              }
+            },
         )
       }
     }
@@ -159,6 +176,34 @@ class VenueDestinationsTest {
   }
 
   @Test
+  fun editingAQuestSavesItAndReturnsToTheQuestsTab() {
+    runBlocking { quests.createQuest(testQuest(venueId = VENUE_ID, title = QUEST_TITLE)) }
+    composeTestRule.onNodeWithTag(VenueTab.QUESTS.tabTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_EDIT).performClick()
+    composeTestRule.waitForIdle()
+
+    assertEquals(Routes.EDIT_QUEST, currentRoute())
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).assertTextContains(QUEST_TITLE)
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_TITLE).performTextReplacement(NEW_TITLE)
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_SUBMIT).performClick()
+
+    assertBackOnTheQuestsTab()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_TITLE).assertTextEquals(NEW_TITLE)
+  }
+
+  @Test
+  fun closingTheEditFormReturnsToTheQuestsTab() {
+    runBlocking { quests.createQuest(testQuest(venueId = VENUE_ID, title = QUEST_TITLE)) }
+    composeTestRule.onNodeWithTag(VenueTab.QUESTS.tabTag).performClick()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_EDIT).performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_CLOSE).performClick()
+
+    assertBackOnTheQuestsTab()
+    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_TITLE).assertTextEquals(QUEST_TITLE)
+  }
+
+  @Test
   fun theProfileTabSignsTheVenueOut() {
     composeTestRule.onNodeWithTag(VenueTab.PROFILE.tabTag).performClick()
     composeTestRule.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
@@ -170,5 +215,6 @@ class VenueDestinationsTest {
     const val DOUBLE_TAP_GAP_MS = 100L
     const val VENUE_ID = "venue-1"
     const val QUEST_TITLE = "Find the fox"
+    const val NEW_TITLE = "Find the golden fox"
   }
 }
