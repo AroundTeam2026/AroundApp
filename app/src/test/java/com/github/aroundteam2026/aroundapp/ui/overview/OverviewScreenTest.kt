@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -16,6 +17,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -44,6 +47,8 @@ import org.robolectric.annotation.Config
 @Config(qualifiers = "en-w413dp-h917dp-mdpi")
 class OverviewScreenTest {
   @get:Rule val compose = createComposeRule()
+
+  private val app = ApplicationProvider.getApplicationContext<Application>()
 
   private val opened = mutableListOf<Pair<String, String>>()
   private var retries = 0
@@ -86,7 +91,7 @@ class OverviewScreenTest {
       current = shown
       compose.waitForIdle()
       compose.onNodeWithTag(C.Tag.OVERVIEW_JOIN_PARTY).assertIsDisplayed()
-      compose.onNodeWithText("Join a party").assertIsDisplayed()
+      compose.onNodeWithText(app.getString(R.string.overview_join_party)).assertIsDisplayed()
     }
   }
 

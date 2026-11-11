@@ -2,6 +2,8 @@
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import android.app.Application
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,7 +16,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -23,19 +26,14 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
-import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
-import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
-import com.github.aroundteam2026.aroundapp.model.testQuest
-import com.github.aroundteam2026.aroundapp.model.testVenue
-import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRow
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRowStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -50,7 +48,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "en-w413dp-h917dp-mdpi")
 class JoinPartyScreenTest {
-  @get:Rule val compose = createComposeRule()
+  @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
   private val app = ApplicationProvider.getApplicationContext<Application>()
 
@@ -115,7 +113,7 @@ class JoinPartyScreenTest {
         mapOf(
             JoinPartyUiState.Error.NotFound to text(R.string.join_party_not_found),
             JoinPartyUiState.Error.Full(joined = 5, capacity = 4) to
-                "This party is full: 5 of 4 joined.",
+                app.resources.getQuantityString(R.plurals.join_party_full, 5, 5, 4),
             JoinPartyUiState.Error.Ended to text(R.string.join_party_ended),
             JoinPartyUiState.Error.Closed to text(R.string.join_party_closed),
             JoinPartyUiState.Error.AlreadyJoined to text(R.string.join_party_already_joined),
@@ -182,36 +180,105 @@ class JoinPartyScreenTest {
     compose.onNodeWithContentDescription(text(R.string.join_party_back)).assertIsNotEnabled()
   }
 
-  @Test
-  fun typingACodeFindsItsPartyAndTappingJoinJoinsItAndSaysSo() {
-    val questRepository = FakeQuestRepository(initialQuests = listOf(testQuest("fox", "venue-1")))
-    val reservations = FakeReservationRepository(quests = questRepository, newCode = { "7KQM42" })
-    runBlocking {
-      reservations.createReservation(newPendingReservation("fox", "venue-1", "Ada", 0L), "friend")
-    }
-    val viewModel =
-        JoinPartyViewModel(
-            "explorer",
-            reservations,
-            questRepository,
-            FakeVenueRepository(listOf(testVenue(id = "venue-1", name = "Café Lumen"))),
-            reservations.party,
-            FakeConnectivityRepository(),
-        )
-    var joined = 0
+  private fun showScreenOn(
+      fakes: JoinPartyOnFakes,
+      party: PartyRepository = fakes.party,
+      onJoined: () -> Unit,
+  ) {
+    val viewModel = fakes.viewModel(partyRepository = party)
     compose.setContent {
-      AroundAppTheme { JoinPartyScreen(viewModel, onBack = {}, onJoined = { joined++ }) }
+      AroundAppTheme { JoinPartyScreen(viewModel, onBack = {}, onJoined = onJoined) }
     }
-
     compose.onNodeWithTag(C.Tag.JOIN_PARTY_CODE).performTextInput("7kq m42")
     compose.waitUntil {
       compose.onAllNodes(hasTestTag(C.Tag.JOIN_PARTY_FOUND)).fetchSemanticsNodes().size == 1
     }
+  }
+
+  // The screen below it (here a stand-in) is the one system back would otherwise reach
+  @Test
+  fun systemBackIsOffWhileJoiningAsTheBackArrowIsAndWorksOtherwise() {
+    var systemBacks = 0
+    state = found(JoinPartyUiState.Join.JOINING)
+    compose.setContent {
+      AroundAppTheme {
+        BackHandler { systemBacks++ }
+        JoinPartyContent(state, {}, {}, {})
+      }
+    }
+
+    compose.pressBack()
+    assertEquals(0, systemBacks)
+
+    state = found()
+    compose.pressBack()
+    assertEquals(1, systemBacks)
+  }
+
+  // The screen closes once the party is joined, not while the join is still on its way
+  @Test
+  fun typingACodeFindsItsPartyAndTappingJoinJoinsItAndOnlyThenSaysSo() {
+    val fakes = JoinPartyOnFakes()
+    val gate = CompletableDeferred<Unit>()
+    var joined = 0
+    showScreenOn(fakes, GatedParty(fakes.party, gate)) { joined++ }
     assertEquals(0, joined)
+
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()
+    compose.waitUntil {
+      compose
+          .onAllNodes(hasText(text(R.string.join_party_joining)))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    compose.waitForIdle()
+    assertEquals(0, joined)
+    gate.complete(Unit)
+    compose.waitUntil { joined == 1 }
+
+    assertEquals(1, joined)
+  }
+
+  @Test
+  fun aRefusedJoinKeepsTheScreenOpenWithItsReasonAndLetsTheExplorerTryAgain() {
+    val fakes = JoinPartyOnFakes()
+    var joined = 0
+    showScreenOn(fakes) { joined++ }
+    fakes.party.forcedFailure = IllegalStateException("denied")
+
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()
+    compose.waitUntil {
+      compose.onAllNodes(hasTestTag(C.Tag.JOIN_PARTY_ERROR)).fetchSemanticsNodes().size == 1
+    }
+
+    compose.onNodeWithText(text(R.string.join_party_failed)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).assertIsEnabled()
+    compose.onNodeWithContentDescription(text(R.string.join_party_back)).assertIsEnabled()
+    assertEquals(0, joined)
+
+    // The button looks the party up again, then joins it
+    fakes.party.forcedFailure = null
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()
+    compose.waitUntil {
+      compose.onAllNodes(hasTestTag(C.Tag.JOIN_PARTY_FOUND)).fetchSemanticsNodes().size == 1
+    }
     compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()
     compose.waitUntil { joined == 1 }
 
     assertEquals(1, joined)
+  }
+
+  /**
+   * A party that joins only once [gate] opens, to look at the screen while a join is on its way.
+   */
+  private class GatedParty(
+      private val inner: PartyRepository,
+      private val gate: CompletableDeferred<Unit>,
+  ) : PartyRepository by inner {
+    override suspend fun join(reservationId: String, uid: String): Result<Unit> {
+      gate.await()
+      return inner.join(reservationId, uid)
+    }
   }
 
   private fun party() =

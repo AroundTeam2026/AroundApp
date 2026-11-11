@@ -15,21 +15,13 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
-import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
-import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
-import com.github.aroundteam2026.aroundapp.model.testQuest
-import com.github.aroundteam2026.aroundapp.model.testVenue
-import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.Tab
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewViewModel
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
@@ -49,22 +41,16 @@ class JoinPartyNavigationTest {
   /** What closes the Join a party screen, as the app hands it to the screen. */
   private lateinit var closeScreen: () -> Unit
 
-  private val questRepository =
-      FakeQuestRepository(initialQuests = listOf(testQuest("fox", "venue-1")))
-  private val reservations = FakeReservationRepository(quests = questRepository, newCode = { CODE })
-  private val venues = FakeVenueRepository(listOf(testVenue(id = "venue-1", name = "Café Lumen")))
+  private val fakes = JoinPartyOnFakes()
 
   private fun launch() {
-    runBlocking {
-      reservations.createReservation(newPendingReservation("fox", "venue-1", "Ada", 0L), "friend")
-    }
     val overviewViewModel =
         OverviewViewModel(
             EXPLORER,
-            reservations,
-            questRepository,
-            venues,
-            reservations.party,
+            fakes.reservations,
+            fakes.questRepository,
+            fakes.venues,
+            fakes.reservations.party,
             FakeCompletionRepository(),
         )
     composeTestRule.setContent {
@@ -80,18 +66,7 @@ class JoinPartyNavigationTest {
             closeScreen = close
             JoinParty(
                 close,
-                viewModelFactory {
-                  initializer {
-                    JoinPartyViewModel(
-                        EXPLORER,
-                        reservations,
-                        questRepository,
-                        venues,
-                        reservations.party,
-                        FakeConnectivityRepository(),
-                    )
-                  }
-                },
+                viewModelFactory { initializer { fakes.viewModel() } },
             )
           },
       )
@@ -164,8 +139,7 @@ class JoinPartyNavigationTest {
   }
 
   private companion object {
-    const val EXPLORER = "explorer"
-    const val CODE = "7KQM42"
+    const val EXPLORER = JoinPartyOnFakes.EXPLORER
     const val WAIT_MS = 5_000L
   }
 }

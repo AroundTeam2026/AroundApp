@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -88,6 +90,9 @@ fun JoinPartyContent(
     modifier: Modifier = Modifier,
 ) {
   val joining = state.join == JoinPartyUiState.Join.JOINING
+  // System back is off while joining too, as the back arrow is: leaving would cancel the join and
+  // hide why it failed
+  BackHandler(enabled = joining) {}
   Scaffold(
       modifier = modifier.testTag(C.Tag.JOIN_PARTY_SCREEN).imePadding(),
       containerColor = MaterialTheme.colorScheme.background,
@@ -211,7 +216,12 @@ private fun ErrorLine(error: JoinPartyUiState.Error) {
       when (error) {
         JoinPartyUiState.Error.NotFound -> stringResource(R.string.join_party_not_found)
         is JoinPartyUiState.Error.Full ->
-            stringResource(R.string.join_party_full, error.joined, error.capacity)
+            pluralStringResource(
+                R.plurals.join_party_full,
+                error.joined,
+                error.joined,
+                error.capacity,
+            )
         JoinPartyUiState.Error.Ended -> stringResource(R.string.join_party_ended)
         JoinPartyUiState.Error.Closed -> stringResource(R.string.join_party_closed)
         JoinPartyUiState.Error.AlreadyJoined -> stringResource(R.string.join_party_already_joined)

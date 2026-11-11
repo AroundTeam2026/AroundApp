@@ -11,7 +11,10 @@
     <string name="join_party_join">Join party</string>
     <string name="join_party_joining">Joining…</string>
     <string name="join_party_not_found">No party has this code. Check it with your friend.</string>
-    <string name="join_party_full">This party is full: %1$d of %2$d joined.</string>
+    <plurals name="join_party_full">
+        <item quantity="one">This party is full: %1$d of %2$d joined.</item>
+        <item quantity="other">This party is full: %1$d of %2$d joined.</item>
+    </plurals>
     <string name="join_party_ended">This reservation has ended.</string>
     <string name="join_party_closed">The venue already approved this party, so it takes no one else.</string>
     <string name="join_party_already_joined">You\'re already in this party.</string>
