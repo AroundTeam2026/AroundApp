@@ -158,13 +158,15 @@ jobs:
 
       # android-emulator-runner downloads the latest emulator in every job, and a download that comes
       # back broken fails the job ("Error reading Zip content", 4 jobs since 4 Nov; #393). Installed
-      # here first, with retries, the emulator is up to date when the action checks, so it downloads
-      # nothing. This uses the runner's own command-line tools, which the next step removes.
+      # here first, with retries 10 s apart, the emulator is up to date when the action checks, so
+      # it downloads nothing. This uses the runner's own command-line tools, which the next step
+      # removes. sdkmanager prints its errors on stderr, so each failed attempt still shows why.
       - name: Install the Android emulator
         run: |
           for attempt in 1 2 3; do
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install emulator --channel=0 > /dev/null && exit 0
             echo "Downloading the emulator failed (attempt $attempt)"
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
           done
           exit 1
 
