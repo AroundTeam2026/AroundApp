@@ -112,7 +112,7 @@ fun JoinPartyContent(
           onClick = onBack,
           enabled = !joining,
           modifier = Modifier.size(CONTROL_SIZE),
-          border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+          border = BorderStroke(BORDER_WIDTH, MaterialTheme.colorScheme.outline),
       ) {
         Icon(painterResource(R.drawable.ic_chevron_left), stringResource(R.string.join_party_back))
       }
@@ -255,8 +255,10 @@ private fun SubmitButton(state: JoinPartyUiState, onSubmit: () -> Unit) {
       enabled = state.canSubmit,
       colors =
           ButtonDefaults.buttonColors(
-              disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-              disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
+              disabledContainerColor =
+                  MaterialTheme.colorScheme.primary.copy(alpha = DISABLED_ALPHA),
+              disabledContentColor =
+                  MaterialTheme.colorScheme.onPrimary.copy(alpha = DISABLED_ALPHA),
           ),
       shape = MaterialTheme.shapes.medium,
       modifier =
@@ -285,3 +287,5 @@ private val SUBMIT_MIN_HEIGHT = 54.dp
 private val PROGRESS_SIZE = 20.dp
 private val PROGRESS_STROKE = 2.dp
 private val INFO_SIZE = 16.dp
+private val BORDER_WIDTH = 1.dp
+private const val DISABLED_ALPHA = 0.4f
