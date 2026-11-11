@@ -48,8 +48,8 @@ class ProfileSetupViewModelTest {
     Dispatchers.resetMain()
   }
 
-  private suspend fun create(name: String = "") {
-    users.createUser(User(uid, name, Role.EXPLORER, 12L)).getOrThrow()
+  private suspend fun create(name: String = "", pictureUrl: String? = null) {
+    users.createUser(User(uid, name, Role.EXPLORER, 12L, pictureUrl)).getOrThrow()
   }
 
   @Test
@@ -208,5 +208,147 @@ class ProfileSetupViewModelTest {
         release.complete(Unit)
         advanceUntilIdle()
         assertEquals(ProfileSetupDestination.HOME, model.destination.value)
+      }
+
+  @Test
+  fun editingOnlyTheNameKeepsTheSavedPictureRoleAndCreationTime() =
+      runTest(dispatcher) {
+        create("Ada", "gs://old-picture")
+        val model = ProfileSetupViewModel(uid, users, pictures)
+        advanceUntilIdle()
+        model.startEditing()
+        assertEquals("Ada", model.form.value.name)
+        model.setName(" Bea ")
+        model.save()
+        advanceUntilIdle()
+        assertEquals(User(uid, "Bea", Role.EXPLORER, 12L, "gs://old-picture"), users.getUser(uid))
+        assertFalse(model.editing.value)
+      }
+
+  @Test
+  fun replacingAndRemovingThePictureUseTheSameProfileWrite() =
+      runTest(dispatcher) {
+        create("Ada", "gs://old-picture")
+        val model = ProfileSetupViewModel(uid, users, pictures)
+        advanceUntilIdle()
+        model.startEditing()
+        model.setPhoto(Uri.parse("content://photos/new"))
+        model.save()
+        advanceUntilIdle()
+        assertTrue(users.getUser(uid)?.pictureUrl?.contains("user-pictures/$uid/") == true)
+        model.startEditing()
+        model.removePhoto()
+        model.save()
+        advanceUntilIdle()
+        assertNull(users.getUser(uid)?.pictureUrl)
+        assertEquals("Ada", users.getUser(uid)?.displayName)
+      }
+
+  @Test
+  fun editFailureKeepsTheDraftAndAllowsRetryOrCancel() =
+      runTest(dispatcher) {
+        create("Ada", "gs://old-picture")
+        var fail = true
+        val failing =
+            object : UserRepository by users {
+              override suspend fun updateProfile(
+                  uid: String,
+                  displayName: String,
+                  pictureUrl: String?,
+              ) =
+                  if (fail) Result.failure(IllegalStateException("offline"))
+                  else users.updateProfile(uid, displayName, pictureUrl)
+            }
+        val model = ProfileSetupViewModel(uid, failing, pictures)
+        advanceUntilIdle()
+        model.startEditing()
+        model.setName("Bea")
+        model.save()
+        advanceUntilIdle()
+        assertTrue(model.editing.value)
+        assertEquals("Bea", model.form.value.name)
+        assertEquals(ProfileSetupError.SAVE_FAILED, model.form.value.error)
+        assertEquals("Ada", users.getUser(uid)?.displayName)
+        fail = false
+        model.save()
+        advanceUntilIdle()
+        assertEquals("Bea", users.getUser(uid)?.displayName)
+        model.startEditing()
+        model.setName("Not saved")
+        model.cancelEditing()
+        model.startEditing()
+        assertEquals("Bea", model.form.value.name)
+      }
+
+  @Test
+  fun removingAPickedPhotoClearsItAndSavesNoPicture() =
+      runTest(dispatcher) {
+        create("Ada", "gs://old-picture")
+        val model = ProfileSetupViewModel(uid, users, pictures)
+        advanceUntilIdle()
+        model.startEditing()
+        model.setPhoto(Uri.parse("content://photos/new"))
+        model.removePhoto()
+        assertNull(model.form.value.photo)
+        assertTrue(model.form.value.removePhoto)
+        model.save()
+        advanceUntilIdle()
+        assertNull(users.getUser(uid)?.pictureUrl)
+      }
+
+  @Test
+  fun pickingAPhotoAfterRemovingUploadsIt() =
+      runTest(dispatcher) {
+        create("Ada", "gs://old-picture")
+        val model = ProfileSetupViewModel(uid, users, pictures)
+        advanceUntilIdle()
+        model.startEditing()
+        model.removePhoto()
+        model.setPhoto(Uri.parse("content://photos/new"))
+        assertFalse(model.form.value.removePhoto)
+        model.save()
+        advanceUntilIdle()
+        assertTrue(users.getUser(uid)?.pictureUrl?.contains("user-pictures/$uid/") == true)
+      }
+
+  @Test
+  fun cancellingIsIgnoredWhileTheEditSaves() =
+      runTest(dispatcher) {
+        create("Ada")
+        val written = CompletableDeferred<Result<Unit>>()
+        val slow =
+            object : UserRepository by users {
+              override suspend fun updateProfile(
+                  uid: String,
+                  displayName: String,
+                  pictureUrl: String?,
+              ) = written.await().also { users.updateProfile(uid, displayName, pictureUrl) }
+            }
+        val model = ProfileSetupViewModel(uid, slow, pictures)
+        advanceUntilIdle()
+        model.startEditing()
+        model.setName("Bea")
+        model.save()
+        runCurrent()
+        model.cancelEditing()
+        assertTrue(model.editing.value)
+
+        written.complete(Result.success(Unit))
+        advanceUntilIdle()
+        assertFalse(model.editing.value)
+        assertEquals("Bea", users.getUser(uid)?.displayName)
+      }
+
+  @Test
+  fun editingOnlyOpensOnceTheProfileIsComplete() =
+      runTest(dispatcher) {
+        create()
+        val model = ProfileSetupViewModel(uid, users, pictures)
+        advanceUntilIdle()
+        assertEquals(ProfileSetupDestination.SETUP, model.destination.value)
+        model.setName("Draft")
+        model.startEditing()
+        assertFalse(model.editing.value)
+        assertEquals("Draft", model.form.value.name)
       }
 }
