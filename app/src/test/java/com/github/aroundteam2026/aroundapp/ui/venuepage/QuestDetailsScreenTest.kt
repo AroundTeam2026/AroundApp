@@ -232,6 +232,14 @@ class QuestDetailsScreenTest {
   }
 
   @Test
+  fun aQuestWithItsOwnLocationHasItsMapEvenWithoutTheVenues() {
+    val quest = quest().copy(location = Location(46.5191, 6.5668))
+    show(quest, state(quest))
+
+    node(C.Tag.QUEST_DETAIL_RADIUS_MAP).assertExists()
+  }
+
+  @Test
   fun aVenueWithoutALocationKeepsTheRadiusButHasNoMap() {
     show()
 

@@ -29,8 +29,8 @@ import kotlinx.coroutines.flow.mapNotNull
 private const val OPEN_CARD_Z_INDEX = 1f
 
 /**
- * Marks each of [pins] on the map: a pin, or the card of the [selectedVenueId] venue, over the
- * venue's area. Tapping a pin calls [onPinClick] with its venue; tapping the card calls
+ * Marks each of [pins] on the map: a pin, or the card of the pin keyed [selectedVenueId], over its
+ * area. Tapping a pin calls [onPinClick] with its [VenuePin.key]; tapping the card calls
  * [onCardClick].
  *
  * Each marker is drawn as an image, which is redrawn only when what it shows changes: a pin's icon

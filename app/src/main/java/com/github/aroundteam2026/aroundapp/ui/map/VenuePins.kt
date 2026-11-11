@@ -45,7 +45,8 @@ data class VenuePin(
  *
  * A pin features the venue's [Venue.featuredQuestId] when it is one of the venue's valid quests,
  * else its newest valid quest (ties go to the smallest id). It takes the venue's name, location and
- * area radius from [venues]; a venue missing from it, or without a location yet, gets no pin.
+ * area radius from [venues]; a venue missing from it, or without a location yet, gets no pin. A
+ * quest with its own location gets its own pin there, drawing its own radius.
  *
  * @param venues The known venues, by id.
  * @param from The explorer's position, to tell how far each pin is, or null when unknown.
@@ -65,7 +66,8 @@ fun buildVenuePins(
         .groupBy(::pinKey)
         .toSortedMap()
         .mapNotNull { (key, own) ->
-          val venueId = own.first().venueId
+          val first = own.first()
+          val venueId = first.venueId
           val venue = venues[venueId] ?: return@mapNotNull null
           val shown = shownVenue(own, venue) ?: return@mapNotNull null
           VenuePin(
@@ -79,8 +81,7 @@ fun buildVenuePins(
               otherQuestCount = own.size - 1,
               distanceMeters = from?.distanceTo(shown.location),
               areaRadiusMeters =
-                  if (own.first().location == null) venue.radiusMeters
-                  else own.first().radiusMeters,
+                  if (first.location == null) venue.radiusMeters else first.radiusMeters,
           )
         }
 

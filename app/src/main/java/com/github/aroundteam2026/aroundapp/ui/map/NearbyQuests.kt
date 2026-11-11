@@ -42,9 +42,10 @@ data class NearbyQuest(
  * One row per quest valid at [now], by the same rule as the map's pins.
  *
  * Each row shows its venue as its pin does (see [shownVenue]); a venue missing from [venues] or
- * without a location has no rows. With the explorer's position [from], it lists the quests within
- * [NEARBY_RADIUS_METERS], nearest first; without it, every valid quest by venue name as [locale]
- * sorts them. A venue's quests stay together, newest first, then by smallest id.
+ * without a location has no rows, but for quests with their own. With the explorer's position
+ * [from], it lists the quests within [NEARBY_RADIUS_METERS], nearest first; without it, every valid
+ * quest by venue name as [locale] sorts them. A venue's quests stay together, newest first, then by
+ * smallest id.
  *
  * @param venues The known venues, by id.
  * @param from The explorer's position, or null when unknown.

@@ -278,8 +278,8 @@ class MapViewModel(
   /**
    * The active quests, their venues, the explorer's position and the time, again whenever quests or
    * their venues change, when a reward expires, and once the explorer is located. Without quests
-   * there are none; without venues there are none either, as each quest is shown at its venue's
-   * location, under its name. A failure to load the quests or the venues is logged and reported in
+   * there are none; without venues there are none either, as each quest is shown under its venue's
+   * name. A failure to load the quests or the venues is logged and reported in
    * [MapData.questsFailed] or [MapData.venuesFailed] until they load, on [onRetry] or, for the
    * venues, for a new set of venues.
    *
