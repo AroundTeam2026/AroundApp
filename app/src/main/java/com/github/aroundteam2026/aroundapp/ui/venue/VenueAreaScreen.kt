@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
@@ -196,7 +197,7 @@ private fun AreaMap(
         Circle(
             center = markerState.position,
             radius = state.radiusMeters.toDouble(),
-            fillColor = color.copy(alpha = 0.3f),
+            fillColor = color.copy(alpha = AREA_FILL_ALPHA),
             strokeColor = color,
             strokeWidth = 2f,
         )
@@ -373,3 +374,6 @@ private fun SaveButton(isSaving: Boolean, enabled: Boolean, onClick: () -> Unit)
 }
 
 private fun LatLng.toLocation() = Location(latitude, longitude)
+
+/** How visible the area is on the map, over the colour it is drawn in. */
+private const val AREA_FILL_ALPHA = 0.3f

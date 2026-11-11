@@ -43,6 +43,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
@@ -71,21 +73,31 @@ class AddressSearchBarTest {
   private var clears = 0
   private val picks = mutableListOf<AddressSuggestion>()
 
-  private fun show(colors: AddressSearchColors? = null) {
+  private fun show() {
     composeTestRule.setContent {
-      AddressSearchBar(
-          query = query,
-          state = state,
-          onQueryChange = {
-            queries += it
-            query = it
-          },
-          onSearch = { searches++ },
-          onClear = { clears++ },
-          onPick = { picks += it },
-          colors = colors ?: AddressSearchDefaults.colors(),
-      )
+      AroundAppTheme {
+        AddressSearchBar(
+            query = query,
+            state = state,
+            onQueryChange = {
+              queries += it
+              query = it
+            },
+            onSearch = { searches++ },
+            onClear = { clears++ },
+            onPick = { picks += it },
+        )
+      }
     }
+  }
+
+  /** The default colours under the theme, light or dark. */
+  private fun themeColors(darkTheme: Boolean): AddressSearchColors {
+    lateinit var result: AddressSearchColors
+    composeTestRule.setContent {
+      AroundAppTheme(darkTheme) { result = AddressSearchDefaults.colors() }
+    }
+    return result
   }
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
@@ -186,7 +198,7 @@ class AddressSearchBarTest {
     val title = titleOf(0).annotated()
     val highlight = title.spanStyles.single()
     assertEquals("Bourg", title.text.substring(highlight.start, highlight.end))
-    assertEquals(AddressSearchDefaults.colors(darkTheme = false).highlight, highlight.item.color)
+    assertEquals(AroundColors.Purple, highlight.item.color)
   }
 
   @Test
@@ -324,7 +336,18 @@ class AddressSearchBarTest {
 
     val image = node(C.Tag.VENUE_ADDRESS_FIELD_BOX).captureToImage()
     val middle = image.height / 2
-    val light = AddressSearchDefaults.colors(darkTheme = false)
+    val light =
+        AddressSearchColors(
+            surface = AroundColors.Paper,
+            outline = AroundColors.Purple,
+            ink = AroundColors.Ink,
+            muted = AroundColors.InkMuted,
+            line = AroundColors.Line,
+            avatar = AroundColors.Tertiary,
+            onAvatar = AroundColors.Cream,
+            highlight = AroundColors.Purple,
+            shadow = AroundColors.AddressShadow,
+        )
     // The left edge is the straight part of the outline
     assertPixel(image, 1.dp.px(), middle, light.outline)
     assertPixel(image, image.width - 1.dp.px() - 1, middle, light.outline)
@@ -333,21 +356,49 @@ class AddressSearchBarTest {
   }
 
   @Test
-  fun theDarkColoursComeFromTheFigmaDarkMode() {
-    val dark = AddressSearchDefaults.colors(darkTheme = true)
-    show(dark)
+  fun theColoursAreTheThemesInLightMode() {
+    assertEquals(
+        AddressSearchColors(
+            surface = AroundColors.Paper,
+            outline = AroundColors.Purple,
+            ink = AroundColors.Ink,
+            muted = AroundColors.InkMuted,
+            line = AroundColors.Line,
+            avatar = AroundColors.Tertiary,
+            onAvatar = AroundColors.Cream,
+            highlight = AroundColors.Purple,
+            shadow = AroundColors.AddressShadow,
+        ),
+        themeColors(darkTheme = false),
+    )
+  }
 
-    val image = node(C.Tag.VENUE_ADDRESS_FIELD_BOX).captureToImage()
-    assertPixel(image, 6.dp.px(), image.height / 2, Color(0xFF383838))
+  // Figma uses the dark mode's ink colour for the accent text
+  @Test
+  fun theColoursAreTheThemesInDarkMode() {
+    assertEquals(
+        AddressSearchColors(
+            surface = AroundColors.DarkSurface,
+            outline = AroundColors.Purple,
+            ink = AroundColors.Cream,
+            muted = AroundColors.DarkMuted,
+            line = AroundColors.DarkLine,
+            avatar = AroundColors.Tertiary,
+            onAvatar = AroundColors.Cream,
+            highlight = AroundColors.Cream,
+            shadow = AroundColors.AddressShadow,
+        ),
+        themeColors(darkTheme = true),
+    )
   }
 
   @Test
   @Config(qualifiers = "+night")
-  fun theDefaultColoursFollowDarkMode() {
-    var colors: AddressSearchColors? = null
-    composeTestRule.setContent { colors = AddressSearchDefaults.colors() }
+  fun theFieldIsDrawnOnTheDarkSurfaceInDarkMode() {
+    show()
 
-    assertEquals(AddressSearchDefaults.colors(darkTheme = true), colors)
+    val image = node(C.Tag.VENUE_ADDRESS_FIELD_BOX).captureToImage()
+    assertPixel(image, 6.dp.px(), image.height / 2, AroundColors.DarkSurface)
   }
 
   private fun androidx.compose.ui.test.SemanticsNodeInteraction.annotated(): AnnotatedString =

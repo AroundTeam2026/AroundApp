@@ -38,6 +38,17 @@ class AroundAppThemeTest {
   }
 
   @Test
+  fun theThemeSaysWhetherItIsDarkWhateverTheSystemIs() {
+    val seen = mutableListOf<Boolean>()
+    composeTestRule.setContent {
+      AroundAppTheme(darkTheme = true) { seen += AroundTheme.isDark }
+      AroundAppTheme(darkTheme = false) { seen += AroundTheme.isDark }
+    }
+
+    assertEquals(listOf(true, false), seen)
+  }
+
+  @Test
   fun lightPaletteMatchesFigma() {
     val colors = palette(false)
     assertEquals(Color(0xFF4D0092), colors.primary)
