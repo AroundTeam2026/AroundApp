@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -177,6 +178,38 @@ class VenuePageUiStateTest {
     assertNull(booked.copy(acceptAvailable = false).cancellableReservationId)
   }
 
+  // The bug of #426: the details still offered to cancel, and the proof seemed to vanish
+  @Test
+  fun aReservationWithAProofCanNoLongerBeCancelledWhateverItsStatus() {
+    val booked =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            approvedIds = setOf("r"),
+        )
+
+    CompletionStatus.entries.forEach { status ->
+      val reason = "Too dark".takeIf { status == CompletionStatus.REJECTED }
+      val proof = completion("r").copy(status = status, rejectReason = reason)
+      assertNull(
+          status.name,
+          booked.copy(completions = mapOf("r" to proof)).cancellableReservationId,
+      )
+    }
+  }
+
+  @Test
+  fun aProofOfAnotherReservationLeavesThePickedOneCancellable() {
+    val booked =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            completions = mapOf("other" to completion("other")),
+        )
+
+    assertEquals("r", booked.cancellableReservationId)
+  }
+
   @Test
   fun onlyAnApprovedReservationOfThePickedQuestCanBeCompleted() {
     val booked = loaded.copy(reservationIds = mapOf("a" to "r"), selectedQuestId = "a")
@@ -283,6 +316,57 @@ class VenuePageUiStateTest {
     assertNull(left.detailQuestId)
 
     assertNull(left.withQuests(listOf(quest("a"), quest("b"))).detailQuestId)
+  }
+
+  // As when the explorer taps the quest's card on the Quests tab
+  @Test
+  fun arrivingAtAQuestOpensItsDetailsAndClosingThemLeavesThePage() {
+    val arrived = loaded.arrivingAt("b")
+
+    assertEquals("b", arrived.detailQuestId)
+    assertEquals("b", arrived.selectedQuestId)
+    assertEquals("b", arrived.arrivalQuestId)
+    assertTrue(arrived.detailsLeaveThePage)
+  }
+
+  @Test
+  fun detailsOpenedFromTheListDoNotLeaveThePage() {
+    assertFalse(loaded.detailsLeaveThePage)
+    assertFalse(loaded.withQuestDetails("b").detailsLeaveThePage)
+  }
+
+  // A quest whose reward expired is no longer listed: the page shows its list, and says why
+  @Test
+  fun arrivingAtAnUnlistedQuestShowsTheListAndSaysSo() {
+    assertEquals(loaded.copy(arrivalMissed = true), loaded.arrivingAt("gone"))
+  }
+
+  // The page says the venue is gone, which explains the quest too
+  @Test
+  fun arrivingAtAPageThatIsNotLoadedChangesNothing() {
+    val gone = VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
+    assertSame(gone, gone.arrivingAt("a"))
+  }
+
+  // Once they closed, the explorer has seen the list, so details opened from it close back to it
+  @Test
+  fun detailsArrivedAtThatLeaveTheListNoLongerLeaveThePage() {
+    val left = loaded.arrivingAt("a").withQuests(listOf(quest("b")))
+    assertNull(left.arrivalQuestId)
+
+    val reopened = left.withQuests(listOf(quest("a"), quest("b"))).withQuestDetails("a")
+    assertFalse(reopened.detailsLeaveThePage)
+  }
+
+  @Test
+  fun theDetailsArrivedAtStayArrivedAtWhileTheirQuestIsListed() {
+    val updated = loaded.arrivingAt("a").withQuests(listOf(quest("c"), quest("a")))
+    assertTrue(updated.detailsLeaveThePage)
+  }
+
+  @Test
+  fun closingTheDetailsArrivedAtForgetsThem() {
+    assertNull(loaded.arrivingAt("a").withoutQuestDetails().arrivalQuestId)
   }
 
   @Test

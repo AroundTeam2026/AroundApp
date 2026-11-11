@@ -3,15 +3,22 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.util.Log
+import com.github.aroundteam2026.aroundapp.model.party.EVERY_PARTY_CODE_TAKEN
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
+import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyUserFirestore
+import com.github.aroundteam2026.aroundapp.model.party.newPartyCode
+import com.github.aroundteam2026.aroundapp.model.party.normalizePartyCode
 import com.github.aroundteam2026.aroundapp.model.party.partyMemberId
 import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Source
 import java.util.Date
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,7 +33,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * [ReservationRepository] backed by the Firestore `reservations` collection, with each party in the
- * `party_user` collection.
+ * `party_user` collection and each party code in the `party_codes` collection.
  *
  * Documents that cannot be mapped back to a [Reservation] are logged and skipped: the `observe*`
  * flows leave them out, and [updateStatus] treats them as missing.
@@ -39,45 +46,144 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [createReservation] waits for the server to confirm a write, in
  *   milliseconds, before it returns success with the write still queued.
+ * @param newCode Draws the party code of a new reservation. Random by default; tests pass a taken
+ *   code to cause a collision.
  * @param now Clock used for `createdAt`, in epoch milliseconds.
  */
 class ReservationRepositoryFirestore(
     private val db: FirebaseFirestore,
     private val confirmTimeoutMs: Long = CONFIRM_TIMEOUT_MS,
+    private val newCode: () -> String = { newPartyCode() },
     private val now: () -> Long = System::currentTimeMillis,
 ) : ReservationRepository {
   private val reservations
     get() = db.collection(RESERVATIONS)
 
+  private val partyCodes
+    get() = db.collection(PARTY_CODES)
+
   /**
-   * Writes the reservation and [creatorUid]'s membership in one batch, applied whole or not at all,
-   * and waits up to [confirmTimeoutMs] for the server's answer.
+   * Writes the reservation, [creatorUid]'s membership and its party code in one batch, applied
+   * whole or not at all, and waits up to [confirmTimeoutMs] for the server's answer.
    *
-   * A refusal in that time, e.g. because [creatorUid] is not the signed-in user, is returned as the
-   * Firestore exception, and Firestore drops its local copy of both. Without an answer in time,
-   * e.g. while offline, it returns success and a later refusal is only logged. Errors while issuing
-   * the write are returned as a failure too.
+   * The rules refuse a code that is already taken. When they refuse a batch and its code's document
+   * exists on the server, it writes the batch again under a new id with a new code, at most
+   * [MAX_PARTY_CODE_ATTEMPTS] codes in all, and then fails with an [IllegalStateException]. Any
+   * other refusal in that time, e.g. because [creatorUid] is not the signed-in user, is returned as
+   * the Firestore exception, and Firestore drops its local copy of the batch. Without an answer in
+   * time, e.g. while offline, it returns success and a later refusal, a taken code included, is
+   * only logged. Errors while issuing the write are returned as a failure too.
    */
   override suspend fun createReservation(
       reservation: Reservation,
       creatorUid: String,
   ): Result<String> =
       try {
-        val document = reservations.document()
+        // One time for every attempt, so the creator stays joined at the reservation's creation
         val time = Timestamp(Date(now()))
-        val write =
-            db.batch()
-                .set(document, reservation.toFirestore(time))
-                .set(
-                    db.collection(PartyUserFirestore.COLLECTION)
-                        .document(partyMemberId(document.id, creatorUid)),
-                    PartyUserFirestore.joinedMembership(document.id, creatorUid, time),
-                )
-                .commit()
-        write.addOnFailureListener { Log.w(TAG, "Write of reservation ${document.id} failed", it) }
-        // Null when the server hasn't answered in time; a refusal throws
-        withTimeoutOrNull(confirmTimeoutMs) { write.await() }
-        Result.success(document.id)
+        val id =
+            (1..MAX_PARTY_CODE_ATTEMPTS).firstNotNullOfOrNull {
+              createUnlessTaken(reservation, creatorUid, time, newCode())
+            } ?: throw IllegalStateException(EVERY_PARTY_CODE_TAKEN)
+        Result.success(id)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
+
+  /**
+   * Writes the new reservation with the party code [code] like [create], but returns null instead
+   * of throwing when the rules refused it because another reservation already has [code].
+   */
+  private suspend fun createUnlessTaken(
+      reservation: Reservation,
+      creatorUid: String,
+      time: Timestamp,
+      code: String,
+  ): String? =
+      try {
+        create(reservation, creatorUid, time, code)
+      } catch (e: FirebaseFirestoreException) {
+        if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED || !isTaken(code)) throw e
+        Log.i(TAG, "Party code $code is taken, drawing another")
+        null
+      }
+
+  /**
+   * Writes the batch of a new reservation with the party code [code], created at [time], and waits
+   * up to [confirmTimeoutMs] for the server's answer. Returns the reservation's id, also when the
+   * server hasn't answered in time, and throws its refusal.
+   */
+  private suspend fun create(
+      reservation: Reservation,
+      creatorUid: String,
+      time: Timestamp,
+      code: String,
+  ): String {
+    val document = reservations.document()
+    val write =
+        db.batch()
+            .set(document, reservation.toFirestore(time, code))
+            .set(
+                db.collection(PartyUserFirestore.COLLECTION)
+                    .document(partyMemberId(document.id, creatorUid)),
+                PartyUserFirestore.joinedMembership(document.id, creatorUid, time),
+            )
+            .set(partyCodes.document(code), mapOf(CODE_RESERVATION_ID to document.id))
+            .commit()
+    write.addOnFailureListener { Log.w(TAG, "Write of reservation ${document.id} failed", it) }
+    // Null when the server hasn't answered in time; a refusal throws
+    withTimeoutOrNull(confirmTimeoutMs) { write.await() }
+    return document.id
+  }
+
+  /** Whether another reservation already has the party code [code], asking the server. */
+  private suspend fun isTaken(code: String): Boolean =
+      partyCodes.document(code).get(Source.SERVER).await().exists()
+
+  /**
+   * Normalizes [code] and reads its `party_codes` document from the server. A code that is not one,
+   * or whose document is missing or has no reservation id, is a [PartyCodeNotFoundException]; a
+   * read that fails, e.g. offline, is the Firestore exception.
+   */
+  override suspend fun findReservationIdByCode(code: String): Result<String> =
+      try {
+        val normalized = normalizePartyCode(code) ?: throw PartyCodeNotFoundException(code)
+        val id =
+            partyCodes
+                .document(normalized)
+                .get(Source.SERVER)
+                .await()
+                .getString(CODE_RESERVATION_ID) ?: throw PartyCodeNotFoundException(normalized)
+        Result.success(id)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
+
+  /**
+   * Reads the reservation's document from the server, with the `joinedCount` it stores. A missing
+   * or malformed document, one without its `joinedCount` included, is a [NoSuchElementException]; a
+   * read that fails, e.g. offline, is the Firestore exception.
+   */
+  override suspend fun getPartyPreview(reservationId: String): Result<PartyPreview> =
+      try {
+        val document = reservations.document(reservationId).get(Source.SERVER).await()
+        val reservation =
+            document.toReservation()
+                ?: throw NoSuchElementException("No reservation with id $reservationId")
+        Result.success(
+            PartyPreview(
+                reservation,
+                // A party always has its creator, so a missing count is malformed, like any field
+                document.getLong(PartyUserFirestore.JOINED_COUNT)?.toInt()
+                    ?: throw NoSuchElementException(
+                        "Reservation $reservationId has no joinedCount"
+                    ),
+            )
+        )
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
@@ -121,7 +227,7 @@ class ReservationRepositoryFirestore(
    * Fails with [NoSuchElementException] if the reservation is missing or malformed, with
    * [IllegalStateException] if [canTransition] forbids the change, and with the Firestore exception
    * if the rules refuse it, which they do for everyone but the venue and, to cancel, a joined
-   * member of the party.
+   * member of the party, and when approving a party without the size its quest asks for.
    */
   override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> =
       try {
@@ -184,11 +290,12 @@ class ReservationRepositoryFirestore(
   }
 
   /**
-   * The document fields for a new reservation. The status is always [ReservationStatus.PENDING],
-   * which is also the only status the rules let an explorer create, and its party has one joined
-   * member, the creator, whose membership is in the same batch.
+   * The document fields for a new reservation with the party code [partyCode]. The status is always
+   * [ReservationStatus.PENDING], which is also the only status the rules let an explorer create,
+   * and its party has one joined member, the creator, whose membership is in the same batch, as is
+   * the code's document.
    */
-  private fun Reservation.toFirestore(createdAt: Timestamp): Map<String, Any> =
+  private fun Reservation.toFirestore(createdAt: Timestamp, partyCode: String): Map<String, Any> =
       mapOf(
           QUEST_ID to questId,
           VENUE_ID to venueId,
@@ -197,6 +304,7 @@ class ReservationRepositoryFirestore(
           CREATED_AT to createdAt,
           EXPLORER_NAME to explorerName,
           PartyUserFirestore.JOINED_COUNT to 1,
+          PARTY_CODE to partyCode,
       )
 
   /** Maps this document to a [Reservation], or returns null if it is missing or malformed. */
@@ -212,6 +320,8 @@ class ReservationRepositoryFirestore(
           createdAt = required(CREATED_AT) { getTimestamp(it) }.toDate().time,
           // Reservations made before the name was stored have none: show them, unnamed
           explorerName = getString(EXPLORER_NAME) ?: "",
+          // Reservations made before party codes have none
+          partyCode = getString(PARTY_CODE),
       )
     } catch (e: Exception) {
       Log.w(TAG, "Skipping malformed reservation document $id", e)
@@ -226,6 +336,10 @@ class ReservationRepositoryFirestore(
     const val CONFIRM_TIMEOUT_MS = 5_000L
 
     const val RESERVATIONS = PartyUserFirestore.RESERVATIONS
+    const val PARTY_CODES = "party_codes"
+
+    /** The field of a `party_codes` document holding the id of the code's reservation. */
+    const val CODE_RESERVATION_ID = "reservationId"
 
     const val QUEST_ID = "questId"
     const val VENUE_ID = "venueId"
@@ -233,5 +347,6 @@ class ReservationRepositoryFirestore(
     const val STATUS = "status"
     const val CREATED_AT = "createdAt"
     const val EXPLORER_NAME = "explorerName"
+    const val PARTY_CODE = "partyCode"
   }
 }

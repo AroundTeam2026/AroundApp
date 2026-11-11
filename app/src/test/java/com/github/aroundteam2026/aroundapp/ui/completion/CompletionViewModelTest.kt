@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
@@ -17,7 +18,9 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -83,6 +86,7 @@ class CompletionViewModelTest {
   private val fakeCompletions = FakeCompletionRepository { NOW }
   private val completions = GatedCompletions(fakeCompletions)
   private val photos = FakeProofPhotoRepository()
+  private var photoRepository: ProofPhotoRepository = photos
   private var venues = FakeVenueRepository(listOf(testVenue(id = CAFE)))
   private val locations = FakeLocationRepository(VENUE_LOCATION)
 
@@ -95,7 +99,7 @@ class CompletionViewModelTest {
         venues,
         locations,
         completions,
-        photos,
+        photoRepository,
     )
   }
 
@@ -133,7 +137,7 @@ class CompletionViewModelTest {
     runCurrent()
   }
 
-  private suspend fun stored() = fakeCompletions.observeForExplorer(EXPLORER).first()
+  private suspend fun stored() = fakeCompletions.observeForReservation(reservationId).first()
 
   /** Where the fake stores the [upload]th photo of the reservation. */
   private fun location(upload: Int) = "gs://fake-bucket/proofs/$reservationId/photo-$upload"
@@ -282,7 +286,7 @@ class CompletionViewModelTest {
     assertEquals(reservationId, completion.reservationId)
     assertEquals(CAFE, completion.venueId)
     assertEquals(EXPLORER, completion.explorerUid)
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertEquals(0, photos.uploads.size)
   }
 
@@ -527,7 +531,7 @@ class CompletionViewModelTest {
 
     assertEquals(listOf(PHOTO), photos.uploads.values.toList())
     assertEquals(Proof.Photo(location(1)), stored().single().proof)
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test
@@ -543,7 +547,7 @@ class CompletionViewModelTest {
 
     gate.complete(Unit)
     runCurrent()
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test
@@ -609,7 +613,7 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertEquals(1, stored().size)
   }
 
@@ -675,7 +679,7 @@ class CompletionViewModelTest {
     viewModel
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertFalse(state.canSubmit)
     viewModel.submit()
     runCurrent()
@@ -714,18 +718,79 @@ class CompletionViewModelTest {
     fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
+  // Not saved, so the screen doesn't close as if this member's proof was sent
   @Test
-  fun aPartyMembersCompletionOfTheSameReservationDoesNotCount() = test {
+  fun aTeammatesCompletionOfTheSameReservationShowsSentByTeammate() = test {
     reservationId = book("fox")
-    fakeCompletions.submit(reservationId, CAFE, "friend", Proof.Text("By the till")).getOrThrow()
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("By the till")).getOrThrow()
     viewModel
     runCurrent()
 
-    assertEquals(CompletionFormStatus.READY, state.status)
+    assertTrue(state.sentByTeammate)
     assertEquals(SaveState.Idle, state.saveState)
+    assertFalse(state.isEditable)
+  }
+
+  @Test
+  fun aTeammateSendingWhileTheFormIsOpenLocksItWithoutSaving() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    assertTrue(state.canSubmit)
+
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    runCurrent()
+
+    assertTrue(state.sentByTeammate)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertFalse(state.canSubmit)
+    viewModel.updateAnswer("Changed")
+    assertEquals("By the till", state.answer)
+    viewModel.submit()
+    runCurrent()
+    assertEquals(0, completions.calls)
+  }
+
+  // The teammate's proof clears an earlier send's error, which no longer applies
+  @Test
+  fun aTeammatesProofAfterAFailedSendClearsTheError() = test {
+    fakeCompletions.forcedFailure = IOException("offline")
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    viewModel.submit()
+    runCurrent()
+    assertEquals(SaveState.Failed, state.saveState)
+
+    fakeCompletions.forcedFailure = null
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    runCurrent()
+
+    assertTrue(state.sentByTeammate)
+    assertEquals(SaveState.Idle, state.saveState)
+  }
+
+  // Both members send at once and the teammate's arrives first: this member's send then fails as
+  // already stored, and the form shows the teammate's proof rather than an error to retry
+  @Test
+  fun aSendBeatenByATeammateEndsAsSentByTeammate() = test {
+    open("fox")
+    val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
+    viewModel.updateAnswer("By the till")
+    viewModel.submit()
+    runCurrent()
+    assertEquals(SaveState.Saving, state.saveState)
+
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    runCurrent()
+    assertEquals(SaveState.Saving, state.saveState)
+    submitGate.complete(Unit)
+    runCurrent()
+
+    assertTrue(state.sentByTeammate)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(FRIEND, stored().single().explorerUid)
   }
 
   @Test
@@ -744,12 +809,12 @@ class CompletionViewModelTest {
 
     listenerGate.complete(Unit)
     runCurrent()
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
 
     submitGate.complete(Unit) // the submit now fails: it is already stored
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
   @Test
@@ -762,12 +827,44 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(SaveState.Saved(completionId(reservationId, EXPLORER)), state.saveState)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+  }
+
+  @Test
+  fun aTrimmedAnswerAtTheLimitIsAllowedAndStoredWhole() = test {
+    open("fox")
+    val answer = "x".repeat(MAX_TEXT_ANSWER_LENGTH)
+    viewModel.updateAnswer("  $answer  ")
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(Proof.Text(answer), stored().single().proof)
+    assertTrue(state.saveState is SaveState.Saved)
+  }
+
+  @Test
+  fun oversizedUploadedLocationFailsWithoutCrashingOrSubmitting() = test {
+    photoRepository =
+        object : ProofPhotoRepository by photos {
+          override suspend fun upload(reservationId: String, photo: Uri) =
+              Result.success("x".repeat(2001))
+        }
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(SaveState.Failed, state.saveState)
+    assertEquals(PHOTO, state.photo)
+    assertTrue(state.isEditable)
+    assertEquals(0, completions.calls)
+    assertTrue(stored().isEmpty())
   }
 
   private companion object {
     const val CAFE = "cafe"
     const val EXPLORER = "explorer"
+    const val FRIEND = "friend"
     const val NOW = 1_800_000_000_000L
     val VENUE_LOCATION = Location(46.5220, 6.6330)
     val PHOTO: Uri = Uri.parse("content://media/photos/1")

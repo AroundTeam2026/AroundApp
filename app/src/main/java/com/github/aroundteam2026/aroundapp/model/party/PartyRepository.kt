@@ -13,8 +13,8 @@ interface PartyRepository {
    * sets `joinedAt` and `updatedAt`.
    *
    * The security rules only let an explorer join as themselves, a pending reservation, once, while
-   * it has fewer than [MAX_PARTY_SIZE] joined members: the Firestore implementation fails when the
-   * server refuses.
+   * it has fewer joined members than the [partyCapacity] of its quest: the Firestore implementation
+   * fails when the server refuses.
    *
    * @return success, or a failure if [uid] already has a membership for this reservation, whatever
    *   its status, if the party is full, or if the write failed.
@@ -25,8 +25,13 @@ interface PartyRepository {
    * Moves [uid]'s membership in the party of [reservationId] to [PartyMemberStatus.WITHDRAWN] and
    * sets its `updatedAt`. The membership is kept.
    *
+   * The security rules only let an explorer withdraw themselves, while the reservation is pending
+   * or approved and before their party sent its proof. The creator can't withdraw and cancels the
+   * reservation instead. Withdrawing can take an approved party below the size its quest asks for
+   * ([meetsPartySize]); the reservation stays approved.
+   *
    * @return success, or a failure if there is no such membership, if it is already withdrawn
-   *   ([IllegalStateException]), or if the write failed.
+   *   ([IllegalStateException]), if the rules refuse the withdrawal, or if the write failed.
    */
   suspend fun withdraw(reservationId: String, uid: String): Result<Unit>
 
@@ -44,25 +49,31 @@ interface PartyRepository {
 }
 
 /**
+ * Observes the party of each reservation of [reservationIds], joined and withdrawn members alike.
+ * Emits once every party has been read, then again whenever one changes.
+ *
+ * @return every membership of each party, keyed by reservation id, with every id of
+ *   [reservationIds]; an empty map at once when there are none.
+ * @throws Exception from the flow if the listener of any party fails, as [observeMembers] does.
+ */
+fun PartyRepository.observeParties(
+    reservationIds: Collection<String>
+): Flow<Map<String, List<PartyMember>>> {
+  val ids = reservationIds.distinct()
+  if (ids.isEmpty()) return flowOf(emptyMap())
+  return combine(ids.map { id -> observeMembers(id).map { id to it } }) { it.toMap() }
+}
+
+/**
  * Observes how many explorers are [PartyMemberStatus.JOINED] in the party of each reservation of
- * [reservationIds]. Emits once every party has been read, then again whenever one changes.
+ * [reservationIds]; emits and fails as [observeParties] does.
  *
  * @return the number of joined members, keyed by reservation id, with every id of [reservationIds];
  *   an empty map at once when there are none.
- * @throws Exception from the flow if the listener of any party fails, as [observeMembers] does.
  */
 fun PartyRepository.observeJoinedCounts(
     reservationIds: Collection<String>
-): Flow<Map<String, Int>> {
-  val ids = reservationIds.distinct()
-  if (ids.isEmpty()) return flowOf(emptyMap())
-  return combine(
-      ids.map { id ->
-        observeMembers(id).map { members ->
-          id to members.count { it.status == PartyMemberStatus.JOINED }
-        }
-      }
-  ) {
-    it.toMap()
-  }
-}
+): Flow<Map<String, Int>> =
+    observeParties(reservationIds).map { parties ->
+      parties.mapValues { (_, members) -> members.count { it.isJoined } }
+    }

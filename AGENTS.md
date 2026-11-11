@@ -18,9 +18,11 @@ A Kotlin/Android Exploration/Social app (`com.github.aroundteam2026.aroundapp`),
 
 - The feature works and matches its acceptance criteria (the acceptance criteria of the user story).
 - **All new code comes with unit tests.**
+  - A fake goes next to the tests that use it: in `app/src/testSupport/java` if device tests (`androidTest`) use it too, since both test source sets compile that folder, or in `app/src/test` if only unit tests do. Never in a source set that ships, such as `app/src/main` or `app/src/debug` (the released APK is a debug build): `./gradlew check` fails if one is there.
 - `./gradlew check` is green (unit tests + lint) and `./gradlew ktfmtCheck` passes (formatting) before you submit.
 - Features covered by instrumented tests (under `androidTest/`, e.g. the Firestore repository) must also pass `./gradlew connectedDebugAndroidTest`, with an Android emulator and the Firebase emulator running.
   - Start the Firebase emulators from the repository root with `firebase emulators:start`; it loads `firestore.rules`. Tests that use Firebase call `FirebaseEmulator.connect()` (in `androidTest/.../testing/`) in their setup, never the real project.
+  - Start them as the CI does, with `NODE_OPTIONS="--require ./.github/scripts/keep-emulator-connections.cjs"` set first (PowerShell: `$env:NODE_OPTIONS = "--require ./.github/scripts/keep-emulator-connections.cjs"`). Otherwise an Auth call made about 5 s after the previous one can fail with "unexpected end of stream"; the script says why.
   - A change to `firestore.rules` comes with a test in `FirestoreRulesTest`.
   - Firestore repository tests get clients from `emulatorClient` and users from `signInNewUser` (in `androidTest/.../testing/`). Don't terminate those clients in `@After`: they stay open across tests, because a new client costs about a second per test on CI. Terminate only a client the test needs closed, under an app name of its own.
 - The CI runs the whole test suit, no flags exist to govern the CI behavior.

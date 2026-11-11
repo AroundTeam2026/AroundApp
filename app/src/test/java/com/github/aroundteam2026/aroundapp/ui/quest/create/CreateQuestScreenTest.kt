@@ -25,6 +25,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.input.ImeAction
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -49,7 +50,12 @@ import org.robolectric.annotation.Config
 class CreateQuestScreenTest {
   @get:Rule val compose = createComposeRule()
   private val viewModel =
-      CreateQuestViewModel(FakeAuthRepository(), FakeVenueRepository(), FakeQuestRepository())
+      CreateQuestViewModel(
+          FakeAuthRepository(),
+          FakeVenueRepository(),
+          FakeQuestRepository(),
+          FakeAddressSearchRepository(),
+      )
   private var closeCalls = 0
 
   @Before

@@ -34,7 +34,7 @@ data class OverviewUiState(
  *
  * @property reservationId Id of the reservation the row shows.
  * @property questId Id of the accepted quest.
- * @property venueId Id of the quest's venue, whose page a tap opens.
+ * @property venueId Id of the quest's venue, whose page a tap opens with the quest's details.
  * @property questTitle The quest's title.
  * @property reward The quest's reward, or null if it has none.
  * @property venueName The venue's name.
@@ -69,18 +69,18 @@ enum class OverviewStatus {
 }
 
 /**
- * Where a row's reservation stands with its venue, then, once approved, where the explorer's proof
+ * Where a row's reservation stands with its venue, then, once approved, where the party's proof
  * stands.
  *
- * @property cancellable Whether the explorer can still cancel the reservation: not once they sent
- *   their proof.
+ * @property cancellable Whether the explorer can still cancel the reservation: not once their party
+ *   sent its proof.
  */
 enum class OverviewRowStatus(val cancellable: Boolean) {
   /** Pending: the venue hasn't answered yet. */
   WAITING(cancellable = true),
-  /** The venue approved it, and the explorer hasn't sent a proof yet. */
+  /** The venue approved it, and the party hasn't sent a proof yet. */
   APPROVED(cancellable = true),
-  /** The explorer sent the proof; the venue hasn't answered it yet. */
+  /** A member of the party sent the proof; the venue hasn't answered it yet. */
   PROOF_SENT(cancellable = false),
   /** The venue approved the proof: the quest is done. */
   COMPLETED(cancellable = false),

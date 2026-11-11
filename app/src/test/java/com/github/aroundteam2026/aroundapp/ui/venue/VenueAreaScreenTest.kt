@@ -47,7 +47,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits.MIN_RADIUS_ME
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
-import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaViewModel.Companion.SEARCH_DELAY_MILLIS
+import com.github.aroundteam2026.aroundapp.ui.venue.AddressSearchController.Companion.SEARCH_DELAY_MILLIS
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.MarkerState

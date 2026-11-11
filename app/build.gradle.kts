@@ -15,6 +15,13 @@ plugins {
   id("jacoco")
 }
 
+// One JaCoCo version for both the agent AGP attaches to the tests and the jacocoTestReport task,
+// which otherwise falls back to Gradle's default and reads data written by a different version.
+// Set after evaluation: AGP resets the jacoco extension's toolVersion once the script has run.
+val jacocoToolVersion = "0.8.15"
+
+afterEvaluate { jacoco { toolVersion = jacocoToolVersion } }
+
 // The Google Maps API key, from MAPS_API_KEY in local.properties, else from the MAPS_API_KEY
 // environment variable (set by the CI from a repository secret). Never commit the key itself.
 // The key only accepts builds signed by a registered certificate: if the map stays grey, send your
@@ -75,11 +82,12 @@ android {
     }
   }
 
-  testCoverage { jacocoVersion = "0.8.11" }
+  testCoverage { jacocoVersion = jacocoToolVersion }
 
   buildFeatures { compose = true }
 
-  // Registration page-object steps are exercised by Robolectric and reused by device journeys.
+  // Code both unit and device tests use: the fakes they share, which must stay out of what ships
+  // (see checkNoFakesInMain), and the registration page-object steps device journeys reuse.
   sourceSets {
     getByName("test").kotlin.directories.add("src/testSupport/java")
     getByName("androidTest").kotlin.directories.add("src/testSupport/java")
@@ -253,3 +261,32 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
       },
   )
 }
+
+// A fake in a source set that ships ends up in the APK (#418): fakes belong in src/testSupport/java
+// or src/test
+val checkNoFakesInMain =
+    tasks.register("checkNoFakesInMain") {
+      group = "verification"
+      description =
+          "Fails if a source set that ships holds a fake (Fake*.kt), as it would be in the APK."
+      // Every source set but the tests': main, and debug, as the released APK is a debug build
+      val fakes =
+          fileTree("src") {
+            include("**/Fake*.kt")
+            exclude("test*/**", "androidTest*/**")
+          }
+      val root = projectDir
+      inputs.files(fakes)
+      doLast {
+        val found = fakes.files.map { it.relativeTo(root).invariantSeparatorsPath }.sorted()
+        if (found.isNotEmpty()) {
+          throw GradleException(
+              "Fakes belong in src/testSupport/java (shared with device tests) or src/test, not " +
+                  "in a source set that ships, such as src/main or src/debug: " +
+                  found.joinToString()
+          )
+        }
+      }
+    }
+
+tasks.named("check") { dependsOn(checkNoFakesInMain) }

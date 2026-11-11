@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -249,7 +250,7 @@ class VenueEntryNavigationTest {
     val venue = testVenue(id = "venue-owner")
     val repository = FakeVenueRepository(listOf(venue))
     val quests = FakeQuestRepository()
-    val form = CreateQuestViewModel(auth, repository, quests)
+    val form = CreateQuestViewModel(auth, repository, quests, FakeAddressSearchRepository())
     compose.setContent {
       AroundAppTheme {
         VenueEntryNavigation(

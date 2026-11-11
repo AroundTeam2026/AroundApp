@@ -133,6 +133,12 @@ class ExplorerJourneyTest : TestCase() {
     step("The Quests tab lists the quest, waiting for the venue") {
       composeTestRule.seeTheQuestsCard(reservationId, questTitle, R.string.overview_status_waiting)
     }
+    step("Its card opens the quest's details, whose back arrow returns to the Quests tab") {
+      composeTestRule.onNodeWithTag("${C.Tag.OVERVIEW_ROW}_$reservationId").performClick()
+      composeTestRule.waitFor(hasTestTag(C.Tag.QUEST_DETAIL_SCREEN))
+      composeTestRule.onNodeWithTag(C.Tag.VENUE_PAGE_BACK).performClick()
+      composeTestRule.waitFor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId"))
+    }
     step("The explorer signs out") { composeTestRule.signOut() }
     step("The quest's venue signs in and its dashboard lists the request") {
       composeTestRule.signIn(venueEmail, landsOn = C.Tag.VENUE_DASHBOARD_SCREEN)

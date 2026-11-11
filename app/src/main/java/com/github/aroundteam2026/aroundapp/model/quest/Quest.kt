@@ -1,15 +1,18 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.quest
 
+import com.github.aroundteam2026.aroundapp.model.common.Location
+
 /**
  * A quest offered by a venue, which explorers complete by visiting it and submitting proof.
  *
  * The repository assigns [Quest.id], [Quest.createdAt] and [Quest.updatedAt]; any values the caller
- * sets for them are overwritten.
+ * sets for them are overwritten. An update also keeps the stored [Quest.venueId].
  *
  * @property venueId Id of the owning venue, equal to the venue owner's uid.
- * @property radiusMeters Distance from the venue's location within which a visit counts, between
- *   [QuestLimits.MIN_RADIUS_METERS] and [QuestLimits.MAX_RADIUS_METERS].
+ * @property radiusMeters Distance from the quest's location (its own, or else the venue's) within
+ *   which a visit counts, between [QuestLimits.MIN_RADIUS_METERS] and
+ *   [QuestLimits.MAX_RADIUS_METERS].
  * @property title Short name shown on the map, at most [QuestLimits.TITLE_MAX_LENGTH] characters.
  * @property description What the quest is about, at most [QuestLimits.DESCRIPTION_MAX_LENGTH]
  *   characters.
@@ -19,11 +22,13 @@ package com.github.aroundteam2026.aroundapp.model.quest
  * @property minPartySize Smallest party allowed to take the quest; defaults to a solo visit.
  * @property exactPartySize Whether the party must have exactly [minPartySize] people rather than at
  *   least that many; defaults to at least.
+ * @property location Where explorers go for this quest, or null to use the venue's location, which
+ *   then also moves with the venue. Set for a quest that takes place away from the venue itself.
  * @property reward What explorers get on completion, or null if there is none.
  * @property status Lifecycle state; only [QuestStatus.ACTIVE] quests are visible to explorers.
  * @property createdAt Creation time, in epoch milliseconds. Set by [QuestRepository.createQuest].
  * @property updatedAt Last modification time, in epoch milliseconds. Set by
- *   [QuestRepository.createQuest].
+ *   [QuestRepository.createQuest] and [QuestRepository.updateQuest].
  */
 data class Quest(
     val id: String,
@@ -35,6 +40,7 @@ data class Quest(
     val proofType: ProofType,
     val minPartySize: Int = QuestLimits.MIN_PARTY_SIZE,
     val exactPartySize: Boolean = false,
+    val location: Location? = null,
     val reward: Reward?,
     val status: QuestStatus,
     val createdAt: Long,

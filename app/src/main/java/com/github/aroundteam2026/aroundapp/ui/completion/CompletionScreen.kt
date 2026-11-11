@@ -1,3 +1,5 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
@@ -42,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -53,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
@@ -97,6 +101,7 @@ fun CompletionScreen(
             viewModel::pickPhoto,
             { viewModel.pickPhoto(null) },
             enabled = state.isEditable,
+            questTitle = state.questTitle,
         )
       },
   )
@@ -129,8 +134,9 @@ fun CompletionContent(
               verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
           ) {
             Text(
-                stringResource(R.string.completion_review_hint, venueName),
-                Modifier.fillMaxWidth(),
+                if (state.sentByTeammate) stringResource(R.string.completion_sent_by_teammate)
+                else stringResource(R.string.completion_review_hint, venueName),
+                Modifier.fillMaxWidth().testTag(C.Tag.COMPLETION_HINT),
                 style = AroundTextStyles.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -162,7 +168,7 @@ fun CompletionContent(
               Text(
                   stringResource(
                       if (saving) R.string.completion_sending
-                      else if (saved) R.string.completion_sent
+                      else if (saved || state.sentByTeammate) R.string.completion_sent
                       else if (state.saveState == SaveState.Failed) R.string.completion_retry
                       else R.string.completion_send
                   ),
@@ -262,6 +268,19 @@ fun CompletionContent(
                   value = state.answer,
                   onValueChange = onAnswerChange,
                   enabled = state.isEditable,
+                  isError = state.answerTooLong,
+                  supportingText =
+                      if (state.answerTooLong) {
+                        {
+                          CompletionMessage(
+                              pluralStringResource(
+                                  R.plurals.completion_answer_too_long,
+                                  MAX_TEXT_ANSWER_LENGTH,
+                                  MAX_TEXT_ANSWER_LENGTH,
+                              )
+                          )
+                        }
+                      } else null,
                   placeholder = { Text(stringResource(R.string.completion_answer_hint)) },
                   modifier =
                       Modifier.fillMaxWidth()

@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -21,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
@@ -34,7 +34,12 @@ fun AroundHeader(modifier: Modifier = Modifier) {
   Box(
       modifier
           .fillMaxWidth()
-          .shadow(HEADER_ELEVATION, HEADER_SHAPE, ambientColor = SHADOW, spotColor = SHADOW)
+          .shadow(
+              HEADER_ELEVATION,
+              HEADER_SHAPE,
+              ambientColor = AroundColors.HeaderShadow,
+              spotColor = AroundColors.HeaderShadow,
+          )
           .background(AroundTheme.colors.panel, HEADER_SHAPE)
           .padding(horizontal = HORIZONTAL_PADDING, vertical = AroundSpacing.Medium)
           .height(ROW_HEIGHT)
@@ -56,5 +61,3 @@ private val HORIZONTAL_PADDING = 20.dp
 private val ROW_HEIGHT = 44.dp
 private val WORDMARK_WIDTH = 142.dp
 private val WORDMARK_HEIGHT = 34.dp
-// Figma's plum shadow at 12 %, the same in light and dark mode, so it isn't a theme colour
-private val SHADOW = Color(0x1F1F142E)

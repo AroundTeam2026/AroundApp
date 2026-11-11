@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
 <!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
 <resources>
     <!-- The proof photo picker, on the completion screen -->
@@ -19,15 +20,22 @@
     <string name="proof_photo_no_camera">No camera app found. Pick a photo from your gallery instead.</string>
     <string name="proof_photo_unreadable">Couldn\'t use this photo. Try another one.</string>
     <string name="proof_photo_too_big">This photo is too big to send. Try another one.</string>
+    <string name="proof_photo_no_settings">Can\'t open settings. Pick a photo from your gallery instead.</string>
     <string name="completion_heading">Submit proof</string>
     <string name="completion_back">Back</string>
     <string name="completion_send">Send proof</string>
     <string name="completion_sending">Sending…</string>
     <string name="completion_sent">Proof sent</string>
     <string name="completion_review_hint">%1$s checks your proof, usually within a few minutes.</string>
+    <!-- Instead of the review hint, once another member of the party sent its proof -->
+    <string name="completion_sent_by_teammate">A teammate already sent your party\'s proof.</string>
     <string name="completion_requirements">WHAT TO DO</string>
     <string name="completion_answer">Your answer</string>
     <string name="completion_answer_hint">Write your answer here</string>
+    <plurals name="completion_answer_too_long">
+        <item quantity="one">Use %1$d character or fewer in your answer.</item>
+        <item quantity="other">Use %1$d characters or fewer in your answer.</item>
+    </plurals>
     <string name="completion_retry">Try again</string>
     <string name="completion_load_failed">Could not load this quest. Please try again.</string>
     <string name="completion_unavailable">This reservation is no longer available to complete.</string>

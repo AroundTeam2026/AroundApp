@@ -38,12 +38,15 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -52,11 +55,12 @@ import kotlinx.coroutines.launch
  * Holds the page of the venue [venueId]: its header and the quests explorers can take there.
  *
  * It keeps up with the venue, its active quests, the reservations of [explorerUid] with their
- * parties and the proofs they sent, and with rewards expiring by [clock]. If the venue or its
- * quests fail to load, the page is [VenuePageStatus.FAILED] until [onRetry]; if the reservations
- * fail, accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and
- * if the proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the
- * explorer as in their profile.
+ * parties and the parties' proofs, and with rewards expiring by [clock]. If the venue or its quests
+ * fail to load, the page is [VenuePageStatus.FAILED] until [onRetry]; if the reservations fail,
+ * accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and if the
+ * proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the explorer
+ * as in their profile. Given [arrivalQuestId], the page opens that quest's details the first time
+ * it shows the venue; see [VenuePageUiState.arrivingAt].
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -68,12 +72,20 @@ class VenuePageViewModel(
     private val completionRepository: CompletionRepository,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
+    arrivalQuestId: String? = null,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(VenuePageUiState())
   /** What the page shows now; the page observes it. */
   val uiState: StateFlow<VenuePageUiState> = mutableUiState.asStateFlow()
 
   private var listening: Job? = null
+
+  /**
+   * The quest whose details the page opens the first time it shows the venue; null afterwards. Kept
+   * out of the state, which only learns of it once it has been opened, as
+   * [VenuePageUiState.arrivalQuestId], or missed, as [VenuePageUiState.arrivalMissed].
+   */
+  private var arriving: String? = arrivalQuestId
 
   /**
    * The reservations this page created, by reservation id. One that was shown as pending and then
@@ -127,6 +139,11 @@ class VenuePageViewModel(
   /** Called when the explorer opens the details of the quest [questId]. */
   fun onQuestDetailsOpened(questId: String) {
     mutableUiState.update { it.withQuestDetails(questId) }
+  }
+
+  /** Called once the page has said that the quest it was to arrive at is no longer listed. */
+  fun onArrivalMissedShown() {
+    mutableUiState.update { it.copy(arrivalMissed = false) }
   }
 
   /** Called when the explorer closes the quest details, however they close them. */
@@ -253,21 +270,29 @@ class VenuePageViewModel(
   }
 
   /**
-   * Listens to the venue, its quests, the explorer's reservations and their parties, and the proofs
-   * they sent until the ViewModel is cleared or listening fails. The quests are checked again each
-   * time a reward expires, even when nothing else changes. A failure of the reservations or parties
-   * only is not the page's: it goes on without them, with accepting unavailable. Nor is a failure
-   * of the proofs, with sending one unavailable.
+   * Listens to the venue, its quests, the explorer's reservations and their parties, and the
+   * parties' proofs, whichever member sent them, until the ViewModel is cleared or listening fails.
+   * The quests are checked again each time a reward expires, even when nothing else changes. A
+   * failure of the reservations or parties only is not the page's: it goes on without them, with
+   * accepting unavailable. Nor is a failure of the proofs, with sending one unavailable.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen() {
     listening?.cancel()
     listening = viewModelScope.launch {
+      // One listener of the reservations for both uses below. Its failure is shared as a value,
+      // since a failing shareIn would fail this scope, and each use handles it on its own
+      val reservations =
+          reservationRepository
+              .observeForExplorer(explorerUid)
+              .map { Result.success(it) }
+              .catch { emit(Result.failure(it)) }
+              .shareIn(this, SharingStarted.Lazily, replay = 1)
       combine(
               venueRepository.observeVenue(venueId),
               questRepository.observeActiveQuestsByVenue(venueId),
-              reservationRepository
-                  .observeForExplorer(explorerUid)
+              reservations
+                  .map { it.getOrThrow() }
                   .flatMapLatest { reservations ->
                     // Only the parties acceptedPartiesOf counts, so an old reservation elsewhere
                     // can't make accepting unavailable here
@@ -279,8 +304,23 @@ class VenuePageViewModel(
                     Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
                     emit(null)
                   },
-              completionRepository
-                  .observeForExplorer(explorerUid)
+              reservations
+                  .map { it.getOrThrow() }
+                  .flatMapLatest { reservations ->
+                    // The party's proof, whichever member sent it, of each reservation here. Only
+                    // an approved party has one, and the rules may refuse listening to a party
+                    // just joined until the server has the membership, which an approved one has
+                    val ids =
+                        reservations
+                            .filter {
+                              it.venueId == venueId && it.status == ReservationStatus.APPROVED
+                            }
+                            .map { it.id }
+                    completionRepository.observeForReservations(ids)
+                  }
+                  // A new list of the same proofs mustn't show the page again with older
+                  // reservations, which would end a refused accept's "failed" too early
+                  .distinctUntilChanged()
                   .map<List<Completion>, List<Completion>?> { it }
                   .catch {
                     Log.w(TAG, "Listening to the proofs of $explorerUid failed", it)
@@ -332,6 +372,10 @@ class VenuePageViewModel(
     mutableUiState.update {
       it.showing(venue, quests, accepted, reservationIds, approved, refused, completions)
     }
+    arriving?.let { questId ->
+      arriving = null
+      mutableUiState.update { it.arrivingAt(questId) }
+    }
   }
 
   /**
@@ -365,23 +409,27 @@ class VenuePageViewModel(
 
     /**
      * Builds the [VenuePageViewModel] of the venue [venueId] for the explorer [explorerUid], with
-     * the app's repositories.
+     * the app's repositories, opening the details of [arrivalQuestId] if given.
      */
-    fun factory(venueId: String, explorerUid: String): ViewModelProvider.Factory =
-        viewModelFactory {
-          initializer {
-            VenuePageViewModel(
-                venueId,
-                VenueRepositoryProvider.repository,
-                QuestRepositoryProvider.repository,
-                ReservationRepositoryProvider.repository,
-                UserRepositoryProvider.repository,
-                PartyRepositoryProvider.repository,
-                CompletionRepositoryProvider.repository,
-                explorerUid,
-            )
-          }
-        }
+    fun factory(
+        venueId: String,
+        explorerUid: String,
+        arrivalQuestId: String? = null,
+    ): ViewModelProvider.Factory = viewModelFactory {
+      initializer {
+        VenuePageViewModel(
+            venueId,
+            VenueRepositoryProvider.repository,
+            QuestRepositoryProvider.repository,
+            ReservationRepositoryProvider.repository,
+            UserRepositoryProvider.repository,
+            PartyRepositoryProvider.repository,
+            CompletionRepositoryProvider.repository,
+            explorerUid,
+            arrivalQuestId = arrivalQuestId,
+        )
+      }
+    }
   }
 }
 

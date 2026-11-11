@@ -25,11 +25,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +60,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import kotlinx.coroutines.launch
 
 /**
  * Draws one of the venue's quests. The page calls it for each listed quest, in order.
@@ -73,7 +79,9 @@ typealias VenuePageQuestRow =
  * keeps it clear of the system bars.
  *
  * @param viewModel Loads the venue and its quests, and keeps the picked one.
- * @param onBack Called when the explorer taps the back arrow.
+ * @param onBack Called when the explorer taps the back arrow, and when they close the details the
+ *   page arrived at ([VenuePageUiState.detailsLeaveThePage]). A quest it was to arrive at that it
+ *   no longer lists shows a snackbar once ([VenuePageUiState.arrivalMissed]).
  * @param onSubmitProof Opens the proof form of an approved reservation, given its id and the
  *   venue's name, from the page's bar or the quest's details.
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
@@ -90,19 +98,34 @@ fun VenuePageScreen(
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val snackbarHostState = remember { SnackbarHostState() }
+  val scope = rememberCoroutineScope()
+  val questGone = stringResource(R.string.venue_page_quest_gone)
+  LaunchedEffect(state.arrivalMissed) {
+    if (state.arrivalMissed) {
+      // Launched in the screen's scope, not in this effect: clearing the flag changes the effect's
+      // key, which would cancel a snackbar shown from inside it
+      scope.launch { snackbarHostState.showSnackbar(questGone) }
+      // Cleared at once, so the snackbar doesn't show again when the screen is recreated
+      viewModel.onArrivalMissedShown()
+    }
+  }
   VenuePageContent(
       state = state,
       onBack = onBack,
       onQuestTapped = viewModel::onQuestSelected,
       onRetry = viewModel::onRetry,
       onQuestDetails = viewModel::onQuestDetailsOpened,
-      onQuestDetailsClosed = viewModel::onQuestDetailsClosed,
+      onQuestDetailsClosed = {
+        if (state.detailsLeaveThePage) onBack() else viewModel.onQuestDetailsClosed()
+      },
       onAccept = viewModel::accept,
       onCancel = viewModel::cancel,
       modifier = modifier,
       questRow = questRow,
       bottomBar = bottomBar,
       onSubmitProof = { onSubmitProof(it, state.venueName) },
+      snackbarHostState = snackbarHostState,
   )
 }
 
@@ -111,7 +134,8 @@ fun VenuePageScreen(
  * [bottomBar], or by default a [QuestActionBar] whose button calls [onAccept] or, for an approved
  * reservation, [onSubmitProof]. While [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen]
  * takes the page's place, and [onCancel] cancels the reservation from there, or [onSubmitProof]
- * opens the proof form of an approved one, given its id.
+ * opens the proof form of an approved one, given its id. [snackbarHostState] shows its messages
+ * above the bar.
  */
 @Composable
 fun VenuePageContent(
@@ -127,6 +151,7 @@ fun VenuePageContent(
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
     onSubmitProof: (reservationId: String) -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
   // Out here, so that the list is back where it was when the details close
   val listState = rememberLazyListState()
@@ -179,6 +204,7 @@ fun VenuePageContent(
             }
           }
         }
+        SnackbarHost(snackbarHostState)
         if (bottomBar != null) {
           bottomBar(state.selectedQuest)
         } else {

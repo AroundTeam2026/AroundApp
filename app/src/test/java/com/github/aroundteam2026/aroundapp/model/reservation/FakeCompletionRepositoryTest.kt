@@ -1,4 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import kotlinx.coroutines.CoroutineStart
@@ -69,6 +71,18 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
+  fun submit_byAnotherMemberOfTheParty_failsAndKeepsTheFirst() =
+      runBlocking<Unit> {
+        submit()
+        val first = stored()
+
+        val result = repository.submit(RESERVATION_ID, VENUE_ID, OTHER_ID, OTHER_PROOF)
+
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        assertEquals(first, stored())
+      }
+
+  @Test
   fun submit_whenFailureIsForced_returnsItAndStoresNothing() =
       runBlocking<Unit> {
         val failure = IllegalStateException(OFFLINE)
@@ -90,27 +104,14 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
-  fun observeForExplorer_returnsOnlyThatExplorersCompletions() =
+  fun observeForReservation_returnsOnlyThatReservationsCompletion() =
       runBlocking<Unit> {
-        val mine = submit()
-        submit(explorerUid = OTHER_ID)
-
-        assertEquals(
-            listOf(mine),
-            repository.observeForExplorer(EXPLORER_UID).first().map { it.id },
-        )
-      }
-
-  @Test
-  fun observeForReservation_returnsEveryExplorerOfThatReservationOnly() =
-      runBlocking<Unit> {
-        val mine = submit()
-        val friends = submit(explorerUid = OTHER_ID)
+        val partyProof = submit()
         submit(reservationId = OTHER_ID)
 
         assertEquals(
-            setOf(mine, friends),
-            repository.observeForReservation(RESERVATION_ID).first().map { it.id }.toSet(),
+            listOf(partyProof),
+            repository.observeForReservation(RESERVATION_ID).first().map { it.id },
         )
       }
 
@@ -192,6 +193,30 @@ class FakeCompletionRepositoryTest {
       }
 
   @Test
+  fun reject_reasonAtAndOverTheLimit_refusesOnlyTheLongOneLeavingTheProof() = runBlocking {
+    val id = submit()
+    val before = stored()
+    assertTrue(
+        repository.reject(id, "x".repeat(MAX_REJECT_REASON_LENGTH + 1)).exceptionOrNull()
+            is IllegalArgumentException
+    )
+    assertEquals(before, stored())
+
+    val reason = "x".repeat(MAX_REJECT_REASON_LENGTH)
+    repository.reject(id, reason).getOrThrow()
+    assertEquals(reason, stored().rejectReason)
+  }
+
+  @Test
+  fun reject_oversizedReason_failsBeforeTheBackendAndTheLookup() = runBlocking {
+    repository.forcedFailure = IllegalStateException(OFFLINE)
+    assertTrue(
+        repository.reject(OTHER_ID, "x".repeat(MAX_REJECT_REASON_LENGTH + 1)).exceptionOrNull()
+            is IllegalArgumentException
+    )
+  }
+
+  @Test
   fun answer_unknownId_fails() =
       runBlocking<Unit> {
         assertTrue(repository.approve(OTHER_ID).exceptionOrNull() is NoSuchElementException)
@@ -215,7 +240,7 @@ class FakeCompletionRepositoryTest {
     const val VENUE_ID = "v1"
     const val EXPLORER_UID = "u1"
     const val OTHER_ID = "other"
-    const val COMPLETION_ID = "${RESERVATION_ID}_$EXPLORER_UID"
+    const val COMPLETION_ID = RESERVATION_ID
     const val REASON = "Blurry photo"
     const val BLANK = " "
     const val OFFLINE = "offline"

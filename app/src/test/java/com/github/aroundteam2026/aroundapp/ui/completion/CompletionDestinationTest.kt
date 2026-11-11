@@ -77,8 +77,8 @@ class CompletionDestinationTest {
           explorerUid = EXPLORER,
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, onBack, onSubmitProof ->
-            VenuePageOnFakes(venueId, onBack, onSubmitProof, approvedQuestId)
+          venuePage = { venueId, questId, onBack, onSubmitProof ->
+            VenuePageOnFakes(venueId, onBack, onSubmitProof, approvedQuestId, questId)
           },
           overview = { OverviewOnFakes(it) },
           completion = { reservationId, venueName, close ->

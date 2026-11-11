@@ -38,6 +38,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 
@@ -88,20 +89,21 @@ class OverviewViewModelTest {
   private fun test(body: suspend TestScope.() -> Unit) = runTest(dispatcher) { body() }
 
   /**
-   * Books [questId] at [venueId] as the explorer, with its slot at [slotStart], and has [friends]
-   * join its party; returns its id.
+   * Books [questId] at [venueId] as [creator], the explorer by default, with its slot at
+   * [slotStart], and has [friends] join its party; returns its id.
    */
   private suspend fun book(
       questId: String,
       venueId: String = CAFE,
       slotStart: Long = START,
       friends: List<String> = emptyList(),
+      creator: String = EXPLORER,
   ): String {
     val id =
         reservations
             .createReservation(
                 newPendingReservation(questId, venueId, TEST_EXPLORER_NAME, slotStart),
-                EXPLORER,
+                creator,
             )
             .getOrThrow()
     friends.forEach { party.join(id, it).getOrThrow() }
@@ -116,9 +118,12 @@ class OverviewViewModelTest {
   private suspend fun approvedReservation(questId: String = "fox"): String =
       book(questId).also { answer(it, ReservationStatus.APPROVED) }
 
-  /** Sends the explorer's proof of the reservation [reservationId]; returns the completion's id. */
-  private suspend fun sendProof(reservationId: String): String =
-      completions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the window")).getOrThrow()
+  /**
+   * Sends the party's proof of the reservation [reservationId] as [sender], the explorer unless
+   * given; returns the completion's id.
+   */
+  private suspend fun sendProof(reservationId: String, sender: String = EXPLORER): String =
+      completions.submit(reservationId, CAFE, sender, Proof.Text("By the window")).getOrThrow()
 
   private fun titles() = state.rows.map { it.questTitle }
 
@@ -191,7 +196,8 @@ class OverviewViewModelTest {
 
   @Test
   fun aReservationTheExplorerWithdrewFromLeavesTheList() = test {
-    val id = book("fox", friends = listOf("friend"))
+    // The creator can't withdraw, so a friend creates the party and the explorer joins it
+    val id = book("fox", friends = listOf(EXPLORER), creator = "friend")
     book("cake")
     viewModel
     runCurrent()
@@ -395,17 +401,44 @@ class OverviewViewModelTest {
 
   @Test
   fun aFailingCompletionListenerShowsFailed() = test {
-    book("fox")
+    approvedReservation()
     val broken =
         object : CompletionRepository by completions {
-          override fun observeForExplorer(uid: String): Flow<List<Completion>> = flow {
-            throw IOException("denied")
-          }
+          override fun observeForReservations(
+              reservationIds: Collection<String>
+          ): Flow<List<Completion>> = flow { throw IOException("denied") }
         }
     val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, party, broken)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
+  }
+
+  // Only an approved party has a proof, and the rules may refuse listening to the proof of a
+  // party just joined, before the server has the membership
+  @Test
+  fun onlyApprovedReservationsListenToTheirProof() = test {
+    val pending = book("fox")
+    val approved = approvedReservation("cake")
+    answer(book("bread", venueId = BAKERY), ReservationStatus.CANCELLED)
+    val listened = mutableSetOf<String>()
+    val recording =
+        object : CompletionRepository by completions {
+          override fun observeForReservations(
+              reservationIds: Collection<String>
+          ): Flow<List<Completion>> {
+            listened += reservationIds
+            return completions.observeForReservations(reservationIds)
+          }
+        }
+    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, party, recording)
+    runCurrent()
+
+    assertEquals(
+        setOf(pending, approved),
+        viewModel.uiState.value.rows.map { it.reservationId }.toSet(),
+    )
+    assertEquals(setOf(approved), listened)
   }
 
   // The venue answers the proof while the tab is open, and the row follows
@@ -423,6 +456,18 @@ class OverviewViewModelTest {
     completions.approve(proof).getOrThrow()
     runCurrent()
     assertEquals(OverviewRowStatus.COMPLETED, state.rows.single().status)
+  }
+
+  // One proof stands for the whole party, so another member's counts as the explorer's
+  @Test
+  fun aProofSentByAnotherMemberShowsAsSentAndCannotBeCancelled() = test {
+    sendProof(approvedReservation(), sender = "friend")
+    viewModel
+    runCurrent()
+
+    val row = state.rows.single()
+    assertEquals(OverviewRowStatus.PROOF_SENT, row.status)
+    assertFalse(row.status.cancellable)
   }
 
   @Test

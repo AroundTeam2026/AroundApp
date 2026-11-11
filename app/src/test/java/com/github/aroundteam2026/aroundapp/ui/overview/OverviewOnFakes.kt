@@ -14,7 +14,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
  * that show the whole app: the app's own overview would read Firestore.
  */
 @Composable
-fun OverviewOnFakes(onOpenVenue: (venueId: String) -> Unit) {
+fun OverviewOnFakes(onOpenQuest: (venueId: String, questId: String) -> Unit) {
   val viewModel = remember {
     val party = FakePartyRepository()
     OverviewViewModel(
@@ -26,5 +26,5 @@ fun OverviewOnFakes(onOpenVenue: (venueId: String) -> Unit) {
         FakeCompletionRepository(),
     )
   }
-  OverviewScreen(viewModel, onOpenVenue)
+  OverviewScreen(viewModel, onOpenQuest)
 }

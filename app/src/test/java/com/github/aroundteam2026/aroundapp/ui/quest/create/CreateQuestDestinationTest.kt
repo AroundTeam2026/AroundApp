@@ -15,6 +15,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -50,6 +51,7 @@ class CreateQuestDestinationTest {
             override suspend fun createQuest(quest: Quest): Result<String> =
                 heldSave?.await() ?: quests.createQuest(quest)
           },
+          FakeAddressSearchRepository(),
       )
   private lateinit var navController: NavHostController
 
