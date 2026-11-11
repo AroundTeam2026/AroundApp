@@ -16,6 +16,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardViewModel
 
@@ -82,6 +84,8 @@ class ReviewProofOnFakes {
           FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
           party,
           completions,
+          FakeUserRepository(),
+          FakeUserPictureRepository(),
       )
     }
   }

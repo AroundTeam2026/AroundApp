@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.text.format.DateUtils
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -29,11 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -192,20 +196,19 @@ private fun requestedText(requestedAt: Long, now: Long): String =
         ?: stringResource(R.string.dashboard_requested_just_now)
 
 /**
- * The party: the avatars, the explorer who reserved with a "Leader" tag when others come along, and
- * the party's size. Only the leader's name is stored, so the others show as a "+N" avatar. An
+ * The party: its first members' avatars, the explorer who reserved with a "Leader" tag when others
+ * come along, then who else is in it and its size, e.g. "with Lea M., Max K. · 3 of 4 joined". An
  * approved reservation ends the line with its "Approved" pill.
  */
 @Composable
 private fun Party(reservation: DashboardReservation) {
   val colors = MaterialTheme.colorScheme
-  val others = reservation.partySize - 1
   Row(
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
       verticalAlignment = Alignment.CenterVertically,
   ) {
     val name = reservation.explorerName ?: stringResource(R.string.dashboard_unknown_explorer)
-    Avatars(reservation.explorerName, others)
+    Avatars(reservation)
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
       Row(
           horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
@@ -219,16 +222,10 @@ private fun Party(reservation: DashboardReservation) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (others > 0) LeaderTag()
+        if (reservation.partySize > 1) LeaderTag()
       }
       Text(
-          if (others == 0) stringResource(R.string.dashboard_party_solo)
-          else
-              pluralStringResource(
-                  R.plurals.dashboard_party_size,
-                  reservation.partySize,
-                  reservation.partySize,
-              ),
+          partyText(reservation),
           Modifier.testTag(C.Tag.DASHBOARD_ROW_PARTY),
           color = colors.onSurfaceVariant,
           style = AroundTextStyles.Caption,
@@ -241,42 +238,123 @@ private fun Party(reservation: DashboardReservation) {
 }
 
 /**
- * The leader's initials on the primary colour, overlapped by a "+N" avatar for the [others] in the
- * party, both ringed with the row's colour. The texts beside them say the same, so screen readers
- * skip the avatars.
+ * Who else is in the party and its size: "with Lea M., Max K. +2 · 5 of 6 joined", naming at most
+ * [NAMED_OTHERS] members after the leader and counting the rest, those without a name included. The
+ * size is "6 joined · at least 4" for a quest that takes at least a group, "Party of 5" for one
+ * that takes explorers alone too, or "Solo visit · Party of 1" for a lone explorer.
  */
 @Composable
-private fun Avatars(leaderName: String?, others: Int) {
+private fun partyText(reservation: DashboardReservation): String {
+  val others = reservation.members.drop(1)
+  val named = others.mapNotNull { it.name }.take(NAMED_OTHERS)
+  val unnamed = others.size - named.size
+  val with =
+      if (others.isEmpty()) null
+      else {
+        val more =
+            if (unnamed > 0) stringResource(R.string.dashboard_more_explorers, unnamed) else ""
+        // "with +1" when none of the others can be named
+        stringResource(R.string.dashboard_party_with, "${named.joinToString(", ")} $more".trim())
+      }
+  val group = reservation.groupSize
+  val size =
+      when {
+        group != null ->
+            pluralStringResource(
+                if (reservation.exactGroupSize) R.plurals.dashboard_party_joined_of
+                else R.plurals.dashboard_party_joined_at_least,
+                reservation.partySize,
+                reservation.partySize,
+                group,
+            )
+        reservation.partySize == 1 -> stringResource(R.string.dashboard_party_solo)
+        else ->
+            pluralStringResource(
+                R.plurals.dashboard_party_size,
+                reservation.partySize,
+                reservation.partySize,
+            )
+      }
+  return with?.let { stringResource(R.string.dashboard_party_with_size, it, size) } ?: size
+}
+
+/**
+ * The first [MAX_AVATARS] members, overlapping, the leader on top on the primary colour, then "+N"
+ * for the rest. A party not read yet shows the leader's initials alone. The texts beside them name
+ * the party, so screen readers skip the avatars.
+ */
+@Composable
+private fun Avatars(reservation: DashboardReservation) {
   val colors = MaterialTheme.colorScheme
-  Box(Modifier.clearAndSetSemantics {}) {
-    Avatar(
-        leaderName?.let(::initialsOf) ?: stringResource(R.string.dashboard_unknown_initials),
-        background = colors.primary,
-        content = colors.onPrimary,
-        modifier = Modifier.zIndex(1f),
-    )
-    if (others > 0) {
-      Avatar(
-          stringResource(R.string.dashboard_more_explorers, others),
-          background = colors.background,
-          content = colors.onSurface,
-          modifier = Modifier.padding(start = AVATAR_SIZE - AVATAR_OVERLAP),
+  val members = reservation.members.ifEmpty { listOf(DashboardMember(reservation.explorerName)) }
+  val shown = members.take(MAX_AVATARS)
+  Row(
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Box {
+      shown.forEachIndexed { index, member ->
+        val leader = index == 0
+        Avatar(
+            // The leader's name may only be stored with the reservation
+            member.copy(name = if (leader) reservation.explorerName else member.name),
+            background = if (leader) colors.primary else colors.tertiary,
+            content = if (leader) colors.onPrimary else colors.onTertiary,
+            modifier =
+                Modifier.padding(start = (AVATAR_SIZE - AVATAR_OVERLAP) * index)
+                    .zIndex((shown.size - index).toFloat()),
+        )
+      }
+    }
+    if (members.size > MAX_AVATARS) {
+      Text(
+          stringResource(R.string.dashboard_more_explorers, members.size - MAX_AVATARS),
+          Modifier.testTag(C.Tag.DASHBOARD_ROW_MORE),
+          color = colors.onSurfaceVariant,
+          style = AroundTextStyles.Label,
+          maxLines = 1,
       )
     }
   }
 }
 
+/** [member]'s picture, or else their initials on [background], ringed with the row's colour. */
 @Composable
-private fun Avatar(text: String, background: Color, content: Color, modifier: Modifier = Modifier) {
+private fun Avatar(
+    member: DashboardMember,
+    background: Color,
+    content: Color,
+    modifier: Modifier = Modifier,
+) {
+  val picture = member.picture
   Box(
       modifier
           .size(AVATAR_SIZE)
           .border(AVATAR_RING, MaterialTheme.colorScheme.surface, AroundPillShape)
           .padding(AVATAR_RING)
-          .background(background, AroundPillShape),
+          .clip(AroundPillShape)
+          .background(background)
+          .clearAndSetSemantics {
+            testTag =
+                if (picture != null) C.Tag.DASHBOARD_ROW_PICTURE else C.Tag.DASHBOARD_ROW_INITIALS
+          },
       contentAlignment = Alignment.Center,
   ) {
-    Text(text, color = content, style = AroundTextStyles.Label, maxLines = 1)
+    if (picture != null) {
+      Image(
+          picture,
+          contentDescription = null,
+          Modifier.fillMaxSize(),
+          contentScale = ContentScale.Crop,
+      )
+    } else {
+      Text(
+          member.name?.let(::initialsOf) ?: stringResource(R.string.dashboard_unknown_initials),
+          color = content,
+          style = AroundTextStyles.Label,
+          maxLines = 1,
+      )
+    }
   }
 }
 
@@ -370,6 +448,8 @@ private fun RowScope.RowButton(
 }
 
 private const val TITLE_MAX_LINES = 2
+private const val MAX_AVATARS = 3
+private const val NAMED_OTHERS = 2
 // Material's opacity for disabled content
 private const val DISABLED_ALPHA = 0.38f
 private val TEXT_GAP = 2.dp
@@ -405,25 +485,30 @@ private fun DashboardReservationRowPreview() {
     ) {
       DashboardReservationRow(
           DashboardReservation(
-              reservationId = "pending",
+              reservationId = "too-small",
               questTitle = "Find the hidden fox",
               explorerName = "Yusuf S.",
               partySize = 3,
               requestedAt = now - 12 * DateUtils.MINUTE_IN_MILLIS,
               approved = false,
+              approveBlock = ApproveBlock.TooFew(1),
+              members = membersNamed("Yusuf S.", "Lea M.", "Max K."),
+              groupSize = 4,
           ),
           onDecline = {},
           onApprove = {},
       )
       DashboardReservationRow(
           DashboardReservation(
-              reservationId = "too-small",
+              reservationId = "pending",
               questTitle = "Brunch for six",
               explorerName = "Nora B.",
-              partySize = 4,
+              partySize = 6,
               requestedAt = now - 30 * DateUtils.MINUTE_IN_MILLIS,
               approved = false,
-              approveBlock = ApproveBlock.TooFew(2),
+              members = membersNamed("Nora B.", "Elif T.", "Sam R.", "Ana P.", "Tom L.", "Ida K."),
+              groupSize = 6,
+              exactGroupSize = true,
           ),
           onDecline = {},
           onApprove = {},
@@ -436,6 +521,7 @@ private fun DashboardReservationRowPreview() {
               partySize = 1,
               requestedAt = now - 3 * DateUtils.HOUR_IN_MILLIS,
               approved = true,
+              members = membersNamed("Camille D."),
           ),
           onDecline = {},
           onApprove = {},
@@ -443,3 +529,5 @@ private fun DashboardReservationRowPreview() {
     }
   }
 }
+
+private fun membersNamed(vararg names: String) = names.map { DashboardMember(it) }

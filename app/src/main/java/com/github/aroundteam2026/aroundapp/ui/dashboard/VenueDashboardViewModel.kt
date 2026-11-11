@@ -1,18 +1,24 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
+import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.party.isJoined
 import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
-import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
+import com.github.aroundteam2026.aroundapp.model.party.observeParties
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
@@ -26,10 +32,18 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
+import com.github.aroundteam2026.aroundapp.model.user.User
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.user.observeProfiles
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,14 +57,21 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Holds the dashboard of the signed-in venue: its name, the proofs to review, its pending and
- * approved reservations with their quest titles, explorer names and party sizes, and how many of
- * its quests are active.
+ * approved reservations with their quest titles and parties, and how many of its quests are active.
+ *
+ * Each party lists its joined members with their profiles' names and pictures. A picture is
+ * downloaded once, the first time a member has it, and decoded with [decode]; until then, or if
+ * that fails, the member shows initials. A failed download is tried again on the next change to the
+ * members' profiles, or on [retry].
  *
  * It keeps up with changes while the dashboard is watched; if listening fails, it shows
  * [VenueDashboardStatus.FAILED] until [retry]. [approve] and [decline] answer a pending reservation
@@ -65,12 +86,21 @@ class VenueDashboardViewModel(
     private val venueRepository: VenueRepository,
     private val partyRepository: PartyRepository,
     private val completionRepository: CompletionRepository,
+    private val userRepository: UserRepository,
+    private val pictureRepository: UserPictureRepository,
+    private val decode: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
 ) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listeners, even for the same venue. */
   private val retries = MutableStateFlow(0)
 
   /** Saves the answers to reservations. */
   private val answers = AnswerSaver(viewModelScope, TAG)
+
+  /** The downloaded profile pictures, keyed by their location. */
+  private val pictures = MutableStateFlow<Map<String, ImageBitmap>>(emptyMap())
+
+  /** The picture locations already downloaded or being downloaded, so each is fetched once. */
+  private val requestedPictures = HashSet<String>()
 
   /** What the dashboard shows now; the screen observes it. */
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -126,11 +156,12 @@ class VenueDashboardViewModel(
       }
 
   /**
-   * The dashboard of the venue [venueId], from the venue, its reservations, their parties, its
-   * proofs and its quests. A failing listener gives a failed dashboard.
+   * The dashboard of the venue [venueId], from the venue, its reservations, their parties and the
+   * members' profiles, its proofs and its quests. A failing listener gives a failed dashboard, but
+   * a profile that can't be read only leaves its member unnamed.
    *
    * The parties are read again only when the reservations to read change, not on every new or
-   * reviewed proof or every answer that keeps them.
+   * reviewed proof or every answer that keeps them, and the profiles only when the members change.
    */
   @OptIn(ExperimentalCoroutinesApi::class)
   private fun listen(venueId: String): Flow<VenueDashboardUiState> = channelFlow {
@@ -142,28 +173,46 @@ class VenueDashboardViewModel(
                 ::Pair,
             )
             .shareIn(this, SharingStarted.Eagerly, replay = 1)
-    val partySizes =
+    val parties =
         lists
             .map { (reservations, completions) -> partyIdsOf(reservations, completions) }
             .distinctUntilChanged()
-            .flatMapLatest { partyRepository.observeJoinedCounts(it) }
+            .flatMapLatest { partyRepository.observeParties(it) }
+            .map { parties -> parties.mapValues { (_, members) -> members.filter { it.isJoined } } }
+            .shareIn(this, SharingStarted.Eagerly, replay = 1)
     val listsWithParties =
-        combine(lists, partySizes) { (reservations, completions), sizes ->
-              // Right after the ids change the sizes are still the old ones: wait for
+        combine(lists, parties) { (reservations, completions), joined ->
+              // Right after the ids change the parties are still the old ones: wait for
               // the new ones rather than show an empty party
-              if (sizes.keys.containsAll(partyIdsOf(reservations, completions))) {
-                Triple(reservations, completions, sizes)
+              if (joined.keys.containsAll(partyIdsOf(reservations, completions))) {
+                Triple(reservations, completions, joined)
               } else {
                 null
               }
             }
             .filterNotNull()
+    val profiles =
+        parties
+            .map { joined -> joined.values.flatten().mapTo(HashSet()) { it.uid } }
+            .distinctUntilChanged()
+            .flatMapLatest { userRepository.observeProfiles(it) }
+            .onEach { profiles -> loadPictures(profiles.values.mapNotNull { it?.pictureUrl }) }
     combine(
             listsWithParties,
             questRepository.observeQuestsByVenue(venueId),
             venueRepository.observeVenue(venueId),
-        ) { (reservations, completions, sizes), quests, venue ->
-          dashboardOf(reservations, sizes, quests, venue, completions)
+            profiles,
+            pictures,
+        ) { (reservations, completions, joined), quests, venue, profiles, pictures ->
+          dashboardOf(
+              reservations,
+              joined,
+              quests,
+              venue,
+              completions,
+              profiles = profiles,
+              pictures = pictures,
+          )
         }
         .collect { send(it) }
   }
@@ -172,6 +221,28 @@ class VenueDashboardViewModel(
         Log.w(TAG, "Listening to the dashboard of $venueId failed", it)
         emit(VenueDashboardUiState(status = VenueDashboardStatus.FAILED))
       }
+
+  /**
+   * Downloads each picture of [locations] not asked for yet, and adds it to [pictures] once
+   * decoded. A failure is logged and the member keeps their initials; the location is forgotten, so
+   * the next call tries it again, since a download mostly fails for a passing reason such as no
+   * network.
+   */
+  private fun loadPictures(locations: List<String>) {
+    for (location in locations) {
+      if (!requestedPictures.add(location)) continue
+      viewModelScope.launch {
+        pictureRepository
+            .download(location)
+            .mapCatching { checkNotNull(decode(it)) { "Not an image" } }
+            .onSuccess { picture -> pictures.update { it + (location to picture) } }
+            .onFailure {
+              requestedPictures.remove(location)
+              Log.w(TAG, "Showing the profile picture $location failed", it)
+            }
+      }
+    }
+  }
 
   companion object {
     private const val TAG = "VenueDashboardViewModel"
@@ -189,11 +260,34 @@ class VenueDashboardViewModel(
             VenueRepositoryProvider.repository,
             PartyRepositoryProvider.repository,
             CompletionRepositoryProvider.repository,
+            UserRepositoryProvider.repository,
+            UserPictureRepositoryProvider.repository(this[APPLICATION_KEY]!!),
         )
       }
     }
   }
 }
+
+/**
+ * [bytes] as a picture at most [maxEdge] pixels on each side, decoded on [dispatcher], or null if
+ * they aren't an image. An avatar is small, so it never keeps a full-size photo in memory.
+ */
+internal suspend fun decodeAvatar(
+    bytes: ByteArray,
+    maxEdge: Int = AVATAR_EDGE_PX,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+): ImageBitmap? =
+    withContext(dispatcher) {
+      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+      var sample = 1
+      while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxEdge) sample *= 2
+      val options = BitmapFactory.Options().apply { inSampleSize = sample }
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+    }
+
+/** The longest side an avatar is decoded at: its 32 dp even on the densest screens. */
+private const val AVATAR_EDGE_PX = 128
 
 /**
  * The reservations whose parties the dashboard shows: the pending and approved ones, and those of
@@ -204,8 +298,9 @@ private fun partyIdsOf(reservations: List<Reservation>, completions: List<Comple
         completions.filter { it.status == CompletionStatus.PENDING }.map { it.reservationId }
 
 /**
- * The loaded dashboard of [venue], built from [reservations], their joined [partySizes] keyed by
- * reservation id, [quests] and the pending [completions].
+ * The loaded dashboard of [venue], built from [reservations], the joined members of their [parties]
+ * keyed by reservation id, [quests], the pending [completions], and the members' [profiles] and
+ * downloaded [pictures], keyed by uid and by location.
  *
  * Pending reservations need an answer and approved ones are upcoming, each oldest request first,
  * ties going to the smallest id; rejected and cancelled ones are left out. The proofs to review
@@ -215,10 +310,12 @@ private fun partyIdsOf(reservations: List<Reservation>, completions: List<Comple
  */
 internal fun dashboardOf(
     reservations: List<Reservation>,
-    partySizes: Map<String, Int>,
+    parties: Map<String, List<PartyMember>>,
     quests: List<Quest>,
     venue: Venue?,
     completions: List<Completion>,
+    profiles: Map<String, User?> = emptyMap(),
+    pictures: Map<String, ImageBitmap> = emptyMap(),
 ): VenueDashboardUiState {
   val questsById = quests.associateBy { it.id }
   val reservationsById = reservations.associateBy { it.id }
@@ -226,7 +323,14 @@ internal fun dashboardOf(
       reservations
           .filter { it.status == status }
           .sortedWith(compareBy<Reservation> { it.createdAt }.thenBy { it.id })
-          .map { it.toDashboardReservation(questsById, partySizes.getOrDefault(it.id, 0)) }
+          .map {
+            val members =
+                leaderFirst(it, parties[it.id].orEmpty()).map { member ->
+                  val profile = profiles[member.uid]
+                  DashboardMember(profile?.displayName, profile?.pictureUrl?.let(pictures::get))
+                }
+            it.toDashboardReservation(questsById, members)
+          }
   return VenueDashboardUiState(
       status = VenueDashboardStatus.LOADED,
       venueName = venue?.name.orEmpty(),
@@ -242,11 +346,23 @@ internal fun dashboardOf(
                 it.toDashboardProof(
                     reservationsById[it.reservationId],
                     questsById,
-                    partySizes[it.reservationId] ?: 0,
+                    parties[it.reservationId]?.size ?: 0,
                 )
               },
   )
 }
+
+/**
+ * The joined [members] of [reservation]'s party, the explorer who made it first, then in the order
+ * they joined. The rules mark the creator by a membership joined at the reservation's creation
+ * time, which no later join may have.
+ */
+private fun leaderFirst(reservation: Reservation, members: List<PartyMember>) =
+    members.sortedWith(
+        compareBy<PartyMember> { it.joinedAt != reservation.createdAt }
+            .thenBy { it.joinedAt }
+            .thenBy { it.uid }
+    )
 
 /**
  * Why a pending party of [joined] explorers can't be approved for [quest], or null if it has the
@@ -260,20 +376,30 @@ internal fun approveBlockOf(quest: Quest?, joined: Int): ApproveBlock? =
       else -> ApproveBlock.TooMany(joined, quest.minPartySize)
     }
 
-/** Only a pending reservation gets an [ApproveBlock]: an approved one has nothing to approve. */
-private fun Reservation.toDashboardReservation(questsById: Map<String, Quest>, partySize: Int) =
-    DashboardReservation(
-        reservationId = id,
-        questTitle = questsById[questId]?.title,
-        explorerName = explorerName.ifBlank { null },
-        partySize = partySize,
-        requestedAt = createdAt,
-        approved = status == ReservationStatus.APPROVED,
-        approveBlock =
-            approveBlockOf(questsById[questId], partySize).takeIf {
-              status == ReservationStatus.PENDING
-            },
-    )
+/**
+ * The row of this reservation, whose party has [members], leader first: the leader's name is their
+ * profile's, or else the one stored with the reservation. Only a pending reservation gets an
+ * [ApproveBlock]: an approved one has nothing to approve.
+ */
+private fun Reservation.toDashboardReservation(
+    questsById: Map<String, Quest>,
+    members: List<DashboardMember>,
+): DashboardReservation {
+  val quest = questsById[questId]
+  return DashboardReservation(
+      reservationId = id,
+      questTitle = quest?.title,
+      explorerName = members.firstOrNull()?.name ?: explorerName.ifBlank { null },
+      partySize = members.size,
+      requestedAt = createdAt,
+      approved = status == ReservationStatus.APPROVED,
+      approveBlock =
+          approveBlockOf(quest, members.size).takeIf { status == ReservationStatus.PENDING },
+      members = members,
+      groupSize = quest?.minPartySize?.takeIf { it > 1 },
+      exactGroupSize = quest?.exactPartySize == true,
+  )
+}
 
 private fun Completion.toDashboardProof(
     reservation: Reservation?,
