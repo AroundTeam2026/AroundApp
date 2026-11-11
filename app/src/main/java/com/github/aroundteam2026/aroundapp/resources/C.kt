@@ -237,6 +237,7 @@ object C {
     const val DASHBOARD_ROW_APPROVED = "dashboard_row_approved"
     const val DASHBOARD_ROW_DECLINE = "dashboard_row_decline"
     const val DASHBOARD_ROW_APPROVE = "dashboard_row_approve"
+    const val DASHBOARD_ROW_APPROVE_BLOCKED = "dashboard_row_approve_blocked"
     const val DASHBOARD_PROOFS = "dashboard_proofs"
     /** Followed by `_` and the completion's id, e.g. `dashboard_proof_row_r1_explorer`. */
     const val DASHBOARD_PROOF_ROW = "dashboard_proof_row"
