@@ -1,10 +1,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
-import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -16,6 +14,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.party.creatorFirst
 import com.github.aroundteam2026.aroundapp.model.party.isJoined
 import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
 import com.github.aroundteam2026.aroundapp.model.party.observeParties
@@ -42,8 +41,8 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
+import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,8 +60,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Holds the dashboard of the signed-in venue: its name, the proofs to review, its pending and
@@ -96,11 +93,8 @@ class VenueDashboardViewModel(
   /** Saves the answers to reservations. */
   private val answers = AnswerSaver(viewModelScope, TAG)
 
-  /** The downloaded profile pictures, keyed by their location. */
-  private val pictures = MutableStateFlow<Map<String, ImageBitmap>>(emptyMap())
-
-  /** The picture locations already downloaded or being downloaded, so each is fetched once. */
-  private val requestedPictures = HashSet<String>()
+  /** The members' profile pictures, each downloaded once and tried again after a failure. */
+  private val pictures = ProfilePictures(viewModelScope, pictureRepository, decode)
 
   /** What the dashboard shows now; the screen observes it. */
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -196,13 +190,13 @@ class VenueDashboardViewModel(
             .map { joined -> joined.values.flatten().mapTo(HashSet()) { it.uid } }
             .distinctUntilChanged()
             .flatMapLatest { userRepository.observeProfiles(it) }
-            .onEach { profiles -> loadPictures(profiles.values.mapNotNull { it?.pictureUrl }) }
+            .onEach { profiles -> pictures.load(profiles.values.mapNotNull { it?.pictureUrl }) }
     combine(
             listsWithParties,
             questRepository.observeQuestsByVenue(venueId),
             venueRepository.observeVenue(venueId),
             profiles,
-            pictures,
+            pictures.pictures,
         ) { (reservations, completions, joined), quests, venue, profiles, pictures ->
           dashboardOf(
               reservations,
@@ -221,28 +215,6 @@ class VenueDashboardViewModel(
         Log.w(TAG, "Listening to the dashboard of $venueId failed", it)
         emit(VenueDashboardUiState(status = VenueDashboardStatus.FAILED))
       }
-
-  /**
-   * Downloads each picture of [locations] not asked for yet, and adds it to [pictures] once
-   * decoded. A failure is logged and the member keeps their initials; the location is forgotten, so
-   * the next call tries it again, since a download mostly fails for a passing reason such as no
-   * network.
-   */
-  private fun loadPictures(locations: List<String>) {
-    for (location in locations) {
-      if (!requestedPictures.add(location)) continue
-      viewModelScope.launch {
-        pictureRepository
-            .download(location)
-            .mapCatching { checkNotNull(decode(it)) { "Not an image" } }
-            .onSuccess { picture -> pictures.update { it + (location to picture) } }
-            .onFailure {
-              requestedPictures.remove(location)
-              Log.w(TAG, "Showing the profile picture $location failed", it)
-            }
-      }
-    }
-  }
 
   companion object {
     private const val TAG = "VenueDashboardViewModel"
@@ -267,27 +239,6 @@ class VenueDashboardViewModel(
     }
   }
 }
-
-/**
- * [bytes] as a picture at most [maxEdge] pixels on each side, decoded on [dispatcher], or null if
- * they aren't an image. An avatar is small, so it never keeps a full-size photo in memory.
- */
-internal suspend fun decodeAvatar(
-    bytes: ByteArray,
-    maxEdge: Int = AVATAR_EDGE_PX,
-    dispatcher: CoroutineDispatcher = Dispatchers.Default,
-): ImageBitmap? =
-    withContext(dispatcher) {
-      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-      var sample = 1
-      while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxEdge) sample *= 2
-      val options = BitmapFactory.Options().apply { inSampleSize = sample }
-      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
-    }
-
-/** The longest side an avatar is decoded at: its 32 dp even on the densest screens. */
-private const val AVATAR_EDGE_PX = 128
 
 /**
  * The reservations whose parties the dashboard shows: the pending and approved ones, and those of
@@ -325,7 +276,7 @@ internal fun dashboardOf(
           .sortedWith(compareBy<Reservation> { it.createdAt }.thenBy { it.id })
           .map {
             val members =
-                leaderFirst(it, parties[it.id].orEmpty()).map { member ->
+                parties[it.id].orEmpty().creatorFirst(it).map { member ->
                   val profile = profiles[member.uid]
                   DashboardMember(profile?.displayName, profile?.pictureUrl?.let(pictures::get))
                 }
@@ -351,18 +302,6 @@ internal fun dashboardOf(
               },
   )
 }
-
-/**
- * The joined [members] of [reservation]'s party, the explorer who made it first, then in the order
- * they joined. The rules mark the creator by a membership joined at the reservation's creation
- * time, which no later join may have.
- */
-private fun leaderFirst(reservation: Reservation, members: List<PartyMember>) =
-    members.sortedWith(
-        compareBy<PartyMember> { it.joinedAt != reservation.createdAt }
-            .thenBy { it.joinedAt }
-            .thenBy { it.uid }
-    )
 
 /**
  * Why a pending party of [joined] explorers can't be approved for [quest], or null if it has the

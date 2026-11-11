@@ -100,6 +100,13 @@ class QuestDetailsPartyMembersTest {
     assertEquals(2, count(C.Tag.QUEST_DETAIL_SEAT_EMPTY))
   }
 
+  @Test
+  fun aMemberWithoutANameIsCalledAnExplorer() {
+    show(state(creator.copy(name = ""), me))
+
+    assertEquals(listOf("An explorer", "You"), texts(C.Tag.QUEST_DETAIL_MEMBER_NAME))
+  }
+
   private companion object {
     const val QUEST = "quest"
     const val RESERVATION = "reservation"

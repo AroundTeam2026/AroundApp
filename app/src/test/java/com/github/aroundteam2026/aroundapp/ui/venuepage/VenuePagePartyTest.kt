@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import io.mockk.mockk
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
@@ -58,6 +59,14 @@ class VenuePagePartyTest {
 
   private val picture = mockk<ImageBitmap>()
   private val downloads = mutableListOf<String>()
+
+  /**
+   * Whether downloads fail, as offline; the bytes aren't an image; the page gets pictures at all.
+   */
+  private var downloadFails = false
+  private var notAPicture = false
+  private var withPictures = true
+
   private val pictures =
       object : UserPictureRepository {
         override suspend fun upload(uid: String, photo: Uri): Result<String> =
@@ -65,7 +74,8 @@ class VenuePagePartyTest {
 
         override suspend fun download(location: String): Result<ByteArray> {
           downloads += location
-          return Result.success(byteArrayOf(1))
+          return if (downloadFails) Result.failure(IOException("offline"))
+          else Result.success(byteArrayOf(1))
         }
       }
 
@@ -80,8 +90,8 @@ class VenuePagePartyTest {
         FakeCompletionRepository(),
         ME,
         clock = { NOW },
-        pictureRepository = pictures,
-        decodePicture = { picture },
+        pictureRepository = pictures.takeIf { withPictures },
+        decodePicture = { picture.takeUnless { notAPicture } },
     )
   }
 
@@ -187,6 +197,43 @@ class VenuePagePartyTest {
     openDetails()
 
     assertEquals(listOf("Ada Lovelace", ""), state.members.map { it.name })
+  }
+
+  @Test
+  fun aPictureThatFailsToDownloadLeavesTheInitialsAndIsTriedAgain() = test {
+    downloadFails = true
+    val id = reservationBy(FRIEND, ME)
+    openDetails()
+
+    assertNull(state.members.first().picture)
+
+    downloadFails = false
+    time++
+    party.join(id, OTHER)
+    runCurrent()
+
+    assertSame(picture, state.members.first().picture)
+    assertTrue(downloads.count { it == BEA_PICTURE } >= 2)
+  }
+
+  @Test
+  fun bytesThatArentAPictureLeaveTheInitials() = test {
+    notAPicture = true
+    reservationBy(FRIEND, ME)
+    openDetails()
+
+    assertNull(state.members.first().picture)
+    assertEquals("Bea Smith", state.members.first().name)
+  }
+
+  @Test
+  fun withoutAPictureRepositoryNothingIsDownloaded() = test {
+    withPictures = false
+    reservationBy(FRIEND, ME)
+    openDetails()
+
+    assertTrue(state.members.all { it.picture == null })
+    assertTrue(downloads.isEmpty())
   }
 
   private companion object {

@@ -50,6 +50,18 @@ fun PartyMember.createdParty(reservation: Reservation): Boolean =
     reservationId == reservation.id && joinedAt == reservation.createdAt
 
 /**
+ * These members of [reservation]'s party, its creator first ([createdParty]), then in the order
+ * they joined; ties go to the smallest uid, so the order is stable. Without [reservation], none of
+ * them counts as its creator.
+ */
+fun List<PartyMember>.creatorFirst(reservation: Reservation?): List<PartyMember> =
+    sortedWith(
+        compareBy<PartyMember> { reservation == null || !it.createdParty(reservation) }
+            .thenBy { it.joinedAt }
+            .thenBy { it.uid }
+    )
+
+/**
  * The id of [uid]'s membership in the party of [reservationId]. Built from both, so the rules can
  * find a membership with one read and an explorer can't join a party twice.
  */

@@ -42,6 +42,8 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
+import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
+import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -55,6 +57,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
@@ -86,7 +89,7 @@ class VenuePageViewModel(
     private val clock: () -> Long = System::currentTimeMillis,
     arrivalQuestId: String? = null,
     pictureRepository: UserPictureRepository? = null,
-    decodePicture: (ByteArray) -> ImageBitmap? = ::decodeMemberPicture,
+    decodePicture: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(VenuePageUiState())
   /** What the page shows now; the page observes it. */
@@ -142,9 +145,8 @@ class VenuePageViewModel(
   /** What the page last heard from its listeners, so it can be shown again; null when failed. */
   private var latest: Heard<VenuePageQuest>? = null
 
-  /** The members' pictures; the page shows itself again as each one arrives. */
-  private val memberPictures =
-      MemberPictures(viewModelScope, pictureRepository, decodePicture, onLoaded = ::show)
+  /** The members' profile pictures, each downloaded once and tried again after a failure. */
+  private val pictures = ProfilePictures(viewModelScope, pictureRepository, decodePicture)
 
   /** What the listeners sent; [booked] or [completions] is null once its listener failed. */
   private data class Heard<Q>(
@@ -156,6 +158,8 @@ class VenuePageViewModel(
 
   init {
     listen()
+    // The page shows itself again as each picture arrives
+    viewModelScope.launch { pictures.pictures.collect { show() } }
   }
 
   /** Called when the explorer taps the quest [questId]; see [VenuePageUiState.withQuestTapped]. */
@@ -326,7 +330,12 @@ class VenuePageViewModel(
                     val ids = reservations.filter { it.acceptsAQuestOf(venueId) }.map { it.id }
                     partyRepository.observeParties(ids).flatMapLatest { parties ->
                       val uids = parties.values.flatten().filter { it.isJoined }.map { it.uid }
-                      userRepository.observeProfiles(uids).map { Booked(reservations, parties, it) }
+                      userRepository
+                          .observeProfiles(uids)
+                          .onEach { profiles ->
+                            pictures.load(profiles.values.mapNotNull { it?.pictureUrl })
+                          }
+                          .map { Booked(reservations, parties, it) }
                     }
                   }
                   .map<Booked, Booked?> { it }
@@ -407,7 +416,7 @@ class VenuePageViewModel(
                   it.parties,
                   it.profiles,
                   explorerUid,
-                  memberPictures::get,
+                  pictures.pictures.value::get,
               ),
       )
     }
