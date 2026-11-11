@@ -16,6 +16,9 @@ interface LocationRepository {
    */
   suspend fun currentLocation(): Location?
 
-  /** A fresh precise position, or null without fine permission or an available fix. */
+  /**
+   * A fresh precise position, or null without fine permission or when no fix comes within a bounded
+   * time, e.g. indoors.
+   */
   suspend fun currentPreciseLocation(): Location?
 }
