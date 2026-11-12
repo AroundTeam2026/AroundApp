@@ -99,7 +99,7 @@ firebase deploy --only firestore:rules,storage --project around-67942
 
 ## Design
 
-Wireframes: [Figma](https://www.figma.com/design/gk5zPAvbe1nj8Lh6vmJexJ/wireframes--second-draft?node-id=2067-1893&t=nJrSIakPcPEJN7Qz-0)
+Wireframes: [Figma](https://www.figma.com/design/9pGpEFlBRBh49Ye6iesVF3/Around-App-Wireframes?node-id=5122-21044&t=wYxNIk8Z5F62SY1E-4)
 
 ## Acknowledgements
 
