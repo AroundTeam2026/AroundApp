@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
@@ -119,12 +120,13 @@ class VenuePageViewModel(
 
   /**
    * The explorer's [reservations], the memberships of the parties of the pending and approved ones
-   * at this venue by reservation id, and the [profiles] of their joined members by uid.
+   * at this venue by reservation id, and the [profiles] of their joined members by uid, null until
+   * they are read.
    */
   private data class Booked(
       val reservations: List<Reservation>,
       val parties: Map<String, List<PartyMember>>,
-      val profiles: Map<String, User?>,
+      val profiles: Map<String, User?>?,
   ) {
     /** The number of joined members of each party of [parties], by reservation id. */
     val partySizes: Map<String, Int> = parties.mapValues { (_, party) ->
@@ -340,6 +342,9 @@ class VenuePageViewModel(
                           .onEach { profiles ->
                             pictures.load(profiles.values.mapNotNull { it?.pictureUrl })
                           }
+                          .map<Map<String, User?>, Map<String, User?>?> { it }
+                          // The reservations show at once; the seats fill in once the names arrive
+                          .onStart { emit(null) }
                           .map { Booked(reservations, parties, it) }
                     }
                   }
@@ -421,13 +426,15 @@ class VenuePageViewModel(
           approved = it.reservations.approvedIds(),
           codes = partyCodesOf(it.reservations, it.parties, explorerUid, venueId),
           members =
-              partyMembersOf(
-                  it.reservations,
-                  it.parties,
-                  it.profiles,
-                  explorerUid,
-                  pictures.pictures.value::get,
-              ),
+              it.profiles?.let { profiles ->
+                partyMembersOf(
+                    it.reservations,
+                    it.parties,
+                    profiles,
+                    explorerUid,
+                    pictures.pictures.value::get,
+                )
+              },
       )
     }
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
@@ -582,14 +589,15 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
  * @property reservationIds The reservation of each accepted quest, by quest id.
  * @property approved Ids of the reservations the venue approved.
  * @property codes The party codes the explorer can share, by reservation id.
- * @property members The joined members of each party, by reservation id.
+ * @property members The joined members of each party, by reservation id; null until their profiles
+ *   are read.
  */
 private data class BookedView(
     val accepted: Map<String, Int>,
     val reservationIds: Map<String, String>,
     val approved: Set<String>,
     val codes: Map<String, String>,
-    val members: Map<String, List<PartyMemberUi>>,
+    val members: Map<String, List<PartyMemberUi>>?,
 )
 
 /**

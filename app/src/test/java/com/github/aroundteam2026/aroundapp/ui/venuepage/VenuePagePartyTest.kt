@@ -14,11 +14,14 @@ import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import io.mockk.mockk
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -57,6 +60,15 @@ class VenuePagePartyTest {
         }
       }
 
+  /** The profile of [slowUid], if set, arrives only once a test emits it here. */
+  private var slowUid: String? = null
+  private val slowProfile = MutableSharedFlow<User?>()
+  private val userRepository =
+      object : UserRepository by users {
+        override fun observeUser(uid: String): Flow<User?> =
+            if (uid == slowUid) slowProfile else users.observeUser(uid)
+      }
+
   private val picture = mockk<ImageBitmap>()
   private val downloads = mutableListOf<String>()
 
@@ -85,7 +97,7 @@ class VenuePagePartyTest {
         FakeVenueRepository(listOf(testVenue(id = VENUE))),
         FakeQuestRepository(initialQuests = listOf(testQuest(id = QUEST, venueId = VENUE))),
         reservations,
-        users,
+        userRepository,
         party,
         FakeCompletionRepository(),
         ME,
@@ -234,6 +246,21 @@ class VenuePagePartyTest {
 
     assertTrue(state.members.all { it.picture == null })
     assertTrue(downloads.isEmpty())
+  }
+
+  @Test
+  fun theReservationsDontWaitForTheMembersProfiles() = test {
+    slowUid = FRIEND
+    reservationBy(FRIEND, ME)
+    openDetails()
+
+    assertEquals(2, state.acceptedParties[QUEST])
+    assertTrue(state.members.isEmpty())
+
+    slowProfile.emit(users.getUser(FRIEND))
+    runCurrent()
+
+    assertEquals(listOf(FRIEND, ME), uids())
   }
 
   private companion object {
