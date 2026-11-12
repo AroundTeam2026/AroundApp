@@ -143,9 +143,9 @@ class CompletionViewModel(
 
   /**
    * Ends a submit with [saveState] and [locationError]. The listener may have shown the completion
-   * as saved meanwhile, e.g. when the answer to an earlier submit was lost, or as a teammate's:
-   * this submit then fails as already stored, and a retry could only fail again, so what the
-   * listener showed stays.
+   * as saved meanwhile, e.g. when the answer to an earlier submit was lost, or as the proof a
+   * teammate sent that the venue approved: this submit then fails as approved, and a retry could
+   * only fail again, so what the listener showed stays.
    */
   private fun finishSubmit(saveState: SaveState, locationError: CompletionLocationError? = null) {
     mutableUiState.update {

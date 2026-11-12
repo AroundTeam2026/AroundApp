@@ -204,6 +204,24 @@ class CompletionRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: any refusal over a stored completion is reported as "can no longer be replaced", when only
+   * an approved one can't be. A pending one refused for another reason is a plain refusal.
+   */
+  @Test
+  fun submit_overAPendingCompletionRefusedForAnotherReason_returnsPermissionDenied() =
+      withTimeoutBlocking {
+        val reservationId = pendingReservation()
+        writeBypassingRules(
+            "$COMPLETIONS/${completionId(reservationId)}",
+            validFields() + ("reservationId" to reservationId),
+        )
+
+        assertPermissionDenied(
+            explorerRepository.submit(reservationId, venueId, explorerUid, TEXT_PROOF)
+        )
+      }
+
+  /**
    * Bug: the read that follows a refusal lets its own refusal escape, or reports another party's
    * completion as this explorer's second submission, when they may not read it.
    */

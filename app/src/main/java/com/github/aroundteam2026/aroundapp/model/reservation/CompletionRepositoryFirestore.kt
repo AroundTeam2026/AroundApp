@@ -32,8 +32,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * it. A submission refused within [confirmTimeoutMs] comes back as a failure, and one refused later
  * is only logged. So when a member submits while offline and the venue approves the party's proof
  * meanwhile, the write that reaches the server afterwards is refused and dropped, while the
- * listeners show the approved one. Until then, their device's local copy holds their own write in
- * place of the party's proof.
+ * listeners show the approved one. Two members sending at once replace each other's proof while it
+ * is pending; once the venue approved it, the later write is refused the same way. Until then,
+ * their device's local copy holds their own write in place of the party's proof.
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it
@@ -53,9 +54,9 @@ class CompletionRepositoryFirestore(
    * server's answer.
    *
    * A refusal in that time is returned as the Firestore exception, or as an [IllegalStateException]
-   * if the completion was there and the rules refused to replace it, as when it is approved.
-   * Without an answer in time, e.g. while offline, it returns success and a later refusal is only
-   * logged. Errors while issuing the write are returned as a failure too.
+   * if the completion is approved, which the rules never let a member replace. Without an answer in
+   * time, e.g. while offline, it returns success and a later refusal is only logged. Errors while
+   * issuing the write are returned as a failure too.
    */
   override suspend fun submit(
       reservationId: String,
@@ -84,7 +85,7 @@ class CompletionRepositoryFirestore(
           // Null when the server hasn't answered in time; a refusal throws
           withTimeoutOrNull(confirmTimeoutMs) { write.await() }
         } catch (e: FirebaseFirestoreException) {
-          if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED && isStored(document)) {
+          if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED && isApproved(document)) {
             throw IllegalStateException("Completion ${document.id} can no longer be replaced", e)
           }
           throw e
@@ -124,10 +125,14 @@ class CompletionRepositoryFirestore(
     return answer(id, CompletionStatus.REJECTED, reason)
   }
 
-  /** Whether the server holds [document], or false if it can't tell in [confirmTimeoutMs]. */
-  private suspend fun isStored(document: DocumentReference): Boolean =
+  /**
+   * Whether the server holds [document] approved, or false if it can't tell in [confirmTimeoutMs].
+   */
+  private suspend fun isApproved(document: DocumentReference): Boolean =
       try {
-        withTimeoutOrNull(confirmTimeoutMs) { document.get(Source.SERVER).await().exists() } == true
+        withTimeoutOrNull(confirmTimeoutMs) {
+          document.get(Source.SERVER).await().getString(STATUS) == CompletionStatus.APPROVED.name
+        } == true
       } catch (e: FirebaseFirestoreException) {
         Log.w(TAG, "Reading completion ${document.id} failed", e)
         false
