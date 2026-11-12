@@ -5,9 +5,11 @@
 
 Going out with friends tends to default to the same few places, while newcomers to a city; such as an international student who wants to explore but lacks local knowledge or an established social circle, have an even harder time discovering somewhere new and finding people to go with. Review apps reinforce existing rankings, making it difficult for newcomers to discover places beyond the most established venues. Discovery is also a coordination problem: trying an unfamiliar place often depends on having company, so people without an available group miss out, while those who find it difficult to approach strangers have no easy way to form one. Small venues face the mirror problem: blanket discounts are costly, and impersonal social-media posts are easy to ignore, assuming they reach nearby locals or newcomers at all. "Around" turns local discovery into a game. Venues (restaurants, cafes， bars) publish short, location-verified quests (i.e.: going with a party of at least six, posting a picture of a dish in the apps menu, finding a small photo of a character hidden in the venue) tied to their premises, each offering a reward (coupon, discount, free desert, etc.) only they can grant. Users discover quests on a live map, team up with like-minded companions when they do not want to explore alone, and climb city and friend leaderboards as they explore. The core insight is that giving discovery a shared activity, social structure, and tangible reward can lower the barrier to trying unfamiliar places while helping small venues reach people who are actively looking for somewhere new.
 
+Leaderboards, friends, posts and chats are planned but not built yet.
+
 ## Split-app model
 
-The app uses Firebase for its cloud-based functionality. Firebase Authentication manages user accounts and sign-in, while Firebase stores and synchronizes shared application data such as quests, rewards, leaderboards, companion queues, reviews, and chats across users and devices. Frequently needed data, including available quests, the user’s active quest, profile information, and pending quest completions, is cached locally so that parts of the app remain usable without a network connection and can be synchronized once connectivity returns.
+The app uses Firebase for its cloud-based functionality. Firebase Authentication manages user accounts and sign-in. Cloud Firestore stores and synchronizes shared application data across users and devices: users, venues, quests, reservations, parties (`party_user`, `party_codes`) and quest completions, as described in [`docs/firestore-schema.md`](docs/firestore-schema.md). Cloud Storage holds the proof photos. Frequently needed data, including available quests, the user’s active quest, profile information, and pending quest completions, is cached locally so that parts of the app remain usable without a network connection and can be synchronized once connectivity returns.
 
 ## Multi-user support
 
@@ -15,11 +17,17 @@ The app supports multiple users through authenticated accounts, with each user s
 
 ## Sensor use
 
-The app uses GPS to determine the user’s location, unlock quests when they enter the required geofenced area, and show nearby quests relative to their current position. The camera supports photo-based quest proof, and user posts.
+The app uses GPS to show nearby quests and their distance on the map, and to check that the user is within the quest's radius when submitting a proof; a proof sent from too far away is refused. The camera takes the photo proof of a quest (a photo from the gallery also works) and the profile photo.
 
 ## Offline mode
 
 In offline mode, users can still view quests they have already picked up, access recently cached nearby map data, and view their cached profile. Quest completions made while offline are stored locally and automatically synced once connectivity returns. Features that depend on live data, such as discovering new quests or viewing updated leaderboards, are temporarily unavailable; leaderboards instead display the most recently synced state together with an “as of” timestamp so users know the information may be outdated.
+
+## Architecture
+
+The app follows **MVVM**. `model/` holds the data classes and the repositories, each behind an interface; Firebase lives only there. `ui/` holds the screens and their ViewModels, which depend on the repository interfaces and never on Firebase.
+
+![Architecture diagram](docs/architecture/around-architecture-diagram.png)
 
 ## Getting started
 
@@ -63,13 +71,19 @@ Instrumented tests that exercise the Firestore repository run against the Fireba
 - JDK 21
 - [firebase-tools](https://firebase.google.com/docs/cli)
 
+Start the Auth, Firestore and Storage emulators from the repository root, as the CI does:
+
+```sh
+NODE_OPTIONS="--require ./.github/scripts/keep-emulator-connections.cjs" firebase emulators:start
+```
+
 ### Firestore security rules
 
 `firestore.rules` protects the production database. The emulators load it through `firebase.json`, so `FirestoreRulesTest` checks it on every CI run, but production only gets it when someone deploys it:
 
 ```sh
 firebase login
-firebase deploy --only firestore:rules --project around-67942
+firebase deploy --only firestore:rules,storage --project around-67942
 ```
 
 - **Who:** a team member with the Owner or Editor role on the `around-67942` Firebase project.
