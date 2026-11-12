@@ -21,6 +21,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -150,7 +151,29 @@ class EditQuestScreenTest {
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER)
         .assertIsDisplayed()
-        .assertTextContains("Explorers will see your edits", substring = true)
+        .assertTextEquals(string(R.string.create_quest_reserved_banner))
+  }
+
+  // Approved explorers keep their proof type, but only pending parties pin the size
+  @Test
+  fun anApprovedOnlyQuestLocksItsProofTypeButNotItsPartySize() {
+    runBlocking {
+      val id =
+          reservations
+              .createReservation(newPendingReservation(QUEST_ID, VENUE_ID, "Ana", 0), "explorer")
+              .getOrThrow()
+      reservations.updateStatus(id, ReservationStatus.APPROVED)
+    }
+    showScreen()
+
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_TEXT).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_LOCKED).assertExists()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).assertIsEnabled()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_LOCKED).assertDoesNotExist()
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER)
+        .assertIsDisplayed()
+        .assertTextEquals(string(R.string.create_quest_reserved_banner))
   }
 
   @Test

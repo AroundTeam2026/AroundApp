@@ -297,6 +297,48 @@ class EditQuestViewModelTest {
     assertEquals(quest.minPartySize, state.minPartySize)
   }
 
+  // The banner follows it, so it mustn't flash in while the reservations load
+  @Test
+  fun activeReservationsAreUnknownUntilRead() = runTest {
+    reservations.createReservation(newPendingReservation(QUEST_ID, VENUE_ID, "Ana", 0), "explorer")
+    viewModel =
+        CreateQuestViewModel(
+            FakeAuthRepository(VENUE_ID),
+            FakeVenueRepository(),
+            quests,
+            FakeAddressSearchRepository(),
+            clock,
+            QUEST_ID,
+            reservations,
+        )
+    assertTrue(state.proofTypeLocked)
+    assertFalse(state.hasActiveReservations)
+
+    dispatcher.scheduler.advanceUntilIdle()
+    assertTrue(state.hasActiveReservations)
+  }
+
+  @Test
+  fun aQuestWithoutReservationsHasNoActiveOnes() {
+    open()
+    assertFalse(state.hasActiveReservations)
+  }
+
+  @Test
+  fun approvedReservationsAreActive() = runTest {
+    val id =
+        reservations
+            .createReservation(newPendingReservation(QUEST_ID, VENUE_ID, "Ana", 0), "explorer")
+            .getOrThrow()
+    reservations.updateStatus(id, ReservationStatus.APPROVED)
+    open()
+    assertTrue(state.hasActiveReservations)
+
+    reservations.updateStatus(id, ReservationStatus.CANCELLED)
+    dispatcher.scheduler.advanceUntilIdle()
+    assertFalse(state.hasActiveReservations)
+  }
+
   @Test
   fun thePartySizeStaysLockedIfReservationsCantBeRead() {
     val failing =

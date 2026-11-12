@@ -189,7 +189,8 @@ fun CreateQuestContent(
           editing = state.editing,
       )
       Spacer(Modifier.height(AroundSpacing.ExtraLarge))
-      if (state.proofTypeLocked) {
+      // Not on proofTypeLocked, which is also true while the reservations load
+      if (state.hasActiveReservations) {
         ReservedBanner()
         Spacer(Modifier.height(AroundSpacing.Medium))
       }
@@ -202,9 +203,7 @@ fun CreateQuestContent(
   }
 }
 
-/**
- * Tells the venue that explorers who reserved see its edits, but the locked fields can't change.
- */
+/** Tells the venue that explorers who reserved see its edits; each locked field says so itself. */
 @Composable
 private fun ReservedBanner() {
   Row(
