@@ -55,6 +55,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property partyCodes The party codes of the reservations the explorer created and friends can
  *   still join, by reservation id.
  * @property partyMembers The joined members of the explorer's parties here, by reservation id.
+ * @property joinedPartyIds Ids of the reservations whose party the explorer joined rather than
+ *   created, known as soon as the parties are read.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -81,6 +83,7 @@ data class VenuePageUiState(
     val proofsAvailable: Boolean = true,
     val partyCodes: Map<String, String> = emptyMap(),
     val partyMembers: Map<String, List<PartyMemberUi>> = emptyMap(),
+    val joinedPartyIds: Set<String> = emptySet(),
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -114,6 +117,14 @@ data class VenuePageUiState(
             ?.takeIf { acceptAvailable }
             ?.let(reservationIds::get)
             ?.takeIf { it !in completions }
+
+  /**
+   * Whether the explorer leaves the party of [cancellableReservationId] rather than cancelling it,
+   * since someone else made it. The rules would let any joined member cancel it, but the app only
+   * lets its creator, so a member can't cancel everyone's reservation.
+   */
+  val leavesParty: Boolean
+    get() = cancellableReservationId in joinedPartyIds
 
   /**
    * The reservation whose quest the explorer can complete, for the picked quest: the one they can

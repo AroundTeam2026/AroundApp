@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,12 +38,14 @@ enum class CancelStatus {
 /**
  * The button that cancels a reservation at [venueName]: "Cancel reservation", which asks first
  * since a cancelled reservation can't be undone; "Cancelling…", disabled, while the cancel is
- * written; or after a failure an error and "Try again", which retries at once.
+ * written; or after a failure an error and "Try again", which retries at once. With [leave], it
+ * says the same of leaving the party of a reservation someone else made.
  *
  * @param status How cancelling stands.
  * @param venueName The venue the dialog names.
  * @param onCancel Cancels the reservation, once the explorer confirmed.
  * @param horizontalAlignment Where the button and the error sit across the width.
+ * @param leave Whether [onCancel] leaves the party rather than cancelling the reservation.
  */
 @Composable
 internal fun CancelReservationAction(
@@ -50,8 +53,10 @@ internal fun CancelReservationAction(
     venueName: String,
     onCancel: () -> Unit,
     horizontalAlignment: Alignment.Horizontal = Alignment.End,
+    leave: Boolean = false,
 ) {
   val colors = MaterialTheme.colorScheme
+  val texts = if (leave) LEAVE_TEXTS else CANCEL_TEXTS
   var asking by rememberSaveable { mutableStateOf(false) }
   Column(
       Modifier.fillMaxWidth(),
@@ -60,7 +65,7 @@ internal fun CancelReservationAction(
   ) {
     if (status == CancelStatus.FAILED) {
       Text(
-          stringResource(R.string.cancel_reservation_failed),
+          stringResource(texts.failed),
           Modifier.testTag(C.Tag.CANCEL_RESERVATION_FAILED),
           color = colors.error,
           style = AroundTextStyles.Caption,
@@ -76,8 +81,8 @@ internal fun CancelReservationAction(
       Text(
           stringResource(
               when (status) {
-                CancelStatus.NONE -> R.string.cancel_reservation
-                CancelStatus.CANCELLING -> R.string.cancel_reservation_cancelling
+                CancelStatus.NONE -> texts.label
+                CancelStatus.CANCELLING -> texts.running
                 CancelStatus.FAILED -> R.string.cancel_reservation_retry
               }
           ),
@@ -97,7 +102,7 @@ internal fun CancelReservationAction(
               colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
               modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_CONFIRM),
           ) {
-            Text(stringResource(R.string.cancel_reservation_confirm))
+            Text(stringResource(texts.confirm))
           }
         },
         dismissButton = {
@@ -108,12 +113,45 @@ internal fun CancelReservationAction(
                   ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
               modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_KEEP),
           ) {
-            Text(stringResource(R.string.cancel_reservation_keep))
+            Text(stringResource(texts.keep))
           }
         },
-        title = { Text(stringResource(R.string.cancel_reservation_title)) },
-        text = { Text(stringResource(R.string.cancel_reservation_text, venueName)) },
+        title = { Text(stringResource(texts.title)) },
+        text = { Text(stringResource(texts.text, venueName)) },
         modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_DIALOG),
     )
   }
 }
+
+/** The strings of a [CancelReservationAction], but its "Try again": its button and its dialog. */
+private class ActionTexts(
+    @StringRes val label: Int,
+    @StringRes val running: Int,
+    @StringRes val failed: Int,
+    @StringRes val title: Int,
+    @StringRes val text: Int,
+    @StringRes val confirm: Int,
+    @StringRes val keep: Int,
+)
+
+private val CANCEL_TEXTS =
+    ActionTexts(
+        R.string.cancel_reservation,
+        R.string.cancel_reservation_cancelling,
+        R.string.cancel_reservation_failed,
+        R.string.cancel_reservation_title,
+        R.string.cancel_reservation_text,
+        R.string.cancel_reservation_confirm,
+        R.string.cancel_reservation_keep,
+    )
+
+private val LEAVE_TEXTS =
+    ActionTexts(
+        R.string.leave_party,
+        R.string.leave_party_leaving,
+        R.string.leave_party_failed,
+        R.string.leave_party_title,
+        R.string.leave_party_text,
+        R.string.leave_party_confirm,
+        R.string.leave_party_stay,
+    )

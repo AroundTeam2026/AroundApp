@@ -4,9 +4,12 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -16,12 +19,14 @@ import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import io.mockk.mockk
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -31,6 +36,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -49,6 +55,15 @@ class VenuePagePartyTest {
   private var time = 0L
   private val party = FakePartyRepository { time }
   private val reservations = FakeReservationRepository(now = { time }, party = party)
+
+  /** Whether withdrawing fails, as offline. */
+  private var withdrawFails = false
+  private val partyRepository =
+      object : PartyRepository by party {
+        override suspend fun withdraw(reservationId: String, uid: String): Result<Unit> =
+            if (withdrawFails) Result.failure(IOException("offline"))
+            else party.withdraw(reservationId, uid)
+      }
   private val users =
       FakeUserRepository().apply {
         runBlocking {
@@ -98,7 +113,7 @@ class VenuePagePartyTest {
         FakeQuestRepository(initialQuests = listOf(testQuest(id = QUEST, venueId = VENUE))),
         reservations,
         userRepository,
-        party,
+        partyRepository,
         FakeCompletionRepository(),
         ME,
         clock = { NOW },
@@ -261,6 +276,67 @@ class VenuePagePartyTest {
     runCurrent()
 
     assertEquals(listOf(FRIEND, ME), uids())
+  }
+
+  @Test
+  fun aMemberWhoCancelsLeavesThePartyInstead() = test {
+    val id = reservationBy(FRIEND, ME)
+    openDetails()
+    assertTrue(state.leavesParty)
+
+    viewModel.cancel()
+    runCurrent()
+
+    val me = party.observeMembers(id).first().single { it.uid == ME }
+    assertEquals(PartyMemberStatus.WITHDRAWN, me.status)
+    val reservation = reservations.observeForExplorer(FRIEND).first().single()
+    assertEquals(ReservationStatus.PENDING, reservation.status)
+    assertNull(state.reservationIds[QUEST])
+  }
+
+  @Test
+  fun aMemberLeavesEvenBeforeTheProfilesArrive() = test {
+    slowUid = FRIEND
+    reservationBy(FRIEND, ME)
+    openDetails()
+
+    assertTrue(state.members.isEmpty())
+    assertTrue(state.leavesParty)
+  }
+
+  @Test
+  fun aFailedLeaveCanBeTriedAgain() = test {
+    val id = reservationBy(FRIEND, ME)
+    openDetails()
+    withdrawFails = true
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(CancelStatus.FAILED, state.cancelStatus)
+    assertTrue(state.leavesParty)
+    val me = party.observeMembers(id).first().single { it.uid == ME }
+    assertEquals(PartyMemberStatus.JOINED, me.status)
+
+    withdrawFails = false
+    viewModel.cancel()
+    runCurrent()
+
+    assertNull(state.reservationIds[QUEST])
+  }
+
+  @Test
+  fun theCreatorCancelsTheReservation() = test {
+    val id = reservationBy(ME, FRIEND)
+    openDetails()
+    assertFalse(state.leavesParty)
+
+    viewModel.cancel()
+    runCurrent()
+
+    val reservation = reservations.observeForExplorer(FRIEND).first().single { it.id == id }
+    assertEquals(ReservationStatus.CANCELLED, reservation.status)
+    assertTrue(party.observeMembers(id).first().all { it.status == PartyMemberStatus.JOINED })
   }
 
   private companion object {

@@ -85,17 +85,17 @@ import java.util.Date
 /**
  * The whole of [quest], as the Figma frame "Quest details": the venue, the quest's title and chips,
  * then a card for each part of it, over a bar that stays in place to accept the quest or, once it
- * is accepted, to cancel the reservation after asking. Once the venue approved the reservation, the
- * bar offers to submit the proof, and once it is sent, a card under the title says where it stands.
- * The explorer who created the reservation finds its party code on the party card, to copy or share
- * with friends while they can still join. The rows only fit part of a quest, so this is where the
- * rest is read.
+ * is accepted, to cancel the reservation, or leave the party of one someone else made, after
+ * asking. Once the venue approved the reservation, the bar offers to submit the proof, and once it
+ * is sent, a card under the title says where it stands. The explorer who created the reservation
+ * finds its party code on the party card, to copy or share with friends while they can still join.
+ * The rows only fit part of a quest, so this is where the rest is read.
  *
  * @param state The venue's page, for the venue and how accepting and cancelling stand.
  * @param quest The quest to show.
  * @param onBack Called by the back arrow and system back.
  * @param onAccept Accepts the quest.
- * @param onCancel Cancels the quest's reservation, once the explorer confirmed.
+ * @param onCancel Cancels the quest's reservation, or leaves its party, once confirmed.
  * @param clock Tells the time zone the reward's expiry is written in.
  * @param onSubmitProof Opens the proof form of the approved reservation with the given id.
  */
@@ -154,6 +154,7 @@ fun QuestDetailsScreen(
           state.venueName,
           onCancel,
           horizontalAlignment = Alignment.CenterHorizontally,
+          leave = state.leavesParty,
       )
     }
     QuestActionBar(
