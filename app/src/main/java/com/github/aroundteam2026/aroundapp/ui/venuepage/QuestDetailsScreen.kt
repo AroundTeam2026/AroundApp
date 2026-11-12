@@ -143,6 +143,7 @@ fun QuestDetailsScreen(
           joined = state.acceptedParties[quest.questId] ?: SOLO_PARTY,
           code = state.partyCode,
           venueName = state.venueName,
+          members = state.members,
       )
       ProofCard(quest.proofType)
       RadiusCard(state, quest)
@@ -360,9 +361,16 @@ private fun RewardCard(reward: Reward, clock: Clock) {
  * How many people [quest] takes, with a seat for each. A party bigger than the quest's minimum gets
  * a seat for everyone. Past the explorer's own seat, [joined] counts who else is in. With a [code],
  * the party's code follows, for friends to join with; sharing it names the quest and [venueName].
+ * Once known, the [members] fill their seats with their picture or initials.
  */
 @Composable
-private fun PartyCard(quest: VenuePageQuest, joined: Int, code: String?, venueName: String) {
+private fun PartyCard(
+    quest: VenuePageQuest,
+    joined: Int,
+    code: String?,
+    venueName: String,
+    members: List<PartyMemberUi> = emptyList(),
+) {
   val seats = maxOf(quest.minPartySize, joined)
   val rule =
       if (quest.exactPartySize) R.plurals.quest_detail_party_exactly
@@ -377,12 +385,17 @@ private fun PartyCard(quest: VenuePageQuest, joined: Int, code: String?, venueNa
         horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
     ) {
-      repeat(seats) { seat ->
-        when {
-          seat == 0 -> OwnSeat()
-          seat < joined -> JoinedSeat()
-          else -> EmptySeat()
+      if (members.isEmpty()) {
+        repeat(seats) { seat ->
+          when {
+            seat == 0 -> OwnSeat()
+            seat < joined -> JoinedSeat()
+            else -> EmptySeat()
+          }
         }
+      } else {
+        members.forEach { MemberSeat(it, SEAT_SIZE) }
+        repeat(seats - members.size) { EmptySeat() }
       }
     }
     Column(verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {

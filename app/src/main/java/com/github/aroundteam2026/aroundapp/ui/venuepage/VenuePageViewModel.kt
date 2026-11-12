@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.util.Log
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -29,8 +30,12 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.user.User
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.user.observeProfiles
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
@@ -39,6 +44,8 @@ import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
+import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
+import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -52,6 +59,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
@@ -67,6 +76,9 @@ import kotlinx.coroutines.launch
  * proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the explorer
  * as in their profile. Given [arrivalQuestId], the page opens that quest's details the first time
  * it shows the venue; see [VenuePageUiState.arrivingAt].
+ *
+ * It also shows who is in each party, downloading their pictures through [pictureRepository];
+ * without one, members show their initials.
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -79,6 +91,8 @@ class VenuePageViewModel(
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
     arrivalQuestId: String? = null,
+    pictureRepository: UserPictureRepository? = null,
+    decodePicture: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(VenuePageUiState())
   /** What the page shows now; the page observes it. */
@@ -105,12 +119,14 @@ class VenuePageViewModel(
   private class Write(val questId: String, var shown: Boolean = false)
 
   /**
-   * The explorer's [reservations] and the memberships of the parties of the pending and approved
-   * ones at this venue, by reservation id.
+   * The explorer's [reservations], the memberships of the parties of the pending and approved ones
+   * at this venue by reservation id, and the [profiles] of their joined members by uid, null until
+   * they are read.
    */
   private data class Booked(
       val reservations: List<Reservation>,
       val parties: Map<String, List<PartyMember>>,
+      val profiles: Map<String, User?>?,
   ) {
     /** The number of joined members of each party of [parties], by reservation id. */
     val partySizes: Map<String, Int> = parties.mapValues { (_, party) ->
@@ -136,6 +152,9 @@ class VenuePageViewModel(
   /** What the page last heard from its listeners, so it can be shown again; null when failed. */
   private var latest: Heard<VenuePageQuest>? = null
 
+  /** The members' profile pictures, each downloaded once and tried again after a failure. */
+  private val pictures = ProfilePictures(viewModelScope, pictureRepository, decodePicture)
+
   /** What the listeners sent; [booked] or [proofs] is null once its listener failed. */
   private data class Heard<Q>(
       val venue: Venue?,
@@ -146,6 +165,8 @@ class VenuePageViewModel(
 
   init {
     listen()
+    // The page shows itself again as each picture arrives
+    viewModelScope.launch { pictures.pictures.collect { show() } }
   }
 
   /** Called when the explorer taps the quest [questId]; see [VenuePageUiState.withQuestTapped]. */
@@ -314,7 +335,18 @@ class VenuePageViewModel(
                     // Only the parties acceptedPartiesOf counts, so an old reservation elsewhere
                     // can't make accepting unavailable here
                     val ids = reservations.filter { it.acceptsAQuestOf(venueId) }.map { it.id }
-                    partyRepository.observeParties(ids).map { Booked(reservations, it) }
+                    partyRepository.observeParties(ids).flatMapLatest { parties ->
+                      val uids = parties.values.flatten().filter { it.isJoined }.map { it.uid }
+                      userRepository
+                          .observeProfiles(uids)
+                          .onEach { profiles ->
+                            pictures.load(profiles.values.mapNotNull { it?.pictureUrl })
+                          }
+                          .map<Map<String, User?>, Map<String, User?>?> { it }
+                          // The reservations show at once; the seats fill in once the names arrive
+                          .onStart { emit(null) }
+                          .map { Booked(reservations, parties, it) }
+                    }
                   }
                   .map<Booked, Booked?> { it }
                   .catch {
@@ -393,6 +425,16 @@ class VenuePageViewModel(
                   refusing,
           approved = it.reservations.approvedIds(),
           codes = partyCodesOf(it.reservations, it.parties, explorerUid, venueId),
+          members =
+              it.profiles?.let { profiles ->
+                partyMembersOf(
+                    it.reservations,
+                    it.parties,
+                    profiles,
+                    explorerUid,
+                    pictures.pictures.value::get,
+                )
+              },
       )
     }
     val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
@@ -452,6 +494,10 @@ class VenuePageViewModel(
             CompletionRepositoryProvider.repository,
             explorerUid,
             arrivalQuestId = arrivalQuestId,
+            pictureRepository =
+                this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]?.let {
+                  UserPictureRepositoryProvider.repository(it)
+                },
         )
       }
     }
@@ -543,12 +589,15 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
  * @property reservationIds The reservation of each accepted quest, by quest id.
  * @property approved Ids of the reservations the venue approved.
  * @property codes The party codes the explorer can share, by reservation id.
+ * @property members The joined members of each party, by reservation id; null until their profiles
+ *   are read.
  */
 private data class BookedView(
     val accepted: Map<String, Int>,
     val reservationIds: Map<String, String>,
     val approved: Set<String>,
     val codes: Map<String, String>,
+    val members: Map<String, List<PartyMemberUi>>?,
 )
 
 /**
@@ -598,6 +647,7 @@ private fun VenuePageUiState.showing(
               proofSenders = proofs?.senders ?: proofSenders,
               proofsAvailable = proofs != null,
               partyCodes = booked?.codes ?: partyCodes,
+              partyMembers = booked?.members ?: partyMembers,
           )
           .withQuests(quests)
     }

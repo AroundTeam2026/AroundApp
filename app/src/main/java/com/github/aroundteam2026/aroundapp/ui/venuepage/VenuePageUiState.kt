@@ -54,6 +54,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   if one was sent and so doesn't offer to send one.
  * @property partyCodes The party codes of the reservations the explorer created and friends can
  *   still join, by reservation id.
+ * @property partyMembers The joined members of the explorer's parties here, by reservation id.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -79,6 +80,7 @@ data class VenuePageUiState(
     val proofSenders: Map<String, ProofSender> = emptyMap(),
     val proofsAvailable: Boolean = true,
     val partyCodes: Map<String, String> = emptyMap(),
+    val partyMembers: Map<String, List<PartyMemberUi>> = emptyMap(),
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?

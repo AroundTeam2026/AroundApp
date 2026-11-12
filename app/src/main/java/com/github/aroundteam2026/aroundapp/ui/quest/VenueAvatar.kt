@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -10,11 +11,16 @@ import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import java.util.Locale
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * What a venue's pin, card and nearby page show for it. Each kind draws itself, so adding one, such
@@ -69,3 +75,24 @@ fun initialsOf(name: String): String {
   val initials = listOfNotNull(firstChars.firstOrNull(), firstChars.drop(1).lastOrNull())
   return if (initials.isEmpty()) "?" else initials.joinToString("").uppercase(Locale.ROOT)
 }
+
+/**
+ * [bytes] as a picture at most [maxEdge] pixels on each side, decoded on [dispatcher], or null if
+ * they aren't an image. An avatar is small, so it never keeps a full-size photo in memory.
+ */
+internal suspend fun decodeAvatar(
+    bytes: ByteArray,
+    maxEdge: Int = AVATAR_EDGE_PX,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+): ImageBitmap? =
+    withContext(dispatcher) {
+      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+      var sample = 1
+      while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxEdge) sample *= 2
+      val options = BitmapFactory.Options().apply { inSampleSize = sample }
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+    }
+
+/** The longest side an avatar is decoded at: its 32 dp even on the densest screens. */
+private const val AVATAR_EDGE_PX = 128

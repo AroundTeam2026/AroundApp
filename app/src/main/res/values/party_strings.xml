@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The party's members on the quest details -->
+    <string name="quest_detail_member_you">You</string>
+    <string name="quest_detail_member_unknown">An explorer</string>
+</resources>
