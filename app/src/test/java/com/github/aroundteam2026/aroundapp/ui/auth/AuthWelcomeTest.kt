@@ -91,7 +91,7 @@ class AuthWelcomeTest {
     launch()
     assertOnWelcome()
     compose.onNodeWithContentDescription("Around").assertIsDisplayed()
-    compose.onNodeWithText("What’s Around ?").assertIsDisplayed()
+    compose.onNodeWithText("It's a small world. See what's Around.").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.AUTH_WELCOME_CREATE_ACCOUNT).assertTextEquals("Create account")
     compose.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).assertTextEquals("Sign in")
   }
