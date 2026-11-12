@@ -156,7 +156,7 @@ class QuestDetailsPartyMembersTest {
   @Test
   fun aMemberLeavesThePartyAfterAsking() {
     var left = false
-    show(state(creator, me)) { left = true }
+    show(state(creator, me).copy(joinedPartyIds = setOf(RESERVATION))) { left = true }
 
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).assertTextEquals("Leave party").performClick()
     compose.onNodeWithText("Leave this party?").assertIsDisplayed()

@@ -268,12 +268,13 @@ class VenuePageViewModel(
     }
     val leaving = current.leavesParty
     viewModelScope.launch {
-      // Only its creator can cancel the reservation; anyone else who joined withdraws instead
+      // Only its creator cancels the reservation; anyone else who joined withdraws instead
       val result =
           if (leaving) partyRepository.withdraw(reservationId, explorerUid)
           else reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
       result.onFailure {
-        Log.w(TAG, "Cancelling reservation $reservationId failed", it)
+        val what = if (leaving) "Leaving the party of" else "Cancelling"
+        Log.w(TAG, "$what reservation $reservationId failed", it)
         mutableUiState.update { state ->
           // A reservation that left meanwhile, e.g. rejected by the venue, has nothing to mark
           val shown = reservationId in state.reservationIds.values
@@ -431,6 +432,7 @@ class VenuePageViewModel(
                   refusing,
           approved = it.reservations.approvedIds(),
           codes = partyCodesOf(it.reservations, it.parties, explorerUid, venueId),
+          joined = joinedPartiesOf(it.reservations, it.parties, explorerUid),
           members =
               it.profiles?.let { profiles ->
                 partyMembersOf(
@@ -578,6 +580,23 @@ internal fun partyCodesOf(
         .mapNotNull { reservation -> reservation.partyCode?.let { reservation.id to it } }
         .toMap()
 
+/**
+ * The ids of the [reservations] whose party [explorerUid] joined rather than created, as their
+ * memberships in [parties] tell.
+ */
+internal fun joinedPartiesOf(
+    reservations: List<Reservation>,
+    parties: Map<String, List<PartyMember>>,
+    explorerUid: String,
+): Set<String> =
+    reservations
+        .filter { reservation ->
+          parties[reservation.id].orEmpty().any {
+            it.uid == explorerUid && it.isJoined && !it.createdParty(reservation)
+          }
+        }
+        .mapTo(HashSet()) { it.id }
+
 /** The ids of the reservations among these that the venue approved. */
 private fun List<Reservation>.approvedIds(): Set<String> = filter {
   it.status == ReservationStatus.APPROVED
@@ -595,6 +614,7 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
  * @property reservationIds The reservation of each accepted quest, by quest id.
  * @property approved Ids of the reservations the venue approved.
  * @property codes The party codes the explorer can share, by reservation id.
+ * @property joined Ids of the reservations whose party the explorer joined rather than created.
  * @property members The joined members of each party, by reservation id; null until their profiles
  *   are read.
  */
@@ -603,6 +623,7 @@ private data class BookedView(
     val reservationIds: Map<String, String>,
     val approved: Set<String>,
     val codes: Map<String, String>,
+    val joined: Set<String>,
     val members: Map<String, List<PartyMemberUi>>?,
 )
 
@@ -654,6 +675,7 @@ private fun VenuePageUiState.showing(
               proofsAvailable = proofs != null,
               partyCodes = booked?.codes ?: partyCodes,
               partyMembers = booked?.members ?: partyMembers,
+              joinedPartyIds = booked?.joined ?: joinedPartyIds,
           )
           .withQuests(quests)
     }
