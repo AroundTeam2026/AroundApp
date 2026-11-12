@@ -24,8 +24,16 @@ const val E2E_PASSWORD = "123456"
  *
  * @param email unique by default, so the account is new on an emulator other tests already used.
  */
-fun ComposeTestRule.createAccount(email: String = "e2e-${UUID.randomUUID()}@around.test") =
-    register(email, C.Tag.AUTH_EXPLORER_CARD, landsOn = C.Tag.NAV_BAR)
+fun ComposeTestRule.createAccount(email: String = "e2e-${UUID.randomUUID()}@around.test") {
+  register(email, C.Tag.AUTH_EXPLORER_CARD, landsOn = C.Tag.PROFILE_SETUP_SCREEN)
+  onNodeWithTag(C.Tag.PROFILE_SETUP_NAME).performTextInput("Explorer")
+  closeKeyboard()
+  onNodeWithTag(C.Tag.PROFILE_SETUP_CONTINUE).performClick()
+  waitUntil(SETUP_TIMEOUT_MS) {
+    onAllNodes(hasTestTag(C.Tag.NAV_BAR)).fetchSemanticsNodes().isNotEmpty()
+  }
+  onNodeWithTag(C.Tag.NAV_BAR).assertIsDisplayed()
+}
 
 /**
  * Creates a venue account through the Explorer form's venue link, from the auth screen [E2eRule]

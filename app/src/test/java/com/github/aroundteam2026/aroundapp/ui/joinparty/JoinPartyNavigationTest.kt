@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import androidx.activity.ComponentActivity
@@ -17,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.Tab
@@ -53,6 +55,7 @@ class JoinPartyNavigationTest {
             fakes.venues,
             fakes.reservations.party,
             FakeCompletionRepository(),
+            FakeUserRepository(),
         )
     composeTestRule.setContent {
       navController = rememberNavController()
@@ -61,7 +64,12 @@ class JoinPartyNavigationTest {
           onSignOut = {},
           navController = navController,
           overview = { onOpenQuest, onJoinParty ->
-            OverviewScreen(overviewViewModel, onOpenQuest, onJoinParty)
+            OverviewScreen(
+                overviewViewModel,
+                onOpenQuest,
+                onJoinParty,
+                onSendNewProof = { _, _ -> },
+            )
           },
           joinParty = { close ->
             closeScreen = close

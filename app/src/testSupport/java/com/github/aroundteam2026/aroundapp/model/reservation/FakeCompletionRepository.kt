@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
@@ -37,8 +38,9 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
 
   /**
    * Stores a pending completion under its [completionId] with [now] as its submission time, and
-   * returns the id. Returns [forcedFailure] instead, storing nothing, if it is set, and an
-   * [IllegalStateException], changing nothing, if a completion is already stored under that id.
+   * returns the id. A pending or rejected one already stored there is replaced, as a new proof.
+   * Returns [forcedFailure] instead, storing nothing, if it is set, and an [IllegalStateException],
+   * changing nothing, if the one stored there is approved.
    */
   override suspend fun submit(
       reservationId: String,
@@ -50,8 +52,10 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
       return Result.failure(it)
     }
     val id = completionId(reservationId)
-    if (id in completions.value) {
-      return Result.failure(IllegalStateException("Completion $id was already submitted"))
+    completions.value[id]?.let {
+      if (!canTransition(it.status, CompletionStatus.PENDING)) {
+        return Result.failure(IllegalStateException("Completion $id was already approved"))
+      }
     }
     val stored =
         Completion(

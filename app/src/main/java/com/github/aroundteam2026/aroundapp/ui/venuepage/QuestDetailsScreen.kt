@@ -1,10 +1,15 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -22,9 +27,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,6 +65,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.overview.slotFormat
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
@@ -66,7 +73,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
@@ -78,9 +87,9 @@ import java.util.Date
  * then a card for each part of it, over a bar that stays in place to accept the quest or, once it
  * is accepted, to cancel the reservation after asking. Once the venue approved the reservation, the
  * bar offers to submit the proof, and once it is sent, a card under the title says where it stands.
- * The explorer who created the reservation finds its party code on the party card, to share with
- * friends while they can still join. The rows only fit part of a quest, so this is where the rest
- * is read.
+ * The explorer who created the reservation finds its party code on the party card, to copy or share
+ * with friends while they can still join. The rows only fit part of a quest, so this is where the
+ * rest is read.
  *
  * @param state The venue's page, for the venue and how accepting and cancelling stand.
  * @param quest The quest to show.
@@ -121,7 +130,7 @@ fun QuestDetailsScreen(
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
       Header(state, quest)
-      state.proof?.let { ProofStatusCard(it, state.venueName) }
+      state.proof?.let { ProofStatusCard(it, state.venueName, state.proofSender) }
       if (quest.description.isNotBlank()) {
         Card(R.drawable.ic_info, R.string.quest_detail_about) {
           CardText(quest.description, C.Tag.QUEST_DETAIL_DESCRIPTION)
@@ -199,10 +208,12 @@ private fun Header(state: VenuePageUiState, quest: VenuePageQuest) {
 
 /**
  * Where [proof] stands, as the Figma frames "Quest details · state": waiting for [venueName], or
- * its answer, with the reason of a rejection.
+ * its answer, with the reason of a rejection. A waiting proof another member sent names its
+ * [sender], as the frame "Quest details · proof sent by a member" does, and says anyone in the
+ * party can still send a new one.
  */
 @Composable
-private fun ProofStatusCard(proof: Completion, venueName: String) {
+private fun ProofStatusCard(proof: Completion, venueName: String, sender: ProofSender?) {
   val colors = MaterialTheme.colorScheme
   val theme = AroundTheme.colors
   val look =
@@ -211,8 +222,12 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
             ProofStatusLook(
                 R.drawable.ic_clock,
                 R.string.quest_detail_proof_pending_label,
-                R.string.quest_detail_proof_pending_title,
-                stringResource(R.string.quest_detail_proof_pending_text, venueName),
+                sender?.name?.let {
+                  stringResource(R.string.quest_detail_proof_pending_title_by, it)
+                } ?: stringResource(R.string.quest_detail_proof_pending_title),
+                if (sender == null)
+                    stringResource(R.string.quest_detail_proof_pending_text, venueName)
+                else stringResource(R.string.quest_detail_proof_pending_text_by, venueName),
                 tile = theme.lavender,
                 icon = theme.accentText,
                 dot = theme.accentText,
@@ -223,7 +238,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
             ProofStatusLook(
                 R.drawable.ic_check,
                 R.string.quest_detail_proof_approved_label,
-                R.string.quest_detail_proof_approved_title,
+                stringResource(R.string.quest_detail_proof_approved_title),
                 stringResource(R.string.quest_detail_proof_approved_text, venueName),
                 tile = theme.sage,
                 icon = colors.surface,
@@ -235,7 +250,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
             ProofStatusLook(
                 R.drawable.ic_proof_rejected,
                 R.string.quest_detail_proof_rejected_label,
-                R.string.quest_detail_proof_rejected_title,
+                stringResource(R.string.quest_detail_proof_rejected_title),
                 proof.rejectReason.orEmpty(),
                 tile = theme.panel,
                 icon = colors.error,
@@ -246,10 +261,10 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
       }
   Row(
       Modifier.fillMaxWidth()
-          .clip(PROOF_STATUS_SHAPE)
+          .clip(AroundCorners.Photo)
           .background(colors.surface)
           .then(
-              look.border?.let { Modifier.border(PROOF_STATUS_BORDER, it, PROOF_STATUS_SHAPE) }
+              look.border?.let { Modifier.border(PROOF_STATUS_BORDER, it, AroundCorners.Photo) }
                   ?: Modifier
           )
           .padding(AroundSpacing.Large)
@@ -280,7 +295,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
         )
       }
       Text(
-          stringResource(look.titleRes),
+          look.title,
           Modifier.semantics { heading() },
           color = colors.onSurface,
           style = AroundTextStyles.CardHeading,
@@ -294,7 +309,7 @@ private fun ProofStatusCard(proof: Completion, venueName: String) {
 private class ProofStatusLook(
     @param:DrawableRes val iconRes: Int,
     @param:StringRes val labelRes: Int,
-    @param:StringRes val titleRes: Int,
+    val title: String,
     val text: String,
     val tile: Color,
     val icon: Color,
@@ -415,16 +430,17 @@ private fun PartyCard(
 
 /**
  * The party's [code], as the Figma component "S5 · Party code": shown in two halves, with a button
- * that opens the phone's share sheet with [message].
+ * that copies it and one that opens the phone's share sheet with [message].
  */
 @Composable
 private fun PartyCodeBox(code: String, message: String) {
   val colors = MaterialTheme.colorScheme
   val context = LocalContext.current
+  val copyLabel = stringResource(R.string.quest_detail_party_code_copy)
   val shareTitle = stringResource(R.string.quest_detail_party_code_share)
   Column(
       Modifier.fillMaxWidth()
-          .clip(PARTY_CODE_SHAPE)
+          .clip(AroundShapes.medium)
           .background(colors.surface)
           .drawBehind {
             val width = PARTY_CODE_BORDER.toPx()
@@ -441,22 +457,44 @@ private fun PartyCodeBox(code: String, message: String) {
           .padding(AroundSpacing.InsetPadding),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
-    Column(verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
-      Text(
-          stringResource(R.string.quest_detail_party_code).uppercase(currentLocale()),
-          color = colors.onSurfaceVariant,
-          style = AroundTextStyles.Label,
-      )
-      Text(
-          partyCodeShown(code),
-          Modifier.testTag(C.Tag.QUEST_DETAIL_PARTY_CODE),
-          color = colors.onSurface,
-          style = AroundTextStyles.PartyCode,
-      )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TEXT_GAP)) {
+        Text(
+            stringResource(R.string.quest_detail_party_code).uppercase(currentLocale()),
+            color = colors.onSurfaceVariant,
+            style = AroundTextStyles.Label,
+        )
+        Text(
+            partyCodeShown(code),
+            Modifier.testTag(C.Tag.QUEST_DETAIL_PARTY_CODE),
+            color = colors.onSurface,
+            style = AroundTextStyles.PartyCode,
+        )
+      }
+      // A 40 dp circle, as in Figma, with Material's 48 dp touch target around it
+      FilledIconButton(
+          onClick = { copyPartyCode(context, copyLabel, code) },
+          colors =
+              IconButtonDefaults.filledIconButtonColors(
+                  containerColor = AroundTheme.colors.lavender,
+                  contentColor = AroundTheme.colors.accentText,
+              ),
+      ) {
+        Icon(
+            painterResource(R.drawable.ic_copy),
+            contentDescription = copyLabel,
+            Modifier.size(PARTY_CODE_COPY_ICON_SIZE),
+            // Purple on lavender, cream on dark lavender: primary stays purple in dark mode
+            tint = AroundTheme.colors.accentText,
+        )
+      }
     }
     Row(
         Modifier.fillMaxWidth()
-            .clip(PARTY_CODE_SHARE_SHAPE)
+            .clip(AroundShapes.small)
             .background(colors.primary)
             .clickable(role = Role.Button) { sharePartyCode(context, shareTitle, message) }
             .padding(vertical = AroundSpacing.Medium)
@@ -486,6 +524,19 @@ private fun PartyCodeBox(code: String, message: String) {
  * `7KQ M42`. Joining accepts it with or without the space.
  */
 internal fun partyCodeShown(code: String): String = code.chunked(PARTY_CODE_HALF).joinToString(" ")
+
+/**
+ * Puts the party's [code] on the clipboard, under [label], as stored: without the space. Android 13
+ * and later confirm a copy themselves; earlier versions show nothing, so this says so with a toast.
+ */
+private fun copyPartyCode(context: Context, label: String, code: String) {
+  context
+      .getSystemService(ClipboardManager::class.java)
+      ?.setPrimaryClip(ClipData.newPlainText(label, code))
+  if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
+    Toast.makeText(context, R.string.quest_detail_party_code_copied, Toast.LENGTH_SHORT).show()
+  }
+}
 
 /** Opens the phone's share sheet, titled [title], with [message] to send to friends. */
 private fun sharePartyCode(context: Context, title: String, message: String) {
@@ -598,7 +649,7 @@ private fun ProofCard(proofType: ProofType) {
   }
 }
 
-/** How close to the venue the proof must be sent, on a map once the venue has a location. */
+/** How close to the quest's location, or else the venue's, the proof must be sent, on a map. */
 @Composable
 private fun RadiusCard(state: VenuePageUiState, quest: VenuePageQuest) {
   Card(
@@ -607,7 +658,7 @@ private fun RadiusCard(state: VenuePageUiState, quest: VenuePageQuest) {
       trailing = stringResource(R.string.quest_detail_radius_meters, quest.radiusMeters),
       trailingTag = C.Tag.QUEST_DETAIL_RADIUS,
   ) {
-    state.venueLocation?.let { location ->
+    (quest.location ?: state.venueLocation)?.let { location ->
       StillRadiusMap(
           location,
           quest.radiusMeters,
@@ -639,7 +690,10 @@ private fun Card(
     content: @Composable ColumnScope.() -> Unit,
 ) {
   Column(
-      Modifier.fillMaxWidth().clip(CARD_SHAPE).background(container).padding(AroundSpacing.Large),
+      Modifier.fillMaxWidth()
+          .clip(AroundShapes.large)
+          .background(container)
+          .padding(AroundSpacing.Large),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
   ) {
     Row(
@@ -711,7 +765,6 @@ internal fun rewardDetails(reward: Reward?): String? =
 private const val EXPIRY_SKELETON = "yMMMd"
 
 private val AVATAR_SIZE = 44.dp
-private val CARD_SHAPE = RoundedCornerShape(20.dp)
 private val CARD_ICON_SIZE = 14.dp
 private val TEXT_GAP = 2.dp
 private val SEAT_SIZE = 36.dp
@@ -720,15 +773,13 @@ private val SEAT_RING = 1.5.dp
 private val SEAT_DASH = 4.dp
 private val PROOF_TILE_SIZE = 40.dp
 private val PROOF_ICON_SIZE = 20.dp
-private val PROOF_STATUS_SHAPE = RoundedCornerShape(22.dp)
 private val PROOF_STATUS_BORDER = 1.5.dp
 private val PROOF_STATUS_TILE_SIZE = 44.dp
 private val PROOF_STATUS_ICON_SIZE = 22.dp
 private val PROOF_STATUS_DOT_SIZE = 6.dp
 private val PARTY_CODE_CORNER = 16.dp
-private val PARTY_CODE_SHAPE = RoundedCornerShape(PARTY_CODE_CORNER)
 private val PARTY_CODE_BORDER = 1.dp
-private val PARTY_CODE_SHARE_SHAPE = RoundedCornerShape(14.dp)
+private val PARTY_CODE_COPY_ICON_SIZE = 20.dp
 private val PARTY_CODE_SHARE_ICON_SIZE = 18.dp
 /** How many characters each half of a shown party code has. */
 private const val PARTY_CODE_HALF = PARTY_CODE_LENGTH / 2
@@ -777,12 +828,38 @@ internal fun QuestDetailsPartyCodePreview() {
   )
 }
 
+@Preview(name = "Proof sent by a member, light")
+@Preview(name = "Proof sent by a member, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+internal fun QuestDetailsSentByMemberPreview() {
+  QuestDetailsSample(
+      reservationIds = mapOf(SAMPLE_QUEST_ID to SAMPLE_RESERVATION_ID),
+      completions =
+          mapOf(
+              SAMPLE_RESERVATION_ID to
+                  Completion(
+                      id = "completion",
+                      reservationId = SAMPLE_RESERVATION_ID,
+                      venueId = "venue",
+                      explorerUid = "lea",
+                      proof = Proof.Photo("gs://proofs/fox.jpg"),
+                      status = CompletionStatus.PENDING,
+                      rejectReason = null,
+                      submittedAt = 0L,
+                  )
+          ),
+      acceptedParties = mapOf(SAMPLE_QUEST_ID to 3),
+      proofSenders = mapOf(SAMPLE_RESERVATION_ID to ProofSender("Lea")),
+  )
+}
+
 @Composable
 private fun QuestDetailsSample(
     reservationIds: Map<String, String> = emptyMap(),
     completions: Map<String, Completion> = emptyMap(),
     acceptedParties: Map<String, Int> = emptyMap(),
     partyCodes: Map<String, String> = emptyMap(),
+    proofSenders: Map<String, ProofSender> = emptyMap(),
 ) {
   val quest =
       VenuePageQuest(
@@ -809,6 +886,7 @@ private fun QuestDetailsSample(
             completions = completions,
             acceptedParties = acceptedParties,
             partyCodes = partyCodes,
+            proofSenders = proofSenders,
         ),
         quest,
         onBack = {},

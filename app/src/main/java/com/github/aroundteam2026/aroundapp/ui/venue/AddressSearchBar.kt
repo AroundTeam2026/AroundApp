@@ -1,10 +1,10 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,16 +17,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -41,20 +42,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.address.AddressSuggestion
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundFonts
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 // The Figma "Search" field and "Search results" card of the explorer search, in the second draft
 private val FIELD_HEIGHT = 44.dp
@@ -65,7 +66,6 @@ private val FIELD_ICON = 20.dp
 private val CLEAR_SIZE = 22.dp
 private val FIELD_SHADOW = 10.dp
 private val CARD_GAP = 18.dp
-private val CARD_RADIUS = 16.dp
 private val ROW_HORIZONTAL_PADDING = 14.dp
 private val ROW_VERTICAL_PADDING = 10.dp
 private val ROW_GAP = 12.dp
@@ -76,11 +76,6 @@ private val HAIRLINE = 1.dp
 
 /** How visible a suggestion from the previous query stays while the next search runs. */
 private const val STALE_ALPHA = 0.5f
-
-private val QUERY_STYLE = TextStyle(fontFamily = AroundFonts.Body, fontSize = 15.sp)
-private val TITLE_STYLE =
-    TextStyle(fontFamily = AroundFonts.Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-private val SUBTITLE_STYLE = TextStyle(fontFamily = AroundFonts.Body, fontSize = 13.sp)
 
 /**
  * The colours of the address search, from the Figma tokens.
@@ -108,38 +103,28 @@ data class AddressSearchColors(
     val shadow: Color,
 )
 
-/** The address search's default colours: the Figma second draft's, light and dark. */
+/** The address search's default colours. */
 object AddressSearchDefaults {
-  // The light tokens the app's colours already hold; the tile's teal is the second draft's
-  // "tertiary", lighter than AroundColors.Teal, which came from the first draft
-  private val LIGHT =
-      AddressSearchColors(
-          surface = AroundColors.Paper,
-          outline = AroundColors.Purple,
-          ink = AroundColors.Ink,
-          muted = AroundColors.InkMuted,
-          line = AroundColors.Line,
-          avatar = AroundColors.Tertiary,
-          onAvatar = AroundColors.Cream,
-          highlight = AroundColors.Purple,
-          shadow = AroundColors.AddressShadow,
-      )
-
-  // Figma uses the dark mode's ink colour for its accent text.
-  private val DARK =
-      LIGHT.copy(
-          surface = AroundColors.DarkSurface,
-          ink = AroundColors.Cream,
-          muted = AroundColors.DarkMuted,
-          line = AroundColors.DarkLine,
-          highlight = AroundColors.Cream,
-      )
-
-  /** The colours for dark mode when [darkTheme], else for light mode. */
-  fun colors(darkTheme: Boolean): AddressSearchColors = if (darkTheme) DARK else LIGHT
-
-  /** The colours for the system's light or dark mode. */
-  @Composable fun colors(): AddressSearchColors = colors(isSystemInDarkTheme())
+  /**
+   * The theme's colours, light or dark: its surface, ink and accents. Figma uses the dark mode's
+   * ink colour for the accent text.
+   */
+  @Composable
+  @ReadOnlyComposable
+  fun colors(): AddressSearchColors {
+    val scheme = MaterialTheme.colorScheme
+    return AddressSearchColors(
+        surface = scheme.surface,
+        outline = scheme.primary,
+        ink = scheme.onSurface,
+        muted = scheme.onSurfaceVariant,
+        line = scheme.outline,
+        avatar = scheme.tertiary,
+        onAvatar = scheme.onTertiary,
+        highlight = AroundTheme.colors.accentText,
+        shadow = AroundColors.AddressShadow,
+    )
+  }
 }
 
 /**
@@ -188,7 +173,7 @@ fun AddressSearchBar(
             Modifier.testTag(C.Tag.VENUE_ADDRESS_STATUS)
                 .padding(horizontal = ROW_HORIZONTAL_PADDING, vertical = ROW_VERTICAL_PADDING),
             color = colors.muted,
-            style = SUBTITLE_STYLE,
+            style = AroundTextStyles.Caption,
         )
       }
     }
@@ -216,12 +201,12 @@ private fun SearchField(
     onClear: () -> Unit,
     colors: AddressSearchColors,
 ) {
-  val shape = RoundedCornerShape(FIELD_HEIGHT / 2)
+  val shape = AroundPillShape
   BasicTextField(
       value = query,
       onValueChange = onQueryChange,
       modifier = Modifier.testTag(C.Tag.VENUE_ADDRESS_FIELD).fillMaxWidth(),
-      textStyle = QUERY_STYLE.copy(color = colors.ink),
+      textStyle = AroundTextStyles.Body.copy(color = colors.ink),
       singleLine = true,
       cursorBrush = SolidColor(colors.outline),
       keyboardOptions =
@@ -260,7 +245,7 @@ private fun SearchField(
               Text(
                   placeholder,
                   color = colors.muted,
-                  style = QUERY_STYLE,
+                  style = AroundTextStyles.Body,
                   maxLines = 1,
                   overflow = TextOverflow.Ellipsis,
               )
@@ -299,7 +284,7 @@ private fun ResultsCard(
     modifier: Modifier,
     content: @Composable () -> Unit,
 ) {
-  val shape = RoundedCornerShape(CARD_RADIUS)
+  val shape = AroundShapes.medium
   Column(
       modifier
           .testTag(C.Tag.VENUE_ADDRESS_RESULTS)
@@ -353,7 +338,7 @@ private fun SuggestionRow(
           highlighted(suggestion.title, query, colors.highlight),
           Modifier.testTag(C.Tag.VENUE_ADDRESS_RESULT_TITLE),
           color = colors.ink,
-          style = TITLE_STYLE,
+          style = AroundTextStyles.Subtitle,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
       )
@@ -362,7 +347,7 @@ private fun SuggestionRow(
         Text(
             it,
             color = colors.muted,
-            style = SUBTITLE_STYLE,
+            style = AroundTextStyles.Caption,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
@@ -47,6 +48,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   now complete.
  * @property completions The proofs of the explorer's parties, whichever member sent them, by
  *   reservation id.
+ * @property proofSenders The other members who sent some of [completions], by reservation id; a
+ *   proof the explorer sent themselves isn't in it.
  * @property proofsAvailable False once those proofs can't be read, since then the page can't tell
  *   if one was sent and so doesn't offer to send one.
  * @property partyCodes The party codes of the reservations the explorer created and friends can
@@ -74,6 +77,7 @@ data class VenuePageUiState(
     val acceptAvailable: Boolean = true,
     val approvedIds: Set<String> = emptySet(),
     val completions: Map<String, Completion> = emptyMap(),
+    val proofSenders: Map<String, ProofSender> = emptyMap(),
     val proofsAvailable: Boolean = true,
     val partyCodes: Map<String, String> = emptyMap(),
     val partyMembers: Map<String, List<PartyMemberUi>> = emptyMap(),
@@ -121,9 +125,13 @@ data class VenuePageUiState(
       it in approvedIds && proofsAvailable && it !in completions
     }
 
-  /** The proof the explorer sent for the picked quest, or null when there is none. */
+  /** The party's proof for the picked quest, or null when there is none. */
   val proof: Completion?
     get() = selectedQuestId?.let(reservationIds::get)?.let(completions::get)
+
+  /** Who sent [proof], when another member of the party did; null when the explorer did. */
+  val proofSender: ProofSender?
+    get() = selectedQuestId?.let(reservationIds::get)?.let(proofSenders::get)
 
   /**
    * The code the explorer shares so friends can join their party for the picked quest: only for a
@@ -276,7 +284,8 @@ enum class VenuePageStatus {
  * @property minPartySize How many people the quest needs at least.
  * @property reward The quest's reward, or null when it has none.
  * @property exactPartySize Whether the party must have exactly [minPartySize] people.
- * @property radiusMeters How close to the venue explorers must be to send their proof.
+ * @property radiusMeters How close to [location] explorers must be to send their proof.
+ * @property location Where the quest takes place, or null when at the venue.
  * @property partyCapacity The most explorers its party can have, as `Quest.partyCapacity`.
  */
 data class VenuePageQuest(
@@ -289,5 +298,6 @@ data class VenuePageQuest(
     val reward: Reward?,
     val exactPartySize: Boolean = false,
     val radiusMeters: Int = QuestLimits.DEFAULT_RADIUS_METERS,
+    val location: Location? = null,
     val partyCapacity: Int = MAX_PARTY_SIZE,
 )

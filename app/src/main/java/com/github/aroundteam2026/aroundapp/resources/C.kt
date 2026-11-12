@@ -8,6 +8,16 @@ package com.github.aroundteam2026.aroundapp.resources
 object C {
   /** Test tags that UI tests use to find composables. */
   object Tag {
+    const val PROFILE_SETUP_LOADING = "profile_setup_loading"
+    const val PROFILE_SETUP_SCREEN = "profile_setup_screen"
+    const val PROFILE_SETUP_AVATAR = "profile_setup_avatar"
+    const val PROFILE_SETUP_ADD_PHOTO = "profile_setup_add_photo"
+    const val PROFILE_SETUP_NAME = "profile_setup_name"
+    const val PROFILE_SETUP_ERROR = "profile_setup_error"
+    const val PROFILE_SETUP_CONTINUE = "profile_setup_continue"
+    const val PROFILE_EDIT_ACTION = "profile_edit_action"
+    const val PROFILE_EDIT_BACK = "profile_edit_back"
+    const val PROFILE_EDIT_REMOVE_PHOTO = "profile_edit_remove_photo"
     const val ROLE_PROFILE_ERROR = "role_profile_error"
     const val ROLE_PROFILE_SIGN_OUT = "role_profile_sign_out"
     const val ROLE_PROFILE_RETRY = "role_profile_retry"
@@ -273,6 +283,7 @@ object C {
     const val OVERVIEW_ROW_PARTY = "overview_row_party"
     const val OVERVIEW_ROW_STATUS = "overview_row_status"
     const val OVERVIEW_JOIN_PARTY = "overview_join_party"
+    const val OVERVIEW_SEND_NEW_PROOF = "overview_send_new_proof"
     const val CANCEL_RESERVATION = "cancel_reservation"
     const val CANCEL_RESERVATION_FAILED = "cancel_reservation_failed"
     const val CANCEL_RESERVATION_DIALOG = "cancel_reservation_dialog"

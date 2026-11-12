@@ -21,9 +21,12 @@ import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
@@ -31,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -417,6 +421,62 @@ class VenuePageAcceptTest {
     assertNull(state.cancellableReservationId)
   }
 
+  /** The quest "a", approved, with the party's proof sent by [sender]; returns the proof's id. */
+  private suspend fun proofOfAnApprovedQuestBy(sender: String): String {
+    val id = storeFor("a")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    return completions.submit(id, VENUE_ID, sender, Proof.Photo("gs://proofs/fox")).getOrThrow()
+  }
+
+  // As the Figma frame "Quest details · proof sent by a member": "Lea sent your party's proof"
+  @Test
+  fun aProofSentByAnotherMemberNamesThemAndFollowsARename() = test {
+    users.createUser(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L)).getOrThrow()
+    proofOfAnApprovedQuestBy(FRIEND)
+    openAndPick("a")
+    assertEquals(ProofSender("Lea"), state.proofSender)
+
+    users.updateProfile(FRIEND, "Lea M.", pictureUrl = null).getOrThrow()
+    runCurrent()
+    assertEquals(ProofSender("Lea M."), state.proofSender)
+  }
+
+  @Test
+  fun theExplorersOwnProofNamesNoOne() = test {
+    proofOfAnApprovedQuestBy(EXPLORER)
+    openAndPick("a")
+
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertNull(state.proofSender)
+  }
+
+  // A profile only names the sender: one that can't be read leaves the proof shown, unnamed
+  @Test
+  fun aSenderWithoutAProfileIsLeftUnnamed() = test {
+    proofOfAnApprovedQuestBy(FRIEND)
+    openAndPick("a")
+
+    assertTrue(state.proofsAvailable)
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertEquals(ProofSender(null), state.proofSender)
+  }
+
+  // Every member sees the venue's answer to the party's proof, and its reason, whoever sent it
+  @Test
+  fun theVenuesAnswerToAnotherMembersProofShows() = test {
+    val proof = proofOfAnApprovedQuestBy(FRIEND)
+    openAndPick("a")
+
+    completions.reject(proof, "The fox isn't in the photo").getOrThrow()
+    runCurrent()
+    assertEquals(CompletionStatus.REJECTED, state.proof?.status)
+    assertEquals("The fox isn't in the photo", state.proof?.rejectReason)
+
+    completions.approve(proof).getOrThrow()
+    runCurrent()
+    assertEquals(CompletionStatus.APPROVED, state.proof?.status)
+  }
+
   // Only an approved party has a proof, and the rules may refuse listening to the proof of a
   // party just joined, before the server has the membership
   @Test
@@ -479,6 +539,42 @@ class VenuePageAcceptTest {
 
     assertFalse(state.proofsAvailable)
     assertEquals(CompletionStatus.PENDING, state.proof?.status)
+  }
+
+  // A profile can take a while offline: the proof shows at once, as a member's, and names them
+  // once it arrives
+  @Test
+  fun theProofDoesntWaitForItsSendersProfile() = test {
+    val lea = MutableSharedFlow<User?>(extraBufferCapacity = 1)
+    userRepository =
+        object : UserRepository by users {
+          override fun observeUser(uid: String): Flow<User?> =
+              if (uid == FRIEND) lea else users.observeUser(uid)
+        }
+    proofOfAnApprovedQuestBy(FRIEND)
+    openAndPick("a")
+    assertEquals(CompletionStatus.PENDING, state.proof?.status)
+    assertEquals(ProofSender(null), state.proofSender)
+
+    lea.tryEmit(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L))
+    runCurrent()
+    assertEquals(ProofSender("Lea"), state.proofSender)
+  }
+
+  // The proof stays shown while its listener is down, so its sender stays named with it
+  @Test
+  fun theSenderOfAProofShownBeforeTheListenerBrokeStaysNamed() = test {
+    users.createUser(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L)).getOrThrow()
+    val proof = proofOfAnApprovedQuestBy(FRIEND)
+    val sent = completions.observeForReservation(proof).first()
+    completionRepository = FailingCompletionsRepository(completions, shownFirst = sent)
+    openAndPick("a")
+    assertEquals(ProofSender("Lea"), state.proofSender)
+
+    advanceTimeBy(FAILS_AFTER_MS + 1)
+
+    assertFalse(state.proofsAvailable)
+    assertEquals(ProofSender("Lea"), state.proofSender)
   }
 
   @Test
@@ -989,6 +1085,7 @@ class VenuePageAcceptTest {
     const val OTHER_VENUE_ID = "bakery"
     const val OTHER_QUEST_ID = "bread"
     const val EXPLORER = "explorer"
+    const val FRIEND = "friend"
     const val NAME = TEST_EXPLORER_NAME
     const val START = 1_800_000_000_000L
   }

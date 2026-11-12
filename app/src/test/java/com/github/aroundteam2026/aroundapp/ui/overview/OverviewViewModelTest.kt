@@ -21,14 +21,20 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
+import com.github.aroundteam2026.aroundapp.model.user.Role
+import com.github.aroundteam2026.aroundapp.model.user.User
+import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -40,6 +46,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -53,6 +60,7 @@ class OverviewViewModelTest {
   private val reservations = FakeReservationRepository({ now }, party)
   private val listener = BreakableReservations(reservations)
   private val completions = FakeCompletionRepository { now }
+  private val users = FakeUserRepository()
 
   private val venues =
       FakeVenueRepository(
@@ -77,7 +85,7 @@ class OverviewViewModelTest {
   }
 
   private val viewModel by lazy {
-    OverviewViewModel(EXPLORER, listener, questRepository, venues, party, completions)
+    OverviewViewModel(EXPLORER, listener, questRepository, venues, party, completions, users)
   }
 
   private val state
@@ -389,7 +397,7 @@ class OverviewViewModelTest {
           }
         }
     val viewModel =
-        OverviewViewModel(EXPLORER, listener, questRepository, broken, party, completions)
+        OverviewViewModel(EXPLORER, listener, questRepository, broken, party, completions, users)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
@@ -405,7 +413,7 @@ class OverviewViewModelTest {
           }
         }
     val viewModel =
-        OverviewViewModel(EXPLORER, listener, questRepository, venues, broken, completions)
+        OverviewViewModel(EXPLORER, listener, questRepository, venues, broken, completions, users)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
@@ -420,7 +428,8 @@ class OverviewViewModelTest {
               reservationIds: Collection<String>
           ): Flow<List<Completion>> = flow { throw IOException("denied") }
         }
-    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, party, broken)
+    val viewModel =
+        OverviewViewModel(EXPLORER, listener, questRepository, venues, party, broken, users)
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
@@ -443,7 +452,8 @@ class OverviewViewModelTest {
             return completions.observeForReservations(reservationIds)
           }
         }
-    val viewModel = OverviewViewModel(EXPLORER, listener, questRepository, venues, party, recording)
+    val viewModel =
+        OverviewViewModel(EXPLORER, listener, questRepository, venues, party, recording, users)
     runCurrent()
 
     assertEquals(
@@ -480,6 +490,112 @@ class OverviewViewModelTest {
     val row = state.rows.single()
     assertEquals(OverviewRowStatus.PROOF_SENT, row.status)
     assertFalse(row.status.cancellable)
+  }
+
+  // As the Figma frame "Quests tab · Send new proof": "Proof sent by Lea"
+  @Test
+  fun aProofSentByAnotherMemberNamesThemAndFollowsARename() = test {
+    users.createUser(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L)).getOrThrow()
+    sendProof(approvedReservation(), sender = FRIEND)
+    viewModel
+    runCurrent()
+    assertEquals(ProofSender("Lea"), state.rows.single().proofSender)
+
+    users.updateProfile(FRIEND, "Lea M.", pictureUrl = null).getOrThrow()
+    runCurrent()
+    assertEquals(ProofSender("Lea M."), state.rows.single().proofSender)
+  }
+
+  @Test
+  fun theExplorersOwnProofNamesNoOne() = test {
+    sendProof(approvedReservation())
+    viewModel
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.PROOF_SENT, state.rows.single().status)
+    assertNull(state.rows.single().proofSender)
+  }
+
+  // A profile only names the sender: one that can't be read leaves them unnamed, not the row failed
+  @Test
+  fun aSenderWithoutAProfileIsLeftUnnamed() = test {
+    sendProof(approvedReservation(), sender = FRIEND)
+    viewModel
+    runCurrent()
+
+    assertEquals(OverviewStatus.LOADED, state.status)
+    assertEquals(ProofSender(null), state.rows.single().proofSender)
+  }
+
+  // A blank name would read "Proof sent by ", so it counts as no name
+  @Test
+  fun aSenderWithABlankNameIsLeftUnnamed() = test {
+    users.createUser(User(FRIEND, " ", Role.EXPLORER, createdAt = 0L)).getOrThrow()
+    sendProof(approvedReservation(), sender = FRIEND)
+    viewModel
+    runCurrent()
+
+    assertEquals(ProofSender(null), state.rows.single().proofSender)
+  }
+
+  // A profile can take a while offline: the rows show at once, and name the sender once it arrives
+  @Test
+  fun theRowsDontWaitForTheSendersProfile() = test {
+    val lea = MutableSharedFlow<User?>(extraBufferCapacity = 1)
+    sendProof(approvedReservation(), sender = FRIEND)
+    val viewModel = viewModelWithProfileOf(FRIEND, lea)
+    runCurrent()
+    assertEquals(OverviewRowStatus.PROOF_SENT, viewModel.uiState.value.rows.single().status)
+    assertEquals(ProofSender(null), viewModel.uiState.value.rows.single().proofSender)
+
+    lea.tryEmit(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L))
+    runCurrent()
+    assertEquals(ProofSender("Lea"), viewModel.uiState.value.rows.single().proofSender)
+  }
+
+  // Waiting for the profile again after another proof mustn't drop the name already shown
+  @Test
+  fun aNamedSenderStaysNamedWhenTheProofsChange() = test {
+    val lea = MutableSharedFlow<User?>(extraBufferCapacity = 1)
+    val id = approvedReservation()
+    val other = approvedReservation("cake")
+    sendProof(id, sender = FRIEND)
+    val viewModel = viewModelWithProfileOf(FRIEND, lea)
+    runCurrent()
+    lea.tryEmit(User(FRIEND, "Lea", Role.EXPLORER, createdAt = 0L))
+    runCurrent()
+
+    sendProof(other)
+    runCurrent()
+
+    val row = viewModel.uiState.value.rows.single { it.reservationId == id }
+    assertEquals(ProofSender("Lea"), row.proofSender)
+  }
+
+  /**
+   * The ViewModel, with the profile of [sender] coming only from [profile], which never replays.
+   */
+  private fun viewModelWithProfileOf(sender: String, profile: Flow<User?>): OverviewViewModel {
+    val slow =
+        object : UserRepository by users {
+          override fun observeUser(uid: String): Flow<User?> =
+              if (uid == sender) profile else users.observeUser(uid)
+        }
+    return OverviewViewModel(EXPLORER, listener, questRepository, venues, party, completions, slow)
+  }
+
+  // Every member sees the venue's answer to the party's proof, whoever sent it
+  @Test
+  fun theVenuesAnswerToAnotherMembersProofShows() = test {
+    val proof = sendProof(approvedReservation(), sender = FRIEND)
+    viewModel
+    completions.reject(proof, "The fox isn't in the photo").getOrThrow()
+    runCurrent()
+    assertEquals(OverviewRowStatus.PROOF_REJECTED, state.rows.single().status)
+
+    completions.approve(proof).getOrThrow()
+    runCurrent()
+    assertEquals(OverviewRowStatus.COMPLETED, state.rows.single().status)
   }
 
   @Test
@@ -559,6 +675,7 @@ class OverviewViewModelTest {
 
   private companion object {
     const val EXPLORER = "explorer"
+    const val FRIEND = "friend"
     const val CAFE = "cafe"
     const val BAKERY = "bakery"
     const val START = 1_800_000_000_000L

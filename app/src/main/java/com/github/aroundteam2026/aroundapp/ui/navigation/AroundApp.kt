@@ -106,9 +106,10 @@ fun AroundApp(
             onJoinParty: () -> Unit,
         ) -> Unit =
         { onOpenQuest, onJoinParty ->
-          OverviewScreen(explorerUid, onOpenQuest, onJoinParty)
+          OverviewScreen(explorerUid, onOpenQuest, onJoinParty, navController::navigateToCompletion)
         },
-    screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, onSignOut) },
+    profileScreen: @Composable () -> Unit = { ProfileScreen(onSignOut) },
+    screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, profileScreen) },
 ) {
   BottomTabScaffold(
       tabs = Tab.entries,
@@ -154,7 +155,7 @@ internal fun NavHostController.openVenue(venueId: String, questId: String? = nul
  *   on it when its row in the overview is, and the Join a party screen from the overview.
  * @param overview draws the Quests tab's overview, given what opens a quest's details and the Join
  *   a party screen.
- * @param onSignOut signs the user out from the Profile tab.
+ * @param profileScreen draws the Profile tab.
  */
 @Composable
 private fun TabScreen(
@@ -166,7 +167,7 @@ private fun TabScreen(
             onOpenQuest: (venueId: String, questId: String) -> Unit,
             onJoinParty: () -> Unit,
         ) -> Unit,
-    onSignOut: () -> Unit,
+    profileScreen: @Composable () -> Unit,
 ) =
     when (tab) {
       Tab.MAP -> MapScreen(onOpenVenue = navController::openVenueFromMap)
@@ -175,5 +176,5 @@ private fun TabScreen(
           Box(Modifier.fillMaxSize().testTag(tab.screenTag)) {
             overview(navController::openVenue, navController::navigateToJoinParty)
           }
-      Tab.PROFILE -> ProfileScreen(onSignOut)
+      Tab.PROFILE -> profileScreen()
     }

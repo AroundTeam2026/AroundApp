@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,8 +18,11 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -43,6 +47,8 @@ import org.robolectric.shadows.ShadowSettings
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "en-w413dp-h917dp-mdpi")
 class OverviewQuestRowTest {
+  private val app = ApplicationProvider.getApplicationContext<Application>()
+
   @get:Rule val compose = createComposeRule()
 
   private var clicks = 0
@@ -108,6 +114,27 @@ class OverviewQuestRowTest {
           status(text).assertIsDisplayed()
           status("APPROVED").assertDoesNotExist()
         }
+  }
+
+  // The Figma frame "Quests tab · Send new proof": "Proof sent by Lea"; unnamed, it stays "Proof
+  // sent"
+  @Test
+  fun aProofAnotherMemberSentNamesThem() {
+    var sender by mutableStateOf<ProofSender?>(ProofSender("Lea"))
+    compose.setContent {
+      AroundAppTheme {
+        OverviewQuestRow(
+            row(status = OverviewRowStatus.PROOF_SENT).copy(proofSender = sender),
+            onClick = {},
+            clock = CLOCK,
+        )
+      }
+    }
+    status(app.getString(R.string.overview_status_proof_sent_by, "Lea").uppercase())
+        .assertIsDisplayed()
+
+    sender = ProofSender(null)
+    status(app.getString(R.string.overview_status_proof_sent).uppercase()).assertIsDisplayed()
   }
 
   @Test

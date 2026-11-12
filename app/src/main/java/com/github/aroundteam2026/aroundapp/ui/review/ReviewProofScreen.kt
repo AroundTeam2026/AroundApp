@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.review
 
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -72,6 +72,7 @@ import com.github.aroundteam2026.aroundapp.ui.proof.ProofPhotoViewer
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.quest.rewardText
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -293,7 +294,7 @@ private fun sentText(partySize: Int, sentAt: Long, now: Long): String {
 @Composable
 private fun Quest(title: String?, requirements: String?) {
   Surface(
-      shape = CARD_SHAPE,
+      shape = AroundCorners.Card,
       color = AroundTheme.colors.panel,
       contentColor = MaterialTheme.colorScheme.onSurface,
   ) {
@@ -334,7 +335,7 @@ private fun PhotoProof(
   Box(
       Modifier.fillMaxWidth()
           .height(PHOTO_HEIGHT)
-          .clip(PHOTO_SHAPE)
+          .clip(AroundCorners.Photo)
           .background(AroundTheme.colors.sage)
           .testTag(C.Tag.REVIEW_PROOF_PHOTO),
       contentAlignment = Alignment.Center,
@@ -450,7 +451,7 @@ private fun PhotoPlaceholder(onRetry: (() -> Unit)?) {
 @Composable
 private fun AnswerProof(answer: String) {
   Surface(
-      shape = CARD_SHAPE,
+      shape = AroundCorners.Card,
       color = MaterialTheme.colorScheme.surface,
       contentColor = MaterialTheme.colorScheme.onSurface,
       border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -556,8 +557,6 @@ private val AVATAR_SIZE = 44.dp
 private val AVATAR_STYLE = AroundTextStyles.AvatarSmall.copy(fontSize = 16.sp)
 private val NAME_GAP = 2.dp
 private val TAG_VERTICAL_PADDING = 5.dp
-private val CARD_SHAPE = RoundedCornerShape(18.dp)
-private val PHOTO_SHAPE = RoundedCornerShape(22.dp)
 private val PHOTO_HEIGHT = 300.dp
 private val PLACEHOLDER_ICON_SIZE = 40.dp
 private val ZOOM_ICON_SIZE = 16.dp

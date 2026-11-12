@@ -7,6 +7,7 @@ import android.icu.text.DateFormat as IcuDateFormat
 import android.icu.util.TimeZone as IcuTimeZone
 import android.text.format.DateFormat
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,11 +15,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -41,6 +43,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
@@ -51,6 +54,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
@@ -68,13 +72,16 @@ import java.util.TimeZone
  * One accepted quest in the overview, as the Figma card `Overview/Quest card` (after the active
  * quest card of F3): where the reservation stands and its slot, then the venue's avatar, the
  * quest's title, the venue's name and address, the party size and the reward chip. Tapping it opens
- * the venue's page. With [onCancel], it ends with a button to cancel the reservation.
+ * the venue's page. With [onCancel], it ends with a button to cancel the reservation, and with
+ * [onSendNewProof], with one to send a new proof.
  *
  * @param row The accepted quest to draw.
  * @param onClick Opens the venue's page, or null for a card that can't be tapped.
  * @param clock Tells which day is today, and the time zone the slot is written in.
  * @param cancelStatus How cancelling this reservation stands, which the cancel button shows.
  * @param onCancel Cancels the reservation, or null to draw no cancel button.
+ * @param onSendNewProof Opens the proof form to replace the party's proof, or null to draw no
+ *   button.
  */
 @Composable
 fun OverviewQuestRow(
@@ -84,6 +91,7 @@ fun OverviewQuestRow(
     clock: Clock = Clock.systemDefaultZone(),
     cancelStatus: CancelStatus = CancelStatus.NONE,
     onCancel: (() -> Unit)? = null,
+    onSendNewProof: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
   Column(
@@ -91,11 +99,11 @@ fun OverviewQuestRow(
           .fillMaxWidth()
           .shadow(
               CARD_ELEVATION,
-              CARD_SHAPE,
+              AroundShapes.extraLarge,
               ambientColor = AroundColors.CardShadow,
               spotColor = AroundColors.CardShadow,
           )
-          .clip(CARD_SHAPE)
+          .clip(AroundShapes.extraLarge)
           .background(colors.surface)
           .then(
               if (onClick == null) Modifier
@@ -114,7 +122,7 @@ fun OverviewQuestRow(
         horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-      Status(row.status, Modifier.weight(1f))
+      Status(row.status, row.proofSender, Modifier.weight(1f))
       Slot(row.slotStart, clock)
     }
     Row(
@@ -158,18 +166,38 @@ fun OverviewQuestRow(
           tint = colors.onSurfaceVariant,
       )
     }
+    if (onSendNewProof != null) NewProofButton(onSendNewProof)
     if (onCancel != null) CancelReservationAction(cancelStatus, row.venueName, onCancel)
+  }
+}
+
+/** The outlined pill at the foot of a card whose proof the party can still replace. */
+@Composable
+private fun NewProofButton(onClick: () -> Unit) {
+  OutlinedButton(
+      onClick,
+      Modifier.fillMaxWidth()
+          .heightIn(min = NEW_PROOF_MIN_HEIGHT)
+          .testTag(C.Tag.OVERVIEW_SEND_NEW_PROOF),
+      shape = AroundPillShape,
+      border = BorderStroke(NEW_PROOF_BORDER, MaterialTheme.colorScheme.onPrimaryContainer),
+  ) {
+    Text(
+        stringResource(R.string.send_new_proof),
+        style = AroundTextStyles.Button,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
   }
 }
 
 /**
  * Where the reservation stands, in small capitals, as in the Figma frames of the Quests tab: a
  * muted dot and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then,
- * for the proof, an accent dot and "Proof sent", a check and "Completed", or a red dot and "Proof
- * rejected".
+ * for the proof, an accent dot and "Proof sent", or "Proof sent by Lea" when [sender] Lea sent the
+ * party's proof, a check and "Completed", or a red dot and "Proof rejected".
  */
 @Composable
-private fun Status(status: OverviewRowStatus, modifier: Modifier) {
+private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Modifier) {
   val colors = MaterialTheme.colorScheme
   Row(
       modifier.testTag(C.Tag.OVERVIEW_ROW_STATUS),
@@ -180,27 +208,30 @@ private fun Status(status: OverviewRowStatus, modifier: Modifier) {
         when (status) {
           OverviewRowStatus.WAITING -> {
             Dot(colors.onSurfaceVariant)
-            R.string.overview_status_waiting to colors.onSurfaceVariant
+            stringResource(R.string.overview_status_waiting) to colors.onSurfaceVariant
           }
           OverviewRowStatus.APPROVED -> {
             Check()
-            R.string.overview_status_approved to colors.onSurface
+            stringResource(R.string.overview_status_approved) to colors.onSurface
           }
           OverviewRowStatus.PROOF_SENT -> {
             Dot(AroundTheme.colors.accentText)
-            R.string.overview_status_proof_sent to colors.onSurfaceVariant
+            val sent =
+                sender?.name?.let { stringResource(R.string.overview_status_proof_sent_by, it) }
+                    ?: stringResource(R.string.overview_status_proof_sent)
+            sent to colors.onSurfaceVariant
           }
           OverviewRowStatus.COMPLETED -> {
             Check()
-            R.string.overview_status_completed to colors.onSurface
+            stringResource(R.string.overview_status_completed) to colors.onSurface
           }
           OverviewRowStatus.PROOF_REJECTED -> {
             Dot(colors.error)
-            R.string.overview_status_proof_rejected to colors.error
+            stringResource(R.string.overview_status_proof_rejected) to colors.error
           }
         }
     Text(
-        stringResource(text).uppercase(currentLocale()),
+        text.uppercase(currentLocale()),
         color = color,
         style = AroundTextStyles.Label,
         maxLines = 1,
@@ -310,7 +341,6 @@ private const val DAY_SKELETON = "EEEdMMM"
 private const val HOURS_24 = "Hm"
 private const val HOURS_12 = "hm"
 private const val TITLE_MAX_LINES = 2
-private val CARD_SHAPE = RoundedCornerShape(28.dp)
 private val CARD_ELEVATION = 10.dp
 private val AVATAR_SIZE = 52.dp
 private val INFO_SPACING = 3.dp
@@ -321,6 +351,8 @@ private val CHECK_SIZE = 12.dp
 private val SLOT_VERTICAL_PADDING = 6.dp
 private val SLOT_ICON_SIZE = 14.dp
 private val DETAIL_ICON_SIZE = 13.dp
+private val NEW_PROOF_MIN_HEIGHT = 52.dp
+private val NEW_PROOF_BORDER = 1.dp
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)

@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
@@ -129,25 +130,12 @@ fun NearbyQuestPager(
 /** How the pager looks by default. */
 object NearbyQuestPagerDefaults {
   /**
-   * The quest card's chips and avatar, sized and set as in Figma. The pager sits on the app's
-   * surface rather than on a card of its own, so it takes the theme's colours, light or dark.
+   * The quest card's chips and avatar, sized and set as in Figma, in the theme's colours, light or
+   * dark.
    */
   @Composable
   fun style(): MarkerStyle {
-    val colors = MaterialTheme.colorScheme
     return MarkerDefaults.style(
-        colors =
-            MarkerDefaults.colors()
-                .copy(
-                    accent = colors.primary,
-                    onAccent = colors.onPrimary,
-                    secondary = colors.tertiary,
-                    onSecondary = colors.onTertiary,
-                    surface = colors.surface,
-                    onSurface = colors.onSurface,
-                    onSurfaceVariant = colors.onSurfaceVariant,
-                    outline = colors.outline,
-                ),
         typography =
             MarkerDefaults.typography()
                 .copy(

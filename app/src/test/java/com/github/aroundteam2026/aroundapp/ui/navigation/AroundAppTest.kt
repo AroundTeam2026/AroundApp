@@ -190,6 +190,7 @@ class AroundAppTest {
                 onRetry = {},
                 onCancel = {},
                 onJoinParty = onJoinParty,
+                onSendNewProof = { _, _ -> },
             )
           },
       )

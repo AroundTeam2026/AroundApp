@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +52,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -253,7 +254,7 @@ private fun Summary(state: VenueDashboardUiState, modifier: Modifier) {
 private fun RowScope.Stat(value: Int, @StringRes label: Int, color: Color, tag: String) {
   Column(
       Modifier.weight(1f)
-          .background(MaterialTheme.colorScheme.surface, STAT_SHAPE)
+          .background(MaterialTheme.colorScheme.surface, AroundCorners.Card)
           .padding(horizontal = AroundSpacing.InsetPadding, vertical = AroundSpacing.Medium),
       verticalArrangement = Arrangement.spacedBy(TEXT_GAP),
   ) {
@@ -368,7 +369,6 @@ private const val DAY_SKELETON = "EEEdMMM"
  */
 private const val PROOF_KEY_PREFIX = "proof:"
 private val TEXT_GAP = 2.dp
-private val STAT_SHAPE = RoundedCornerShape(18.dp)
 // Figma's counts are 26 sp, between the app's page and sheet titles
 private val STAT_STYLE = AroundTextStyles.PageTitle.copy(fontSize = 26.sp)
 private val BADGE_VERTICAL = 2.dp

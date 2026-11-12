@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -32,7 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,20 +50,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.ExperimentalTextApi
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 
@@ -109,249 +105,177 @@ fun VenueInitializationContent(
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-  MaterialTheme(
-      colorScheme = MaterialTheme.colorScheme,
-      shapes = MaterialTheme.shapes,
-      typography = VenueSetupTypography,
+  val keyboard = LocalSoftwareKeyboardController.current
+  val nameLabel = stringResource(R.string.venue_initialization_name)
+  BoxWithConstraints(
+      modifier
+          .fillMaxSize()
+          .background(MaterialTheme.colorScheme.background)
+          .safeDrawingPadding()
+          .imePadding()
+          .testTag(C.Tag.VENUE_INITIALIZATION_SCREEN)
   ) {
-    val keyboard = LocalSoftwareKeyboardController.current
-    val nameLabel = stringResource(R.string.venue_initialization_name)
-    BoxWithConstraints(
-        modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-            .imePadding()
-            .testTag(C.Tag.VENUE_INITIALIZATION_SCREEN)
+    Column(
+        Modifier.fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .heightIn(min = maxHeight)
+            .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 32.dp)
     ) {
-      Column(
-          Modifier.fillMaxWidth()
-              .verticalScroll(rememberScrollState())
-              .heightIn(min = maxHeight)
-              .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 32.dp)
+      Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(16.dp),
       ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-          if (onBack != null) {
-            Surface(
-                onClick = onBack,
-                enabled = !state.isSaving,
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.size(48.dp).testTag(C.Tag.VENUE_INITIALIZATION_BACK),
-            ) {
-              Box(contentAlignment = Alignment.Center) {
-                Image(
-                    painterResource(R.drawable.venue_setup_back),
-                    stringResource(R.string.back),
-                    Modifier.size(22.dp),
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
-                )
-              }
-            }
-          }
-          Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                stringResource(R.string.venue_initialization_step),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-              Box(
-                  Modifier.weight(1f)
-                      .height(4.dp)
-                      .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
-              )
-              Box(
-                  Modifier.weight(1f)
-                      .height(4.dp)
-                      .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(2.dp))
+        if (onBack != null) {
+          Surface(
+              onClick = onBack,
+              enabled = !state.isSaving,
+              shape = CircleShape,
+              color = MaterialTheme.colorScheme.surface,
+              border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+              modifier = Modifier.size(48.dp).testTag(C.Tag.VENUE_INITIALIZATION_BACK),
+          ) {
+            Box(contentAlignment = Alignment.Center) {
+              Image(
+                  painterResource(R.drawable.venue_setup_back),
+                  stringResource(R.string.back),
+                  Modifier.size(22.dp),
+                  colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
               )
             }
           }
         }
-        Spacer(Modifier.height(36.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text(
+              stringResource(R.string.venue_initialization_step),
+              style = AroundTextStyles.Helper,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                Modifier.weight(1f)
+                    .height(4.dp)
+                    .background(MaterialTheme.colorScheme.primary, AroundCorners.ProgressSegment)
+            )
+            Box(
+                Modifier.weight(1f)
+                    .height(4.dp)
+                    .background(MaterialTheme.colorScheme.outline, AroundCorners.ProgressSegment)
+            )
+          }
+        }
+      }
+      Spacer(Modifier.height(36.dp))
+      Text(
+          stringResource(R.string.venue_initialization_title),
+          style = MaterialTheme.typography.headlineLarge,
+          color = MaterialTheme.colorScheme.onBackground,
+          modifier = Modifier.semantics { heading() },
+      )
+      Spacer(Modifier.height(10.dp))
+      Text(
+          stringResource(R.string.venue_initialization_description),
+          style = MaterialTheme.typography.bodyLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Spacer(Modifier.height(28.dp))
+      Text(
+          stringResource(R.string.venue_initialization_name),
+          style = AroundTextStyles.FieldLabel,
+          color = MaterialTheme.colorScheme.onSurface,
+      )
+      Spacer(Modifier.height(8.dp))
+      OutlinedTextField(
+          value = state.businessName,
+          onValueChange = onNameChange,
+          enabled = state.canEditName,
+          singleLine = true,
+          isError =
+              state.error == VenueInitializationError.EMPTY_NAME ||
+                  state.error == VenueInitializationError.NAME_TOO_LONG,
+          placeholder = { Text(stringResource(R.string.venue_initialization_name_hint)) },
+          shape = AroundShapes.small,
+          textStyle = MaterialTheme.typography.bodyLarge,
+          colors =
+              aroundFieldColors(
+                  disabledContainerColor = MaterialTheme.colorScheme.surface,
+                  // Purple on cream, cream in dark mode, where purple barely shows
+                  focusedBorderColor = AroundTheme.colors.accentText,
+                  cursorColor = AroundTheme.colors.accentText,
+              ),
+          keyboardOptions =
+              KeyboardOptions(
+                  capitalization = KeyboardCapitalization.Words,
+                  imeAction = ImeAction.Done,
+              ),
+          keyboardActions =
+              KeyboardActions(
+                  onDone = {
+                    keyboard?.hide()
+                    onSubmit()
+                  }
+              ),
+          modifier =
+              Modifier.fillMaxWidth().testTag(C.Tag.VENUE_INITIALIZATION_NAME).semantics {
+                contentDescription = nameLabel
+              },
+      )
+      state.error?.let { error ->
+        val message =
+            when (error) {
+              VenueInitializationError.EMPTY_NAME ->
+                  stringResource(R.string.venue_initialization_empty_name)
+              VenueInitializationError.NAME_TOO_LONG ->
+                  pluralStringResource(
+                      R.plurals.venue_initialization_name_too_long,
+                      VenueLimits.MAX_NAME_LENGTH,
+                      VenueLimits.MAX_NAME_LENGTH,
+                  )
+              VenueInitializationError.SIGN_IN_REQUIRED ->
+                  stringResource(R.string.venue_initialization_sign_in_required)
+              VenueInitializationError.SAVE_FAILED ->
+                  stringResource(R.string.venue_initialization_save_failed)
+            }
         Text(
-            stringResource(R.string.venue_initialization_title),
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.semantics { heading() },
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            stringResource(R.string.venue_initialization_description),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(28.dp))
-        Text(
-            stringResource(R.string.venue_initialization_name),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = state.businessName,
-            onValueChange = onNameChange,
-            enabled = state.canEditName,
-            singleLine = true,
-            isError =
-                state.error == VenueInitializationError.EMPTY_NAME ||
-                    state.error == VenueInitializationError.NAME_TOO_LONG,
-            placeholder = { Text(stringResource(R.string.venue_initialization_name_hint)) },
-            shape = RoundedCornerShape(14.dp),
-            textStyle = MaterialTheme.typography.bodyLarge,
-            colors =
-                aroundFieldColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.surface,
-                    // Purple on cream, cream in dark mode, where purple barely shows
-                    focusedBorderColor = AroundTheme.colors.accentText,
-                    cursorColor = AroundTheme.colors.accentText,
-                ),
-            keyboardOptions =
-                KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Done,
-                ),
-            keyboardActions =
-                KeyboardActions(
-                    onDone = {
-                      keyboard?.hide()
-                      onSubmit()
-                    }
-                ),
+            message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium,
             modifier =
-                Modifier.fillMaxWidth().testTag(C.Tag.VENUE_INITIALIZATION_NAME).semantics {
-                  contentDescription = nameLabel
+                Modifier.padding(top = 8.dp).testTag(C.Tag.VENUE_INITIALIZATION_ERROR).semantics {
+                  liveRegion = LiveRegionMode.Polite
                 },
         )
-        state.error?.let { error ->
-          val message =
-              when (error) {
-                VenueInitializationError.EMPTY_NAME ->
-                    stringResource(R.string.venue_initialization_empty_name)
-                VenueInitializationError.NAME_TOO_LONG ->
-                    pluralStringResource(
-                        R.plurals.venue_initialization_name_too_long,
-                        VenueLimits.MAX_NAME_LENGTH,
-                        VenueLimits.MAX_NAME_LENGTH,
-                    )
-                VenueInitializationError.SIGN_IN_REQUIRED ->
-                    stringResource(R.string.venue_initialization_sign_in_required)
-                VenueInitializationError.SAVE_FAILED ->
-                    stringResource(R.string.venue_initialization_save_failed)
-              }
-          Text(
-              message,
-              color = MaterialTheme.colorScheme.error,
-              style = MaterialTheme.typography.bodyMedium,
-              modifier =
-                  Modifier.padding(top = 8.dp).testTag(C.Tag.VENUE_INITIALIZATION_ERROR).semantics {
-                    liveRegion = LiveRegionMode.Polite
-                  },
-          )
-        }
-        Spacer(Modifier.weight(1f).heightIn(min = 24.dp))
-        Button(
-            onClick = {
-              keyboard?.hide()
-              onSubmit()
-            },
-            enabled = state.canContinue,
-            shape = RoundedCornerShape(16.dp),
-            contentPadding =
-                androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 16.dp,
-                    vertical = 12.dp,
-                ),
-            colors = ButtonDefaults.buttonColors(),
-            modifier =
-                Modifier.fillMaxWidth()
-                    .heightIn(min = 54.dp)
-                    .testTag(C.Tag.VENUE_INITIALIZATION_CONTINUE),
-        ) {
-          Text(
-              stringResource(
-                  if (state.isSaving) R.string.venue_initialization_saving
-                  else R.string.venue_initialization_continue
+      }
+      Spacer(Modifier.weight(1f).heightIn(min = 24.dp))
+      Button(
+          onClick = {
+            keyboard?.hide()
+            onSubmit()
+          },
+          enabled = state.canContinue,
+          shape = AroundShapes.medium,
+          contentPadding =
+              androidx.compose.foundation.layout.PaddingValues(
+                  horizontal = 16.dp,
+                  vertical = 12.dp,
               ),
-              style = MaterialTheme.typography.bodyLarge,
-              fontWeight = FontWeight.SemiBold,
-          )
-        }
+          colors = ButtonDefaults.buttonColors(),
+          modifier =
+              Modifier.fillMaxWidth()
+                  .heightIn(min = 54.dp)
+                  .testTag(C.Tag.VENUE_INITIALIZATION_CONTINUE),
+      ) {
+        Text(
+            stringResource(
+                if (state.isSaving) R.string.venue_initialization_saving
+                else R.string.venue_initialization_continue
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
       }
     }
   }
 }
-
-@OptIn(ExperimentalTextApi::class)
-private val VenueBodyFont =
-    FontFamily(
-        Font(
-            R.font.venue_instrument_sans,
-            weight = FontWeight.Normal,
-            variationSettings =
-                FontVariation.Settings(
-                    FontVariation.weight(400),
-                    FontVariation.Setting("wdth", 100f),
-                ),
-        ),
-        Font(
-            R.font.venue_instrument_sans,
-            weight = FontWeight.SemiBold,
-            variationSettings =
-                FontVariation.Settings(
-                    FontVariation.weight(600),
-                    FontVariation.Setting("wdth", 100f),
-                ),
-        ),
-    )
-
-@OptIn(ExperimentalTextApi::class)
-private val VenueTitleFont =
-    FontFamily(
-        Font(
-            R.font.venue_bricolage_grotesque,
-            weight = FontWeight.Bold,
-            variationSettings =
-                FontVariation.Settings(
-                    FontVariation.weight(700),
-                    FontVariation.Setting("wdth", 100f),
-                    FontVariation.opticalSizing(14.sp),
-                ),
-        ),
-    )
-
-private val VenueSetupTypography =
-    Typography(
-        headlineLarge =
-            TextStyle(
-                fontFamily = VenueTitleFont,
-                fontWeight = FontWeight.Bold,
-                fontSize = 32.sp,
-                lineHeight = 35.sp,
-                letterSpacing = (-0.96).sp,
-            ),
-        bodyLarge = TextStyle(fontFamily = VenueBodyFont, fontSize = 16.sp, lineHeight = 24.sp),
-        bodyMedium = TextStyle(fontFamily = VenueBodyFont, fontSize = 14.sp, lineHeight = 20.sp),
-        labelLarge =
-            TextStyle(
-                fontFamily = VenueBodyFont,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                lineHeight = 17.sp,
-            ),
-        labelSmall =
-            TextStyle(
-                fontFamily = VenueBodyFont,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                lineHeight = 16.sp,
-            ),
-    )
 
 @Preview(showBackground = true, widthDp = 413, heightDp = 917)
 @Composable

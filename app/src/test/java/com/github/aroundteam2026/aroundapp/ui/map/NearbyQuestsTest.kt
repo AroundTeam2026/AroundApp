@@ -344,4 +344,29 @@ class NearbyQuestsTest {
     assertEquals(emptyList<NearbyQuest>(), nearby(emptyList()))
     assertEquals(emptyList<NearbyQuest>(), nearby(emptyList(), from = null))
   }
+
+  @Test
+  fun aQuestAwayFromItsVenueIsMeasuredFromItsOwnLocation() {
+    // The venue is out of the radius, the quest it runs elsewhere is not, and the other way round
+    val far = questAt(NEARBY_RADIUS_METERS + 10, id = "home", venueId = "cafe")
+    val near = testQuest(id = "away", venueId = "cafe", location = north(100.0))
+    val gone = testQuest(id = "gone", venueId = "bar", location = north(NEARBY_RADIUS_METERS + 10))
+    questAt(100.0, id = "bar-home", venueId = "bar")
+
+    val rows = nearby(listOf(far, near, gone))
+
+    assertEquals(listOf("away"), rows.ids())
+    assertEquals(100.0, rows.single().distanceMeters!!, 0.01)
+    assertEquals("cafe", rows.single().venueId)
+  }
+
+  @Test
+  fun withoutAPositionAQuestAwayFromItsVenueStaysInItsVenuesNewestFirstOrder() {
+    val old = questAt(100.0, id = "old", venueId = "cafe", createdAt = 1)
+    val new = questAt(100.0, id = "new", venueId = "cafe", createdAt = 3)
+    val away = testQuest(id = "away", venueId = "cafe", location = north(500.0), createdAt = 2)
+
+    assertEquals(listOf("new", "away", "old"), nearby(listOf(old, away, new), from = null).ids())
+    assertEquals(listOf("new", "away", "old"), nearby(listOf(away, new, old), from = null).ids())
+  }
 }

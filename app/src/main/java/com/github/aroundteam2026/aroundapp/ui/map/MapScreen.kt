@@ -1,8 +1,8 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -22,6 +22,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.ComposeMapColorScheme
@@ -56,9 +57,10 @@ fun MapScreen(
   // Unlike the context's, these follow configuration changes
   val resources = LocalResources.current
   // The light style would glare in dark mode, which has its own
-  val darkTheme = isSystemInDarkTheme()
+  val darkTheme = AroundTheme.isDark
   val mapStyle = remember(resources, darkTheme) { MapStyleOptions(mapStyle(resources, darkTheme)) }
-  val markerStyle = remember { MarkerDefaults.style() }
+  val markerColors = MarkerDefaults.colors()
+  val markerStyle = remember(markerColors) { MarkerDefaults.style(markerColors) }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
@@ -88,7 +90,7 @@ fun MapScreen(
       )
       QuestMarkers(
           pins = state.pins,
-          selectedVenueId = state.selectedVenueId,
+          selectedPinKey = state.selectedPinKey,
           style = markerStyle,
           onPinClick = viewModel::onPinClick,
           onCardClick = { onOpenVenue(it.venueId, it.venueName) },

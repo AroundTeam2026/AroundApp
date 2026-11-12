@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.theme
 
@@ -34,7 +35,8 @@ fun AroundAppTheme(
       }
 
   CompositionLocalProvider(
-      LocalAroundThemeColors provides if (darkTheme) DarkThemeColors else LightThemeColors
+      LocalAroundThemeColors provides if (darkTheme) DarkThemeColors else LightThemeColors,
+      LocalAroundDarkTheme provides darkTheme,
   ) {
     MaterialTheme(
         colorScheme = colorScheme,

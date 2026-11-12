@@ -149,7 +149,7 @@ class MapScreenNearbyTest {
 
     assertOverlayClosed()
     // Without the location the quests go by venue name, so the first page is the bar's
-    assertEquals("bar", viewModel.uiState.value.selectedVenueId)
+    assertEquals("bar", viewModel.uiState.value.selectedPinKey)
   }
 
   @Test

@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -43,6 +43,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofPhotoViewer
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -92,7 +93,7 @@ internal fun ProofPhotoBox(
     enabled: Boolean = true,
     questTitle: String = "",
 ) {
-  val box = modifier.fillMaxWidth().clip(BOX_SHAPE).testTag(C.Tag.PROOF_PHOTO)
+  val box = modifier.fillMaxWidth().clip(AroundCorners.Photo).testTag(C.Tag.PROOF_PHOTO)
   if (picked) {
     PickedPhoto(preview, venueName, questTitle, enabled, onRetake, box)
   } else {
@@ -264,7 +265,6 @@ private fun Choices(
   }
 }
 
-private val BOX_SHAPE = RoundedCornerShape(22.dp)
 private val BOX_HEIGHT = 290.dp
 private val ICON_SIZE = 28.dp
 private val CONTENT_GAP = 6.dp

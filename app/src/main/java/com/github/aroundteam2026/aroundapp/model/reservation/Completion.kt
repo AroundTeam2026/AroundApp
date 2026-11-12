@@ -13,12 +13,13 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
  * @property id Document id, assigned by the repository: the reservation's, see [completionId].
  * @property reservationId Id of the approved reservation this proof belongs to.
  * @property venueId Id of the venue that owns the quest; the venue's rules check it.
- * @property explorerUid Uid of the party member who submitted the proof.
+ * @property explorerUid Uid of the party member who submitted the proof: the latest, if a new proof
+ *   replaced an earlier one.
  * @property proof What the member submitted, of the quest's [ProofType].
  * @property status Lifecycle state; see [canTransition] for the allowed changes.
  * @property rejectReason Why the venue rejected the proof; required when [status] is
  *   [CompletionStatus.REJECTED], and null otherwise.
- * @property submittedAt Submission time, in epoch milliseconds.
+ * @property submittedAt Submission time of the latest proof, in epoch milliseconds.
  * @throws IllegalArgumentException if [status] is [CompletionStatus.REJECTED] without a reason, or
  *   if a reason is given for any other status.
  */
@@ -92,14 +93,14 @@ enum class CompletionStatus {
   PENDING,
   /** Accepted by the venue. Final. */
   APPROVED,
-  /** Declined by the venue, which can still approve it. The party can't submit again. */
+  /** Declined by the venue, which can still approve it. The party can send a new proof. */
   REJECTED,
 }
 
 /**
  * The id of the party's completion of the reservation [reservationId]: the reservation's own id, so
- * a retried submission writes the same document and a party, whichever member sends it, can't
- * complete a reservation twice.
+ * a retried or new submission writes the same document and a party, whichever member sends it, has
+ * one completion of a reservation.
  */
 fun completionId(reservationId: String) = reservationId
 
@@ -114,9 +115,12 @@ const val MAX_PHOTO_LOCATION_LENGTH = 2000
 
 /**
  * Whether a completion may change from [from] to [to]: a pending one can be answered, and a venue
- * that changes its mind can approve one it rejected.
+ * that changes its mind can approve one it rejected. A party can also send a new proof, which makes
+ * a pending or rejected completion pending again; an approved one is final.
  */
 fun canTransition(from: CompletionStatus, to: CompletionStatus): Boolean =
-    (from == CompletionStatus.PENDING &&
-        (to == CompletionStatus.APPROVED || to == CompletionStatus.REJECTED)) ||
-        (from == CompletionStatus.REJECTED && to == CompletionStatus.APPROVED)
+    when (from) {
+      CompletionStatus.PENDING -> true
+      CompletionStatus.REJECTED -> to != CompletionStatus.REJECTED
+      CompletionStatus.APPROVED -> false
+    }

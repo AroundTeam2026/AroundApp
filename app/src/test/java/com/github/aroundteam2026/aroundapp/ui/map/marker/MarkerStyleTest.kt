@@ -1,23 +1,42 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map.marker
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.ui.quest.ChipColors
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatarStyle
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChipStyle
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundFonts
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Tests that the default marker style compares by value, and what it hands the shared quest pieces.
- * The map keys each pin's image on its style, so a style that isn't equal to the last one, as every
- * new object used to be, redraws every pin.
+ * Tests what the marker style hands the shared quest pieces. That the default style compares by
+ * value, which the map needs because it keys each pin's image on it, is tested in
+ * [MarkerColorsTest].
  */
 class MarkerStyleTest {
 
+  // The markers take their text from the shared styles; this pins that the map looks as designed
   @Test
-  fun theDefaultStyleIsEqualEachTimeItIsBuilt() {
-    assertEquals(MarkerDefaults.style(), MarkerDefaults.style())
+  fun theDefaultTypographyKeepsTheDesignsFontsWeightsSizesAndLineHeights() {
+    val typography = MarkerDefaults.typography()
+
+    fun check(style: TextStyle, family: FontFamily, weight: FontWeight, size: Int, height: Int) {
+      assertEquals(family, style.fontFamily)
+      assertEquals(weight, style.fontWeight ?: FontWeight.Normal)
+      assertEquals(size.sp, style.fontSize)
+      assertEquals(height.sp, style.lineHeight)
+    }
+    check(typography.questTitle, AroundFonts.Body, FontWeight.SemiBold, 16, 20)
+    check(typography.venueName, AroundFonts.Body, FontWeight.Normal, 13, 17)
+    check(typography.chip, AroundFonts.Body, FontWeight.SemiBold, 12, 16)
+    check(typography.moreQuests, AroundFonts.Body, FontWeight.Normal, 12, 16)
+    check(typography.initials, AroundFonts.Title, FontWeight.Bold, 16, 16)
   }
 
   @Test

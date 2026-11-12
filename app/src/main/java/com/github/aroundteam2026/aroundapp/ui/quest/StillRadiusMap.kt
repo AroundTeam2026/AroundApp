@@ -1,10 +1,10 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -99,7 +99,7 @@ private fun RadiusMapContent(
     venue: Location?,
 ) {
   val resources = LocalResources.current
-  val darkTheme = isSystemInDarkTheme()
+  val darkTheme = AroundTheme.isDark
   val style = remember(resources, darkTheme) { MapStyleOptions(mapStyle(resources, darkTheme)) }
   val dash = with(LocalDensity.current) { DASH.toPx() }
   val stroke = with(LocalDensity.current) { CIRCLE_STROKE.toPx() }

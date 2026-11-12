@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
+<resources>
+    <string name="profile_setup_title">Set up your profile</string>
+    <string name="profile_setup_description">Add your name and a picture, so venues and your party know who\'s coming.</string>
+    <string name="profile_setup_add_photo">Add a photo</string>
+    <string name="profile_setup_photo_optional">Optional, you can add one later</string>
+    <string name="profile_setup_name">Display name</string>
+    <string name="profile_setup_name_hint">Yusuf S.</string>
+    <string name="profile_setup_name_required">Enter a display name.</string>
+    <string name="profile_setup_name_too_long">Use 100 characters or fewer.</string>
+    <string name="profile_setup_photo_failed">Could not prepare that photo. Try another.</string>
+    <string name="profile_setup_save_failed">Could not save your profile. Please try again.</string>
+    <string name="profile_setup_saving">Saving…</string>
+    <string name="profile_setup_continue">Continue</string>
+    <string name="profile_edit_title">Edit account</string>
+    <string name="profile_edit_description">Venues and your party see your name and picture on reservations and proofs.</string>
+    <string name="profile_edit_change_photo">Change photo</string>
+    <string name="profile_edit_remove_photo">Remove photo</string>
+    <string name="profile_edit_save">Save changes</string>
+    <string name="profile_edit_save_failed">Couldn\'t save your changes. Check your connection and try again.</string>
+    <string name="profile_edit_back">Back to profile</string>
+    <string name="profile_edit_subtitle">Your name and picture</string>
+    <string name="profile_explorer_since">Explorer · since %1$s</string>
+</resources>

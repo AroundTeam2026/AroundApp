@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -59,6 +59,7 @@ import com.github.aroundteam2026.aroundapp.ui.map.ReportVisibleArea
 import com.github.aroundteam2026.aroundapp.ui.map.RequestLocationPermission
 import com.github.aroundteam2026.aroundapp.ui.map.rememberMapCamera
 import com.github.aroundteam2026.aroundapp.ui.map.toLatLng
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
@@ -196,7 +197,7 @@ private fun AreaMap(
         Circle(
             center = markerState.position,
             radius = state.radiusMeters.toDouble(),
-            fillColor = color.copy(alpha = 0.3f),
+            fillColor = color.copy(alpha = AREA_FILL_ALPHA),
             strokeColor = color,
             strokeWidth = 2f,
         )
@@ -276,7 +277,7 @@ private fun AreaPanel(
     onBack: () -> Unit,
 ) {
   val radiusMeters = state.radiusMeters
-  Surface(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), shadowElevation = 8.dp) {
+  Surface(shape = AroundCorners.TopSheet, shadowElevation = 8.dp) {
     Column(Modifier.fillMaxWidth().padding(24.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(
@@ -373,3 +374,6 @@ private fun SaveButton(isSaving: Boolean, enabled: Boolean, onClick: () -> Unit)
 }
 
 private fun LatLng.toLocation() = Location(latitude, longitude)
+
+/** How visible the area is on the map, over the colour it is drawn in. */
+private const val AREA_FILL_ALPHA = 0.3f

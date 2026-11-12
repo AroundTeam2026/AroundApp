@@ -41,6 +41,8 @@
     <string name="quest_detail_party_me">ME</string>
     <!-- The code the party's creator shares so friends can join -->
     <string name="quest_detail_party_code">Party code</string>
+    <string name="quest_detail_party_code_copy">Copy the party code</string>
+    <string name="quest_detail_party_code_copied">Code copied</string>
     <string name="quest_detail_party_code_share">Share the code</string>
     <string name="quest_detail_party_code_hint">Friends enter it under Quests › Join a party.</string>
     <!-- What the share sheet sends: the quest's title, the venue's name and the code -->
@@ -53,6 +55,9 @@
     <string name="quest_detail_proof_pending_label">Pending</string>
     <string name="quest_detail_proof_pending_title">Proof sent</string>
     <string name="quest_detail_proof_pending_text">%1$s is checking it, usually within a few minutes.</string>
+    <!-- Instead of the two above, once another member of the party sent its proof -->
+    <string name="quest_detail_proof_pending_title_by">%1$s sent your party\'s proof</string>
+    <string name="quest_detail_proof_pending_text_by">%1$s is checking it, usually within a few minutes. Anyone in the party can send a new one until then.</string>
     <string name="quest_detail_proof_approved_label">Completed</string>
     <string name="quest_detail_proof_approved_title">Quest complete!</string>
     <string name="quest_detail_proof_approved_text">%1$s approved your proof. Your reward is ready.</string>
