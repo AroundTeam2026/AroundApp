@@ -3,4 +3,13 @@
     <!-- The party's members on the quest details -->
     <string name="quest_detail_member_you">You</string>
     <string name="quest_detail_member_unknown">An explorer</string>
+
+    <!-- Leaving a party someone else made, in place of cancelling its reservation -->
+    <string name="leave_party">Leave party</string>
+    <string name="leave_party_leaving">Leaving…</string>
+    <string name="leave_party_failed">Couldn\'t leave this party.</string>
+    <string name="leave_party_title">Leave this party?</string>
+    <string name="leave_party_text">You can\'t join it again. To go to %1$s after all, accept the quest again.</string>
+    <string name="leave_party_confirm">Leave party</string>
+    <string name="leave_party_stay">Stay</string>
 </resources>

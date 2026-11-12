@@ -250,10 +250,11 @@ class VenuePageViewModel(
   }
 
   /**
-   * Called when the explorer cancels their reservation for the picked quest, once they confirmed.
-   * Does nothing without such a reservation, or while it is being cancelled, so a double tap
-   * cancels once. It shows as cancelling until the reservations no longer list it. A failure, such
-   * as being offline, shows [CancelStatus.FAILED]; calling this again retries.
+   * Called when the explorer cancels their reservation for the picked quest, once they confirmed,
+   * or leaves its party when someone else made it ([VenuePageUiState.leavesParty]). Does nothing
+   * without such a reservation, or while it is being cancelled, so a double tap cancels once. It
+   * shows as cancelling until the reservations no longer list it. A failure, such as being offline,
+   * shows [CancelStatus.FAILED]; calling this again retries.
    */
   fun cancel() {
     val current = mutableUiState.value
@@ -265,8 +266,13 @@ class VenuePageViewModel(
           failedCancelIds = it.failedCancelIds - reservationId,
       )
     }
+    val leaving = current.leavesParty
     viewModelScope.launch {
-      reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED).onFailure {
+      // Only its creator can cancel the reservation; anyone else who joined withdraws instead
+      val result =
+          if (leaving) partyRepository.withdraw(reservationId, explorerUid)
+          else reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
+      result.onFailure {
         Log.w(TAG, "Cancelling reservation $reservationId failed", it)
         mutableUiState.update { state ->
           // A reservation that left meanwhile, e.g. rejected by the venue, has nothing to mark

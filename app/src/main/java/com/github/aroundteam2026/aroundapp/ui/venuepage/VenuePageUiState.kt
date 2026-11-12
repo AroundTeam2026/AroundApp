@@ -116,6 +116,15 @@ data class VenuePageUiState(
             ?.takeIf { it !in completions }
 
   /**
+   * Whether the explorer leaves the party of [cancellableReservationId] rather than cancelling it,
+   * since someone else made it and only its creator can cancel it, as the rules enforce. False
+   * until its party is read.
+   */
+  val leavesParty: Boolean
+    get() =
+        cancellableReservationId?.let(partyMembers::get).orEmpty().any { it.isMe && !it.isCreator }
+
+  /**
    * The reservation whose quest the explorer can complete, for the picked quest: the one they can
    * cancel, once the venue approved it and until they send a proof. Null otherwise, and while the
    * proofs can't be read.

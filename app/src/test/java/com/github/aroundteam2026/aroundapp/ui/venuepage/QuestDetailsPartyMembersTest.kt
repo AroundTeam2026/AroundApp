@@ -4,14 +4,20 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,7 +60,7 @@ class QuestDetailsPartyMembersTest {
               if (members.isEmpty()) emptyMap() else mapOf(RESERVATION to members.toList()),
       )
 
-  private fun show(state: VenuePageUiState) {
+  private fun show(state: VenuePageUiState, onCancel: () -> Unit = {}) {
     compose.setContent {
       AroundAppTheme {
         QuestDetailsScreen(
@@ -62,7 +68,7 @@ class QuestDetailsPartyMembersTest {
             quest,
             onBack = {},
             onAccept = {},
-            onCancel = {},
+            onCancel = onCancel,
         )
       }
     }
@@ -145,6 +151,25 @@ class QuestDetailsPartyMembersTest {
         listOf("Bea Smith", "You", "Cleo Martin"),
         texts(C.Tag.QUEST_DETAIL_MEMBER_NAME),
     )
+  }
+
+  @Test
+  fun aMemberLeavesThePartyAfterAsking() {
+    var left = false
+    show(state(creator, me)) { left = true }
+
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).assertTextEquals("Leave party").performClick()
+    compose.onNodeWithText("Leave this party?").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
+
+    assertTrue(left)
+  }
+
+  @Test
+  fun theCreatorCancelsTheReservation() {
+    show(state(me.copy(isCreator = true), creator.copy(isCreator = false)))
+
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).assertTextEquals("Cancel reservation")
   }
 
   private companion object {
