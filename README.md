@@ -9,19 +9,18 @@ Leaderboards, friends, posts and chats are planned but not built yet.
 
 ## Split-app model
 
-The app uses Firebase for its cloud-based functionality. Firebase Authentication manages user accounts and sign-in. Cloud Firestore stores and synchronizes shared application data across users and devices: users, venues, quests, reservations, parties (`party_user`, `party_codes`) and quest completions, as described in [`docs/firestore-schema.md`](docs/firestore-schema.md). Cloud Storage holds the proof photos. Frequently needed data, including available quests, the user’s active quest, profile information, and pending quest completions, is cached locally so that parts of the app remain usable without a network connection and can be synchronized once connectivity returns.
-
+The app uses Firebase for its cloud-based functionality. Firebase Authentication manages user accounts and sign-in. Cloud Firestore stores and synchronizes shared application data across users and devices: users, venues, quests, reservations, parties (`party_user`, `party_codes`) and quest completions, as described in [`docs/firestore-schema.md`](docs/firestore-schema.md). Cloud Storage holds the proof photos and profile pictures.
 ## Multi-user support
 
-The app supports multiple users through authenticated accounts, with each user signing up and logging in to their own account either through Google Sign-In or by creating an account directly in the app. Two account types are available: Explorers, who can manage their profile, interests, friends, posts, and quest history, and Venues, which are business accounts used to create and manage quests and rewards. Each account has access only to the functionality and data associated with its role, and users can update their account information and manage their activity within the app.
+The app supports multiple users through authenticated accounts, with each user signing up and logging in to their own account either through Google Sign-In or by creating an account directly in the app. Two account types are available: Explorers, who manage their profile, reserve quests, create or join parties with a code, and submit photo proofs, and Venues, which are business accounts used to create quests and accept or reject the proofs submitted for them. Each account has access only to the functionality and data associated with its role, and users can update their account information and manage their activity within the app.
 
 ## Sensor use
 
-The app uses GPS to show nearby quests and their distance on the map, and to check that the user is within the quest's radius when submitting a proof; a proof sent from too far away is refused. The camera takes the photo proof of a quest (a photo from the gallery also works) and the profile photo.
+The app uses GPS to show nearby quests and their distance on the map, and to check that the user is within the quest's radius when submitting a proof; a proof sent from too far away is refused. The camera takes the photo proof of a quest (a photo from the gallery also works); the profile photo is picked from the gallery.
 
 ## Offline mode
 
-In offline mode, users can still view quests they have already picked up, access recently cached nearby map data, and view their cached profile. Quest completions made while offline are stored locally and automatically synced once connectivity returns. Features that depend on live data, such as discovering new quests or viewing updated leaderboards, are temporarily unavailable; leaderboards instead display the most recently synced state together with an “as of” timestamp so users know the information may be outdated.
+Offline, Firestore's local cache keeps data the app has already loaded, such as quests and the user's profile, viewable. Actions that need the network, such as joining a party or sending a proof, show an offline error instead. Queuing quest completions offline to sync them later (#412–#414) and leaderboards are planned.
 
 ## Architecture
 
@@ -74,12 +73,21 @@ Instrumented tests that exercise the Firestore repository run against the Fireba
 Start the Auth, Firestore and Storage emulators from the repository root, as the CI does:
 
 ```sh
-NODE_OPTIONS="--require ./.github/scripts/keep-emulator-connections.cjs" firebase emulators:start
+NODE_OPTIONS="--require ./.github/scripts/keep-emulator-connections.cjs" firebase emulators:start --only auth,firestore,storage --project demo-project
 ```
 
-### Firestore security rules
+On Windows (PowerShell):
 
-`firestore.rules` protects the production database. The emulators load it through `firebase.json`, so `FirestoreRulesTest` checks it on every CI run, but production only gets it when someone deploys it:
+```powershell
+$env:NODE_OPTIONS = "--require ./.github/scripts/keep-emulator-connections.cjs"
+firebase emulators:start --only auth,firestore,storage --project demo-project
+```
+
+`--project demo-project` matters: the tests connect to `demo-project`, and `storage.rules` reads Firestore, so both emulators must run on that same project. Without it, the emulators take `around-67942` from `.firebaserc`.
+
+### Security rules
+
+`firestore.rules` protects the production database and `storage.rules` the production Cloud Storage bucket. The emulators load both through `firebase.json`, so `FirestoreRulesTest` and `StorageRulesTest` check them on every CI run, but production only gets it when someone deploys it:
 
 ```sh
 firebase login
@@ -87,7 +95,7 @@ firebase deploy --only firestore:rules,storage --project around-67942
 ```
 
 - **Who:** a team member with the Owner or Editor role on the `around-67942` Firebase project.
-- **When:** right after a PR that changes `firestore.rules` is merged, from an up-to-date `main`. Announce it in the team channel, then check the Rules tab of Firestore in the Firebase console.
+- **When:** right after a PR that changes `firestore.rules` or `storage.rules` is merged, from an up-to-date `main`. Announce it in the team channel, then check the Rules tabs of Firestore and Storage in the Firebase console.
 
 ### Useful commands
 
