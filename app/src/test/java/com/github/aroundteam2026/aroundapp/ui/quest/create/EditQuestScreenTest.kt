@@ -148,10 +148,8 @@ class EditQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXACTLY).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_LOCKED).assertExists()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_LOCKED).assertExists()
-    compose
-        .onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER)
-        .assertIsDisplayed()
-        .assertTextEquals(string(R.string.create_quest_reserved_banner))
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.create_quest_reserved_banner)).assertIsDisplayed()
   }
 
   // Approved explorers keep their proof type, but only pending parties pin the size
@@ -170,10 +168,8 @@ class EditQuestScreenTest {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_LOCKED).assertExists()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).assertIsEnabled()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_LOCKED).assertDoesNotExist()
-    compose
-        .onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER)
-        .assertIsDisplayed()
-        .assertTextEquals(string(R.string.create_quest_reserved_banner))
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.create_quest_reserved_banner)).assertIsDisplayed()
   }
 
   @Test
