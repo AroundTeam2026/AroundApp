@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.content.res.Configuration
@@ -167,7 +168,9 @@ fun OverviewQuestRow(
       )
     }
     if (onSendNewProof != null) NewProofButton(onSendNewProof)
-    if (onCancel != null) CancelReservationAction(cancelStatus, row.venueName, onCancel)
+    if (onCancel != null) {
+      CancelReservationAction(cancelStatus, row.venueName, onCancel, offline = false)
+    }
   }
 }
 
