@@ -100,6 +100,8 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
  *   pending reservations.
  * @property proofTypeLocked Whether the proof type can't change, as the quest being edited has
  *   reservations explorers made for it.
+ * @property hasActiveReservations Whether the quest being edited is known to have pending or
+ *   approved reservations, so explorers will see the edits; false until its reservations are read.
  */
 data class CreateQuestUiState(
     val title: String = "",
@@ -127,6 +129,7 @@ data class CreateQuestUiState(
     val questLoadFailed: Boolean = false,
     val partySizeLocked: Boolean = false,
     val proofTypeLocked: Boolean = false,
+    val hasActiveReservations: Boolean = false,
 ) {
   /**
    * This form filled in with [quest], its fields untouched, so it opens without errors. The quest

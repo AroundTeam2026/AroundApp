@@ -366,7 +366,12 @@ class CreateQuestViewModel(
           val proofLocked = ofQuest.any { it.status.isActive }
           val quest = editedQuest
           mutableUiState.update {
-            val locked = it.copy(partySizeLocked = partyLocked, proofTypeLocked = proofLocked)
+            val locked =
+                it.copy(
+                    partySizeLocked = partyLocked,
+                    proofTypeLocked = proofLocked,
+                    hasActiveReservations = proofLocked,
+                )
             when {
               quest == null -> locked
               else ->

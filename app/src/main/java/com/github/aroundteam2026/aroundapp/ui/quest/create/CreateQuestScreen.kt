@@ -5,8 +5,11 @@ package com.github.aroundteam2026.aroundapp.ui.quest.create
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -48,9 +51,11 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import kotlinx.coroutines.launch
 
 /**
@@ -184,12 +189,41 @@ fun CreateQuestContent(
           editing = state.editing,
       )
       Spacer(Modifier.height(AroundSpacing.ExtraLarge))
+      // Not on proofTypeLocked, which is also true while the reservations load
+      if (state.hasActiveReservations) {
+        ReservedBanner()
+        Spacer(Modifier.height(AroundSpacing.Medium))
+      }
       QuestTextFields(state, onTitleChange, onDescriptionChange, onRequirementsChange)
       Spacer(Modifier.height(AroundSpacing.Medium))
       QuestCompletionRules(state, completionActions)
       Spacer(Modifier.height(AroundSpacing.SetupGap))
       RewardFields(state.reward, rewardActions)
     }
+  }
+}
+
+/** Tells the venue that explorers who reserved see its edits; each locked field says so itself. */
+@Composable
+private fun ReservedBanner() {
+  Row(
+      Modifier.fillMaxWidth()
+          .background(AroundTheme.colors.lavender, AroundCorners.InsetField)
+          .padding(AroundSpacing.Medium)
+          .testTag(C.Tag.CREATE_QUEST_RESERVED_BANNER),
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
+  ) {
+    Icon(
+        painterResource(R.drawable.ic_info_filled),
+        contentDescription = null,
+        tint = AroundTheme.colors.accentText,
+        modifier = Modifier.size(BANNER_ICON_SIZE),
+    )
+    Text(
+        stringResource(R.string.create_quest_reserved_banner),
+        style = AroundTextStyles.Caption,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
   }
 }
 
@@ -234,6 +268,7 @@ internal fun FieldLabel(text: String) {
 
 /** The form fades to this while the changes to a quest are saved, as in Figma. */
 private const val SAVING_ALPHA = 0.6f
+private val BANNER_ICON_SIZE = 16.dp
 
 /** The empty form of a venue with a location, which shows the radius map. */
 // Tall enough for the whole form, as a preview can't scroll
