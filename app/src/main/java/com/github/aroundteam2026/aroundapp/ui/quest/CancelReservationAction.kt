@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.quest
 
 import androidx.annotation.StringRes
@@ -21,9 +22,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+
+/** The disabled action uses half-opacity muted text in both Figma themes. */
+private const val OFFLINE_LABEL_ALPHA = 0.5f
 
 /** How cancelling a reservation stands. */
 enum class CancelStatus {
@@ -44,6 +49,8 @@ enum class CancelStatus {
  * @param status How cancelling stands.
  * @param venueName The venue the dialog names.
  * @param onCancel Cancels the reservation, once the explorer confirmed.
+ * @param offline Disables actions that need a connection and shows the hint when no write is in
+ *   progress.
  * @param horizontalAlignment Where the button and the error sit across the width.
  * @param leave Whether [onCancel] leaves the party rather than cancelling the reservation.
  */
@@ -52,18 +59,27 @@ internal fun CancelReservationAction(
     status: CancelStatus,
     venueName: String,
     onCancel: () -> Unit,
+    offline: Boolean,
     horizontalAlignment: Alignment.Horizontal = Alignment.End,
     leave: Boolean = false,
 ) {
   val colors = MaterialTheme.colorScheme
   val texts = if (leave) LEAVE_TEXTS else CANCEL_TEXTS
-  var asking by rememberSaveable { mutableStateOf(false) }
+  val cancelling = status == CancelStatus.CANCELLING
+  val needsConnection = offline && !cancelling
+  var asking by rememberSaveable(offline) { mutableStateOf(false) }
   Column(
       Modifier.fillMaxWidth(),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall),
       horizontalAlignment = horizontalAlignment,
   ) {
-    if (status == CancelStatus.FAILED) {
+    if (needsConnection) {
+      OfflineHint(
+          message =
+              if (leave) R.string.offline_leave_needs_connection
+              else R.string.offline_cancel_needs_connection,
+      )
+    } else if (status == CancelStatus.FAILED) {
       Text(
           stringResource(texts.failed),
           Modifier.testTag(C.Tag.CANCEL_RESERVATION_FAILED),
@@ -74,8 +90,13 @@ internal fun CancelReservationAction(
     TextButton(
         // The explorer already confirmed the cancel that failed
         onClick = { if (status == CancelStatus.FAILED) onCancel() else asking = true },
-        enabled = status != CancelStatus.CANCELLING,
-        colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
+        enabled = !offline && !cancelling,
+        colors =
+            if (needsConnection)
+                ButtonDefaults.textButtonColors(
+                    disabledContentColor = colors.onSurfaceVariant.copy(alpha = OFFLINE_LABEL_ALPHA)
+                )
+            else ButtonDefaults.textButtonColors(contentColor = colors.error),
         modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION),
     ) {
       Text(
@@ -90,7 +111,8 @@ internal fun CancelReservationAction(
       )
     }
   }
-  if (asking) {
+  // A restored asking value can predate the current connectivity state.
+  if (asking && !offline) {
     AlertDialog(
         onDismissRequest = { asking = false },
         confirmButton = {
