@@ -18,13 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -35,12 +31,6 @@ private val TILE_SIZE = 40.dp
 private val ICON_SIZE = 20.dp
 private val TEXT_SPACING = 2.dp
 private val ERROR_BORDER_WIDTH = 1.dp
-private val BANNER_SHADOW =
-    Shadow(
-        radius = 12.dp,
-        color = AroundColors.BannerShadow,
-        offset = DpOffset(0.dp, 8.dp),
-    )
 
 /** A status banner with an icon, title, caption, and an optional trailing action. */
 @Composable
@@ -56,8 +46,7 @@ internal fun StatusBanner(
   val colors = MaterialTheme.colorScheme
   val accent = if (isError) colors.error else colors.onSurface
   val shape = AroundCorners.LocationBanner
-  val card =
-      modifier.fillMaxWidth().dropShadow(shape, BANNER_SHADOW).background(colors.surface, shape)
+  val card = modifier.fillMaxWidth().background(colors.surface, shape)
   Row(
       (if (isError) card.border(ERROR_BORDER_WIDTH, colors.error, shape) else card).padding(
           start = AroundSpacing.InsetPadding,

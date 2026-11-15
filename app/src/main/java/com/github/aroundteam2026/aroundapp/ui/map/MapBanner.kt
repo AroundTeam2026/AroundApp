@@ -11,14 +11,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.ui.StatusBanner
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
 private val BUTTON_HEIGHT = 44.dp
+private val MAP_BANNER_ELEVATION = 8.dp
 
 /**
  * A card at the top of the map that says why the map shows less than usual, with a button that
@@ -43,7 +46,19 @@ internal fun MapBanner(
     isError: Boolean = false,
 ) {
   val colors = MaterialTheme.colorScheme
-  StatusBanner(icon, title, caption, modifier, isError = isError) {
+  StatusBanner(
+      icon,
+      title,
+      caption,
+      modifier =
+          modifier.shadow(
+              MAP_BANNER_ELEVATION,
+              AroundCorners.LocationBanner,
+              ambientColor = AroundColors.BannerShadow,
+              spotColor = AroundColors.BannerShadow,
+          ),
+      isError = isError,
+  ) {
     Button(
         onAction,
         Modifier.testTag(actionTag).height(BUTTON_HEIGHT),
