@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
@@ -61,6 +62,7 @@ class VenueDashboardActionsTest {
       )
   // Given the quests, approving checks the party's size, as the rules do
   private val reservations = FakeReservationRepository(party = party, quests = quests)
+  private val connectivity = FakeConnectivityRepository()
   private lateinit var viewModel: VenueDashboardViewModel
 
   /**
@@ -85,6 +87,7 @@ class VenueDashboardActionsTest {
             FakeCompletionRepository(),
             FakeUserRepository(),
             FakeUserPictureRepository(),
+            connectivity,
         )
     compose.setContent { AroundAppTheme { VenueDashboardScreen(viewModel) } }
     compose.waitForIdle()
@@ -169,6 +172,30 @@ class VenueDashboardActionsTest {
     compose.waitForIdle()
 
     assertEquals(ReservationStatus.REJECTED, status(id))
+  }
+
+  @Test
+  fun offlineTheButtonsAreDisabledAndTheHintSaysWhy() {
+    val id = showWithOnePending()
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+
+    connectivity.online.value = false
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.offline_answer_needs_connection)).assertIsDisplayed()
+    inRow(id, C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    inRow(id, C.Tag.DASHBOARD_ROW_DECLINE).assertIsNotEnabled()
+
+    connectivity.online.value = true
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+    inRow(id, C.Tag.DASHBOARD_ROW_DECLINE).assertIsEnabled()
+    inRow(id, C.Tag.DASHBOARD_ROW_APPROVE).assertIsEnabled().performClick()
+    compose.waitForIdle()
+
+    assertEquals(ReservationStatus.APPROVED, status(id))
   }
 
   @Test

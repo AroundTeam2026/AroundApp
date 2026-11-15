@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
@@ -68,6 +69,7 @@ import kotlinx.coroutines.launch
  * today's date, the pending and active quests counts, then the proofs to review, the reservations
  * that need an answer and the approved ones. Approve and Decline answer a pending reservation: its
  * buttons are disabled while the answer is saved, and a failed answer shows a snackbar once.
+ * Offline, both buttons are disabled and a hint under the header says they need a connection.
  * Tapping a proof calls [onOpenProof] with its completion's id.
  *
  * Figma's "Today" count is left out: reservations have no visit time yet (see
@@ -158,6 +160,9 @@ private fun Dashboard(
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
     item { Header(state.venueName, state.avatar, clock) }
+    if (state.showsOfflineHint) {
+      item { OfflineHint(R.string.offline_answer_needs_connection) }
+    }
     item { Summary(state, Modifier.padding(top = AroundSpacing.ExtraSmall)) }
     if (state.isEmpty) {
       item { NoReservations() }
@@ -171,7 +176,7 @@ private fun Dashboard(
         DashboardProofRow(it, onOpen = { onOpenProof(it.completionId) }, clock = clock)
       }
       section(R.string.dashboard_needs_answer, state.needsAnswer.size, C.Tag.DASHBOARD_NEEDS_ANSWER)
-      reservations(pending, state.savingIds, onApprove, onDecline, clock)
+      reservations(pending, state.savingIds, state.offline, onApprove, onDecline, clock)
       if (pending.size < state.needsAnswer.size) {
         item {
           TextButton(
@@ -187,7 +192,7 @@ private fun Dashboard(
         }
       }
       section(R.string.dashboard_upcoming, state.upcoming.size, C.Tag.DASHBOARD_UPCOMING)
-      reservations(state.upcoming, state.savingIds, onApprove, onDecline, clock)
+      reservations(state.upcoming, state.savingIds, state.offline, onApprove, onDecline, clock)
     }
   }
 }
@@ -294,10 +299,14 @@ private fun LazyListScope.section(@StringRes title: Int, count: Int, tag: String
   }
 }
 
-/** The rows of [reservations]; those in [savingIds] have their buttons disabled. */
+/**
+ * The rows of [reservations]; those in [savingIds] have their buttons disabled, and all of them
+ * while [offline].
+ */
 private fun LazyListScope.reservations(
     reservations: List<DashboardReservation>,
     savingIds: Set<String>,
+    offline: Boolean,
     onApprove: (String) -> Unit,
     onDecline: (String) -> Unit,
     clock: Clock,
@@ -308,6 +317,7 @@ private fun LazyListScope.reservations(
         onDecline = { onDecline(it.reservationId) },
         onApprove = { onApprove(it.reservationId) },
         saving = it.reservationId in savingIds,
+        offline = offline,
         clock = clock,
     )
   }
@@ -415,6 +425,36 @@ internal fun VenueDashboardPreview() {
                         sentAt = now - 2 * DateUtils.MINUTE_IN_MILLIS,
                     )
                 ),
+        ),
+        onApprove = {},
+        onDecline = {},
+        onRetry = {},
+    )
+  }
+}
+
+@Preview(name = "Offline, light")
+@Preview(name = "Offline, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun VenueDashboardOfflinePreview() {
+  AroundAppTheme {
+    VenueDashboardContent(
+        VenueDashboardUiState(
+            status = VenueDashboardStatus.LOADED,
+            venueName = "Café Lumière",
+            avatar = VenueAvatar.Initials("CL"),
+            needsAnswer =
+                listOf(
+                    DashboardReservation(
+                        reservationId = "a",
+                        questTitle = "Find the hidden fox",
+                        explorerName = "Yusuf S.",
+                        partySize = 3,
+                        requestedAt = System.currentTimeMillis(),
+                        approved = false,
+                    )
+                ),
+            offline = true,
         ),
         onApprove = {},
         onDecline = {},
