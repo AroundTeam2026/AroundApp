@@ -433,10 +433,11 @@ internal fun VenueDashboardPreview() {
   }
 }
 
+// Internal, not private, so a test can draw it
 @Preview(name = "Offline, light")
 @Preview(name = "Offline, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun VenueDashboardOfflinePreview() {
+internal fun VenueDashboardOfflinePreview() {
   AroundAppTheme {
     VenueDashboardContent(
         VenueDashboardUiState(

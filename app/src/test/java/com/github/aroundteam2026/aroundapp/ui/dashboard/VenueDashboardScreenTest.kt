@@ -263,6 +263,23 @@ class VenueDashboardScreenTest {
     assertTrue(top(C.Tag.DASHBOARD_PROOFS) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
   }
 
+  @Test
+  fun theOfflinePreviewShowsTheHintAboveTheRowsAndDisablesTheButtons() {
+    compose.setContent { VenueDashboardOfflinePreview() }
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    assertTrue(top(C.Tag.OFFLINE_HINT) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
+    inRow("a", C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    inRow("a", C.Tag.DASHBOARD_ROW_DECLINE).assertIsNotEnabled()
+  }
+
+  @Test
+  fun offlineWithNothingToAnswerShowsNoHint() {
+    show(loaded(upcoming = listOf(pending("u").copy(approved = true))).copy(offline = true))
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+  }
+
   /** Where the node tagged [tag] starts, from the top of the screen. */
   private fun top(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.top
 
