@@ -15,12 +15,15 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   [status] is [OverviewStatus.LOADED], and may stay empty then.
  * @property cancellingIds Ids of the reservations being cancelled right now, among [rows].
  * @property failedCancelIds Ids of the reservations whose last cancel failed, among [rows].
+ * @property offline Whether the device is offline, so cancelling, which needs a connection, is
+ *   unavailable.
  */
 data class OverviewUiState(
     val status: OverviewStatus = OverviewStatus.LOADING,
     val rows: List<OverviewRow> = emptyList(),
     val cancellingIds: Set<String> = emptySet(),
     val failedCancelIds: Set<String> = emptySet(),
+    val offline: Boolean = false,
 ) {
   /** How cancelling the reservation [reservationId] stands, for its card. */
   fun cancelStatusOf(reservationId: String): CancelStatus =

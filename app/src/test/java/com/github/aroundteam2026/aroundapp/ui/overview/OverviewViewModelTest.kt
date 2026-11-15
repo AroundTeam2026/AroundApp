@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -47,6 +49,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -61,6 +64,7 @@ class OverviewViewModelTest {
   private val listener = BreakableReservations(reservations)
   private val completions = FakeCompletionRepository { now }
   private val users = FakeUserRepository()
+  private val connectivity = FakeConnectivityRepository()
 
   private val venues =
       FakeVenueRepository(
@@ -85,7 +89,16 @@ class OverviewViewModelTest {
   }
 
   private val viewModel by lazy {
-    OverviewViewModel(EXPLORER, listener, questRepository, venues, party, completions, users)
+    OverviewViewModel(
+        EXPLORER,
+        listener,
+        questRepository,
+        venues,
+        party,
+        completions,
+        users,
+        connectivity,
+    )
   }
 
   private val state
@@ -397,7 +410,16 @@ class OverviewViewModelTest {
           }
         }
     val viewModel =
-        OverviewViewModel(EXPLORER, listener, questRepository, broken, party, completions, users)
+        OverviewViewModel(
+            EXPLORER,
+            listener,
+            questRepository,
+            broken,
+            party,
+            completions,
+            users,
+            connectivity,
+        )
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
@@ -413,7 +435,16 @@ class OverviewViewModelTest {
           }
         }
     val viewModel =
-        OverviewViewModel(EXPLORER, listener, questRepository, venues, broken, completions, users)
+        OverviewViewModel(
+            EXPLORER,
+            listener,
+            questRepository,
+            venues,
+            broken,
+            completions,
+            users,
+            connectivity,
+        )
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
@@ -429,7 +460,16 @@ class OverviewViewModelTest {
           ): Flow<List<Completion>> = flow { throw IOException("denied") }
         }
     val viewModel =
-        OverviewViewModel(EXPLORER, listener, questRepository, venues, party, broken, users)
+        OverviewViewModel(
+            EXPLORER,
+            listener,
+            questRepository,
+            venues,
+            party,
+            broken,
+            users,
+            connectivity,
+        )
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), viewModel.uiState.value)
@@ -453,7 +493,16 @@ class OverviewViewModelTest {
           }
         }
     val viewModel =
-        OverviewViewModel(EXPLORER, listener, questRepository, venues, party, recording, users)
+        OverviewViewModel(
+            EXPLORER,
+            listener,
+            questRepository,
+            venues,
+            party,
+            recording,
+            users,
+            connectivity,
+        )
     runCurrent()
 
     assertEquals(
@@ -581,7 +630,16 @@ class OverviewViewModelTest {
           override fun observeUser(uid: String): Flow<User?> =
               if (uid == sender) profile else users.observeUser(uid)
         }
-    return OverviewViewModel(EXPLORER, listener, questRepository, venues, party, completions, slow)
+    return OverviewViewModel(
+        EXPLORER,
+        listener,
+        questRepository,
+        venues,
+        party,
+        completions,
+        slow,
+        connectivity,
+    )
   }
 
   // Every member sees the venue's answer to the party's proof, whoever sent it
@@ -628,6 +686,25 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED), state)
+  }
+
+  // Offline, the overview may well fail to load: the hint must stay once it loads on retry
+  @Test
+  fun aFailureAndARetryKeepTheDeviceOffline() = test {
+    book("fox")
+    connectivity.online.value = false
+    listener.broken = true
+    viewModel
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    runCurrent()
+    assertEquals(OverviewUiState(status = OverviewStatus.FAILED, offline = true), state)
+
+    listener.broken = false
+    viewModel.retry()
+    runCurrent()
+
+    assertEquals(OverviewStatus.LOADED, state.status)
+    assertTrue(state.offline)
   }
 
   @Test

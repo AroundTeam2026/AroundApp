@@ -81,6 +81,8 @@ import java.util.TimeZone
  * @param clock Tells which day is today, and the time zone the slot is written in.
  * @param cancelStatus How cancelling this reservation stands, which the cancel button shows.
  * @param onCancel Cancels the reservation, or null to draw no cancel button.
+ * @param offline Whether the device is offline: the cancel button is then disabled, under a hint
+ *   that cancelling needs a connection.
  * @param onSendNewProof Opens the proof form to replace the party's proof, or null to draw no
  *   button.
  */
@@ -92,6 +94,7 @@ fun OverviewQuestRow(
     clock: Clock = Clock.systemDefaultZone(),
     cancelStatus: CancelStatus = CancelStatus.NONE,
     onCancel: (() -> Unit)? = null,
+    offline: Boolean = false,
     onSendNewProof: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
@@ -169,7 +172,7 @@ fun OverviewQuestRow(
     }
     if (onSendNewProof != null) NewProofButton(onSendNewProof)
     if (onCancel != null) {
-      CancelReservationAction(cancelStatus, row.venueName, onCancel, offline = false)
+      CancelReservationAction(cancelStatus, row.venueName, onCancel, offline)
     }
   }
 }
