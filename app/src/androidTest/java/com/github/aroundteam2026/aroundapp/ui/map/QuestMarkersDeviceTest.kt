@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -73,6 +74,7 @@ class QuestMarkersDeviceTest {
           },
           FakeQuestRepository(initialQuests = listOf(cafe, bar, geneva)),
           FakeVenueRepository(venues.values.toList()),
+          FakeConnectivityRepository(),
       )
   private val camera = CameraPositionState()
   // Written on the main thread, read on the test thread

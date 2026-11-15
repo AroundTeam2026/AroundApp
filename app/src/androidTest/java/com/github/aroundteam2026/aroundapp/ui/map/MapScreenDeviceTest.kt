@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -62,7 +63,13 @@ class MapScreenDeviceTest {
   @Test
   fun framesFiveKilometresAroundTheExplorer() {
     val camera = CameraPositionState()
-    val viewModel = MapViewModel(StaticLocation(here), FakeQuestRepository(), FakeVenueRepository())
+    val viewModel =
+        MapViewModel(
+            StaticLocation(here),
+            FakeQuestRepository(),
+            FakeVenueRepository(),
+            FakeConnectivityRepository(),
+        )
     composeTestRule.setContent { MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }) }
 
     // The camera starts on the default center, so reaching the explorer means it framed them
@@ -88,7 +95,13 @@ class MapScreenDeviceTest {
 
   @Test
   fun switchingTabsKeepsTheCameraWhereTheExplorerLeftIt() {
-    val viewModel = MapViewModel(StaticLocation(here), FakeQuestRepository(), FakeVenueRepository())
+    val viewModel =
+        MapViewModel(
+            StaticLocation(here),
+            FakeQuestRepository(),
+            FakeVenueRepository(),
+            FakeConnectivityRepository(),
+        )
     // The camera MapScreen makes by default, made where the app makes it: inside the Map tab, which
     // saves it. This covers rememberMapCamera(), not that MapScreen's default argument still calls
     // it.
@@ -130,7 +143,13 @@ class MapScreenDeviceTest {
 
   @Test
   fun theExplorersPositionIsOnlyDrawnWithThePermission() {
-    val viewModel = MapViewModel(StaticLocation(here), FakeQuestRepository(), FakeVenueRepository())
+    val viewModel =
+        MapViewModel(
+            StaticLocation(here),
+            FakeQuestRepository(),
+            FakeVenueRepository(),
+            FakeConnectivityRepository(),
+        )
     val camera = CameraPositionState()
     composeTestRule.setContent { MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }) }
     val map = composeTestRule.awaitGoogleMap()

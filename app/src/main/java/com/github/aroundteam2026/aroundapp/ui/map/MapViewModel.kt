@@ -12,6 +12,8 @@ import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.contains
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -32,9 +34,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.runningReduce
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
@@ -59,9 +63,12 @@ import kotlinx.coroutines.launch
  * @property showsNearby Whether the nearby quests are open over the map. They and a card are never
  *   open together.
  * @property loadFailed Whether the quests or their venues failed to load, so the map has no pins
- *   even where there are quests. False again once they load.
+ *   even where there are quests. False again once they load, and always false [offline], as the map
+ *   then shows what Firestore kept on the phone and loads the rest once back online.
  * @property retrying Whether what failed is being listened to again after [MapViewModel.onRetry],
  *   until it answers.
+ * @property offline Whether the device is offline, so the map says it shows the quests saved on the
+ *   phone.
  */
 data class MapUiState(
     val areaToFrame: GeoBounds?,
@@ -74,6 +81,7 @@ data class MapUiState(
     val filters: NearbyFilters = NearbyFilters(),
     val loadFailed: Boolean = false,
     val retrying: Boolean = false,
+    val offline: Boolean = false,
 )
 
 /**
@@ -84,11 +92,15 @@ data class MapUiState(
  * as rewards expire, by [clock]. At most one pin is open into its card at a time. It also lists the
  * valid quests near the explorer, from the same quests, venues and position as the pins. If the
  * quests or their venues fail to load, it says so until [onRetry] loads them.
+ *
+ * Offline, it keeps what it last loaded and says it is offline rather than that loading failed;
+ * back online, it loads again whatever failed, without [onRetry].
  */
 class MapViewModel(
     private val locationRepository: LocationRepository,
     private val questRepository: QuestRepository,
     private val venueRepository: VenueRepository,
+    connectivityRepository: ConnectivityRepository,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
   private val _uiState =
@@ -123,6 +135,17 @@ class MapViewModel(
    */
   private val retryWaiting = MutableStateFlow<Retrying?>(null)
   /**
+   * The listeners loaded again because the device came back online that have yet to answer. Until
+   * they do, their failure isn't shown: the explorer didn't ask for this retry.
+   */
+  private val reloading = MutableStateFlow<Set<Retrying>>(emptySet())
+  /**
+   * Whether the device is online, assumed until the repository says otherwise. Declared before
+   * [content], whose listeners read it as soon as they start.
+   */
+  private val online =
+      connectivityRepository.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+  /**
    * The pins of every venue with valid quests, on screen or not, and the nearby list, built
    * together from each snapshot of [mapData], so the screen never shows one newer than the other.
    */
@@ -142,20 +165,28 @@ class MapViewModel(
     viewModelScope.launch {
       // The venues on screen get a pin, and the open one keeps it wherever it is: the card is far
       // bigger than the pin, so it can still be on screen when its venue isn't
-      combine(content, visibleArea, selectedPinKey, filters, retryWaiting) {
+      combine(
+              content,
+              visibleArea,
+              selectedPinKey,
+              filters,
+              combine(retryWaiting, online, reloading, ::Triple),
+          ) {
               (pins, nearby, questsFailed, venuesFailed),
               area,
               opened,
               chosen,
-              waiting ->
+              (waiting, isOnline, reloaded) ->
             val selected = opened?.takeIf { id -> pins.any { it.key == id } }
             val shown = pins.filter { (area != null && it.location in area) || it.key == selected }
             val listed = nearby.filter(chosen::matches)
-            // One error for both: without quests there are no venues to load either
-            val failed = questsFailed || venuesFailed
-            ShownMap(shown, opened, selected, listed, chosen, failed, retrying = waiting != null)
+            // One error for both: without quests there are no venues to load either. Offline,
+            // "Try again" couldn't help: the offline message shows instead. Back online, it waits
+            // for what was loaded again, which needed no tap
+            val failed = (questsFailed || venuesFailed) && isOnline && reloaded.isEmpty()
+            ShownMap(shown, opened, selected, listed, chosen, failed, waiting != null, !isOnline)
           }
-          .collect { (shown, opened, selected, nearby, chosen, failed, retrying) ->
+          .collect { (shown, opened, selected, nearby, chosen, failed, retrying, offline) ->
             // A venue left without valid quests closes its card for good
             if (selected == null && opened != null) selectedPinKey.compareAndSet(opened, null)
             // One update, so the pins and the list always come from the same snapshot
@@ -167,10 +198,14 @@ class MapViewModel(
                   filters = chosen,
                   loadFailed = failed,
                   retrying = retrying,
+                  offline = offline,
               )
             }
           }
     }
+    // Back online, whatever failed loads again, so the explorer needn't try again themselves. Not
+    // on the first value: a failure while online keeps its "Try again"
+    viewModelScope.launch { online.drop(1).collect { if (it) reloadWhatFailed() } }
   }
 
   /**
@@ -250,6 +285,22 @@ class MapViewModel(
     }
   }
 
+  /**
+   * Listens again to every listener that failed, the quests and the venues alike: the venues kept
+   * offline wouldn't change, so reloading the quests alone wouldn't reload them.
+   */
+  private fun reloadWhatFailed() {
+    val current = content.value
+    val failed = buildSet {
+      if (current.questsFailed) add(Retrying.QUESTS)
+      if (current.venuesFailed) add(Retrying.VENUES)
+    }
+    if (failed.isEmpty()) return
+    reloading.value = failed
+    if (Retrying.QUESTS in failed) questRetries.update { it + 1 }
+    if (Retrying.VENUES in failed) venueRetries.update { it + 1 }
+  }
+
   /** Called when the explorer closes the nearby quests. */
   fun onNearbyClose() {
     _uiState.update { it.copy(showsNearby = false) }
@@ -284,7 +335,8 @@ class MapViewModel(
    * venues, for a new set of venues.
    *
    * The quests are listened to once, for both the pins and the nearby list, and their venues again
-   * only when the set of venues changes, as each new listener costs Firestore reads.
+   * only when the set of venues changes, as each new listener costs Firestore reads. A failure
+   * while offline keeps what was last loaded (see [keptOffline]).
    */
   // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -301,8 +353,12 @@ class MapViewModel(
                   }
                   // Answered, whether loaded or failed again: the explorer may try again. Only a
                   // retry of the quests ends here, as they also answer while the venues are retried
-                  .onEach { retryWaiting.compareAndSet(Retrying.QUESTS, null) }
+                  .onEach {
+                    retryWaiting.compareAndSet(Retrying.QUESTS, null)
+                    reloading.update { waiting -> waiting - Retrying.QUESTS }
+                  }
             }
+            .keptOffline()
             .shareIn(viewModelScope, SharingStarted.WhileSubscribed(), replay = 1)
     val venues =
         quests
@@ -317,8 +373,12 @@ class MapViewModel(
                     Log.w(TAG, "Listening to venues $venueIds failed", it)
                     emit(Loaded(emptyMap(), failed = true))
                   }
-                  .onEach { retryWaiting.compareAndSet(Retrying.VENUES, null) }
+                  .onEach {
+                    retryWaiting.compareAndSet(Retrying.VENUES, null)
+                    reloading.update { waiting -> waiting - Retrying.VENUES }
+                  }
             }
+            .keptOffline()
     return combine(quests, venues, explorer) { current, known, here ->
           Triple(current, known, here)
         }
@@ -330,6 +390,14 @@ class MapViewModel(
             delay(nextExpiry - now)
           }
         }
+  }
+
+  /**
+   * Keeps the value last loaded when a listener fails while offline, still marked failed so it
+   * loads again once back online; the map then keeps its pins rather than going empty.
+   */
+  private fun <T> Flow<Loaded<T>>.keptOffline(): Flow<Loaded<T>> = runningReduce { last, next ->
+    if (next.failed && !online.value) Loaded(last.value, failed = true) else next
   }
 
   /** What a listener answered: its [value], empty when it [failed]. */
@@ -362,8 +430,8 @@ class MapViewModel(
   /**
    * What the screen shows: the [pins] on screen, the card the explorer [opened], the one still
    * [selected] (null once its venue has no valid quest left), the [nearby] list that passes the
-   * [filters], whether the quests or their venues [failed] to load, and whether a retry is
-   * [retrying].
+   * [filters], whether the quests or their venues [failed] to load while online, whether a retry is
+   * [retrying], and whether the device is [offline].
    */
   private data class ShownMap(
       val pins: List<VenuePin>,
@@ -373,9 +441,10 @@ class MapViewModel(
       val filters: NearbyFilters,
       val failed: Boolean,
       val retrying: Boolean,
+      val offline: Boolean,
   )
 
-  /** The listener a retry listens to again. */
+  /** A listener that a retry, or coming back online, listens to again. */
   private enum class Retrying {
     QUESTS,
     VENUES,
@@ -390,7 +459,7 @@ class MapViewModel(
     /** A tap on a nearby quest frames this distance around its venue, so 500 m across. */
     const val VENUE_FRAME_RADIUS_METERS = 250.0
 
-    /** Builds the [MapViewModel] with the app's [LocationRepository]. */
+    /** Builds the [MapViewModel] with the app's repositories. */
     val factory: ViewModelProvider.Factory = viewModelFactory {
       initializer {
         val app = this[APPLICATION_KEY]!!
@@ -398,6 +467,7 @@ class MapViewModel(
             LocationRepositoryProvider.repository(app),
             QuestRepositoryProvider.repository,
             VenueRepositoryProvider.repository,
+            ConnectivityRepositoryProvider.repository(app),
         )
       }
     }

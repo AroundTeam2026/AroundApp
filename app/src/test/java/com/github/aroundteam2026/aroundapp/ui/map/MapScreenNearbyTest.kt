@@ -25,6 +25,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -67,6 +68,7 @@ class MapScreenNearbyTest {
                   testVenue(id = "bar", name = "Bar Nocturne"),
               )
           ),
+          FakeConnectivityRepository(),
       )
 
   /** Shows the map; unless [locationOn], the explorer refuses the location permission. */

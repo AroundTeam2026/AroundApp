@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -55,6 +56,7 @@ class MapViewModelOverlayTest {
         locating,
         ScriptedQuestRepository.of(quests),
         FakeVenueRepository(listOf(testVenue(id = "cafe", location = venueLocation))),
+        FakeConnectivityRepository(),
         clock = { 1_000L },
     )
   }

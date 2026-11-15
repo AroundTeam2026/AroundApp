@@ -19,7 +19,9 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
@@ -36,10 +38,11 @@ import com.google.maps.android.compose.MapUiSettings
  *
  * It asks for the location permission if needed; while the location is off, a banner's "Turn on"
  * asks again or opens the settings, and while the venues fail to load, another's "Try again" loads
- * them again. Each venue on screen with valid quests gets a pin that opens into a card; the card
- * opens the venue's page and tapping the map closes it. A "Nearby quests" pill opens the nearby
- * quests over the map, closed by Back or by opening a card. Tapping a quest frames its venue and
- * opens its card, "View quest" opens its page, and filters narrow the list, not the pins.
+ * them again. Offline, a banner says the map shows the quests saved on the phone instead. Each
+ * venue on screen with valid quests gets a pin that opens into a card; the card opens the venue's
+ * page and tapping the map closes it. A "Nearby quests" pill opens the nearby quests over the map,
+ * closed by Back or by opening a card. Tapping a quest frames its venue and opens its card, "View
+ * quest" opens its page, and filters narrow the list, not the pins.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card or "View
@@ -114,11 +117,13 @@ fun MapScreen(
           Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Large),
       )
     }
-    // Both can show at once: the failure first, as the map has no pins until it is fixed
+    // The location banner comes last, under the offline or failure one, which says why pins may be
+    // missing
     Column(
         Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
+      if (state.offline) OfflineHint(R.string.offline_map_saved_quests)
       if (state.loadFailed) VenuesErrorBanner(viewModel::onRetry, retrying = state.retrying)
       if (state.locationRefused) LocationBanner(turnOnLocation)
     }
