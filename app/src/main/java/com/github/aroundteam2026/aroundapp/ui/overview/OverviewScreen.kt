@@ -233,6 +233,7 @@ private fun Rows(
           cancelStatus = state.cancelStatusOf(row.reservationId),
           // Once the proof is sent, the quest is done on the explorer's side
           onCancel = if (row.status.cancellable) ({ onCancel(row.reservationId) }) else null,
+          offline = state.offline,
           onSendNewProof =
               if (row.status.proofReplaceable)
                   ({ onSendNewProof(row.reservationId, row.venueName) })

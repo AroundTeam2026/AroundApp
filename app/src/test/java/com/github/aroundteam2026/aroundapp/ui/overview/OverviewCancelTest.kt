@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
@@ -28,6 +29,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -42,6 +45,7 @@ class OverviewCancelTest {
   private val fake = FakeReservationRepository({ START }, party)
   private val reservations = GatedStatusUpdates(fake)
   private val completions = FakeCompletionRepository()
+  private val connectivity = FakeConnectivityRepository()
 
   private val viewModel by lazy {
     OverviewViewModel(
@@ -52,6 +56,7 @@ class OverviewCancelTest {
         party,
         completions,
         FakeUserRepository(),
+        connectivity,
     )
   }
 
@@ -95,6 +100,36 @@ class OverviewCancelTest {
 
     assertEquals(ReservationStatus.CANCELLED, stored(id))
     assertEquals(OverviewUiState(status = OverviewStatus.LOADED), state)
+  }
+
+  @Test
+  fun offlineCancellingIsUnavailable() = test {
+    val id = bookAndOpen()
+    connectivity.online.value = false
+    runCurrent()
+
+    viewModel.cancel(id)
+    runCurrent()
+
+    assertTrue(state.offline)
+    assertEquals(0, reservations.updates)
+    assertEquals(emptySet<String>(), state.cancellingIds)
+    assertEquals(ReservationStatus.PENDING, stored(id))
+  }
+
+  @Test
+  fun backOnlineCancellingIsAvailableAgain() = test {
+    val id = bookAndOpen()
+    connectivity.online.value = false
+    runCurrent()
+    connectivity.online.value = true
+    runCurrent()
+
+    viewModel.cancel(id)
+    runCurrent()
+
+    assertFalse(state.offline)
+    assertEquals(ReservationStatus.CANCELLED, stored(id))
   }
 
   @Test

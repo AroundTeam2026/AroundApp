@@ -21,6 +21,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -234,6 +235,20 @@ class OverviewScreenTest {
   }
 
   @Test
+  fun offlineTheCardsShowTheHintAndCannotBeCancelled() {
+    show(loaded(row()).copy(offline = true))
+
+    compose
+        .onNode(
+            hasTestTag(C.Tag.OFFLINE_HINT) and
+                hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$ID")),
+            useUnmergedTree = true,
+        )
+        .assertIsDisplayed()
+    cancelButtonOf(ID).assertIsNotEnabled()
+  }
+
+  @Test
   fun aCardBeingCancelledHasItsButtonDisabled() {
     show(loaded(row(), row(id = "reservation-2")).copy(cancellingIds = setOf("reservation-2")))
 
@@ -260,6 +275,7 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
             FakeUserRepository(),
+            FakeConnectivityRepository(),
         )
     compose.setContent {
       AroundAppTheme {
@@ -297,6 +313,7 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
             FakeUserRepository(),
+            FakeConnectivityRepository(),
         )
     compose.setContent {
       AroundAppTheme {

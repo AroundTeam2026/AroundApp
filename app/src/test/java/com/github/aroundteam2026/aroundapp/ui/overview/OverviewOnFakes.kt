@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.overview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
@@ -30,6 +31,7 @@ fun OverviewOnFakes(
         party,
         FakeCompletionRepository(),
         FakeUserRepository(),
+        FakeConnectivityRepository(),
     )
   }
   OverviewScreen(viewModel, onOpenQuest, onJoinParty, onSendNewProof = { _, _ -> })
