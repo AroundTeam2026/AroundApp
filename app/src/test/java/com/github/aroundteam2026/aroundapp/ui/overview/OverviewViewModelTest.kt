@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -694,6 +695,7 @@ class OverviewViewModelTest {
     connectivity.online.value = false
     listener.broken = true
     viewModel
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
     runCurrent()
     assertEquals(OverviewUiState(status = OverviewStatus.FAILED, offline = true), state)
 

@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -20,9 +21,13 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -46,6 +51,8 @@ class OverviewCancelTest {
   private val reservations = GatedStatusUpdates(fake)
   private val completions = FakeCompletionRepository()
   private val connectivity = FakeConnectivityRepository()
+  /** What the ViewModel watches; [connectivity] unless a test replaces it before opening. */
+  private var watched: ConnectivityRepository = connectivity
 
   private val viewModel by lazy {
     OverviewViewModel(
@@ -56,7 +63,7 @@ class OverviewCancelTest {
         party,
         completions,
         FakeUserRepository(),
-        connectivity,
+        watched,
     )
   }
 
@@ -86,6 +93,13 @@ class OverviewCancelTest {
     return id
   }
 
+  /** Takes the device offline for long enough that the overview says so. */
+  private fun TestScope.goOffline() {
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    runCurrent()
+  }
+
   private suspend fun stored(id: String): ReservationStatus =
       fake.observeForExplorer(EXPLORER).first().single { it.id == id }.status
 
@@ -105,8 +119,7 @@ class OverviewCancelTest {
   @Test
   fun offlineCancellingIsUnavailable() = test {
     val id = bookAndOpen()
-    connectivity.online.value = false
-    runCurrent()
+    goOffline()
 
     viewModel.cancel(id)
     runCurrent()
@@ -120,15 +133,70 @@ class OverviewCancelTest {
   @Test
   fun backOnlineCancellingIsAvailableAgain() = test {
     val id = bookAndOpen()
-    connectivity.online.value = false
-    runCurrent()
+    goOffline()
     connectivity.online.value = true
+    // Coming back online shows at once
     runCurrent()
+    assertFalse(state.offline)
 
     viewModel.cancel(id)
     runCurrent()
 
+    assertEquals(ReservationStatus.CANCELLED, stored(id))
+  }
+
+  @Test
+  fun goingOfflineShowsOnlyAfterTheDelay() = test {
+    bookAndOpen()
+    connectivity.online.value = false
+
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
+    runCurrent()
     assertFalse(state.offline)
+
+    advanceTimeBy(1)
+    runCurrent()
+    assertTrue(state.offline)
+  }
+
+  // A handover between networks briefly reports offline; the cards shouldn't flash the hint
+  @Test
+  fun aBriefDropShowsNoHintAndCancellingStaysAvailable() = test {
+    val id = bookAndOpen()
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
+    connectivity.online.value = true
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    runCurrent()
+    assertFalse(state.offline)
+
+    viewModel.cancel(id)
+    runCurrent()
+
+    assertEquals(ReservationStatus.CANCELLED, stored(id))
+  }
+
+  @Test
+  fun aFailingConnectivityWatchCountsAsOnline() = test {
+    watched =
+        object : ConnectivityRepository {
+          override val isOnline: Flow<Boolean> = flow {
+            emit(false)
+            delay(2 * OFFLINE_HINT_DELAY_MS)
+            throw SecurityException("no ACCESS_NETWORK_STATE")
+          }
+        }
+    val id = bookAndOpen()
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    runCurrent()
+    assertTrue(state.offline)
+
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    runCurrent()
+    assertFalse(state.offline)
+    viewModel.cancel(id)
+    runCurrent()
+
     assertEquals(ReservationStatus.CANCELLED, stored(id))
   }
 
