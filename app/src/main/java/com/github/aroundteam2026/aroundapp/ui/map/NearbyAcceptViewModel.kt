@@ -91,9 +91,11 @@ class NearbyAcceptViewModel(
    * Books [quest] as a pending reservation, with the explorer as its party's first member. Does
    * nothing while accepting is unavailable, or once the quest is accepted or being accepted, so a
    * double tap books once.
+   *
+   * Known limit: a booking the server refuses after the app wrote it only drops out of the accepted
+   * quests, without "Try again". The venue page's bar tells the two apart; the map could do the
+   * same if it needs to.
    */
-  // ponytail: a booking the server refuses after the app wrote it only drops out of the accepted
-  // quests, without "Try again"; the venue page's bar tells the two apart, if the map needs it too
   fun accept(quest: NearbyQuest) {
     val id = quest.questId
     val current = _uiState.value
