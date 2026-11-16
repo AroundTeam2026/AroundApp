@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
     <string name="offline_hint_title">You\'re offline</string>
     <string name="offline_needs_connection">This action needs a connection.</string>
     <string name="offline_cancel_needs_connection">Cancelling needs a connection.</string>
     <string name="offline_leave_needs_connection">Leaving the party needs a connection.</string>
+    <!-- Caption of the app-wide offline banner, OfflineBanner -->
+    <string name="offline_banner_caption">Showing what\'s saved on this phone.</string>
 </resources>
