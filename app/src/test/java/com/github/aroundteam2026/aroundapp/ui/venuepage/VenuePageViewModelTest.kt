@@ -118,6 +118,29 @@ class VenuePageViewModelTest {
     assertEquals("a", state.selectedQuestId)
   }
 
+  // Otherwise the page would keep a focus with no row to scroll to, and jump if the quest came back
+  @Test
+  fun aFocusedQuestThatLeavesTheListIsNoLongerFocused() = test {
+    quests.value =
+        listOf(
+            testQuest(id = "a", venueId = VENUE_ID, reward = rewardExpiringAt(START + 60_000)),
+            testQuest(id = "b", venueId = VENUE_ID),
+        )
+    focus = "a"
+    viewModel
+    runCurrent()
+    assertEquals("a", state.focusQuestId)
+
+    advanceTimeBy(60_000)
+    runCurrent()
+    assertNull(state.focusQuestId)
+
+    quests.value =
+        quests.value.map { if (it.id == "a") testQuest(id = "a", venueId = VENUE_ID) else it }
+    runCurrent()
+    assertNull(state.focusQuestId)
+  }
+
   @Test
   fun focusingOnAQuestItDoesNotListPicksNothing() = test {
     focus = "gone"
