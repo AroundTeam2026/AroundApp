@@ -48,6 +48,8 @@ import com.google.maps.android.compose.MapUiSettings
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
  * @param onOpenQuest Opens the details of the quest with this id on its venue's page, when the
  *   quest is tapped in the nearby quests.
+ * @param acceptViewModel Accepts the nearby quests from their "Accept quest"; without it, they
+ *   offer none.
  * @param showOfflineBanner Overlays the shared offline banner at the top of the map; by default,
  *   while the shell says the device is offline.
  */
@@ -57,9 +59,11 @@ fun MapScreen(
     cameraPositionState: CameraPositionState = rememberMapCamera(),
     onOpenVenue: (venueId: String, venueName: String) -> Unit,
     onOpenQuest: (venueId: String, questId: String) -> Unit,
+    acceptViewModel: NearbyAcceptViewModel? = null,
     showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsState()
+  val acceptState = acceptViewModel?.uiState?.collectAsState()?.value
   RequestLocationPermission(viewModel::onLocationPermissionResult)
   val turnOnLocation = rememberTurnOnLocation(viewModel::onLocationPermissionResult)
   // Unlike the context's, these follow configuration changes
@@ -115,6 +119,8 @@ fun MapScreen(
           filters = state.filters,
           onFiltersChange = viewModel::onFiltersChange,
           modifier = Modifier.align(Alignment.BottomCenter),
+          acceptState = acceptState,
+          onAccept = { acceptViewModel?.accept(it) },
       )
     } else {
       NearbyQuestsButton(

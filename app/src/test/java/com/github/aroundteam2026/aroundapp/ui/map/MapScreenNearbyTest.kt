@@ -28,12 +28,15 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
 import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,6 +79,7 @@ class MapScreenNearbyTest {
       locationOn: Boolean = false,
       showOfflineBanner: Boolean = false,
       onOpenQuest: (venueId: String, questId: String) -> Unit = { _, _ -> },
+      acceptViewModel: NearbyAcceptViewModel? = null,
   ) {
     if (locationOn) {
       shadowOf(ApplicationProvider.getApplicationContext<Application>())
@@ -89,6 +93,7 @@ class MapScreenNearbyTest {
             viewModel,
             onOpenVenue = { _, _ -> },
             onOpenQuest = onOpenQuest,
+            acceptViewModel = acceptViewModel,
             showOfflineBanner = showOfflineBanner,
         )
       }
@@ -203,6 +208,32 @@ class MapScreenNearbyTest {
 
     assertEquals(listOf("bar" to "bar-1"), opened)
     // Back from the details finds the quests where the explorer left them
+    node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+  }
+
+  @Test
+  fun withoutAnAcceptViewModelThePagesOfferNoAccept() {
+    show()
+    openNearby()
+
+    node(C.Tag.NEARBY_ACCEPT).assertDoesNotExist()
+  }
+
+  @Test
+  fun acceptOnAPageBooksItsQuestAndSaysItIsAccepted() {
+    val reservations = FakeReservationRepository({ 0L })
+    val accept = NearbyAcceptViewModel(reservations, testUsers(EXPLORER), EXPLORER)
+    show(acceptViewModel = accept)
+    openNearby()
+
+    composeTestRule.onNodeWithTag(C.Tag.NEARBY_ACCEPT).performClick()
+    composeTestRule.waitUntil { accept.uiState.value.statusOf("bar-1") == AcceptStatus.ACCEPTED }
+
+    // Without the location the quests go by venue name, so the first page is the bar's
+    composeTestRule
+        .onNodeWithTag(C.Tag.NEARBY_ACCEPT)
+        .assertTextEquals(context.getString(R.string.accept_quest_accepted_short))
+    // The quests stay open, so the explorer can go on to the next one
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
   }
 
@@ -340,5 +371,9 @@ class MapScreenNearbyTest {
         18.dp,
         node(C.Tag.NEARBY_COUNTER).getBoundsInRoot().left - overlay.left,
     )
+  }
+
+  private companion object {
+    const val EXPLORER = "explorer"
   }
 }
