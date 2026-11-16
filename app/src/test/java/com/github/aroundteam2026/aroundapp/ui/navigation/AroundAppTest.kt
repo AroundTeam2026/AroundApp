@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -139,7 +140,12 @@ class AroundAppTest {
     // The app's own map would read Firestore, so the Map tab shows the map on in-memory
     // repositories
     val map =
-        MapViewModel(FakeLocationRepository(null), FakeQuestRepository(), FakeVenueRepository())
+        MapViewModel(
+            FakeLocationRepository(null),
+            FakeQuestRepository(),
+            FakeVenueRepository(),
+            FakeConnectivityRepository(),
+        )
     launch {
       AroundApp(
           explorerUid = "explorer",

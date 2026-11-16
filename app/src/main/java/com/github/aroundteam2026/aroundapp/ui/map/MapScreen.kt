@@ -128,7 +128,8 @@ fun MapScreen(
           Modifier.align(Alignment.BottomEnd).padding(AroundSpacing.Large),
       )
     }
-    // Both can show at once: the failure first, as the map has no pins until it is fixed
+    // The location banner comes last, under the offline or failure one, which says why pins may be
+    // missing
     Column(
         Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),

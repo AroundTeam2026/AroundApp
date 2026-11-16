@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -69,7 +70,13 @@ class MapViewModelNearbyTest {
   private val locationRepository = FakeLocationRepository(here)
 
   private val viewModel by lazy {
-    MapViewModel(locationRepository, questRepository, venueRepository, clock)
+    MapViewModel(
+        locationRepository,
+        questRepository,
+        venueRepository,
+        FakeConnectivityRepository(),
+        clock,
+    )
   }
 
   private val nearby
