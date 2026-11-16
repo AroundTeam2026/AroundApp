@@ -59,7 +59,7 @@ class MapScreenOfflineTest {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
         MapScreen(
             viewModel,
-            onOpenVenue = { _, _ -> },
+            onFocusQuest = { _, _ -> },
             onOpenQuest = { _, _ -> },
             showOfflineBanner = true,
         )
