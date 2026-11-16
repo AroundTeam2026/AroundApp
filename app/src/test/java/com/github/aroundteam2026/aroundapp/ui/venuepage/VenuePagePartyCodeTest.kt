@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
@@ -63,6 +64,7 @@ class VenuePagePartyCodeTest {
         testUsers(EXPLORER),
         party,
         FakeCompletionRepository { START },
+        FakeConnectivityRepository(),
         EXPLORER,
         { START + dispatcher.scheduler.currentTime },
     )

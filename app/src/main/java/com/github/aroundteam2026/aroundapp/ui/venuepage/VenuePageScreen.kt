@@ -54,6 +54,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatarStyle
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
@@ -89,6 +91,8 @@ typealias VenuePageQuestRow =
  * @param questRow Draws each quest; a [VenueQuestRow] unless replaced.
  * @param bottomBar Sits under the list once the venue is loaded, given the picked quest or null; an
  *   [QuestActionBar] that accepts through [viewModel] unless replaced.
+ * @param showOfflineBanner Shows the offline banner under the top bar; by default, while the shell
+ *   says the device is offline.
  */
 @Composable
 fun VenuePageScreen(
@@ -98,6 +102,7 @@ fun VenuePageScreen(
     modifier: Modifier = Modifier,
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -129,6 +134,7 @@ fun VenuePageScreen(
       bottomBar = bottomBar,
       onSubmitProof = { onSubmitProof(it, state.venueName) },
       snackbarHostState = snackbarHostState,
+      showOfflineBanner = showOfflineBanner,
   )
 }
 
@@ -139,6 +145,7 @@ fun VenuePageScreen(
  * takes the page's place, and [onCancel] cancels the reservation from there, or [onSubmitProof]
  * opens the proof form of an approved one, given its id. [snackbarHostState] shows its messages
  * above the bar. The list scrolls to [VenuePageUiState.focusQuestId], then calls [onFocusShown].
+ * With [showOfflineBanner], the offline banner sits under the top bar.
  */
 @Composable
 fun VenuePageContent(
@@ -156,6 +163,7 @@ fun VenuePageContent(
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
     onSubmitProof: (reservationId: String) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    showOfflineBanner: Boolean = false,
 ) {
   // Out here, so that the list is back where it was when the details close
   val listState = rememberLazyListState()
@@ -169,6 +177,7 @@ fun VenuePageContent(
         onCancel,
         modifier,
         onSubmitProof = onSubmitProof,
+        showOfflineBanner = showOfflineBanner,
     )
     return
   }
@@ -179,6 +188,14 @@ fun VenuePageContent(
           .testTag(C.Tag.VENUE_PAGE_SCREEN)
   ) {
     VenuePageTopBar(onBack)
+    if (showOfflineBanner) {
+      OfflineBanner(
+          Modifier.padding(
+              horizontal = AroundSpacing.ScreenHorizontal,
+              vertical = AroundSpacing.Medium,
+          )
+      )
+    }
     when (state.status) {
       VenuePageStatus.LOADING ->
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_PAGE_LOADING)) }
