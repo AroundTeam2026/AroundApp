@@ -95,13 +95,10 @@ class VenueInitializationViewModel(
     val state = uiState.value
     if (!state.canContinue) return
     val name = state.businessName.trim()
-    val checksName = state.editing || !state.hasVenue
-    if (checksName && name.isEmpty()) {
-      mutableUiState.value = state.copy(error = VenueInitializationError.EMPTY_NAME)
-      return
-    }
-    if (checksName && name.length > VenueLimits.MAX_NAME_LENGTH) {
-      mutableUiState.value = state.copy(error = VenueInitializationError.NAME_TOO_LONG)
+    // An existing venue's name is only checked when editing; setup keeps it as it is
+    val invalid = if (state.editing || !state.hasVenue) nameError(name) else null
+    if (invalid != null) {
+      mutableUiState.value = state.copy(error = invalid)
       return
     }
     val uid = authRepository.currentUserId.value
@@ -113,14 +110,7 @@ class VenueInitializationViewModel(
     mutableUiState.value = state.copy(isSaving = true, error = null)
     viewModelScope.launch {
       try {
-        val savedName =
-            // Editing always renames, even if the first read failed, unless nothing changed
-            if (state.editing) {
-              if (name != loadedName) venueRepository.setName(uid, name).getOrThrow()
-              name
-            } else {
-              getOrCreateVenue(uid, name).name
-            }
+        val savedName = save(uid, name, state.editing)
         mutableUiState.value =
             uiState.value.copy(
                 isSaving = false,
@@ -136,6 +126,23 @@ class VenueInitializationViewModel(
             uiState.value.copy(isSaving = false, error = VenueInitializationError.SAVE_FAILED)
       }
     }
+  }
+
+  private fun nameError(name: String): VenueInitializationError? =
+      when {
+        name.isEmpty() -> VenueInitializationError.EMPTY_NAME
+        name.length > VenueLimits.MAX_NAME_LENGTH -> VenueInitializationError.NAME_TOO_LONG
+        else -> null
+      }
+
+  /**
+   * Saves [name] and returns the venue's name. Editing always renames, even if the first read
+   * failed, unless the name is unchanged; setup creates the venue unless it already exists.
+   */
+  private suspend fun save(uid: String, name: String, editing: Boolean): String {
+    if (!editing) return getOrCreateVenue(uid, name).name
+    if (name != loadedName) venueRepository.setName(uid, name).getOrThrow()
+    return name
   }
 
   private suspend fun getOrCreateVenue(uid: String, name: String): Venue {
