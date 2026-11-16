@@ -24,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -109,13 +110,8 @@ class VenuePageViewModel(
    */
   private var arriving: String? = arrivalQuestId
 
-  /**
-   * The reservations this page created, by reservation id. One that was shown as pending and then
-   * vanishes was refused by the server, see [refusedWrites].
-   */
-  private val written = mutableMapOf<String, Write>()
-
-  private class Write(val questId: String, var shown: Boolean = false)
+  /** The reservations this page created, to tell which ones the server then refused. */
+  private val writes = RefusedWrites()
 
   /**
    * The explorer's [reservations], the memberships of the parties of the pending and approved ones
@@ -223,7 +219,7 @@ class VenuePageViewModel(
       result
           .onSuccess { reservationId ->
             // The page stays "accepting" until the reservation shows up in the listener
-            written[reservationId] = Write(id)
+            writes.record(reservationId, id)
             show()
           }
           .onFailure {
@@ -282,7 +278,7 @@ class VenuePageViewModel(
   fun onRetry() {
     if (mutableUiState.value.status != VenuePageStatus.FAILED) return
     mutableUiState.value = VenuePageUiState()
-    written.clear()
+    writes.clear()
     refusing.clear()
     latest = null
     listen()
@@ -419,38 +415,12 @@ class VenuePageViewModel(
               },
       )
     }
-    val refused = booked?.reservations?.let(::refusedWrites).orEmpty()
+    val refused = booked?.reservations?.let(writes::refusedIn).orEmpty()
     mutableUiState.update { it.showing(venue, quests, view, refused, proofs) }
     arriving?.let { questId ->
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
     }
-  }
-
-  /**
-   * The quests whose reservation this page created and the server then refused, e.g. because the
-   * quest was deactivated meanwhile: Firestore first lists the write as pending, then drops it. A
-   * reservation that was never listed yet is not refused, and one that the venue answered, or the
-   * explorer cancelled, is not either. Each refusal is reported once.
-   */
-  private fun refusedWrites(reservations: List<Reservation>): Set<String> {
-    val byId = reservations.associateBy { it.id }
-    val refused = mutableSetOf<String>()
-    val writes = written.iterator()
-    while (writes.hasNext()) {
-      val (id, write) = writes.next()
-      val current = byId[id]
-      when {
-        current == null && write.shown -> {
-          refused += write.questId
-          writes.remove()
-        }
-        current == null -> Unit
-        current.status == ReservationStatus.PENDING -> write.shown = true
-        else -> writes.remove()
-      }
-    }
-    return refused
   }
 
   companion object {
