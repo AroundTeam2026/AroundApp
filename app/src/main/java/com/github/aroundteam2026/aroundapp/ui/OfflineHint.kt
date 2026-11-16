@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui
 
 import androidx.annotation.StringRes
@@ -16,14 +17,23 @@ fun OfflineHint(modifier: Modifier = Modifier) {
   OfflineHint(message = R.string.offline_needs_connection, modifier = modifier)
 }
 
-/** Shows the offline hint with copy for the action that needs a connection. */
+/**
+ * Shows the offline hint with copy for the action that needs a connection.
+ *
+ * @param tag The banner's test tag, so a screen's hint and the app-wide `OfflineBanner` can be told
+ *   apart when both show.
+ */
 @Composable
-internal fun OfflineHint(@StringRes message: Int, modifier: Modifier = Modifier) {
+internal fun OfflineHint(
+    @StringRes message: Int,
+    modifier: Modifier = Modifier,
+    tag: String = C.Tag.OFFLINE_HINT,
+) {
   StatusBanner(
       icon = R.drawable.ic_offline_hint,
       title = stringResource(R.string.offline_hint_title),
       caption = stringResource(message),
-      modifier = modifier.testTag(C.Tag.OFFLINE_HINT),
+      modifier = modifier.testTag(tag),
       iconTint = AroundTheme.colors.accentText,
   )
 }
