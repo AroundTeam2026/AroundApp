@@ -202,6 +202,40 @@ class VenueInitializationViewModelTest {
         assertNull(viewModel.uiState.value.venueId)
       }
 
+  // The first read failed, so the venue looks new: Continue must still rename it, not keep the old
+  // name
+  @Test
+  fun editingAfterAFailedFirstReadStillRenames() =
+      runTest(dispatcher) {
+        val original = Venue("owner-1", "Original", null, 75, null, 1L)
+        repository.seed(original)
+        repository.readFailure = IllegalStateException("offline")
+        val viewModel = viewModel(editing = true)
+        repository.readFailure = null
+
+        viewModel.updateBusinessName("Café Lumière")
+        viewModel.submit()
+        runCurrent()
+
+        assertEquals(original.copy(name = "Café Lumière"), repository.getVenue("owner-1"))
+        assertEquals("owner-1", viewModel.uiState.value.venueId)
+      }
+
+  // Only moving the marker: an unchanged name isn't written, so it can't fail
+  @Test
+  fun editingWithAnUnchangedNameContinuesWithoutWriting() =
+      runTest(dispatcher) {
+        repository.seed(Venue("owner-1", "Original", null, 75, null, 1L))
+        repository.renameFailure = IllegalStateException("offline")
+        val viewModel = viewModel(editing = true)
+
+        viewModel.submit()
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.error)
+        assertEquals("owner-1", viewModel.uiState.value.venueId)
+      }
+
   @Test
   fun aFailedRenameKeepsTheNameForRetry() =
       runTest(dispatcher) {

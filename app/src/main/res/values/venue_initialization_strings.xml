@@ -5,6 +5,8 @@
     <string name="venue_initialization_title">Set up your venue</string>
     <!-- The same screen, opened from "Edit details" on the venue's Profile tab -->
     <string name="venue_initialization_edit_title">Edit your venue</string>
+    <!-- Saves the name before the area step, so going back afterwards doesn't undo it -->
+    <string name="venue_initialization_edit_continue">Save and continue</string>
     <string name="venue_profile_edit">Edit details</string>
     <string name="venue_profile_edit_subtitle">Your name and address</string>
     <string name="venue_initialization_description">Explorers will see this on your quests and on the map.</string>

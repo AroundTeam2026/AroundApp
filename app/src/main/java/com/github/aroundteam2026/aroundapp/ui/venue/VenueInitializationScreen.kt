@@ -269,8 +269,11 @@ fun VenueInitializationContent(
       ) {
         Text(
             stringResource(
-                if (state.isSaving) R.string.venue_initialization_saving
-                else R.string.venue_initialization_continue
+                when {
+                  state.isSaving -> R.string.venue_initialization_saving
+                  state.editing -> R.string.venue_initialization_edit_continue
+                  else -> R.string.venue_initialization_continue
+                }
             ),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,

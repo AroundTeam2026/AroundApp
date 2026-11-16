@@ -52,6 +52,9 @@ class VenueInitializationViewModel(
 ) : ViewModel() {
   private val mutableUiState =
       MutableStateFlow(VenueInitializationUiState(isLoading = true, editing = editing))
+
+  /** The name as loaded, so editing skips the write when it's unchanged. */
+  private var loadedName: String? = null
   val uiState = mutableUiState.asStateFlow()
 
   init {
@@ -60,6 +63,7 @@ class VenueInitializationViewModel(
         val uid = authRepository.currentUserId.value
         val venue = if (uid.isNullOrBlank()) null else venueRepository.getVenue(uid)
         if (venue != null) {
+          loadedName = venue.name
           mutableUiState.value = uiState.value.copy(businessName = venue.name, hasVenue = true)
         }
       } catch (cancelled: CancellationException) {
@@ -110,8 +114,9 @@ class VenueInitializationViewModel(
     viewModelScope.launch {
       try {
         val savedName =
-            if (state.editing && state.hasVenue) {
-              venueRepository.setName(uid, name).getOrThrow()
+            // Editing always renames, even if the first read failed, unless nothing changed
+            if (state.editing) {
+              if (name != loadedName) venueRepository.setName(uid, name).getOrThrow()
               name
             } else {
               getOrCreateVenue(uid, name).name

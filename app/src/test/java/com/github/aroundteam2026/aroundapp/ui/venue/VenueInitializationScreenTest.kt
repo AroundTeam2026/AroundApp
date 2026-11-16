@@ -109,6 +109,7 @@ class VenueInitializationScreenTest {
 
     compose.onNodeWithText("Edit your venue").assertIsDisplayed()
     compose.onNodeWithText("Set up your venue").assertDoesNotExist()
+    compose.onNodeWithText("Save and continue").assertIsDisplayed()
   }
 
   @Test

@@ -91,7 +91,16 @@ fun VenueEntryNavigation(
         createQuestFactory,
         VenueTabFactories(venueQuestsFactory, dashboardFactory, venueProfileFactory),
     )
-    venueEditDestinations(navController, authRepository, venueRepository, locationScreen)
+    // Editing from the profile: saving the area returns to the Profile tab
+    venueOnboardingDestinations(navController, authRepository, venueRepository, editing = true) {
+        venueId,
+        onBack ->
+      locationScreen(
+          venueId,
+          { navController.popBackStack(VenueOnboardingRoutes.EDIT, inclusive = true) },
+          onBack,
+      )
+    }
   }
   if (start is VenueEntryStart.Area) ResumeOnArea(start.venueId, navController)
 }
