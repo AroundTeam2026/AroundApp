@@ -23,6 +23,8 @@
     <string name="review_proof_title">Review proof</string>
     <string name="review_proof_back">Back to the dashboard</string>
     <string name="review_proof_pending">Pending</string>
+    <string name="review_proof_rejected">Rejected</string>
+    <string name="review_proof_approved">Approved</string>
     <!-- The explorer's party, then when the proof was sent, e.g. "Party of 4 · sent 2 min. ago" -->
     <string name="review_proof_party_and_sent">%1$s · sent %2$s</string>
     <string name="review_proof_party_and_sent_just_now">%1$s · sent just now</string>

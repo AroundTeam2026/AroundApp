@@ -3,12 +3,17 @@ package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.Context
 import android.text.format.DateUtils
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
@@ -135,6 +140,36 @@ class DashboardProofRowTest {
 
     assertEquals(1, opens)
   }
+
+  @Test
+  fun aProofToReviewHasNoReason() {
+    show(proof())
+
+    node(C.Tag.PROOF_REJECT_REASON).assertDoesNotExist()
+    row().assert(clickLabel(string(R.string.dashboard_proof_open)))
+  }
+
+  @Test
+  fun aRejectedProofShowsItsReasonAndOpensToBeSeen() {
+    show(proof().copy(rejectReason = "Not taken at the venue: show the fox"))
+
+    node(C.Tag.PROOF_REJECT_REASON).assertIsDisplayed()
+    compose
+        .onNodeWithText(string(R.string.review_proof_rejected).uppercase(), useUnmergedTree = true)
+        .assertIsDisplayed()
+    compose
+        .onNodeWithText("Not taken at the venue: show the fox", useUnmergedTree = true)
+        .assertIsDisplayed()
+    row().assert(clickLabel(string(R.string.dashboard_proof_see))).performClick()
+
+    assertEquals(1, opens)
+  }
+
+  /** Matches a node whose click is announced to screen readers as [label]. */
+  private fun clickLabel(label: String) =
+      SemanticsMatcher("taps say \"$label\"") {
+        it.config.getOrNull(SemanticsActions.OnClick)?.label == label
+      }
 
   @Test
   fun thePreviewShowsAPhotoAndAWrittenAnswer() {

@@ -62,8 +62,10 @@ import kotlinx.coroutines.withContext
  * It follows the venue's completions for this one, as the repository has no listener for a single
  * completion, and reads the reservation it belongs to (the explorer's name), the reservation's
  * party, the quest (title, requirements and reward) and, for a photo, the photo through
- * [proofPhotoRepository], decoded by [decode]. Once the proof is no longer pending, here or on
- * another phone, the state is [ReviewProofUiState.reviewed]. A proof that can't be found, or its
+ * [proofPhotoRepository], decoded by [decode]. Once the proof is no longer pending, the state is
+ * [ReviewProofUiState.reviewed], with the reason of a rejection; once it is answered while shown,
+ * here or on another phone, the state is also [ReviewProofUiState.answered]. A proof the venue
+ * already rejected opens read-only, for the venue to look at. A proof that can't be found, or its
  * listener failing, shows [ReviewProofStatus.FAILED] until [retry]. The reservation, party or quest
  * failing only leaves out what they tell, and a photo that can't be downloaded or decoded shows
  * [ProofPhoto.Failed] until [retry].
@@ -96,6 +98,15 @@ class ReviewProofViewModel(
   /** Saves the venue's answer to the proof. */
   private val answers = AnswerSaver(viewModelScope, TAG)
 
+  /**
+   * Where the proof stood when last shown: pending, rejected or approved, as [answerOf] tells; null
+   * until it is shown.
+   */
+  private var shownAnswer: Answer? = null
+
+  /** Whether the proof was answered while shown; it stays so, as the screen is leaving. */
+  private var answeredWhileShown = false
+
   /** Whether the venue's answer is being written, until the repository returns. */
   private val writing = MutableStateFlow(false)
 
@@ -116,12 +127,21 @@ class ReviewProofViewModel(
               writing,
           ) { listened, answers, reloading, writing ->
             val shown = if (reloading) ReviewProofUiState() else listened
+            if (shown.status == ReviewProofStatus.LOADED) {
+              val answer = answerOf(shown)
+              val before = shownAnswer
+              if (before != null && answer != before && answer != Answer.NONE) {
+                answeredWhileShown = true
+              }
+              shownAnswer = answer
+            }
             val pending =
                 if (shown.status == ReviewProofStatus.LOADED && !shown.reviewed) setOf(completionId)
                 else emptySet()
             // While the answer is being written, saving even if the proof fails to load meanwhile:
             // the screen keeps Back disabled, as leaving would cancel the write
             shown.copy(
+                answered = answeredWhileShown,
                 saving = writing || answers.savingAmong(pending).isNotEmpty(),
                 updateFailed = answers.failed,
             )
@@ -303,6 +323,7 @@ class ReviewProofViewModel(
           proof = completion.proof,
           photo = read.photo,
           reviewed = completion.status != CompletionStatus.PENDING,
+          rejectReason = completion.rejectReason,
       )
 
   /** What was read about the proof of the reservation [reservationId], besides the proof itself. */
@@ -313,6 +334,21 @@ class ReviewProofViewModel(
       val quest: Quest?,
       val photo: ProofPhoto?,
   )
+
+  /** The venue's answer to a proof, as far as the screen tells it apart. */
+  private enum class Answer {
+    NONE,
+    REJECTED,
+    APPROVED,
+  }
+
+  /** The venue's answer to the proof [state] shows. */
+  private fun answerOf(state: ReviewProofUiState) =
+      when {
+        !state.reviewed -> Answer.NONE
+        state.rejectReason != null -> Answer.REJECTED
+        else -> Answer.APPROVED
+      }
 
   companion object {
     private const val TAG = "ReviewProofViewModel"

@@ -242,22 +242,23 @@ class VenueDashboardViewModel(
 
 /**
  * The reservations whose parties the dashboard shows: the pending and approved ones, and those of
- * the pending proofs, whose reservation may have been cancelled since.
+ * the pending and rejected proofs, whose reservation may have been cancelled since.
  */
 private fun partyIdsOf(reservations: List<Reservation>, completions: List<Completion>) =
     reservations.filter { it.status.isActive }.mapTo(HashSet()) { it.id } +
-        completions.filter { it.status == CompletionStatus.PENDING }.map { it.reservationId }
+        completions.filter { it.status != CompletionStatus.APPROVED }.map { it.reservationId }
 
 /**
  * The loaded dashboard of [venue], built from [reservations], the joined members of their [parties]
- * keyed by reservation id, [quests], the pending [completions], and the members' [profiles] and
+ * keyed by reservation id, [quests], the venue's [completions], and the members' [profiles] and
  * downloaded [pictures], keyed by uid and by location.
  *
  * Pending reservations need an answer and approved ones are upcoming, each oldest request first,
  * ties going to the smallest id; rejected and cancelled ones are left out. The proofs to review
- * follow the same order. A missing party counts as empty, and an unreadable [venue] leaves the
- * header empty. Each pending reservation gets its [ApproveBlock] from its quest and party.
- * Reservations have no visit time yet, so nothing is sorted or filtered by slot.
+ * follow the same order, and the rejected proofs the opposite one, most recently sent first. A
+ * missing party counts as empty, and an unreadable [venue] leaves the header empty. Each pending
+ * reservation gets its [ApproveBlock] from its quest and party. Reservations have no visit time
+ * yet, so nothing is sorted or filtered by slot.
  */
 internal fun dashboardOf(
     reservations: List<Reservation>,
@@ -270,6 +271,17 @@ internal fun dashboardOf(
 ): VenueDashboardUiState {
   val questsById = quests.associateBy { it.id }
   val reservationsById = reservations.associateBy { it.id }
+  fun proofs(status: CompletionStatus) =
+      completions
+          .filter { it.status == status }
+          .sortedWith(compareBy<Completion> { it.submittedAt }.thenBy { it.id })
+          .map {
+            it.toDashboardProof(
+                reservationsById[it.reservationId],
+                questsById,
+                parties[it.reservationId]?.size ?: 0,
+            )
+          }
   fun withStatus(status: ReservationStatus) =
       reservations
           .filter { it.status == status }
@@ -289,17 +301,8 @@ internal fun dashboardOf(
       needsAnswer = withStatus(ReservationStatus.PENDING),
       upcoming = withStatus(ReservationStatus.APPROVED),
       activeQuestsCount = quests.count { it.status == QuestStatus.ACTIVE },
-      proofsToReview =
-          completions
-              .filter { it.status == CompletionStatus.PENDING }
-              .sortedWith(compareBy<Completion> { it.submittedAt }.thenBy { it.id })
-              .map {
-                it.toDashboardProof(
-                    reservationsById[it.reservationId],
-                    questsById,
-                    parties[it.reservationId]?.size ?: 0,
-                )
-              },
+      proofsToReview = proofs(CompletionStatus.PENDING),
+      rejectedProofs = proofs(CompletionStatus.REJECTED).asReversed(),
   )
 }
 
@@ -352,4 +355,5 @@ private fun Completion.toDashboardProof(
         partySize = partySize,
         proofType = proof.type,
         sentAt = submittedAt,
+        rejectReason = rejectReason,
     )

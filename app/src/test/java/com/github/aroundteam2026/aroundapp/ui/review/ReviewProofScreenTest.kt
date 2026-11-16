@@ -460,6 +460,47 @@ class ReviewProofScreenTest {
     assertEquals(1, backs)
   }
 
+  @Test
+  fun aRejectedProofShowsItsReasonAndCantBeAnswered() {
+    show(PHOTO.copy(reviewed = true, rejectReason = "Not taken at the venue"))
+
+    node(C.Tag.PROOF_REJECT_REASON).assertIsDisplayed()
+    compose.onNodeWithText("Not taken at the venue").assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.review_proof_rejected)).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.review_proof_pending)).assertDoesNotExist()
+    // The photo is still there to look at
+    node(C.Tag.REVIEW_PROOF_PHOTO).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_REJECT).assertDoesNotExist()
+  }
+
+  @Test
+  fun anApprovedProofSaysSoWithoutAReason() {
+    show(ANSWER.copy(reviewed = true))
+
+    compose.onNodeWithText(string(R.string.review_proof_approved)).assertIsDisplayed()
+    node(C.Tag.PROOF_REJECT_REASON).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertDoesNotExist()
+  }
+
+  @Test
+  fun aRejectedProofStaysOpenUntilItIsAnsweredElsewhere() {
+    val fakes = ReviewProofOnFakes()
+    val id = runBlocking { fakes.sendProof() }
+    runBlocking { fakes.completions.reject(id, "Blurry").getOrThrow() }
+    val viewModel = fakes.reviewProof(id)
+    compose.setContent { AroundAppTheme { ReviewProofScreen(viewModel, onBack = { backs++ }) } }
+    compose.waitForIdle()
+
+    compose.onNodeWithText("Blurry").assertIsDisplayed()
+    assertEquals(0, backs)
+
+    runBlocking { fakes.completions.approve(id).getOrThrow() }
+    compose.waitForIdle()
+
+    assertEquals(1, backs)
+  }
+
   /** A real image's bytes, as a downloaded photo would be. */
   private fun pngBytes(): ByteArray {
     val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)

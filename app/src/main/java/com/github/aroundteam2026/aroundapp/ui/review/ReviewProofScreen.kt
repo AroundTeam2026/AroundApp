@@ -83,8 +83,9 @@ import kotlinx.coroutines.launch
 /**
  * The Review proof screen, as the Figma frames `S4 · Review proof`: who sent the proof, for which
  * quest, the photo or the written answer, and Approve and Reject. Reject opens [RejectProofSheet].
- * A failed answer shows a snackbar once. Once the proof is reviewed, here or on another phone,
- * [onBack] returns to the dashboard; while an answer is being saved, Back waits for it.
+ * A failed answer shows a snackbar once. Once the proof is answered while shown, here or on another
+ * phone, [onBack] returns to the dashboard; while an answer is being saved, Back waits for it. A
+ * proof the venue already rejected shows read-only, with the reason, and no Approve or Reject.
  *
  * @param viewModel Holds the proof the dashboard opened.
  * @param onBack Returns to the dashboard.
@@ -107,7 +108,7 @@ fun ReviewProofScreen(
     }
   }
   val currentOnBack by rememberUpdatedState(onBack)
-  LaunchedEffect(state.reviewed) { if (state.reviewed) currentOnBack() }
+  LaunchedEffect(state.answered) { if (state.answered) currentOnBack() }
   BackHandler(state.saving) {}
   ReviewProofContent(
       state = state,
@@ -145,7 +146,8 @@ internal fun ReviewProofContent(
       containerColor = MaterialTheme.colorScheme.background,
       snackbarHost = { SnackbarHost(snackbarHostState) },
       bottomBar = {
-        if (loaded) {
+        // An answered proof is only there to look at
+        if (loaded && !state.reviewed) {
           Actions(
               state,
               approving = state.saving && !rejecting,
@@ -172,6 +174,7 @@ internal fun ReviewProofContent(
         ReviewProofStatus.FAILED -> LoadFailed(onRetry)
         ReviewProofStatus.LOADED -> {
           Explorer(state, clock)
+          state.rejectReason?.let { RejectedReason(it) }
           Quest(state.questTitle, state.requirements)
           when (val proof = state.proof) {
             is Proof.Photo -> PhotoProof(state, explorerInSentence(state), clock, onRetry)
@@ -222,7 +225,9 @@ private fun TopBar(onBack: () -> Unit, enabled: Boolean) {
   }
 }
 
-/** Who sent the proof, their party and when, then the Pending tag. */
+/**
+ * Who sent the proof, their party and when, then where it stands: Pending, Rejected or Approved.
+ */
 @Composable
 private fun Explorer(state: ReviewProofUiState, clock: Clock) {
   val name = state.explorerName
@@ -265,7 +270,13 @@ private fun Explorer(state: ReviewProofUiState, clock: Clock) {
         contentColor = AroundTheme.colors.accentText,
     ) {
       Text(
-          stringResource(R.string.review_proof_pending),
+          stringResource(
+              when {
+                !state.reviewed -> R.string.review_proof_pending
+                state.rejectReason != null -> R.string.review_proof_rejected
+                else -> R.string.review_proof_approved
+              }
+          ),
           Modifier.padding(horizontal = AroundSpacing.Medium, vertical = TAG_VERTICAL_PADDING),
           style = AroundTextStyles.Badge,
       )

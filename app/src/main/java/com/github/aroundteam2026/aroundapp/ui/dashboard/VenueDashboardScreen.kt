@@ -66,9 +66,10 @@ import kotlinx.coroutines.launch
 /**
  * The venue's Dashboard tab, as the Figma frame `Venue dashboard`: a header with the venue and
  * today's date, the pending and active quests counts, then the proofs to review, the reservations
- * that need an answer and the approved ones. Approve and Decline answer a pending reservation: its
- * buttons are disabled while the answer is saved, and a failed answer shows a snackbar once.
- * Tapping a proof calls [onOpenProof] with its completion's id.
+ * that need an answer, the approved ones and the proofs the venue rejected, as `M2 · Dashboard ·
+ * rejected proofs`. Approve and Decline answer a pending reservation: its buttons are disabled
+ * while the answer is saved, and a failed answer shows a snackbar once. Tapping a proof, to review
+ * or rejected, calls [onOpenProof] with its completion's id.
  *
  * Figma's "Today" count is left out: reservations have no visit time yet (see
  * [VenueDashboardUiState]).
@@ -188,6 +189,16 @@ private fun Dashboard(
       }
       section(R.string.dashboard_upcoming, state.upcoming.size, C.Tag.DASHBOARD_UPCOMING)
       reservations(state.upcoming, state.savingIds, onApprove, onDecline, clock)
+      // Nothing left to do there, so its count is grey rather than purple
+      section(
+          R.string.dashboard_rejected_proofs,
+          state.rejectedProofs.size,
+          C.Tag.DASHBOARD_REJECTED_PROOFS,
+          muted = true,
+      )
+      items(state.rejectedProofs, key = { REJECTED_KEY_PREFIX + it.completionId }) {
+        DashboardProofRow(it, onOpen = { onOpenProof(it.completionId) }, clock = clock)
+      }
     }
   }
 }
@@ -270,10 +281,15 @@ private fun RowScope.Stat(value: Int, @StringRes label: Int, color: Color, tag: 
 }
 
 /**
- * A section's heading, [title], with its [count] in a badge, a little apart from what is above.
- * Left out when the section is empty.
+ * A section's heading, [title], with its [count] in a badge, purple unless [muted], a little apart
+ * from what is above. Left out when the section is empty.
  */
-private fun LazyListScope.section(@StringRes title: Int, count: Int, tag: String) {
+private fun LazyListScope.section(
+    @StringRes title: Int,
+    count: Int,
+    tag: String,
+    muted: Boolean = false,
+) {
   if (count == 0) return
   item(key = tag) {
     Row(
@@ -285,9 +301,12 @@ private fun LazyListScope.section(@StringRes title: Int, count: Int, tag: String
       Text(stringResource(title), color = colors.onBackground, style = AroundTextStyles.CardHeading)
       Text(
           count.toString(),
-          Modifier.background(colors.primary, AroundPillShape)
+          Modifier.background(
+                  if (muted) colors.onSurfaceVariant else colors.primary,
+                  AroundPillShape,
+              )
               .padding(horizontal = AroundSpacing.Small, vertical = BADGE_VERTICAL),
-          color = colors.onPrimary,
+          color = if (muted) colors.surface else colors.onPrimary,
           style = AroundTextStyles.Badge,
       )
     }
@@ -364,10 +383,11 @@ internal const val PENDING_SHOWN_FIRST = 3
 private const val DAY_SKELETON = "EEEdMMM"
 
 /**
- * Starts the list key of a proof row. A proof's completion id is its reservation's id, which also
- * keys the reservation's row, and keys must be unique in the list.
+ * Start the list keys of the proof rows, to review and rejected. A proof's completion id is its
+ * reservation's id, which also keys the reservation's row, and keys must be unique in the list.
  */
 private const val PROOF_KEY_PREFIX = "proof:"
+private const val REJECTED_KEY_PREFIX = "rejected:"
 private val TEXT_GAP = 2.dp
 // Figma's counts are 26 sp, between the app's page and sheet titles
 private val STAT_STYLE = AroundTextStyles.PageTitle.copy(fontSize = 26.sp)

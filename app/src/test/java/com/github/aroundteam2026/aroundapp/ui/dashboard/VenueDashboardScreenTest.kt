@@ -64,6 +64,7 @@ class VenueDashboardScreenTest {
       needsAnswer: List<DashboardReservation> = emptyList(),
       upcoming: List<DashboardReservation> = emptyList(),
       proofs: List<DashboardProof> = emptyList(),
+      rejected: List<DashboardProof> = emptyList(),
   ) =
       VenueDashboardUiState(
           status = VenueDashboardStatus.LOADED,
@@ -73,6 +74,7 @@ class VenueDashboardScreenTest {
           upcoming = upcoming,
           activeQuestsCount = 4,
           proofsToReview = proofs,
+          rejectedProofs = rejected,
       )
 
   private fun string(id: Int, vararg args: Any) =
@@ -261,6 +263,39 @@ class VenueDashboardScreenTest {
     compose.onNodeWithTag(C.Tag.DASHBOARD_PROOFS).assertIsDisplayed()
     proofRow("p").assertIsDisplayed()
     assertTrue(top(C.Tag.DASHBOARD_PROOFS) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
+  }
+
+  @Test
+  fun rejectedProofsComeLastWithAGreyCountAndTheirReason() {
+    val rejected =
+        listOf(proof("r1").copy(rejectReason = "Blurry"), proof("r2").copy(rejectReason = "Other"))
+    show(loaded(upcoming = listOf(pending("a").copy(approved = true)), rejected = rejected))
+    scrollTo(C.Tag.DASHBOARD_REJECTED_PROOFS)
+
+    compose
+        .onNode(hasText("2") and hasAnyAncestor(hasTestTag(C.Tag.DASHBOARD_REJECTED_PROOFS)), true)
+        .assertExists()
+    assertTrue(top(C.Tag.DASHBOARD_UPCOMING) < top(C.Tag.DASHBOARD_REJECTED_PROOFS))
+    scrollTo("${C.Tag.DASHBOARD_PROOF_ROW}_r1")
+    compose
+        .onNode(
+            hasText("Blurry") and hasAnyAncestor(hasTestTag("${C.Tag.DASHBOARD_PROOF_ROW}_r1")),
+            useUnmergedTree = true,
+        )
+        .assertIsDisplayed()
+
+    proofRow("r1").performClick()
+
+    assertEquals(listOf("r1"), opened)
+  }
+
+  @Test
+  fun onlyRejectedProofsShowNoEmptyState() {
+    show(loaded(rejected = listOf(proof("r1").copy(rejectReason = "Blurry"))))
+
+    compose.onNodeWithTag(C.Tag.DASHBOARD_EMPTY).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_REJECTED_PROOFS).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_PROOFS).assertDoesNotExist()
   }
 
   /** Where the node tagged [tag] starts, from the top of the screen. */

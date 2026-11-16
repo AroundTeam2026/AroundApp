@@ -18,6 +18,9 @@
     <string name="dashboard_proof_sent_just_now">%1$s · sent just now</string>
     <!-- What tapping a proof row does, read by screen readers -->
     <string name="dashboard_proof_open">Review proof</string>
+    <string name="dashboard_rejected_proofs">Rejected proofs</string>
+    <!-- What tapping a rejected proof's row does, read by screen readers -->
+    <string name="dashboard_proof_see">See the proof</string>
     <!-- How long ago the explorer asked, e.g. "Requested 12 min. ago" -->
     <string name="dashboard_requested">Requested %1$s</string>
     <string name="dashboard_requested_just_now">Requested just now</string>
