@@ -9,7 +9,6 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
-import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,11 +16,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -79,62 +75,12 @@ class MapViewModelOfflineTest {
   private fun TestScope.showing() {
     viewModel.onVisibleAreaChanged(lausanneView)
     runCurrent()
-    // A test that went offline first only sees the banner once the view model waited for it
-    waitForTheOfflineBanner()
   }
 
   /** Takes the device offline, or back online with [online], and lets the view model answer. */
   private fun TestScope.goOnline(online: Boolean) {
     connectivity.online.value = online
     runCurrent()
-    waitForTheOfflineBanner()
-  }
-
-  /** Lets [OFFLINE_HINT_DELAY_MS] pass, after which the map says it's offline. */
-  private fun TestScope.waitForTheOfflineBanner() {
-    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
-    runCurrent()
-  }
-
-  @Test
-  fun theMapSaysItIsOfflineOnlyAfterTheDelay() = test {
-    showing()
-
-    connectivity.online.value = false
-    runCurrent()
-    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
-    runCurrent()
-    assertFalse(state.offline)
-
-    advanceTimeBy(1)
-    runCurrent()
-    assertTrue(state.offline)
-  }
-
-  @Test
-  fun aHandoverShorterThanTheDelayNeverSaysOffline() = test {
-    // Switching between Wi-Fi and mobile data counts as offline until the new network is validated
-    showing()
-    val seen = mutableListOf<Boolean>()
-    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-      viewModel.uiState.collect { seen += it.offline }
-    }
-
-    connectivity.online.value = false
-    runCurrent()
-    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
-    connectivity.online.value = true
-    runCurrent()
-    waitForTheOfflineBanner()
-
-    assertFalse(true in seen)
-  }
-
-  @Test
-  fun onlineTheMapIsNotOffline() = test {
-    showing()
-
-    assertFalse(state.offline)
   }
 
   @Test
@@ -143,7 +89,6 @@ class MapViewModelOfflineTest {
     goOnline(false)
     showing()
 
-    assertTrue(state.offline)
     assertFalse(state.loadFailed)
     assertEquals(setOf("cafe"), pinIds)
   }
@@ -158,7 +103,6 @@ class MapViewModelOfflineTest {
     quests.value = quests.value + testQuest(id = "bar-1", venueId = "bar")
     runCurrent()
 
-    assertTrue(state.offline)
     assertFalse(state.loadFailed)
     assertEquals(setOf("cafe"), pinIds)
   }
@@ -184,7 +128,6 @@ class MapViewModelOfflineTest {
     venueRepository.failing = true
     showing()
 
-    assertTrue(state.offline)
     assertFalse(state.loadFailed)
     assertEquals(emptyList<VenuePin>(), state.pins)
   }
@@ -198,7 +141,6 @@ class MapViewModelOfflineTest {
     venueRepository.failing = false
     goOnline(true)
 
-    assertFalse(state.offline)
     assertFalse(state.loadFailed)
     assertEquals(setOf("cafe"), pinIds)
     assertEquals(2, venueRepository.requests)
@@ -279,7 +221,6 @@ class MapViewModelOfflineTest {
     venueRepository.failing = true
     showing()
 
-    assertFalse(state.offline)
     assertTrue(state.loadFailed)
     // Not listened to again before the explorer taps "Try again"
     assertEquals(1, venueRepository.requests)
@@ -293,7 +234,6 @@ class MapViewModelOfflineTest {
     viewModel.onLocationPermissionResult(false)
     runCurrent()
 
-    assertTrue(state.offline)
     assertTrue(state.locationRefused)
   }
 
