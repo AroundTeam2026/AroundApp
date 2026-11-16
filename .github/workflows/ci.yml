@@ -45,6 +45,32 @@ jobs:
           google-services: ${{ secrets.GOOGLE_SERVICES }}
           debug-keystore: ${{ secrets.DEBUG_KEYSTORE }}
 
+      # DO NOT MERGE (written with the help of Claude): reproduces #393. Runs the started factory
+      # test and the map test together 6 times in this workspace, and prints each run's class order
+      # and failures. Gradle runs the classes that failed last time first, so the order can flip.
+      - name: Reproduce the map tab flake (#393)
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: |
+          for i in 1 2 3 4 5 6; do
+            ./gradlew -q :app:testDebugUnitTest --rerun \
+              --tests '*.ui.completion.CompletionViewModelFactoryTest' \
+              --tests '*.ui.navigation.AroundAppTest.theMapTabShowsTheMap' > "repro-$i.log" 2>&1 \
+              && result=passed || result=FAILED
+            echo "run $i: $result"
+            python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          suites = [ET.parse(f).getroot() for f in glob.glob("app/build/test-results/testDebugUnitTest/*.xml")]
+          for s in sorted(suites, key=lambda s: s.get("timestamp")):
+              for case in s.iter("testcase"):
+                  failure = case.find("failure")
+                  if failure is None:
+                      failure = case.find("error")
+                  outcome = "passed" if failure is None else "FAILED: " + ((failure.get("message") or failure.text or "").strip().splitlines() or [""])[0][:150]
+                  print(f"  {s.get('timestamp')} {s.get('name').split('.')[-1]}.{case.get('name')} {outcome}")
+          PY
+          done
+
       # Formatting, then unit tests and lint. Only the steps that build the app get the Maps API
       # key, which app/build.gradle.kts writes into the manifest; the other steps never see it.
       - name: KTFmt Check, unit tests and lint
