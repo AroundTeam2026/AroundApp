@@ -56,6 +56,7 @@ class QuestDetailsPartyMembersTest {
           detailQuestId = QUEST,
           acceptedParties = mapOf(QUEST to maxOf(members.size, 1)),
           reservationIds = mapOf(QUEST to RESERVATION),
+          leavesParties = mapOf(RESERVATION to false),
           partyMembers =
               if (members.isEmpty()) emptyMap() else mapOf(RESERVATION to members.toList()),
       )
@@ -156,7 +157,7 @@ class QuestDetailsPartyMembersTest {
   @Test
   fun aMemberLeavesThePartyAfterAsking() {
     var left = false
-    show(state(creator, me).copy(joinedPartyIds = setOf(RESERVATION))) { left = true }
+    show(state(creator, me).copy(leavesParties = mapOf(RESERVATION to true))) { left = true }
 
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).assertTextEquals("Leave party").performClick()
     compose.onNodeWithText("Leave this party?").assertIsDisplayed()

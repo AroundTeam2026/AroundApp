@@ -172,7 +172,13 @@ fun OverviewQuestRow(
     }
     if (onSendNewProof != null) NewProofButton(onSendNewProof)
     if (onCancel != null) {
-      CancelReservationAction(cancelStatus, row.venueName, onCancel, offline, leave = row.leave)
+      CancelReservationAction(
+          cancelStatus,
+          row.venueName,
+          onCancel,
+          offline,
+          leave = row.leave == true,
+      )
     }
   }
 }

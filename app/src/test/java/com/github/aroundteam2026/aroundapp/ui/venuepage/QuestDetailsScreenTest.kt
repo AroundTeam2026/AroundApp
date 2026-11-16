@@ -85,7 +85,11 @@ class QuestDetailsScreenTest {
 
   private fun accepted(quest: VenuePageQuest, party: Int = 1) =
       state(quest)
-          .copy(acceptedParties = mapOf(QUEST to party), reservationIds = mapOf(QUEST to "r"))
+          .copy(
+              acceptedParties = mapOf(QUEST to party),
+              reservationIds = mapOf(QUEST to "r"),
+              leavesParties = mapOf("r" to false),
+          )
 
   private fun show(quest: VenuePageQuest = quest(), state: VenuePageUiState = state(quest)) {
     compose.setContent {
@@ -302,6 +306,14 @@ class QuestDetailsScreenTest {
   @Test
   fun aQuestNotAcceptedHasNothingToCancel() {
     show()
+
+    node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
+  }
+
+  @Test
+  fun withoutTheExplorersMembershipThereIsNothingToCancelOrLeave() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(leavesParties = emptyMap()))
 
     node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
   }

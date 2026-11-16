@@ -323,6 +323,7 @@ class VenuePageScreenTest {
             selectedQuestId = "a",
             acceptedParties = mapOf("a" to 1),
             reservationIds = mapOf("a" to "r"),
+            leavesParties = mapOf("r" to false),
         )
     )
 

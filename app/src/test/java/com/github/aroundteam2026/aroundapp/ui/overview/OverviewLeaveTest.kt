@@ -3,6 +3,8 @@ package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.isJoined
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
@@ -16,7 +18,9 @@ import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
@@ -26,6 +30,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -46,13 +51,20 @@ class OverviewLeaveTest {
   private val party = FakePartyRepository { time }
   private val reservations = FakeReservationRepository(now = { time }, party = party)
 
-  private fun overviewOf(uid: String) =
+  /** A party repository whose parties never list [uid]'s membership, though it is stored. */
+  private fun hiding(uid: String): PartyRepository =
+      object : PartyRepository by party {
+        override fun observeMembers(reservationId: String): Flow<List<PartyMember>> =
+            party.observeMembers(reservationId).map { members -> members.filter { it.uid != uid } }
+      }
+
+  private fun overviewOf(uid: String, partyRepository: PartyRepository = party) =
       OverviewViewModel(
           uid,
           reservations,
           ScriptedQuestRepository(quest = { id -> testQuest(id = id, venueId = CAFE) }),
           FakeVenueRepository(listOf(testVenue(id = CAFE))),
-          party,
+          partyRepository,
           FakeCompletionRepository(),
           FakeUserRepository(),
           FakeConnectivityRepository(),
@@ -76,7 +88,8 @@ class OverviewLeaveTest {
   }
 
   /** Opens the overview of [uid] on its rows. */
-  private fun TestScope.open(uid: String): OverviewViewModel = overviewOf(uid).also { runCurrent() }
+  private fun TestScope.open(uid: String, partyRepository: PartyRepository = party) =
+      overviewOf(uid, partyRepository).also { runCurrent() }
 
   private suspend fun stored(id: String): ReservationStatus =
       reservations.observeForExplorer(CREATOR).first().single { it.id == id }.status
@@ -88,7 +101,7 @@ class OverviewLeaveTest {
   fun aMemberWhoCancelsLeavesAndTheReservationStays() = test {
     val id = sharedReservation()
     val overview = open(MEMBER)
-    assertTrue(overview.uiState.value.rows.single().leave)
+    assertEquals(true, overview.uiState.value.rows.single().leave)
 
     overview.cancel(id)
     runCurrent()
@@ -103,13 +116,27 @@ class OverviewLeaveTest {
   fun theCreatorStillCancelsTheReservation() = test {
     val id = sharedReservation()
     val overview = open(CREATOR)
-    assertFalse(overview.uiState.value.rows.single().leave)
+    assertEquals(false, overview.uiState.value.rows.single().leave)
 
     overview.cancel(id)
     runCurrent()
 
     assertEquals(ReservationStatus.CANCELLED, stored(id))
     assertTrue(joined(id, MEMBER))
+  }
+
+  @Test
+  fun withoutTheirMembershipAMemberNeitherCancelsNorLeaves() = test {
+    val id = sharedReservation()
+    val overview = open(MEMBER, hiding(MEMBER))
+    assertNull(overview.uiState.value.rows.single().leave)
+
+    overview.cancel(id)
+    runCurrent()
+
+    assertTrue(joined(id, MEMBER))
+    assertEquals(ReservationStatus.PENDING, stored(id))
+    assertEquals(emptySet<String>(), overview.uiState.value.cancellingIds)
   }
 
   @Test

@@ -13,7 +13,7 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityReposi
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.isJoined
-import com.github.aroundteam2026.aroundapp.model.party.joinedPartiesOf
+import com.github.aroundteam2026.aroundapp.model.party.leavesPartiesOf
 import com.github.aroundteam2026.aroundapp.model.party.observeParties
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
@@ -111,21 +111,19 @@ class OverviewViewModel(
   /**
    * Called when the explorer cancels the reservation [reservationId], or, on an [OverviewRow.leave]
    * row, leaves its party, which keeps the reservation for the others. Does nothing unless it is
-   * one of the rows and still [OverviewRowStatus.cancellable], or while it is being cancelled, so a
-   * double tap cancels once, or while the device is offline, since the cancel needs a connection.
-   * The row shows as cancelling until the listener drops it. A failure, such as being offline,
-   * keeps the row and marks it failed, unless the row left meanwhile; calling this again retries.
+   * one of the rows and still [OverviewRowStatus.cancellable], nor when its [OverviewRow.leave] is
+   * unknown, or while it is being cancelled, so a double tap cancels once, or while the device is
+   * offline, since the cancel needs a connection. The row shows as cancelling until the listener
+   * drops it. A failure, such as being offline, keeps the row and marks it failed, unless the row
+   * left meanwhile; calling this again retries.
    */
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
-    if (
-        current.offline ||
-            reservationId in current.cancellingIds ||
-            current.rows.none { it.reservationId == reservationId && it.status.cancellable }
-    ) {
-      return
-    }
-    val leaving = current.rows.any { it.reservationId == reservationId && it.leave }
+    val row =
+        current.rows.find { it.reservationId == reservationId }?.takeIf { it.status.cancellable }
+    // Without the explorer's membership, cancelling for everyone might not be theirs to do
+    val leaving = row?.leave
+    if (current.offline || reservationId in current.cancellingIds || leaving == null) return
     mutableUiState.update {
       it.copy(
           cancellingIds = it.cancellingIds + reservationId,
@@ -195,8 +193,8 @@ class OverviewViewModel(
                 },
             ) { venues, parties, (completions, senders) ->
               val partySizes = parties.mapValues { (_, members) -> members.count { it.isJoined } }
-              val joined = joinedPartiesOf(reservations, parties, explorerUid)
-              overviewRows(booked, venues, partySizes, proofsOf(completions), senders, joined)
+              val leaves = leavesPartiesOf(reservations, parties, explorerUid)
+              overviewRows(booked, venues, partySizes, proofsOf(completions), senders, leaves)
             }
           }
           .catch {
@@ -278,9 +276,9 @@ internal fun proofsOf(completions: List<Completion>): Map<String, CompletionStat
  * joined members of each party from [partySizes], where the party's proof stands from [proofs], and
  * who sent it from [senders] when another member did, all keyed by reservation id. A reservation
  * whose venue isn't among [venues], because it no longer exists, has no row. A party missing from
- * [partySizes] counts as just the explorer, who is in every party they see here. The rows of the
- * reservations in [joined], whose party the explorer joined rather than created, are
- * [OverviewRow.leave] rows.
+ * [partySizes] counts as just the explorer, who is in every party they see here. Each row's
+ * [OverviewRow.leave] comes from [leaves] ([leavesPartiesOf]); a reservation missing from it has a
+ * null one.
  */
 internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,
@@ -288,7 +286,7 @@ internal fun overviewRows(
     partySizes: Map<String, Int>,
     proofs: Map<String, CompletionStatus>,
     senders: Map<String, ProofSender> = emptyMap(),
-    joined: Set<String> = emptySet(),
+    leaves: Map<String, Boolean> = emptyMap(),
 ): List<OverviewRow> {
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
@@ -296,7 +294,7 @@ internal fun overviewRows(
       // A safety net only: observeParties gives every party it is asked for
       val partySize = partySizes[reservation.id] ?: 1
       overviewRow(reservation, quest, venue, partySize, rowStatus(reservation, proofs))
-          .copy(proofSender = senders[reservation.id], leave = reservation.id in joined)
+          .copy(proofSender = senders[reservation.id], leave = leaves[reservation.id])
     }
   }
 }

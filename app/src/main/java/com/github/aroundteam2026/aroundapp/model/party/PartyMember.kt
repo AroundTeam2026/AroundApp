@@ -68,18 +68,21 @@ fun List<PartyMember>.creatorFirst(reservation: Reservation?): List<PartyMember>
 fun partyMemberId(reservationId: String, uid: String) = "${reservationId}_$uid"
 
 /**
- * The ids of the [reservations] whose party [explorerUid] joined rather than created, as their
- * memberships in [parties] tell.
+ * Whether [explorerUid] leaves the party of each of the [reservations] rather than cancelling it,
+ * by reservation id: true when they joined someone else's party, false when they created it, as
+ * their memberships in [parties] tell. A reservation whose party doesn't list them as joined isn't
+ * in it, since then neither is known to be safe: cancelling would end it for everyone.
  */
-fun joinedPartiesOf(
+fun leavesPartiesOf(
     reservations: List<Reservation>,
     parties: Map<String, List<PartyMember>>,
     explorerUid: String,
-): Set<String> =
+): Map<String, Boolean> =
     reservations
-        .filter { reservation ->
-          parties[reservation.id].orEmpty().any {
-            it.uid == explorerUid && it.isJoined && !it.createdParty(reservation)
-          }
+        .mapNotNull { reservation ->
+          parties[reservation.id]
+              .orEmpty()
+              .find { it.uid == explorerUid && it.isJoined }
+              ?.let { reservation.id to !it.createdParty(reservation) }
         }
-        .mapTo(HashSet()) { it.id }
+        .toMap()

@@ -155,14 +155,15 @@ fun QuestDetailsScreen(
           onCancel,
           offline = false,
           horizontalAlignment = Alignment.CenterHorizontally,
-          leave = state.leavesParty,
+          leave = state.leavesParty == true,
       )
     }
     QuestActionBar(
         state,
         onAccept,
         onSubmitProof,
-        footer = cancelAction.takeIf { state.cancellableReservationId != null },
+        // Without the explorer's membership, neither cancelling nor leaving is known to be safe
+        footer = cancelAction.takeIf { state.leavesParty != null },
     )
   }
 }
