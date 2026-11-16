@@ -177,7 +177,7 @@ object C {
     const val NEARBY_QUEST_TITLE = "nearby_quest_title"
     const val NEARBY_VENUE = "nearby_venue"
     const val NEARBY_DOT = "nearby_dot"
-    const val NEARBY_VIEW = "nearby_view"
+    const val NEARBY_SHOW_ON_MAP = "nearby_show_on_map"
     const val NEARBY_BUTTON = "nearby_button"
     const val NEARBY_OVERLAY = "nearby_overlay"
     const val NEARBY_GRABBER = "nearby_grabber"

@@ -72,7 +72,7 @@ class MapScreenNearbyTest {
   /** Shows the map; unless [locationOn], the explorer refuses the location permission. */
   private fun show(
       locationOn: Boolean = false,
-      onOpenVenue: (venueId: String, venueName: String) -> Unit = { _, _ -> },
+      onOpenQuest: (venueId: String, questId: String) -> Unit = { _, _ -> },
   ) {
     if (locationOn) {
       shadowOf(ApplicationProvider.getApplicationContext<Application>())
@@ -82,7 +82,7 @@ class MapScreenNearbyTest {
         PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = onOpenVenue)
+        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = onOpenQuest)
       }
     }
     composeTestRule.waitForIdle()
@@ -140,11 +140,11 @@ class MapScreenNearbyTest {
   }
 
   @Test
-  fun tappingAPageOpensItsVenuesCardInPlaceOfTheOverlay() {
+  fun thePinOpensItsVenuesCardInPlaceOfTheOverlay() {
     show()
     openNearby()
 
-    node(C.Tag.NEARBY_PAGE).performClick()
+    node(C.Tag.NEARBY_SHOW_ON_MAP).performClick()
     composeTestRule.waitForIdle()
 
     assertOverlayClosed()
@@ -153,16 +153,16 @@ class MapScreenNearbyTest {
   }
 
   @Test
-  fun viewQuestOpensTheShownQuestsVenueAndKeepsTheOverlay() {
+  fun tappingAPageOpensItsQuestsDetailsAndKeepsTheOverlay() {
     val opened = mutableListOf<Pair<String, String>>()
-    show(onOpenVenue = { id, name -> opened += id to name })
+    show(onOpenQuest = { venueId, questId -> opened += venueId to questId })
     openNearby()
 
-    node(C.Tag.NEARBY_VIEW).performClick()
+    node(C.Tag.NEARBY_PAGE).performClick()
     composeTestRule.waitForIdle()
 
-    assertEquals(listOf("bar" to "Bar Nocturne"), opened)
-    // Back from the venue's page finds the quests where the explorer left them
+    assertEquals(listOf("bar" to "bar-1"), opened)
+    // Back from the details finds the quests where the explorer left them
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
   }
 
