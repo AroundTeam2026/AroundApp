@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- Under the venue's name on its Profile tab, before it has picked an address -->
+    <string name="venue_profile_no_address">No address yet</string>
+    <string name="venue_profile_failed">Couldn\'t load your venue.</string>
+    <string name="venue_profile_retry">Try again</string>
+</resources>

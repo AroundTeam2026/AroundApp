@@ -13,6 +13,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToEditQuest
 import com.github.aroundteam2026.aroundapp.ui.review.defaultReviewProofFactory
 import com.github.aroundteam2026.aroundapp.ui.review.navigateToReviewProof
 import com.github.aroundteam2026.aroundapp.ui.review.reviewProofDestination
+import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
 
 /**
  * Registers the venue home and the screens it opens, in the venue's NavHost. Those screens are
@@ -28,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.ui.review.reviewProofDestination
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
+ * @param venueProfileFactory builds the Profile tab's ViewModel; tests pass one on fakes.
  * @param editQuestFactory builds the edit-quest form's ViewModel for a quest's id; tests pass one
  *   on fakes.
  * @param reviewProofFactory builds the Review proof screen's ViewModel for a completion's id; tests
@@ -41,6 +43,7 @@ fun NavGraphBuilder.venueDestinations(
     dashboardFactory: ViewModelProvider.Factory,
     reviewProofFactory: (String) -> ViewModelProvider.Factory = ::defaultReviewProofFactory,
     editQuestFactory: (String) -> ViewModelProvider.Factory = CreateQuestViewModel::factory,
+    venueProfileFactory: ViewModelProvider.Factory = VenueProfileViewModel.factory(),
 ) {
   composable(Routes.VENUE_HOME) {
     VenueHome(
@@ -50,6 +53,7 @@ fun NavGraphBuilder.venueDestinations(
         venueQuestsFactory = venueQuestsFactory,
         dashboardFactory = dashboardFactory,
         onOpenProof = navController::navigateToReviewProof,
+        venueProfileFactory = venueProfileFactory,
     )
   }
   // By route: a second tap on X during the form's exit fade must not also pop the home

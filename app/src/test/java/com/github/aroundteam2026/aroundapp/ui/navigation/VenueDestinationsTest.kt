@@ -28,6 +28,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
+import com.github.aroundteam2026.aroundapp.ui.venue.venueProfileFactoryOnFakes
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -65,6 +66,7 @@ class VenueDestinationsTest {
             venueQuestsFactory =
                 viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
             dashboardFactory = venueDashboardFactoryOnFakes(VENUE_ID),
+            venueProfileFactory = venueProfileFactoryOnFakes(VENUE_ID),
             editQuestFactory = { id ->
               viewModelFactory {
                 initializer {
