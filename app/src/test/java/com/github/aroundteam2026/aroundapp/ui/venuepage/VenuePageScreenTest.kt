@@ -73,6 +73,7 @@ class VenuePageScreenTest {
       state: VenuePageUiState,
       questRow: VenuePageQuestRow = DefaultQuestRow,
       bottomBar: @Composable (VenuePageQuest?) -> Unit = {},
+      showOfflineBanner: Boolean = false,
   ) {
     compose.setContent {
       AroundAppTheme {
@@ -86,9 +87,17 @@ class VenuePageScreenTest {
             onCancel = { cancels++ },
             questRow = questRow,
             bottomBar = bottomBar,
+            showOfflineBanner = showOfflineBanner,
         )
       }
     }
+  }
+
+  @Test
+  fun offlineThePageShowsTheBannerItself() {
+    show(VenuePageUiState(), showOfflineBanner = true)
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
   }
 
   @Test

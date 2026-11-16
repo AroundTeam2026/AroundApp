@@ -5,6 +5,7 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -35,6 +36,7 @@ const val APPROVED_RESERVATION_ID = "reservation-1"
  *   [FAKE_EXPLORER_UID] the venue approved, so its details show "Submit proof"; none if null.
  * @param arrivalQuestId A quest whose details the page opens at once, as the route asks; none if
  *   null.
+ * @param connectivity Tells the page whether the device is online.
  */
 @Composable
 fun VenuePageOnFakes(
@@ -43,6 +45,7 @@ fun VenuePageOnFakes(
     onSubmitProof: (reservationId: String, venueName: String) -> Unit,
     approvedQuestId: String? = null,
     arrivalQuestId: String? = null,
+    connectivity: ConnectivityRepository = FakeConnectivityRepository(),
 ) {
   val viewModel =
       remember(venueId, arrivalQuestId) {
@@ -74,7 +77,7 @@ fun VenuePageOnFakes(
             testUsers(FAKE_EXPLORER_UID),
             party,
             FakeCompletionRepository(),
-            FakeConnectivityRepository(),
+            connectivity,
             FAKE_EXPLORER_UID,
             arrivalQuestId = arrivalQuestId,
         )

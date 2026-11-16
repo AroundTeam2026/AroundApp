@@ -130,6 +130,8 @@ fun AroundApp(
       modifier = Modifier.testTag(C.Tag.APP),
       connectivityRepository = connectivityRepository,
       inlineBannerTabs = INLINE_BANNER_TABS,
+      // The venue's page and a quest's details show the offline card where Figma places it
+      inlineBannerRoutes = setOf(Routes.VENUE_PAGE),
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
     venuePageDestination(
