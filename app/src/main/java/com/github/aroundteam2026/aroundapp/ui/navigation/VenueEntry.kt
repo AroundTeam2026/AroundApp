@@ -29,6 +29,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
+import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
 
 /**
  * Where a signed-in venue user enters the app: role routing's `venueScreen`, which it fills with
@@ -45,6 +46,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
  * @param createQuestFactory builds the create-quest form's ViewModel; tests pass one on fakes.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
+ * @param venueProfileFactory builds the Profile tab's ViewModel; tests pass one on fakes.
  */
 @Composable
 fun VenueEntry(
@@ -59,6 +61,7 @@ fun VenueEntry(
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
     dashboardFactory: ViewModelProvider.Factory = VenueDashboardViewModel.factory(),
+    venueProfileFactory: ViewModelProvider.Factory = VenueProfileViewModel.factory(),
 ) {
   when (val state = viewModel.uiState.collectAsStateWithLifecycle().value) {
     VenueEntryUiState.Loading ->
@@ -77,6 +80,7 @@ fun VenueEntry(
           createQuestFactory = createQuestFactory,
           venueQuestsFactory = venueQuestsFactory,
           dashboardFactory = dashboardFactory,
+          venueProfileFactory = venueProfileFactory,
           start = state.start,
           navController = navController,
       )

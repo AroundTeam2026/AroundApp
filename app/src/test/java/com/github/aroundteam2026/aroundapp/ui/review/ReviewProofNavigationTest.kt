@@ -16,6 +16,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.Routes
 import com.github.aroundteam2026.aroundapp.ui.navigation.VenueTab
+import com.github.aroundteam2026.aroundapp.ui.navigation.VenueTabFactories
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
 import com.github.aroundteam2026.aroundapp.ui.navigation.venueDestinations
 import kotlinx.coroutines.runBlocking
@@ -47,8 +48,11 @@ class ReviewProofNavigationTest {
             onSignOut = {},
             // Neither the form nor the Quests tab is opened here
             createQuestFactory = viewModelFactory {},
-            venueQuestsFactory = viewModelFactory {},
-            dashboardFactory = fakes.dashboardFactory(),
+            tabFactories =
+                VenueTabFactories(
+                    quests = viewModelFactory {},
+                    dashboard = fakes.dashboardFactory(),
+                ),
             reviewProofFactory = fakes::reviewProofFactory,
         )
       }

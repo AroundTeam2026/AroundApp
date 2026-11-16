@@ -63,10 +63,13 @@ class VenueDestinationsTest {
             navController,
             { signOuts++ },
             createQuestFactory = viewModelFactory { initializer { form } },
-            venueQuestsFactory =
-                viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
-            dashboardFactory = venueDashboardFactoryOnFakes(VENUE_ID),
-            venueProfileFactory = venueProfileFactoryOnFakes(VENUE_ID),
+            tabFactories =
+                VenueTabFactories(
+                    quests =
+                        viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
+                    dashboard = venueDashboardFactoryOnFakes(VENUE_ID),
+                    profile = venueProfileFactoryOnFakes(VENUE_ID),
+                ),
             editQuestFactory = { id ->
               viewModelFactory {
                 initializer {
