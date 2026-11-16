@@ -129,7 +129,7 @@ fun NearbyQuestPager(
           style = AroundTextStyles.BodyMedium,
       )
     } else {
-      Pages(quests, locationOn, summary, header, style) { quest ->
+      Pages(quests, locationOn, summary, header) { quest ->
         QuestPage(
             quest,
             style,
@@ -238,7 +238,6 @@ private fun Pages(
     locationOn: Boolean,
     summary: String?,
     header: @Composable (counter: String) -> Unit,
-    style: MarkerStyle,
     page: @Composable (NearbyQuest) -> Unit,
 ) {
   val pagerState = rememberPagerState { quests.size }
