@@ -91,7 +91,7 @@ class QuestMarkersDeviceTest {
         MapScreen(
             viewModel,
             camera,
-            onOpenVenue = { id, name -> opened += id to name },
+            onOpenVenue = { id, questId -> opened += id to questId },
             onOpenQuest = { _, _ -> },
         )
       }
@@ -193,7 +193,8 @@ class QuestMarkersDeviceTest {
     tapCard(cafe)
 
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { opened.isNotEmpty() }
-    assertEquals(listOf("cafe" to "Café Zürich"), opened)
+    // The card passes its quest, which the venue page scrolls to
+    assertEquals(listOf("cafe" to cafe.id), opened)
   }
 
   @Test
