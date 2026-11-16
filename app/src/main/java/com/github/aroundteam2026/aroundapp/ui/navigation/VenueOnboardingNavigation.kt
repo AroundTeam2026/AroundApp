@@ -21,6 +21,57 @@ object VenueOnboardingRoutes {
 
   /** The route to the location step of the venue [venueId], encoded so any id fits. */
   fun location(venueId: String): String = "venue_location/${android.net.Uri.encode(venueId)}"
+
+  /** The same two steps, opened from "Edit details" on the venue's Profile tab. */
+  const val EDIT = "venue_edit"
+  const val EDIT_LOCATION = "venue_edit_location/{venueId}"
+
+  /** The route to the location step when editing the venue [venueId]. */
+  fun editLocation(venueId: String): String =
+      "venue_edit_location/${android.net.Uri.encode(venueId)}"
+}
+
+/** Opens the venue's details for editing, from "Edit details" on its Profile tab. */
+fun NavHostController.navigateToVenueEdit() {
+  navigate(VenueOnboardingRoutes.EDIT) { launchSingleTop = true }
+}
+
+/**
+ * Adds editing a venue's details to its NavHost: setup's two steps again, with the name editable.
+ * Back from the name returns to the Profile tab; the location step returns to the name on back, and
+ * to the Profile tab once saved.
+ */
+fun NavGraphBuilder.venueEditDestinations(
+    navController: NavHostController,
+    authRepository: AuthRepository,
+    venueRepository: VenueRepository,
+    locationScreen: VenueAreaStep,
+) {
+  composable(VenueOnboardingRoutes.EDIT) { entry ->
+    val editViewModel =
+        viewModel<VenueInitializationViewModel>(viewModelStoreOwner = entry) {
+          VenueInitializationViewModel(authRepository, venueRepository, editing = true)
+        }
+    VenueInitializationScreen(
+        viewModel = editViewModel,
+        onBack = { navController.popBackStack(VenueOnboardingRoutes.EDIT, inclusive = true) },
+        onContinueToLocation = { venueId ->
+          navController.navigate(VenueOnboardingRoutes.editLocation(venueId)) {
+            launchSingleTop = true
+          }
+        },
+    )
+  }
+  composable(
+      VenueOnboardingRoutes.EDIT_LOCATION,
+      arguments = listOf(navArgument("venueId") { type = NavType.StringType }),
+  ) { entry ->
+    locationScreen(
+        requireNotNull(entry.arguments?.getString("venueId")),
+        { navController.popBackStack(VenueOnboardingRoutes.EDIT, inclusive = true) },
+        { navController.popBackStack(VenueOnboardingRoutes.EDIT_LOCATION, inclusive = true) },
+    )
+  }
 }
 
 /** Called by the auth screen after a successful Venue sign-up. */

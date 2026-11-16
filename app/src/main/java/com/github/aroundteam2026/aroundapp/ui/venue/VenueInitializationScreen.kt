@@ -166,7 +166,10 @@ fun VenueInitializationContent(
       }
       Spacer(Modifier.height(36.dp))
       Text(
-          stringResource(R.string.venue_initialization_title),
+          stringResource(
+              if (state.editing) R.string.venue_initialization_edit_title
+              else R.string.venue_initialization_title
+          ),
           style = MaterialTheme.typography.headlineLarge,
           color = MaterialTheme.colorScheme.onBackground,
           modifier = Modifier.semantics { heading() },

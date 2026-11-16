@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: OpenAI Codex -->
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
     <string name="venue_initialization_title">Set up your venue</string>
+    <!-- The same screen, opened from "Edit details" on the venue's Profile tab -->
+    <string name="venue_initialization_edit_title">Edit your venue</string>
+    <string name="venue_profile_edit">Edit details</string>
+    <string name="venue_profile_edit_subtitle">Your name and address</string>
     <string name="venue_initialization_description">Explorers will see this on your quests and on the map.</string>
     <string name="venue_initialization_step">Step 1 of 2</string>
     <string name="venue_initialization_name">Venue name</string>

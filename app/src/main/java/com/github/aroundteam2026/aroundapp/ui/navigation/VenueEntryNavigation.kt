@@ -91,6 +91,7 @@ fun VenueEntryNavigation(
         createQuestFactory,
         VenueTabFactories(venueQuestsFactory, dashboardFactory, venueProfileFactory),
     )
+    venueEditDestinations(navController, authRepository, venueRepository, locationScreen)
   }
   if (start is VenueEntryStart.Area) ResumeOnArea(start.venueId, navController)
 }

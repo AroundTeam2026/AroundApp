@@ -29,21 +29,29 @@ data class VenueInitializationUiState(
     val venueId: String? = null,
     val isLoading: Boolean = false,
     val hasVenue: Boolean = false,
+    /** Whether an existing venue is editing its details, rather than setting it up. */
+    val editing: Boolean = false,
 ) {
   val canContinue: Boolean
     get() = !isLoading && !isSaving && venueId == null
 
   val canEditName: Boolean
-    get() = canContinue && !hasVenue
+    get() = canContinue && (editing || !hasVenue)
 }
 
-/** Creates the signed-in venue's profile once, before its location is configured. */
+/**
+ * Creates the signed-in venue's profile once, before its location is configured. With [editing],
+ * the venue edits its details from its profile instead: the name stays editable and is saved with
+ * [VenueRepository.setName] before moving on to the location.
+ */
 class VenueInitializationViewModel(
     private val authRepository: AuthRepository,
     private val venueRepository: VenueRepository,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
+    editing: Boolean = false,
 ) : ViewModel() {
-  private val mutableUiState = MutableStateFlow(VenueInitializationUiState(isLoading = true))
+  private val mutableUiState =
+      MutableStateFlow(VenueInitializationUiState(isLoading = true, editing = editing))
   val uiState = mutableUiState.asStateFlow()
 
   init {
@@ -83,11 +91,12 @@ class VenueInitializationViewModel(
     val state = uiState.value
     if (!state.canContinue) return
     val name = state.businessName.trim()
-    if (!state.hasVenue && name.isEmpty()) {
+    val checksName = state.editing || !state.hasVenue
+    if (checksName && name.isEmpty()) {
       mutableUiState.value = state.copy(error = VenueInitializationError.EMPTY_NAME)
       return
     }
-    if (!state.hasVenue && name.length > VenueLimits.MAX_NAME_LENGTH) {
+    if (checksName && name.length > VenueLimits.MAX_NAME_LENGTH) {
       mutableUiState.value = state.copy(error = VenueInitializationError.NAME_TOO_LONG)
       return
     }
@@ -100,12 +109,18 @@ class VenueInitializationViewModel(
     mutableUiState.value = state.copy(isSaving = true, error = null)
     viewModelScope.launch {
       try {
-        val savedVenue = getOrCreateVenue(uid, name)
+        val savedName =
+            if (state.editing && state.hasVenue) {
+              venueRepository.setName(uid, name).getOrThrow()
+              name
+            } else {
+              getOrCreateVenue(uid, name).name
+            }
         mutableUiState.value =
             uiState.value.copy(
                 isSaving = false,
                 venueId = uid,
-                businessName = savedVenue.name,
+                businessName = savedName,
                 hasVenue = true,
             )
       } catch (cancelled: CancellationException) {
