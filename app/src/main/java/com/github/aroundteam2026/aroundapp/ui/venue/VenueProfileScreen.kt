@@ -3,16 +3,19 @@ package com.github.aroundteam2026.aroundapp.ui.venue
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,10 +23,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -44,15 +50,17 @@ import com.github.aroundteam2026.aroundapp.ui.venuepage.venueAvatarStyle
  *
  * @param viewModel Holds the signed-in venue's profile.
  * @param onSignOut Ends the current session.
+ * @param onEditDetails Opens the venue's details form, from "Edit details" once the venue loaded.
  */
 @Composable
 fun VenueProfileScreen(
     viewModel: VenueProfileViewModel,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditDetails: () -> Unit = {},
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  VenueProfileContent(state, onSignOut, viewModel::retry, modifier)
+  VenueProfileContent(state, onSignOut, viewModel::retry, modifier, onEditDetails)
 }
 
 /** The Profile tab showing [state]; see [VenueProfileScreen]. */
@@ -62,6 +70,7 @@ internal fun VenueProfileContent(
     onSignOut: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditDetails: () -> Unit = {},
 ) {
   Column(
       modifier
@@ -90,7 +99,10 @@ internal fun VenueProfileContent(
               color = MaterialTheme.colorScheme.onBackground,
               textAlign = TextAlign.Center,
           )
-      VenueProfileStatus.LOADED -> VenueCard(state.name, state.address)
+      VenueProfileStatus.LOADED -> {
+        VenueCard(state.name, state.address)
+        EditDetailsCard(onEditDetails)
+      }
     }
     SignOutCard(onSignOut)
   }
@@ -120,6 +132,33 @@ private fun VenueCard(name: String, address: String?) {
     }
   }
 }
+
+/**
+ * "Edit details", which opens the form for the venue's name and address, as the explorer's card.
+ */
+@Composable
+private fun EditDetailsCard(onEditDetails: () -> Unit) {
+  ProfileCard(
+      Modifier.testTag(C.Tag.VENUE_PROFILE_EDIT)
+          .clickable(role = Role.Button, onClick = onEditDetails)
+  ) {
+    Icon(painterResource(R.drawable.ic_edit), null, Modifier.size(EDIT_ICON_SIZE))
+    Column(Modifier.weight(1f)) {
+      Text(
+          stringResource(R.string.venue_profile_edit),
+          style = MaterialTheme.typography.titleMedium,
+      )
+      Text(
+          stringResource(R.string.venue_profile_edit_subtitle),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    Icon(painterResource(R.drawable.ic_chevron_right), null)
+  }
+}
+
+private val EDIT_ICON_SIZE = 20.dp
 
 /** Says the venue couldn't be read, with "Try again". */
 @Composable

@@ -50,6 +50,31 @@ class VenueProfileScreenTest {
   }
 
   @Test
+  fun editDetailsOpensTheFormOnceTheVenueLoaded() {
+    var edits = 0
+    compose.setContent {
+      AroundAppTheme {
+        VenueProfileContent(
+            VenueProfileUiState(VenueProfileStatus.LOADED, "Café Lumière", null),
+            onSignOut = {},
+            onRetry = {},
+            onEditDetails = { edits++ },
+        )
+      }
+    }
+
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_EDIT).performClick()
+    assertEquals(1, edits)
+  }
+
+  @Test
+  fun editDetailsIsHiddenUntilTheVenueLoaded() {
+    show(VenueProfileUiState())
+
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_EDIT).assertDoesNotExist()
+  }
+
+  @Test
   fun aVenueWithoutAnAddressSaysSo() {
     show(VenueProfileUiState(VenueProfileStatus.LOADED, "Café Lumière", null))
 
