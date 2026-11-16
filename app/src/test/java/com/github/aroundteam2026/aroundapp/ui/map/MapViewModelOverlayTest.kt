@@ -138,7 +138,7 @@ class MapViewModelOverlayTest {
     runCurrent()
     assertTrue("the venue is off screen", state.pins.isEmpty())
 
-    viewModel.onNearbyQuestClick(state.nearby.single())
+    viewModel.onShowOnMap(state.nearby.single())
     runCurrent()
 
     assertFalse(state.showsNearby)
@@ -152,7 +152,7 @@ class MapViewModelOverlayTest {
     viewModel.onNearbyOpen()
     runCurrent()
 
-    viewModel.onNearbyQuestClick(state.nearby.single())
+    viewModel.onShowOnMap(state.nearby.single())
     runCurrent()
 
     assertEquals(
@@ -168,7 +168,7 @@ class MapViewModelOverlayTest {
     viewModel.onNearbyOpen()
     runCurrent()
 
-    viewModel.onNearbyQuestClick(state.nearby.single { it.questId == "away" })
+    viewModel.onShowOnMap(state.nearby.single { it.questId == "away" })
     runCurrent()
 
     assertEquals("away", state.selectedPinKey)
@@ -184,7 +184,7 @@ class MapViewModelOverlayTest {
     runCurrent()
     val before = state
 
-    viewModel.onNearbyQuestClick(page)
+    viewModel.onShowOnMap(page)
     runCurrent()
 
     assertEquals(before, state)
@@ -193,7 +193,7 @@ class MapViewModelOverlayTest {
 
   @Test
   fun aPageTappedBeforeTheExplorerIsLocatedKeepsItsVenueFramed() = pickBeforeLocated {
-    viewModel.onNearbyQuestClick(state.nearby.single())
+    viewModel.onShowOnMap(state.nearby.single())
   }
 
   @Test

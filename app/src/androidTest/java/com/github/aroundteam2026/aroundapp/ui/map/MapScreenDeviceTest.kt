@@ -70,7 +70,9 @@ class MapScreenDeviceTest {
             FakeVenueRepository(),
             FakeConnectivityRepository(),
         )
-    composeTestRule.setContent { MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }) }
+    composeTestRule.setContent {
+      MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+    }
 
     // The camera starts on the default center, so reaching the explorer means it framed them
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
@@ -114,7 +116,7 @@ class MapScreenDeviceTest {
             if (tab == Tab.MAP) {
               val mapCamera = rememberMapCamera()
               SideEffect { camera = mapCamera }
-              MapScreen(viewModel, mapCamera, onOpenVenue = { _, _ -> })
+              MapScreen(viewModel, mapCamera, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
             } else {
               Text("")
             }
@@ -151,7 +153,9 @@ class MapScreenDeviceTest {
             FakeConnectivityRepository(),
         )
     val camera = CameraPositionState()
-    composeTestRule.setContent { MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }) }
+    composeTestRule.setContent {
+      MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+    }
     val map = composeTestRule.awaitGoogleMap()
 
     // Granted by the rule above, so the map draws the position and its button

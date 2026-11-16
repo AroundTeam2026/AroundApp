@@ -3,7 +3,6 @@ package com.github.aroundteam2026.aroundapp.e2e
 
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
@@ -80,26 +79,22 @@ class ExplorerJourneyTest : TestCase() {
   @After fun stopMockingLocation() = runBlocking { stopMockingDeviceLocation() }
 
   @Test
-  fun aNewExplorerFindsTheSeededQuestAndOpensItsVenuesPage() = run {
+  fun aNewExplorerFindsTheSeededQuestAndOpensItsDetails() = run {
     step("Register a new explorer") { composeTestRule.createAccount() }
     step("Find the quest in the map's nearby list") {
       composeTestRule.findTheQuestNearby(questTitle)
     }
-    step("View the venue's page, which lists the quest") {
-      composeTestRule.viewTheVenuesPage(venueName, questTitle)
-    }
+    step("Tap it to open its details") { composeTestRule.openTheShownQuest(venueName, questTitle) }
   }
 
   @Test
   fun anExplorerAcceptsTheSeededQuestAndItsVenueSeesTheRequest() = run {
-    step("Register a new explorer and open the venue's page") {
+    step("Register a new explorer and open the quest's details") {
       composeTestRule.createAccount()
       composeTestRule.findTheQuestNearby(questTitle)
-      composeTestRule.viewTheVenuesPage(venueName, questTitle)
+      composeTestRule.openTheShownQuest(venueName, questTitle)
     }
-    step("Pick the quest and accept it") {
-      val row = hasTestTag(C.Tag.VENUE_QUEST_ROW) and hasText(questTitle)
-      composeTestRule.onNode(row).performClick().assertIsSelected()
+    step("Accept it from its details") {
       composeTestRule.onNodeWithTag(C.Tag.ACCEPT_QUEST_BUTTON).assertIsEnabled().performClick()
     }
     step("The bar says the venue has yet to approve") {

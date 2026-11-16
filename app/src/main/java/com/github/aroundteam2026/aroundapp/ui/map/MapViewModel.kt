@@ -318,12 +318,12 @@ class MapViewModel(
   }
 
   /**
-   * Called when the explorer taps the page of [quest] in the nearby quests: opens its pin's card in
-   * their place, as a tap on its pin does, and frames [VENUE_FRAME_RADIUS_METERS] around the pin:
-   * the quest's own, or else its venue's. A page whose venue no longer has valid quests changes
-   * nothing.
+   * Called when the explorer taps the pin under [quest] in the nearby quests: opens its pin's card
+   * in their place, as a tap on its pin does, and frames [VENUE_FRAME_RADIUS_METERS] around the
+   * pin: the quest's own, or else its venue's. A page whose venue no longer has valid quests
+   * changes nothing.
    */
-  fun onNearbyQuestClick(quest: NearbyQuest) {
+  fun onShowOnMap(quest: NearbyQuest) {
     val pins = content.value.pins
     val pin =
         pins.find { it.key == quest.questId } ?: pins.find { it.key == quest.venueId } ?: return

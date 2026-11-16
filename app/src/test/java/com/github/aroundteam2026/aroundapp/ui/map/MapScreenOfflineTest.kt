@@ -56,7 +56,7 @@ class MapScreenOfflineTest {
     val dialog = PermissionDialog(answer)
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> })
+        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     // The map says it's offline once the device has been for a moment

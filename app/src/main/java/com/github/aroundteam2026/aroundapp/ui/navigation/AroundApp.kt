@@ -152,7 +152,8 @@ internal fun NavHostController.openVenue(venueId: String, questId: String? = nul
  * The screen of [tab].
  *
  * @param navController opens a venue's page when its card on the map is tapped, a quest's details
- *   on it when its row in the overview is, and the Join a party screen from the overview.
+ *   on it when the quest is tapped in the map's nearby quests or its row in the overview is, and
+ *   the Join a party screen from the overview.
  * @param overview draws the Quests tab's overview, given what opens a quest's details and the Join
  *   a party screen.
  * @param profileScreen draws the Profile tab.
@@ -170,7 +171,11 @@ private fun TabScreen(
     profileScreen: @Composable () -> Unit,
 ) =
     when (tab) {
-      Tab.MAP -> MapScreen(onOpenVenue = navController::openVenueFromMap)
+      Tab.MAP ->
+          MapScreen(
+              onOpenVenue = navController::openVenueFromMap,
+              onOpenQuest = navController::openVenue,
+          )
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS ->
           Box(Modifier.fillMaxSize().testTag(tab.screenTag)) {

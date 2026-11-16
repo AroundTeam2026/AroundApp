@@ -1,12 +1,16 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
@@ -28,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -54,7 +59,8 @@ import kotlinx.coroutines.launch
  * other than the explorer who sent one, to name them. Rows follow the reservations, the venues, the
  * parties, the completions and those profiles as they change. If anything fails, including the
  * reservations' listener after sign-out, the overview shows [OverviewStatus.FAILED] until [retry].
- * The explorer can [cancel] a reservation.
+ * The explorer can [cancel] a reservation, but not while [OverviewUiState.offline] says the device
+ * is offline, which it follows from [connectivityRepository].
  */
 class OverviewViewModel(
     private val explorerUid: String,
@@ -64,6 +70,7 @@ class OverviewViewModel(
     private val partyRepository: PartyRepository,
     private val completionRepository: CompletionRepository,
     private val userRepository: UserRepository,
+    private val connectivityRepository: ConnectivityRepository,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(OverviewUiState())
   /** What the overview shows now; the screen observes it. */
@@ -75,20 +82,30 @@ class OverviewViewModel(
   private val proofSenders = ProofSenders(userRepository, explorerUid)
 
   init {
+    watchConnectivity()
     listen()
+  }
+
+  private fun watchConnectivity() {
+    viewModelScope.launch {
+      connectivityRepository.observeOffline(TAG).collect { offline ->
+        mutableUiState.update { it.copy(offline = offline) }
+      }
+    }
   }
 
   /**
    * Called when the explorer cancels the reservation [reservationId]. Does nothing unless it is one
    * of the rows and still [OverviewRowStatus.cancellable], or while it is being cancelled, so a
-   * double tap cancels once. The row shows as cancelling until the listener drops it. A failure,
-   * such as being offline, keeps the row and marks it failed, unless the row left meanwhile;
-   * calling this again retries.
+   * double tap cancels once, or while the device is offline, since the cancel needs a connection.
+   * The row shows as cancelling until the listener drops it. A failure, such as being offline,
+   * keeps the row and marks it failed, unless the row left meanwhile; calling this again retries.
    */
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
     if (
-        reservationId in current.cancellingIds ||
+        current.offline ||
+            reservationId in current.cancellingIds ||
             current.rows.none { it.reservationId == reservationId && it.status.cancellable }
     ) {
       return
@@ -118,7 +135,8 @@ class OverviewViewModel(
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
   fun retry() {
     if (mutableUiState.value.status != OverviewStatus.FAILED) return
-    mutableUiState.value = OverviewUiState()
+    // Whether the device is offline doesn't depend on the overview
+    mutableUiState.update { OverviewUiState(offline = it.offline) }
     listen()
   }
 
@@ -160,7 +178,9 @@ class OverviewViewModel(
           }
           .catch {
             Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
-            mutableUiState.value = OverviewUiState(status = OverviewStatus.FAILED)
+            mutableUiState.update {
+              OverviewUiState(status = OverviewStatus.FAILED, offline = it.offline)
+            }
           }
           .collect { rows ->
             // A reservation that left the rows, e.g. once cancelled, is no longer cancelling
@@ -198,6 +218,7 @@ class OverviewViewModel(
             PartyRepositoryProvider.repository,
             CompletionRepositoryProvider.repository,
             UserRepositoryProvider.repository,
+            ConnectivityRepositoryProvider.repository(this[APPLICATION_KEY]!!),
         )
       }
     }
