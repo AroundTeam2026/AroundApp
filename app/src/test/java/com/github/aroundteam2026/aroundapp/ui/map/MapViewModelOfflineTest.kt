@@ -3,12 +3,14 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,8 +18,11 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -75,11 +80,20 @@ class MapViewModelOfflineTest {
   private fun TestScope.showing() {
     viewModel.onVisibleAreaChanged(lausanneView)
     runCurrent()
+    // A device already offline counts as such once the disconnect lasted a moment
+    waitPastAShortDisconnect()
   }
 
   /** Takes the device offline, or back online with [online], and lets the view model answer. */
   private fun TestScope.goOnline(online: Boolean) {
     connectivity.online.value = online
+    runCurrent()
+    waitPastAShortDisconnect()
+  }
+
+  /** Lets [OFFLINE_HINT_DELAY_MS] pass, after which a disconnect counts as offline. */
+  private fun TestScope.waitPastAShortDisconnect() {
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
     runCurrent()
   }
 
@@ -203,6 +217,79 @@ class MapViewModelOfflineTest {
 
     assertFalse(state.loadFailed)
     assertFalse(state.retrying)
+  }
+
+  @Test
+  fun aReloadThatNeverAnswersEndsOnTryAgain() = test {
+    // On a network too weak to answer, the map mustn't stay silent
+    goOnline(false)
+    venueRepository.failing = true
+    showing()
+    venueRepository.answering = false
+    goOnline(true)
+
+    advanceTimeBy(MapViewModel.RELOAD_TIMEOUT_MILLIS)
+    runCurrent()
+
+    assertTrue(state.loadFailed)
+    assertFalse(state.retrying)
+    viewModel.onRetry()
+    runCurrent()
+    assertTrue(state.retrying)
+  }
+
+  @Test
+  fun backOnlineNeverFlashesTheError() = test {
+    // The reload's answer and the end of its wait reach the screen together
+    goOnline(false)
+    venueRepository.failing = true
+    showing()
+    val failures = mutableListOf<Boolean>()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect { failures += it.loadFailed }
+    }
+
+    venueRepository.failing = false
+    goOnline(true)
+
+    assertEquals(setOf("cafe"), pinIds)
+    assertFalse(true in failures)
+  }
+
+  @Test
+  fun aShortDisconnectDoesNotListenAgain() = test {
+    // Switching between Wi-Fi and mobile data counts as offline for a moment, which costs nothing
+    venueRepository.failing = true
+    showing()
+    venueRepository.failing = false
+
+    connectivity.online.value = false
+    runCurrent()
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
+    connectivity.online.value = true
+    runCurrent()
+
+    assertTrue(state.loadFailed)
+    assertEquals(1, venueRepository.requests)
+  }
+
+  @Test
+  fun failingToWatchConnectivityLeavesTheMapWorking() = test {
+    // Registering the network callback can throw: the map then acts as if online
+    val viewModel =
+        MapViewModel(
+            FakeLocationRepository(null),
+            questRepository,
+            venueRepository,
+            object : ConnectivityRepository {
+              override val isOnline = flow<Boolean> { throw SecurityException("no permission") }
+            },
+            clock = { START },
+        )
+    viewModel.onVisibleAreaChanged(lausanneView)
+    runCurrent()
+
+    assertEquals(setOf("cafe"), viewModel.uiState.value.pins.map { it.venueId }.toSet())
   }
 
   @Test
