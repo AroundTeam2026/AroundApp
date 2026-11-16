@@ -2,6 +2,10 @@
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import android.content.Context
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -43,6 +47,15 @@ class OfflineBannerTest {
 
     // A screen's own hint can show with the banner, so tests must tell the two apart
     compose.onAllNodesWithTag(C.Tag.OFFLINE_HINT).assertCountEquals(0)
+  }
+
+  @Test
+  fun theBannerIsAnnouncedWhenItAppears() {
+    compose.setContent { AroundAppTheme { OfflineBanner() } }
+
+    compose
+        .onNodeWithTag(C.Tag.OFFLINE_BANNER)
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
   }
 
   @Test

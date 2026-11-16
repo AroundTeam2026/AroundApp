@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -22,7 +25,12 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
  */
 @Composable
 fun OfflineBanner(modifier: Modifier = Modifier) {
-  OfflineHint(R.string.offline_banner_caption, modifier, tag = C.Tag.OFFLINE_BANNER)
+  OfflineHint(
+      R.string.offline_banner_caption,
+      // It appears while the app is in use, so TalkBack reads it out without moving focus
+      modifier.semantics { liveRegion = LiveRegionMode.Polite },
+      tag = C.Tag.OFFLINE_BANNER,
+  )
 }
 
 @Preview(name = "Light", widthDp = 413)
