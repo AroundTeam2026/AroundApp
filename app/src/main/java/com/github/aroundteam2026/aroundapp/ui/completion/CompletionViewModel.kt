@@ -3,7 +3,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
-import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -296,34 +295,26 @@ class CompletionViewModel(
 
     /**
      * Builds the [CompletionViewModel] of the reservation [reservationId] for the explorer
-     * [explorerUid], with the app's repositories. The location and photo repositories are built
-     * from the application, so they never keep a screen in memory.
-     *
-     * @param locations Builds the location repository; the app's unless a test can't use Play
-     *   services.
-     * @param photos Builds the proof photo repository; the app's unless a test needs another.
+     * [explorerUid], with the app's repositories. The location, photo and connectivity repositories
+     * are built from the application, so they never keep a screen in memory.
      */
-    fun factory(
-        reservationId: String,
-        explorerUid: String,
-        locations: (Context) -> LocationRepository = LocationRepositoryProvider::repository,
-        photos: (Context) -> ProofPhotoRepository = ProofPhotoRepositoryProvider::repository,
-    ): ViewModelProvider.Factory = viewModelFactory {
-      initializer {
-        val app = this[APPLICATION_KEY]!!
-        CompletionViewModel(
-            reservationId,
-            explorerUid,
-            ReservationRepositoryProvider.repository,
-            QuestRepositoryProvider.repository,
-            VenueRepositoryProvider.repository,
-            locations(app),
-            CompletionRepositoryProvider.repository,
-            photos(app),
-            ConnectivityRepositoryProvider.repository(app),
-        )
-      }
-    }
+    fun factory(reservationId: String, explorerUid: String): ViewModelProvider.Factory =
+        viewModelFactory {
+          initializer {
+            val app = this[APPLICATION_KEY]!!
+            CompletionViewModel(
+                reservationId,
+                explorerUid,
+                ReservationRepositoryProvider.repository,
+                QuestRepositoryProvider.repository,
+                VenueRepositoryProvider.repository,
+                LocationRepositoryProvider.repository(app),
+                CompletionRepositoryProvider.repository,
+                ProofPhotoRepositoryProvider.repository(app),
+                ConnectivityRepositoryProvider.repository(app),
+            )
+          }
+        }
   }
 }
 
