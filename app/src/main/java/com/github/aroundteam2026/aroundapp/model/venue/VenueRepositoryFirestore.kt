@@ -108,6 +108,17 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
     }
   }
 
+  /** Writes only `name`. Needs a connection: a transaction fails while the device is offline. */
+  override suspend fun setName(venueId: String, name: String): Result<Unit> = transaction {
+    val document = venues.document(venueId)
+    if (!it.get(document).exists()) {
+      IllegalArgumentException("No venue with id $venueId")
+    } else {
+      it.update(document, NAME, name)
+      null
+    }
+  }
+
   /**
    * Runs [block] in a transaction. [block] returns the reason for refusing instead of throwing it,
    * so the caller gets that exact exception rather than one wrapped by Firestore. Other exceptions,

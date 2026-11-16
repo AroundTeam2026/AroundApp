@@ -54,4 +54,19 @@ interface VenueRepository {
       radiusMeters: Int,
       address: String?,
   ): Result<Unit>
+
+  /**
+   * Renames the venue identified by [venueId]: replaces its [Venue.name] and leaves every other
+   * field unchanged.
+   *
+   * The existence check and the write are one atomic step. Fails with [IllegalArgumentException] if
+   * the venue does not exist, without creating it.
+   *
+   * [name] is not checked against [VenueLimits]; the ViewModel validates and trims it before
+   * calling, as for venue setup.
+   *
+   * @param venueId Id of the venue to rename.
+   * @param name The venue's new name.
+   */
+  suspend fun setName(venueId: String, name: String): Result<Unit>
 }
