@@ -24,8 +24,8 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /** The disabled action uses half-opacity muted text in both Figma themes. */
 private const val OFFLINE_LABEL_ALPHA = 0.5f
@@ -116,23 +116,20 @@ internal fun CancelReservationAction(
     AlertDialog(
         onDismissRequest = { asking = false },
         confirmButton = {
-          TextButton(
+          AroundTextButton(
               onClick = {
                 asking = false
                 onCancel()
               },
-              colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
+              contentColor = colors.error,
               modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_CONFIRM),
           ) {
             Text(stringResource(texts.confirm))
           }
         },
         dismissButton = {
-          TextButton(
+          AroundTextButton(
               onClick = { asking = false },
-              // The default primary colour is unreadable on the dark background
-              colors =
-                  ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
               modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_KEEP),
           ) {
             Text(stringResource(texts.keep))

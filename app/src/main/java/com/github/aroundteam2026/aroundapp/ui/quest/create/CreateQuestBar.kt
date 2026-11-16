@@ -23,7 +23,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,8 +41,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
  * The sticky bar under the quest form: a one-line summary of the quest's rules, and the "Create
@@ -185,12 +184,10 @@ private fun LoadFailed(
       // Announced by TalkBack, as it appears after the screen, to say why saving is disabled
       modifier = Modifier.testTag(messageTag).semantics { liveRegion = LiveRegionMode.Polite },
   )
-  TextButton(
+  AroundTextButton(
       onClick = onRetry,
       enabled = !retrying,
       modifier = Modifier.testTag(retryTag),
-      // The default primary colour is unreadable on the dark background
-      colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
   ) {
     Text(stringResource(R.string.create_quest_venue_retry), style = AroundTextStyles.Button)
   }
