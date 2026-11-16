@@ -123,7 +123,7 @@ class OfflineBannerShellTest {
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, arrivalQuestId, onBack, onSubmitProof ->
+          venuePage = { venueId, arrivalQuestId, _, onBack, onSubmitProof ->
             VenuePageOnFakes(
                 venueId,
                 onBack,
