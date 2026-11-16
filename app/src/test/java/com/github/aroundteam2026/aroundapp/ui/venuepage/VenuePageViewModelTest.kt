@@ -56,6 +56,9 @@ class VenuePageViewModelTest {
   /** The quest whose details the page opens as it arrives, as the route asks; none if null. */
   private var arrival: String? = null
 
+  /** The quest the page scrolls to and picks as it arrives, as the route asks; none if null. */
+  private var focus: String? = null
+
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE_ID,
@@ -69,6 +72,7 @@ class VenuePageViewModelTest {
         "explorer",
         clock,
         arrival,
+        focus,
     )
   }
 
@@ -95,6 +99,60 @@ class VenuePageViewModelTest {
     assertEquals(VenueAvatar.Initials("CL"), state.avatar)
     assertEquals("Rue du Pont 1", state.address)
     assertEquals(listOf("a"), ids())
+    // Opened without a quest, the page picks none
+    assertNull(state.selectedQuestId)
+    assertNull(state.focusQuestId)
+  }
+
+  // As when the explorer taps the quest's card on the map
+  @Test
+  fun picksAndFocusesTheQuestItFocusesOnOnceLoadedWithoutOpeningIt() = test {
+    focus = "a"
+    viewModel
+    runCurrent()
+
+    assertEquals("a", state.selectedQuestId)
+    assertEquals("a", state.focusQuestId)
+    assertNull(state.detailQuestId)
+
+    viewModel.onFocusShown()
+    assertNull(state.focusQuestId)
+    assertEquals("a", state.selectedQuestId)
+  }
+
+  // Otherwise the page would keep a focus with no row to scroll to, and jump if the quest came back
+  @Test
+  fun aFocusedQuestThatLeavesTheListIsNoLongerFocused() = test {
+    quests.value =
+        listOf(
+            testQuest(id = "a", venueId = VENUE_ID, reward = rewardExpiringAt(START + 60_000)),
+            testQuest(id = "b", venueId = VENUE_ID),
+        )
+    focus = "a"
+    viewModel
+    runCurrent()
+    assertEquals("a", state.focusQuestId)
+
+    advanceTimeBy(60_000)
+    runCurrent()
+    assertNull(state.focusQuestId)
+
+    quests.value =
+        quests.value.map { if (it.id == "a") testQuest(id = "a", venueId = VENUE_ID) else it }
+    runCurrent()
+    assertNull(state.focusQuestId)
+  }
+
+  @Test
+  fun focusingOnAQuestItDoesNotListPicksNothing() = test {
+    focus = "gone"
+    viewModel
+    runCurrent()
+    quests.value = quests.value + testQuest(id = "gone", venueId = VENUE_ID)
+    runCurrent()
+
+    assertNull(state.selectedQuestId)
+    assertNull(state.focusQuestId)
   }
 
   // As when the explorer taps the quest's card on the Quests tab
@@ -472,4 +530,6 @@ private class ScriptedVenueRepository(private val venue: Flow<Venue?>) : VenueRe
       radiusMeters: Int,
       address: String?,
   ) = Result.success(Unit)
+
+  override suspend fun setName(venueId: String, name: String) = Result.success(Unit)
 }

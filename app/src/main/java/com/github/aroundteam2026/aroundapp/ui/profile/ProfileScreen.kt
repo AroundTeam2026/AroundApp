@@ -48,8 +48,8 @@ private val ROW_ICON_SIZE = 20.dp
 
 /**
  * The Profile tab. With a [model] and [pictures], the Explorer's profile: their picture, name and
- * join date, an action that opens the edit form, and sign-out. Without them, the sign-out-only
- * placeholder venues still use.
+ * join date, an action that opens the edit form, and sign-out. Without them, a sign-out-only
+ * placeholder; the venue's Profile tab is `VenueProfileScreen`.
  *
  * @param onSignOut ends the current session.
  * @param model the Explorer's profile, shared with the setup gate so a save shows here at once.
@@ -140,17 +140,7 @@ private fun ExplorerProfile(
       }
       Icon(painterResource(R.drawable.ic_chevron_right), null)
     }
-    ProfileCard(
-        Modifier.testTag(C.Tag.PROFILE_SIGN_OUT).clickable(role = Role.Button, onClick = onSignOut)
-    ) {
-      Icon(
-          painterResource(R.drawable.ic_profile_logout),
-          null,
-          Modifier.size(ROW_ICON_SIZE),
-          tint = MaterialTheme.colorScheme.error,
-      )
-      Text(stringResource(R.string.auth_sign_out), color = MaterialTheme.colorScheme.error)
-    }
+    SignOutCard(onSignOut)
   }
   if (editing) {
     Dialog(
@@ -164,9 +154,25 @@ private fun ExplorerProfile(
   }
 }
 
+/** The red "Sign out" card that ends both the explorer's and the venue's profile. */
+@Composable
+internal fun SignOutCard(onSignOut: () -> Unit) {
+  ProfileCard(
+      Modifier.testTag(C.Tag.PROFILE_SIGN_OUT).clickable(role = Role.Button, onClick = onSignOut)
+  ) {
+    Icon(
+        painterResource(R.drawable.ic_profile_logout),
+        null,
+        Modifier.size(ROW_ICON_SIZE),
+        tint = MaterialTheme.colorScheme.error,
+    )
+    Text(stringResource(R.string.auth_sign_out), color = MaterialTheme.colorScheme.error)
+  }
+}
+
 /** A full-width surface card holding one row, as the profile cards in Figma. */
 @Composable
-private fun ProfileCard(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+internal fun ProfileCard(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
   Card(
       colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
       elevation = CardDefaults.cardElevation(defaultElevation = CARD_ELEVATION),

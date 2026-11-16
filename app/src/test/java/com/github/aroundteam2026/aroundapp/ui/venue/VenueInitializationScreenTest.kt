@@ -244,6 +244,8 @@ class VenueInitializationScreenTest {
         address: String?,
     ) = delegate.setArea(venueId, location, radiusMeters, address)
 
+    override suspend fun setName(venueId: String, name: String) = delegate.setName(venueId, name)
+
     override suspend fun getVenue(venueId: String) = delegate.getVenue(venueId)
 
     override suspend fun createVenue(venue: Venue): Result<Unit> {

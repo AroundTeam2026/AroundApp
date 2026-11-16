@@ -329,6 +329,57 @@ class FakeVenueRepositoryTest {
   }
 
   @Test
+  fun setName_onExistingVenue_succeedsAndReplacesOnlyTheName() = runTest {
+    val repository = FakeVenueRepository()
+    val original = testVenue(name = "Café Lumen", address = "Rue de Bourg 12")
+    repository.createVenue(original)
+
+    val result = repository.setName(original.id, "Café Lumière")
+
+    Assert.assertEquals(Result.success(Unit), result)
+    Assert.assertEquals(original.copy(name = "Café Lumière"), repository.getVenue(original.id))
+  }
+
+  @Test
+  fun setName_onUnknownId_failsAndCreatesNoVenue() = runTest {
+    val repository = FakeVenueRepository()
+
+    val result = repository.setName("unknown-venue", "Café Lumière")
+
+    Assert.assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    Assert.assertNull(repository.getVenue("unknown-venue"))
+  }
+
+  @Test
+  fun setName_doesNotChangeAnotherVenue() = runTest {
+    val repository = FakeVenueRepository()
+    val venueB = testVenue(id = "venue-b")
+    repository.createVenue(testVenue(id = "venue-a"))
+    repository.createVenue(venueB)
+
+    val result = repository.setName("venue-a", "Café Lumière")
+
+    Assert.assertEquals(Result.success(Unit), result)
+    Assert.assertEquals(venueB, repository.getVenue("venue-b"))
+  }
+
+  @Test
+  fun observeVenue_emitsTheRenamedVenueAfterSetName() = runTest {
+    val repository = FakeVenueRepository()
+    val original = testVenue(name = "Café Lumen")
+    repository.createVenue(original)
+    val emissions = mutableListOf<Venue?>()
+    val job = launch { repository.observeVenue(original.id).collect { emissions.add(it) } }
+    runCurrent()
+
+    repository.setName(original.id, "Café Lumière")
+    runCurrent()
+
+    Assert.assertEquals(listOf(original, original.copy(name = "Café Lumière")), emissions)
+    job.cancel()
+  }
+
+  @Test
   fun keepsInitialVenuesExactlyAsGiven() = runTest {
     val venue = testVenue(id = "cafe", featuredQuestId = "quest-7")
     val repository = FakeVenueRepository(initialVenues = listOf(venue))

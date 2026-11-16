@@ -32,6 +32,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   its list, since the explorer never saw that list. Null otherwise.
  * @property arrivalMissed The page was to arrive at a quest it doesn't list, such as one whose
  *   reward expired, and shows its list instead; true until the page has said so once.
+ * @property focusQuestId Id of the quest the page scrolls to as it arrives, as from a card on the
+ *   map, until it has; null otherwise.
  * @property pickBeforeDetails What closing the details picks: the pick from before they opened, or
  *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
@@ -71,6 +73,7 @@ data class VenuePageUiState(
     val detailQuestId: String? = null,
     val arrivalQuestId: String? = null,
     val arrivalMissed: Boolean = false,
+    val focusQuestId: String? = null,
     val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
     val reservationIds: Map<String, String> = emptyMap(),
@@ -197,6 +200,7 @@ data class VenuePageUiState(
         selectedQuestId = pick.ifListed(),
         detailQuestId = detailQuestId.ifListed(),
         arrivalQuestId = arrivalQuestId.takeIf { !detailsClosed },
+        focusQuestId = focusQuestId.ifListed(),
         pickBeforeDetails = pickBeforeDetails.ifListed().takeIf { !detailsClosed },
     )
   }
@@ -213,6 +217,18 @@ data class VenuePageUiState(
         status != VenuePageStatus.LOADED -> this
         quests.none { it.questId == questId } -> copy(arrivalMissed = true)
         else -> withQuestDetails(questId).copy(arrivalQuestId = questId)
+      }
+
+  /**
+   * This page arriving at the quest [questId] in its list, as from a card on the map: picked, and
+   * the [focusQuestId] the list scrolls to. A quest it doesn't list, or a page that isn't loaded,
+   * changes nothing, leaving the list at its top.
+   */
+  fun focusingOn(questId: String): VenuePageUiState =
+      if (status == VenuePageStatus.LOADED && quests.any { it.questId == questId }) {
+        copy(selectedQuestId = questId, focusQuestId = questId)
+      } else {
+        this
       }
 
   /** Whether closing the open details leaves the page, since it arrived at them. */

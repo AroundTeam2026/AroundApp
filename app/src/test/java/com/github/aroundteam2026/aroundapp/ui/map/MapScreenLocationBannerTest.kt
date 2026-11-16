@@ -20,6 +20,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -44,6 +45,7 @@ class MapScreenLocationBannerTest {
           FakeLocationRepository(Location(46.5220, 6.6330)),
           FakeQuestRepository(),
           FakeVenueRepository(),
+          FakeConnectivityRepository(),
       )
   private val refused = mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false)
   private val granted = mapOf(ACCESS_FINE_LOCATION to true, ACCESS_COARSE_LOCATION to true)
@@ -52,7 +54,7 @@ class MapScreenLocationBannerTest {
   private fun show(dialog: PermissionDialog): PermissionDialog {
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     composeTestRule.waitForIdle()

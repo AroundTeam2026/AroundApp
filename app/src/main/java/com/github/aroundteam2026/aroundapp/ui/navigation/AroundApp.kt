@@ -71,8 +71,8 @@ private val INLINE_BANNER_TABS = setOf(Tab.QUESTS, Tab.MAP)
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  * @param explorerUid the signed-in explorer, who accepts quests on a venue's page.
  * @param venuePage draws a venue's page, given its id, the quest whose details it opens at once if
- *   any, its back action and what its "Submit proof" button opens; tests pass their own so the page
- *   doesn't read Firestore.
+ *   any, the quest it scrolls to and picks if any, its back action and what its "Submit proof"
+ *   button opens; tests pass their own so the page doesn't read Firestore.
  * @param overview draws the Quests tab's overview, given what opens a quest's details on its
  *   venue's page and what opens the Join a party screen; tests pass their own so the overview
  *   doesn't read Firestore.
@@ -93,11 +93,12 @@ fun AroundApp(
         (
             venueId: String,
             questId: String?,
+            focusQuestId: String?,
             onBack: () -> Unit,
             onSubmitProof: (reservationId: String, venueName: String) -> Unit,
         ) -> Unit =
-        { venueId, questId, onBack, onSubmitProof ->
-          VenuePage(venueId, questId, explorerUid, onBack, onSubmitProof)
+        { venueId, questId, focusQuestId, onBack, onSubmitProof ->
+          VenuePage(venueId, questId, focusQuestId, explorerUid, onBack, onSubmitProof)
         },
     completion: @Composable (reservationId: String, venueName: String, close: () -> Unit) -> Unit =
         { reservationId, venueName, close ->
@@ -145,21 +146,24 @@ fun AroundApp(
 }
 
 /**
- * Opens the page of the venue with [venueId], when its card on the map is tapped. The venue page
- * loads the venue's name itself, so [venueName] is not passed on.
+ * Opens the page of the venue with [venueId], scrolled to its quest [questId], when the quest's
+ * card on the map is tapped.
  */
-@Suppress("UNUSED_PARAMETER")
-internal fun NavHostController.openVenueFromMap(venueId: String, venueName: String) =
-    openVenue(venueId)
+internal fun NavHostController.openVenueFromMap(venueId: String, questId: String) =
+    openVenue(venueId, focusQuestId = questId)
 
 /**
  * Opens the page of the venue with [venueId] from a tab, with the details of its quest [questId]
- * open if given. A tap that arrives once a venue's page is open, such as the second of a fast
- * double tap, opens nothing.
+ * open if given, or scrolled to its quest [focusQuestId] if given. A tap that arrives once a
+ * venue's page is open, such as the second of a fast double tap, opens nothing.
  */
-internal fun NavHostController.openVenue(venueId: String, questId: String? = null) {
+internal fun NavHostController.openVenue(
+    venueId: String,
+    questId: String? = null,
+    focusQuestId: String? = null,
+) {
   if (currentDestination?.route == Routes.VENUE_PAGE) return
-  navigateToVenuePage(venueId, questId)
+  navigateToVenuePage(venueId, questId, focusQuestId)
 }
 
 /**
@@ -189,7 +193,7 @@ private fun TabScreen(
     when (tab) {
       Tab.MAP ->
           MapScreen(
-              onOpenVenue = navController::openVenueFromMap,
+              onFocusQuest = navController::openVenueFromMap,
               onOpenQuest = navController::openVenue,
               acceptViewModel = viewModel(factory = NearbyAcceptViewModel.factory(explorerUid)),
           )

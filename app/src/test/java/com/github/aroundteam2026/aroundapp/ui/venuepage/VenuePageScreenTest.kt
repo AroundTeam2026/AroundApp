@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -28,6 +30,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -251,6 +254,34 @@ class VenuePageScreenTest {
     val bar = compose.onNodeWithTag("bar").fetchSemanticsNode().boundsInRoot
     assertEquals(list.bottom, bar.top)
     assertEquals("b", given.last()?.questId)
+  }
+
+  // As when the explorer taps the last quest's card on the map
+  @Test
+  fun theListScrollsToTheFocusedQuestThenSaysSo() {
+    var state by mutableStateOf(LOADED.copy(quests = listOf("a", "b", "c").map { quest(it) }))
+    var focusShown = 0
+    compose.setContent {
+      AroundAppTheme {
+        VenuePageContent(
+            state,
+            {},
+            {},
+            {},
+            onFocusShown = { focusShown++ },
+            questRow = { quest, _, _, _ ->
+              Text(quest.title, Modifier.testTag("row_${quest.questId}").height(600.dp))
+            },
+        )
+      }
+    }
+    compose.onNodeWithTag("row_c").assertIsNotDisplayed()
+
+    state = state.copy(focusQuestId = "c")
+    compose.waitForIdle()
+
+    compose.onNodeWithTag("row_c").assertIsDisplayed()
+    assertEquals(1, focusShown)
   }
 
   @Test
