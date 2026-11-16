@@ -55,7 +55,7 @@ class RoutesTest {
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, questId, onBack, onSubmitProof ->
+          venuePage = { venueId, questId, _, onBack, onSubmitProof ->
             VenuePageOnFakes(venueId, onBack, onSubmitProof, arrivalQuestId = questId)
           },
           overview = { onOpenQuest, onJoinParty -> OverviewOnFakes(onOpenQuest, onJoinParty) },

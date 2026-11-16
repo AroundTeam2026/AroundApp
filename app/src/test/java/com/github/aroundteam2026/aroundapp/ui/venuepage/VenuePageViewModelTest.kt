@@ -55,6 +55,9 @@ class VenuePageViewModelTest {
   /** The quest whose details the page opens as it arrives, as the route asks; none if null. */
   private var arrival: String? = null
 
+  /** The quest the page scrolls to and picks as it arrives, as the route asks; none if null. */
+  private var focus: String? = null
+
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE_ID,
@@ -67,6 +70,7 @@ class VenuePageViewModelTest {
         "explorer",
         clock,
         arrival,
+        focus,
     )
   }
 
@@ -93,6 +97,37 @@ class VenuePageViewModelTest {
     assertEquals(VenueAvatar.Initials("CL"), state.avatar)
     assertEquals("Rue du Pont 1", state.address)
     assertEquals(listOf("a"), ids())
+    // Opened without a quest, the page picks none
+    assertNull(state.selectedQuestId)
+    assertNull(state.focusQuestId)
+  }
+
+  // As when the explorer taps the quest's card on the map
+  @Test
+  fun picksAndFocusesTheQuestItFocusesOnOnceLoadedWithoutOpeningIt() = test {
+    focus = "a"
+    viewModel
+    runCurrent()
+
+    assertEquals("a", state.selectedQuestId)
+    assertEquals("a", state.focusQuestId)
+    assertNull(state.detailQuestId)
+
+    viewModel.onFocusShown()
+    assertNull(state.focusQuestId)
+    assertEquals("a", state.selectedQuestId)
+  }
+
+  @Test
+  fun focusingOnAQuestItDoesNotListPicksNothing() = test {
+    focus = "gone"
+    viewModel
+    runCurrent()
+    quests.value = quests.value + testQuest(id = "gone", venueId = VENUE_ID)
+    runCurrent()
+
+    assertNull(state.selectedQuestId)
+    assertNull(state.focusQuestId)
   }
 
   // As when the explorer taps the quest's card on the Quests tab

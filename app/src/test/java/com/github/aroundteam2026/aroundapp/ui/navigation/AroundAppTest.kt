@@ -49,6 +49,9 @@ class AroundAppTest {
 
   private lateinit var navController: NavHostController
 
+  /** The quest the last venue page shown was asked to arrive at and to focus on. */
+  private var pageQuests: Pair<String?, String?>? = null
+
   private fun launch(
       app: @Composable () -> Unit = {
         AroundApp(
@@ -79,7 +82,8 @@ class AroundAppTest {
         onSignOut = {},
         navController = navController,
         screen = { Text(it.route, Modifier.testTag(it.screenTag)) },
-        venuePage = { venueId, questId, onBack, onSubmitProof ->
+        venuePage = { venueId, questId, focusQuestId, onBack, onSubmitProof ->
+          pageQuests = questId to focusQuestId
           VenuePageOnFakes(venueId, onBack, onSubmitProof, arrivalQuestId = questId)
         },
     )
@@ -93,9 +97,9 @@ class AroundAppTest {
   }
 
   /** Opens a venue's page as a tap on its card on the map does. */
-  private fun openFromMap(venueId: String) {
+  private fun openFromMap(venueId: String, questId: String = "quest-1") {
     composeTestRule.waitForIdle()
-    composeTestRule.runOnUiThread { navController.openVenueFromMap(venueId, "Café") }
+    composeTestRule.runOnUiThread { navController.openVenueFromMap(venueId, questId) }
     composeTestRule.waitForIdle()
   }
 
@@ -174,7 +178,7 @@ class AroundAppTest {
           explorerUid = "explorer",
           onSignOut = {},
           navController = navController,
-          venuePage = { venueId, questId, onBack, onSubmitProof ->
+          venuePage = { venueId, questId, _, onBack, onSubmitProof ->
             VenuePageOnFakes(
                 venueId,
                 onBack,
@@ -287,6 +291,16 @@ class AroundAppTest {
       navController.currentBackStackEntry?.arguments?.getString(Routes.VENUE_ID)
     }
     assertEquals("venue-1", venueId)
+  }
+
+  // The card's quest is focused on, not opened: its details would hide the venue's other quests
+  @Test
+  fun aQuestCardOnTheMapFocusesItsQuestOnTheVenuesPage() {
+    launchWithNavController()
+    select(Tab.MAP)
+    openFromMap("venue-1", "quest/&?1")
+
+    assertEquals(null to "quest/&?1", pageQuests)
   }
 
   // A fast double tap on a card would otherwise stack the venue's page twice

@@ -42,7 +42,8 @@ import com.google.maps.android.compose.MapUiSettings
  * pin frames its venue and opens its card, and filters narrow the list, not the pins.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
- * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
+ * @param onOpenVenue Opens the page of the venue with this id, scrolled to its card's quest, when
+ *   the card is tapped.
  * @param onOpenQuest Opens the details of the quest with this id on its venue's page, when the
  *   quest is tapped in the nearby quests.
  */
@@ -50,7 +51,7 @@ import com.google.maps.android.compose.MapUiSettings
 fun MapScreen(
     viewModel: MapViewModel = viewModel(factory = MapViewModel.factory),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
-    onOpenVenue: (venueId: String, venueName: String) -> Unit,
+    onOpenVenue: (venueId: String, questId: String) -> Unit,
     onOpenQuest: (venueId: String, questId: String) -> Unit,
 ) {
   val state by viewModel.uiState.collectAsState()
@@ -95,7 +96,7 @@ fun MapScreen(
           selectedPinKey = state.selectedPinKey,
           style = markerStyle,
           onPinClick = viewModel::onPinClick,
-          onCardClick = { onOpenVenue(it.venueId, it.venueName) },
+          onCardClick = { onOpenVenue(it.venueId, it.featuredQuest.id) },
       )
     }
     if (state.showsNearby) {
