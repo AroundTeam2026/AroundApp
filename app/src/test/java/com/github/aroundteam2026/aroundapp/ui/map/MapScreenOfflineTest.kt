@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Application
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
@@ -22,10 +23,12 @@ import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.resources.C
+import java.time.Duration
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 
 /** Tests the banner that says the map is offline, showing the quests saved on the phone. */
 @RunWith(AndroidJUnit4::class)
@@ -56,6 +59,9 @@ class MapScreenOfflineTest {
         MapScreen(viewModel, onOpenVenue = { _, _ -> })
       }
     }
+    // The map says it's offline once the device has been for a moment
+    shadowOf(Looper.getMainLooper())
+        .idleFor(Duration.ofMillis(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS))
     composeTestRule.waitForIdle()
   }
 

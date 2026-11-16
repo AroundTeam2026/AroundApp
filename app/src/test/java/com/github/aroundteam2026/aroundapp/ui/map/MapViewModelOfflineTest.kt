@@ -16,8 +16,11 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -75,12 +78,57 @@ class MapViewModelOfflineTest {
   private fun TestScope.showing() {
     viewModel.onVisibleAreaChanged(lausanneView)
     runCurrent()
+    // A test that went offline first only sees the banner once the view model waited for it
+    waitForTheOfflineBanner()
   }
 
   /** Takes the device offline, or back online with [online], and lets the view model answer. */
   private fun TestScope.goOnline(online: Boolean) {
     connectivity.online.value = online
     runCurrent()
+    waitForTheOfflineBanner()
+  }
+
+  /**
+   * Lets [MapViewModel.OFFLINE_BANNER_DELAY_MILLIS] pass, after which the map says it's offline.
+   */
+  private fun TestScope.waitForTheOfflineBanner() {
+    advanceTimeBy(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS)
+    runCurrent()
+  }
+
+  @Test
+  fun theMapSaysItIsOfflineOnlyAfterTheDelay() = test {
+    showing()
+
+    connectivity.online.value = false
+    runCurrent()
+    advanceTimeBy(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS - 1)
+    runCurrent()
+    assertFalse(state.offline)
+
+    advanceTimeBy(1)
+    runCurrent()
+    assertTrue(state.offline)
+  }
+
+  @Test
+  fun aHandoverShorterThanTheDelayNeverSaysOffline() = test {
+    // Switching between Wi-Fi and mobile data counts as offline until the new network is validated
+    showing()
+    val seen = mutableListOf<Boolean>()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect { seen += it.offline }
+    }
+
+    connectivity.online.value = false
+    runCurrent()
+    advanceTimeBy(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS - 1)
+    connectivity.online.value = true
+    runCurrent()
+    waitForTheOfflineBanner()
+
+    assertFalse(true in seen)
   }
 
   @Test
