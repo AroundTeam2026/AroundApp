@@ -5,11 +5,24 @@ package com.github.aroundteam2026.aroundapp.ui
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+
+/** The offline hint's Figma shadow. */
+private val OFFLINE_HINT_SHADOW =
+    Shadow(
+        radius = 12.dp,
+        color = AroundColors.BannerShadow,
+        offset = DpOffset(0.dp, 8.dp),
+    )
 
 /** Explains that an unavailable action needs a connection. */
 @Composable
@@ -33,6 +46,7 @@ internal fun OfflineHint(
       icon = R.drawable.ic_offline_hint,
       title = stringResource(R.string.offline_hint_title),
       caption = stringResource(message),
+      applyShadow = { shape -> dropShadow(shape, OFFLINE_HINT_SHADOW) },
       modifier = modifier.testTag(tag),
       iconTint = AroundTheme.colors.accentText,
   )
