@@ -54,7 +54,7 @@ class MapScreenLocationBannerTest {
   private fun show(dialog: PermissionDialog): PermissionDialog {
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     composeTestRule.waitForIdle()

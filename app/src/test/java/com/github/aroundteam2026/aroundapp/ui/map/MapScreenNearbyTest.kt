@@ -93,7 +93,7 @@ class MapScreenNearbyTest {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
         MapScreen(
             viewModel,
-            onOpenVenue = { _, _ -> },
+            onFocusQuest = { _, _ -> },
             onOpenQuest = onOpenQuest,
             acceptViewModel = acceptViewModel,
             showOfflineBanner = showOfflineBanner,
@@ -115,7 +115,7 @@ class MapScreenNearbyTest {
           LocalActivityResultRegistryOwner provides dialog,
           LocalShowOfflineBanner provides true,
       ) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     composeTestRule.waitForIdle()

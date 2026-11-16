@@ -46,7 +46,7 @@ class MapColoursDeviceTest {
             FakeConnectivityRepository(),
         )
     composeTestRule.setContent {
-      AroundAppTheme { MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> }) }
+      AroundAppTheme { MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> }) }
     }
 
     composeTestRule.awaitMapColours(lightPalette, "the light style's land and water") { pixels ->
@@ -80,7 +80,7 @@ class DarkMapColoursDeviceTest {
             FakeConnectivityRepository(),
         )
     composeTestRule.setContent {
-      AroundAppTheme { MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> }) }
+      AroundAppTheme { MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> }) }
     }
 
     composeTestRule.awaitMapColours(

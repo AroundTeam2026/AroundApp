@@ -71,7 +71,7 @@ class MapScreenDeviceTest {
             FakeConnectivityRepository(),
         )
     composeTestRule.setContent {
-      MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+      MapScreen(viewModel, camera, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
     }
 
     // The camera starts on the default center, so reaching the explorer means it framed them
@@ -116,7 +116,7 @@ class MapScreenDeviceTest {
             if (tab == Tab.MAP) {
               val mapCamera = rememberMapCamera()
               SideEffect { camera = mapCamera }
-              MapScreen(viewModel, mapCamera, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+              MapScreen(viewModel, mapCamera, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
             } else {
               Text("")
             }
@@ -154,7 +154,7 @@ class MapScreenDeviceTest {
         )
     val camera = CameraPositionState()
     composeTestRule.setContent {
-      MapScreen(viewModel, camera, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+      MapScreen(viewModel, camera, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
     }
     val map = composeTestRule.awaitGoogleMap()
 

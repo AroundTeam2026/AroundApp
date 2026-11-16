@@ -58,7 +58,7 @@ class MapScreenTest {
     val dialog = PermissionDialog(answer)
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     composeTestRule.waitForIdle()
@@ -117,7 +117,7 @@ class MapScreenTest {
             onSignOut = {},
             screen = { tab ->
               if (tab == Tab.MAP)
-                  MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+                  MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
               else Text(tab.route)
             },
         )
