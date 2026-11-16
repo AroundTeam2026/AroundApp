@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /** The offline hint's Figma shadow. */
@@ -47,8 +46,8 @@ internal fun OfflineHint(
       icon = R.drawable.ic_offline_hint,
       title = stringResource(R.string.offline_hint_title),
       caption = stringResource(message),
-      modifier =
-          modifier.testTag(tag).dropShadow(AroundCorners.LocationBanner, OFFLINE_HINT_SHADOW),
+      applyShadow = { shape -> dropShadow(shape, OFFLINE_HINT_SHADOW) },
+      modifier = modifier.testTag(tag),
       iconTint = AroundTheme.colors.accentText,
   )
 }

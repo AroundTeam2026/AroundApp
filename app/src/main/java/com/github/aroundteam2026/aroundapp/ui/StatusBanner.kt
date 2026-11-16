@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
@@ -32,12 +33,18 @@ private val ICON_SIZE = 20.dp
 private val TEXT_SPACING = 2.dp
 private val ERROR_BORDER_WIDTH = 1.dp
 
-/** A status banner with an icon, title, caption, and an optional trailing action. */
+/**
+ * A status banner with an icon, title, caption, and an optional trailing action.
+ *
+ * @param applyShadow Adds the caller's shadow using the same shape as the banner surface and
+ *   border.
+ */
 @Composable
 internal fun StatusBanner(
     @DrawableRes icon: Int,
     title: String,
     caption: String,
+    applyShadow: Modifier.(Shape) -> Modifier,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
     iconTint: Color? = null,
@@ -46,7 +53,7 @@ internal fun StatusBanner(
   val colors = MaterialTheme.colorScheme
   val accent = if (isError) colors.error else colors.onSurface
   val shape = AroundCorners.LocationBanner
-  val card = modifier.fillMaxWidth().background(colors.surface, shape)
+  val card = modifier.applyShadow(shape).fillMaxWidth().background(colors.surface, shape)
   Row(
       (if (isError) card.border(ERROR_BORDER_WIDTH, colors.error, shape) else card).padding(
           start = AroundSpacing.InsetPadding,

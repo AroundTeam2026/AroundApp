@@ -50,13 +50,15 @@ internal fun MapBanner(
       icon,
       title,
       caption,
-      modifier =
-          modifier.shadow(
-              MAP_BANNER_ELEVATION,
-              AroundCorners.LocationBanner,
-              ambientColor = AroundColors.BannerShadow,
-              spotColor = AroundColors.BannerShadow,
-          ),
+      applyShadow = { shape ->
+        shadow(
+            MAP_BANNER_ELEVATION,
+            shape,
+            ambientColor = AroundColors.BannerShadow,
+            spotColor = AroundColors.BannerShadow,
+        )
+      },
+      modifier = modifier,
       isError = isError,
   ) {
     Button(
