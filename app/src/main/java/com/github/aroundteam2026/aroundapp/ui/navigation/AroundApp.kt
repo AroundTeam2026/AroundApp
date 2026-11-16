@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.completion.Completion
 import com.github.aroundteam2026.aroundapp.ui.completion.CompletionViewModel
@@ -57,6 +58,9 @@ enum class Tab(
 /** The tab the app opens on, and that Back returns to before leaving the app. */
 private val START_TAB = Tab.QUESTS
 
+/** The tabs whose screens place the offline banner themselves, where Figma draws it. */
+private val INLINE_BANNER_TABS = setOf(Tab.QUESTS, Tab.MAP)
+
 /**
  * The explorer's home: the selected tab's screen above a bottom navigation bar (see
  * [BottomTabScaffold]).
@@ -75,6 +79,7 @@ private val START_TAB = Tab.QUESTS
  * @param completion draws the screen where the explorer completes a reservation's quest, given the
  *   reservation's id, the venue's name and what closes it; tests pass their own so it doesn't read
  *   Firestore.
+ * @param connectivityRepository tells the shell when the device is offline; tests pass a fake.
  */
 @Composable
 fun AroundApp(
@@ -110,6 +115,7 @@ fun AroundApp(
         },
     profileScreen: @Composable () -> Unit = { ProfileScreen(onSignOut) },
     screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, profileScreen) },
+    connectivityRepository: ConnectivityRepository? = null,
 ) {
   BottomTabScaffold(
       tabs = Tab.entries,
@@ -118,6 +124,8 @@ fun AroundApp(
       navBarTag = C.Tag.NAV_BAR,
       screen = screen,
       modifier = Modifier.testTag(C.Tag.APP),
+      connectivityRepository = connectivityRepository,
+      inlineBannerTabs = INLINE_BANNER_TABS,
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
     venuePageDestination(
@@ -152,7 +160,8 @@ internal fun NavHostController.openVenue(venueId: String, questId: String? = nul
  * The screen of [tab].
  *
  * @param navController opens a venue's page when its card on the map is tapped, a quest's details
- *   on it when its row in the overview is, and the Join a party screen from the overview.
+ *   on it when the quest is tapped in the map's nearby quests or its row in the overview is, and
+ *   the Join a party screen from the overview.
  * @param overview draws the Quests tab's overview, given what opens a quest's details and the Join
  *   a party screen.
  * @param profileScreen draws the Profile tab.
@@ -170,7 +179,11 @@ private fun TabScreen(
     profileScreen: @Composable () -> Unit,
 ) =
     when (tab) {
-      Tab.MAP -> MapScreen(onOpenVenue = navController::openVenueFromMap)
+      Tab.MAP ->
+          MapScreen(
+              onOpenVenue = navController::openVenueFromMap,
+              onOpenQuest = navController::openVenue,
+          )
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS ->
           Box(Modifier.fillMaxSize().testTag(tab.screenTag)) {

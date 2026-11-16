@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.activity.compose.BackHandler
@@ -21,6 +22,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -38,18 +41,23 @@ import com.google.maps.android.compose.MapUiSettings
  * asks again or opens the settings, and while the venues fail to load, another's "Try again" loads
  * them again. Each venue on screen with valid quests gets a pin that opens into a card; the card
  * opens the venue's page and tapping the map closes it. A "Nearby quests" pill opens the nearby
- * quests over the map, closed by Back or by opening a card. Tapping a quest frames its venue and
- * opens its card, "View quest" opens its page, and filters narrow the list, not the pins.
+ * quests over the map, closed by Back or by opening a card. Tapping a quest opens its details, its
+ * pin frames its venue and opens its card, and filters narrow the list, not the pins.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
- * @param onOpenVenue Opens the page of the venue with this id and name, when its card or "View
- *   quest" is tapped.
+ * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
+ * @param onOpenQuest Opens the details of the quest with this id on its venue's page, when the
+ *   quest is tapped in the nearby quests.
+ * @param showOfflineBanner Overlays the shared offline banner at the top of the map; by default,
+ *   while the shell says the device is offline.
  */
 @Composable
 fun MapScreen(
     viewModel: MapViewModel = viewModel(factory = MapViewModel.factory),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
     onOpenVenue: (venueId: String, venueName: String) -> Unit,
+    onOpenQuest: (venueId: String, questId: String) -> Unit,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)
@@ -100,9 +108,9 @@ fun MapScreen(
       NearbyQuestOverlay(
           state.nearby,
           locationOn = state.showsUserLocation,
-          onQuestClick = viewModel::onNearbyQuestClick,
-          // The quests stay open, so Back from the venue's page finds them where they were
-          onViewQuest = { onOpenVenue(it.venueId, it.venueName) },
+          // The quests stay open, so Back from the details finds them where they were
+          onOpenQuest = { onOpenQuest(it.venueId, it.questId) },
+          onShowOnMap = viewModel::onShowOnMap,
           onClose = viewModel::onNearbyClose,
           filters = state.filters,
           onFiltersChange = viewModel::onFiltersChange,
@@ -119,6 +127,7 @@ fun MapScreen(
         Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
+      if (showOfflineBanner) OfflineBanner()
       if (state.loadFailed) VenuesErrorBanner(viewModel::onRetry, retrying = state.retrying)
       if (state.locationRefused) LocationBanner(turnOnLocation)
     }

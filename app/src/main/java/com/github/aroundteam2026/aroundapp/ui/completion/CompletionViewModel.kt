@@ -14,6 +14,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -34,6 +36,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +71,7 @@ class CompletionViewModel(
     private val locationRepository: LocationRepository,
     private val completionRepository: CompletionRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
+    connectivityRepository: ConnectivityRepository,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(CompletionUiState())
   /** What the completion screen shows now; the screen observes it. */
@@ -85,6 +89,11 @@ class CompletionViewModel(
   private var uploaded: Pair<Uri, String>? = null
 
   init {
+    viewModelScope.launch {
+      connectivityRepository.observeOffline(TAG).collect { offline ->
+        mutableUiState.update { it.copy(offline = offline) }
+      }
+    }
     listen()
   }
 
@@ -102,7 +111,8 @@ class CompletionViewModel(
    * Called when the explorer submits the proof. Does nothing unless the proof is filled in and the
    * form is not already saving or saved, so a double tap submits once. A failure, at the upload or
    * at the submit, keeps what the explorer filled in and shows [SaveState.Failed]; calling this
-   * again retries. A precise location is checked before any photo upload or completion write.
+   * again retries. A precise location is checked before any photo upload or completion write. Photo
+   * proofs also require a connection before and after the location check.
    */
   fun submit() {
     val form = mutableUiState.value
@@ -118,7 +128,8 @@ class CompletionViewModel(
         current.saveState is SaveState.Saved -> Unit
         current.sentByTeammate -> finishSubmit(SaveState.Idle)
         // Approval may be withdrawn while the device is finding its position.
-        current.status != CompletionFormStatus.READY -> finishSubmit(SaveState.Idle)
+        current.status != CompletionFormStatus.READY || current.photoBlockedOffline ->
+            finishSubmit(SaveState.Idle)
         else -> finishSubmit(submitProof(form, venueId))
       }
     }
@@ -309,6 +320,7 @@ class CompletionViewModel(
             locations(app),
             CompletionRepositoryProvider.repository,
             photos(app),
+            ConnectivityRepositoryProvider.repository(app),
         )
       }
     }

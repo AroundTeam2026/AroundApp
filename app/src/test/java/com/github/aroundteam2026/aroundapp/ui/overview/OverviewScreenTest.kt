@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.app.Application
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -39,6 +42,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,7 +62,7 @@ class OverviewScreenTest {
   private val cancelled = mutableListOf<String>()
   private val newProofs = mutableListOf<Pair<String, String>>()
 
-  private fun show(state: OverviewUiState) {
+  private fun show(state: OverviewUiState, showOfflineBanner: Boolean = false) {
     compose.setContent {
       AroundAppTheme {
         OverviewContent(
@@ -71,6 +75,7 @@ class OverviewScreenTest {
               newProofs += reservationId to venueName
             },
             clock = CLOCK,
+            showOfflineBanner = showOfflineBanner,
         )
       }
     }
@@ -78,6 +83,15 @@ class OverviewScreenTest {
 
   private fun loaded(vararg rows: OverviewRow) =
       OverviewUiState(OverviewStatus.LOADED, rows.toList())
+
+  @Test
+  fun offlineBannerAppearsBelowTheQuestsTitle() {
+    show(loaded(), showOfflineBanner = true)
+
+    val titleBottom = compose.onNodeWithTag(C.Tag.OVERVIEW_TITLE).getUnclippedBoundsInRoot().bottom
+    val bannerTop = compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).getUnclippedBoundsInRoot().top
+    assertTrue(bannerTop >= titleBottom)
+  }
 
   @Test
   fun everyStateOfTheOverviewOffersJoiningAParty() {
@@ -234,6 +248,20 @@ class OverviewScreenTest {
   }
 
   @Test
+  fun offlineTheCardsShowTheHintAndCannotBeCancelled() {
+    show(loaded(row()).copy(offline = true))
+
+    compose
+        .onNode(
+            hasTestTag(C.Tag.OFFLINE_HINT) and
+                hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$ID")),
+            useUnmergedTree = true,
+        )
+        .assertIsDisplayed()
+    cancelButtonOf(ID).assertIsNotEnabled()
+  }
+
+  @Test
   fun aCardBeingCancelledHasItsButtonDisabled() {
     show(loaded(row(), row(id = "reservation-2")).copy(cancellingIds = setOf("reservation-2")))
 
@@ -260,6 +288,7 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
             FakeUserRepository(),
+            FakeConnectivityRepository(),
         )
     compose.setContent {
       AroundAppTheme {
@@ -297,6 +326,7 @@ class OverviewScreenTest {
             party,
             FakeCompletionRepository(),
             FakeUserRepository(),
+            FakeConnectivityRepository(),
         )
     compose.setContent {
       AroundAppTheme {
