@@ -66,3 +66,20 @@ fun List<PartyMember>.creatorFirst(reservation: Reservation?): List<PartyMember>
  * find a membership with one read and an explorer can't join a party twice.
  */
 fun partyMemberId(reservationId: String, uid: String) = "${reservationId}_$uid"
+
+/**
+ * The ids of the [reservations] whose party [explorerUid] joined rather than created, as their
+ * memberships in [parties] tell.
+ */
+fun joinedPartiesOf(
+    reservations: List<Reservation>,
+    parties: Map<String, List<PartyMember>>,
+    explorerUid: String,
+): Set<String> =
+    reservations
+        .filter { reservation ->
+          parties[reservation.id].orEmpty().any {
+            it.uid == explorerUid && it.isJoined && !it.createdParty(reservation)
+          }
+        }
+        .mapTo(HashSet()) { it.id }

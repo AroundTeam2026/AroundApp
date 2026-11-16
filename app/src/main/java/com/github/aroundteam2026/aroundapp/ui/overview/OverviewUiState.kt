@@ -50,6 +50,8 @@ data class OverviewUiState(
  * @property status Whether the venue has approved the reservation yet, and then the proof.
  * @property proofSender Who sent the party's proof, when another member did; null when the explorer
  *   did, or there is none.
+ * @property leave Whether the explorer joined the party rather than created it, so they leave it
+ *   instead of cancelling the reservation for everyone.
  */
 data class OverviewRow(
     val reservationId: String,
@@ -64,6 +66,7 @@ data class OverviewRow(
     val partySize: Int,
     val status: OverviewRowStatus,
     val proofSender: ProofSender? = null,
+    val leave: Boolean = false,
 )
 
 /** Where the overview stands. */

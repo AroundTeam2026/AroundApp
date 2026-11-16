@@ -14,6 +14,7 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.createdParty
 import com.github.aroundteam2026.aroundapp.model.party.isJoined
+import com.github.aroundteam2026.aroundapp.model.party.joinedPartiesOf
 import com.github.aroundteam2026.aroundapp.model.party.observeParties
 import com.github.aroundteam2026.aroundapp.model.party.partyCapacity
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -579,23 +580,6 @@ internal fun partyCodesOf(
         }
         .mapNotNull { reservation -> reservation.partyCode?.let { reservation.id to it } }
         .toMap()
-
-/**
- * The ids of the [reservations] whose party [explorerUid] joined rather than created, as their
- * memberships in [parties] tell.
- */
-internal fun joinedPartiesOf(
-    reservations: List<Reservation>,
-    parties: Map<String, List<PartyMember>>,
-    explorerUid: String,
-): Set<String> =
-    reservations
-        .filter { reservation ->
-          parties[reservation.id].orEmpty().any {
-            it.uid == explorerUid && it.isJoined && !it.createdParty(reservation)
-          }
-        }
-        .mapTo(HashSet()) { it.id }
 
 /** The ids of the reservations among these that the venue approved. */
 private fun List<Reservation>.approvedIds(): Set<String> = filter {
