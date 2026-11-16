@@ -26,6 +26,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
@@ -72,6 +73,7 @@ class MapScreenNearbyTest {
                   testVenue(id = "bar", name = "Bar Nocturne"),
               )
           ),
+          FakeConnectivityRepository(),
       )
 
   /** Shows the map; unless [locationOn], the explorer refuses the location permission. */
@@ -91,7 +93,7 @@ class MapScreenNearbyTest {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
         MapScreen(
             viewModel,
-            onOpenVenue = { _, _ -> },
+            onFocusQuest = { _, _ -> },
             onOpenQuest = onOpenQuest,
             acceptViewModel = acceptViewModel,
             showOfflineBanner = showOfflineBanner,
@@ -113,7 +115,7 @@ class MapScreenNearbyTest {
           LocalActivityResultRegistryOwner provides dialog,
           LocalShowOfflineBanner provides true,
       ) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     composeTestRule.waitForIdle()

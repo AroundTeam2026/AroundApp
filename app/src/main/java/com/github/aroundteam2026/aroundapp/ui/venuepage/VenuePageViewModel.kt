@@ -75,7 +75,8 @@ import kotlinx.coroutines.launch
  * accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and if the
  * proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the explorer
  * as in their profile. Given [arrivalQuestId], the page opens that quest's details the first time
- * it shows the venue; see [VenuePageUiState.arrivingAt].
+ * it shows the venue; see [VenuePageUiState.arrivingAt]. Given [focusQuestId], it scrolls to and
+ * picks that quest instead; see [VenuePageUiState.focusingOn].
  *
  * It also shows who is in each party, downloading their pictures through [pictureRepository];
  * without one, members show their initials.
@@ -91,6 +92,7 @@ class VenuePageViewModel(
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
     arrivalQuestId: String? = null,
+    focusQuestId: String? = null,
     pictureRepository: UserPictureRepository? = null,
     decodePicture: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
 ) : ViewModel() {
@@ -109,6 +111,9 @@ class VenuePageViewModel(
    * [VenuePageUiState.arrivalQuestId], or missed, as [VenuePageUiState.arrivalMissed].
    */
   private var arriving: String? = arrivalQuestId
+
+  /** The quest the page scrolls to and picks the first time it shows the venue; null afterwards. */
+  private var focusing: String? = focusQuestId
 
   /** The reservations this page created, to tell which ones the server then refused. */
   private val writes = RefusedWrites()
@@ -172,6 +177,11 @@ class VenuePageViewModel(
   /** Called when the explorer opens the details of the quest [questId]. */
   fun onQuestDetailsOpened(questId: String) {
     mutableUiState.update { it.withQuestDetails(questId) }
+  }
+
+  /** Called once the page has scrolled to [VenuePageUiState.focusQuestId]. */
+  fun onFocusShown() {
+    mutableUiState.update { it.copy(focusQuestId = null) }
   }
 
   /** Called once the page has said that the quest it was to arrive at is no longer listed. */
@@ -421,6 +431,10 @@ class VenuePageViewModel(
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
     }
+    focusing?.let { questId ->
+      focusing = null
+      mutableUiState.update { it.focusingOn(questId) }
+    }
   }
 
   companion object {
@@ -428,12 +442,14 @@ class VenuePageViewModel(
 
     /**
      * Builds the [VenuePageViewModel] of the venue [venueId] for the explorer [explorerUid], with
-     * the app's repositories, opening the details of [arrivalQuestId] if given.
+     * the app's repositories, opening the details of [arrivalQuestId] if given, or scrolled to
+     * [focusQuestId] if given.
      */
     fun factory(
         venueId: String,
         explorerUid: String,
         arrivalQuestId: String? = null,
+        focusQuestId: String? = null,
     ): ViewModelProvider.Factory = viewModelFactory {
       initializer {
         VenuePageViewModel(
@@ -446,6 +462,7 @@ class VenuePageViewModel(
             CompletionRepositoryProvider.repository,
             explorerUid,
             arrivalQuestId = arrivalQuestId,
+            focusQuestId = focusQuestId,
             pictureRepository =
                 this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]?.let {
                   UserPictureRepositoryProvider.repository(it)

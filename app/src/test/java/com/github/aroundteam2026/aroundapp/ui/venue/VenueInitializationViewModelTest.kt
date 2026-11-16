@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex
 package com.github.aroundteam2026.aroundapp.ui.venue
 
@@ -291,6 +292,8 @@ class VenueInitializationViewModelTest {
         radiusMeters: Int,
         address: String?,
     ) = delegate.setArea(venueId, location, radiusMeters, address)
+
+    override suspend fun setName(venueId: String, name: String) = delegate.setName(venueId, name)
 
     override suspend fun getVenue(venueId: String): Venue? {
       reads++

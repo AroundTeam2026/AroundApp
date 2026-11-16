@@ -31,6 +31,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.venue.venueProfileFactoryOnFakes
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -75,6 +76,7 @@ class VenueEntryNavigationTest {
             createQuestFactory = createQuestFactoryOnFakes(),
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
             dashboardFactory = venueDashboardFactoryOnFakes(),
+            venueProfileFactory = venueProfileFactoryOnFakes(),
             start = start,
         )
       }
@@ -222,6 +224,7 @@ class VenueEntryNavigationTest {
                   createQuestFactory = createQuestFactoryOnFakes(),
                   venueQuestsFactory = venueQuestsFactoryOnFakes(),
                   dashboardFactory = venueDashboardFactoryOnFakes(),
+                  venueProfileFactory = venueProfileFactoryOnFakes(),
                   locationScreen = { uid, onSaved, _ ->
                     Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
                   },
@@ -262,6 +265,7 @@ class VenueEntryNavigationTest {
             createQuestFactory = viewModelFactory { initializer { form } },
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
             dashboardFactory = venueDashboardFactoryOnFakes(),
+            venueProfileFactory = venueProfileFactoryOnFakes(),
         )
       }
     }
