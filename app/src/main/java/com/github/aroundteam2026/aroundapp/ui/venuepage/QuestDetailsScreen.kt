@@ -140,7 +140,8 @@ fun QuestDetailsScreen(
       quest.reward?.let { RewardCard(it, clock) }
       PartyCard(
           quest,
-          joined = state.acceptedParties[quest.questId] ?: SOLO_PARTY,
+          // Before the explorer accepts, nobody is in the party yet
+          joined = state.acceptedParties[quest.questId] ?: 0,
           code = state.partyCode,
           venueName = state.venueName,
           members = state.members,
@@ -361,9 +362,10 @@ private fun RewardCard(reward: Reward, clock: Clock) {
 
 /**
  * How many people [quest] takes, with a seat for each. A party bigger than the quest's minimum gets
- * a seat for everyone. Past the explorer's own seat, [joined] counts who else is in. With a [code],
- * the party's code follows, for friends to join with; sharing it names the quest and [venueName].
- * Once known, the [members] fill their seats with their picture or initials.
+ * a seat for everyone. [joined] counts who is in: the explorer's own seat first, then the others,
+ * and only empty seats while it is 0, before the explorer accepts. With a [code], the party's code
+ * follows, for friends to join with; sharing it names the quest and [venueName]. Once known, the
+ * [members] fill their seats with their picture or initials.
  */
 @Composable
 private fun PartyCard(
@@ -390,9 +392,9 @@ private fun PartyCard(
       if (members.isEmpty()) {
         repeat(seats) { seat ->
           when {
+            seat >= joined -> EmptySeat()
             seat == 0 -> OwnSeat()
-            seat < joined -> JoinedSeat()
-            else -> EmptySeat()
+            else -> JoinedSeat()
           }
         }
       } else {

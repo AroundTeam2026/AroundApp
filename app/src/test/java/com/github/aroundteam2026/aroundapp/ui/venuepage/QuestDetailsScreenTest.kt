@@ -202,8 +202,27 @@ class QuestDetailsScreenTest {
   }
 
   @Test
-  fun beforeAcceptingOnlyTheExplorersSeatIsTaken() {
+  fun beforeAcceptingEverySeatIsEmpty() {
     show(quest(minPartySize = 4))
+
+    node(C.Tag.QUEST_DETAIL_PARTY_JOINED).assertTextEquals("0 of 4 joined")
+    compose.onNodeWithText("ME").assertDoesNotExist()
+    assertEquals(4, nodes(C.Tag.QUEST_DETAIL_SEAT_EMPTY).fetchSemanticsNodes().size)
+  }
+
+  @Test
+  fun aSoloQuestBeforeAcceptingHasItsOneSeatEmpty() {
+    show(quest(minPartySize = 1))
+
+    node(C.Tag.QUEST_DETAIL_PARTY_JOINED).assertTextEquals("0 of 1 joined")
+    compose.onNodeWithText("ME").assertDoesNotExist()
+    assertEquals(1, nodes(C.Tag.QUEST_DETAIL_SEAT_EMPTY).fetchSemanticsNodes().size)
+  }
+
+  @Test
+  fun afterAcceptingTheExplorerTakesTheFirstSeat() {
+    val quest = quest(minPartySize = 4)
+    show(quest, accepted(quest))
 
     node(C.Tag.QUEST_DETAIL_PARTY_JOINED).assertTextEquals("1 of 4 joined")
     compose.onNodeWithText("ME").assertExists()
