@@ -15,8 +15,9 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardScreen
-import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsScreen
+import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileScreen
+import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
 
 /** The venue's top-level destinations, one per tab of its bottom bar. */
 enum class VenueTab(
@@ -70,6 +71,7 @@ private val VENUE_INLINE_BANNER_TABS = setOf(VenueTab.DASHBOARD)
  * @param onSignOut signs the venue out, from the Profile tab.
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
+ * @param venueProfileFactory builds the Profile tab's ViewModel; tests pass one on fakes.
  * @param onOpenProof opens the Review proof screen of a completion's id.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  * @param connectivityRepository tells the shell when the device is offline; tests pass a fake.
@@ -82,6 +84,7 @@ fun VenueHome(
     dashboardFactory: ViewModelProvider.Factory,
     onOpenProof: (String) -> Unit = {},
     onEditQuest: (String) -> Unit = {},
+    venueProfileFactory: ViewModelProvider.Factory = VenueProfileViewModel.factory(),
     navController: NavHostController = rememberNavController(),
     screen: @Composable (VenueTab) -> Unit = {
       VenueTabScreen(
@@ -92,6 +95,7 @@ fun VenueHome(
           dashboardFactory,
           onOpenProof,
           onEditQuest,
+          venueProfileFactory,
       )
     },
     connectivityRepository: ConnectivityRepository? = null,
@@ -118,6 +122,7 @@ private fun VenueTabScreen(
     dashboardFactory: ViewModelProvider.Factory,
     onOpenProof: (String) -> Unit,
     onEditQuest: (String) -> Unit,
+    venueProfileFactory: ViewModelProvider.Factory,
 ) =
     when (tab) {
       VenueTab.DASHBOARD ->
@@ -133,5 +138,10 @@ private fun VenueTabScreen(
               Modifier.testTag(tab.screenTag),
               onEditQuest = onEditQuest,
           )
-      VenueTab.PROFILE -> ProfileScreen(onSignOut)
+      VenueTab.PROFILE ->
+          VenueProfileScreen(
+              viewModel(factory = venueProfileFactory),
+              onSignOut,
+              Modifier.testTag(tab.screenTag),
+          )
     }
