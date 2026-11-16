@@ -33,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -96,6 +97,24 @@ class MapScreenNearbyTest {
   }
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
+
+  // The shell leaves the Map's banner to the screen, so the screen must show it by default offline
+  @Test
+  fun theMapShowsTheBannerWhileTheShellSaysItIsOffline() {
+    val dialog =
+        PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+    composeTestRule.setContent {
+      CompositionLocalProvider(
+          LocalActivityResultRegistryOwner provides dialog,
+          LocalShowOfflineBanner provides true,
+      ) {
+        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+      }
+    }
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+  }
 
   // As in Figma, the offline banner comes first in the map's top column, above the location banner
   // that shows here since the permission is refused
