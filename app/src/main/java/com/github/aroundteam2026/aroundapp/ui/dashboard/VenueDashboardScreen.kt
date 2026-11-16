@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.res.Configuration
@@ -48,6 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
@@ -68,7 +71,9 @@ import kotlinx.coroutines.launch
  * today's date, the pending and active quests counts, then the proofs to review, the reservations
  * that need an answer and the approved ones. Approve and Decline answer a pending reservation: its
  * buttons are disabled while the answer is saved, and a failed answer shows a snackbar once.
- * Tapping a proof calls [onOpenProof] with its completion's id.
+ * Tapping a proof calls [onOpenProof] with its completion's id. With [showOfflineBanner], by
+ * default while the shell says the device is offline, the offline banner sits under the header and
+ * stays at the top while the list scrolls.
  *
  * Figma's "Today" count is left out: reservations have no visit time yet (see
  * [VenueDashboardUiState]).
@@ -78,6 +83,7 @@ fun VenueDashboardScreen(
     viewModel: VenueDashboardViewModel,
     modifier: Modifier = Modifier,
     onOpenProof: (String) -> Unit = {},
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -99,6 +105,7 @@ fun VenueDashboardScreen(
       onRetry = viewModel::retry,
       modifier = modifier,
       onOpenProof = onOpenProof,
+      showOfflineBanner = showOfflineBanner,
       snackbarHostState = snackbarHostState,
   )
 }
@@ -118,6 +125,7 @@ internal fun VenueDashboardContent(
     onOpenProof: (String) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     clock: Clock = Clock.systemDefaultZone(),
+    showOfflineBanner: Boolean = false,
 ) {
   Box(
       modifier
@@ -133,7 +141,11 @@ internal fun VenueDashboardContent(
       VenueDashboardStatus.LOADING ->
           CircularProgressIndicator(Modifier.testTag(C.Tag.DASHBOARD_LOADING))
       VenueDashboardStatus.FAILED -> LoadFailed(onRetry)
-      VenueDashboardStatus.LOADED -> Dashboard(state, onApprove, onDecline, onOpenProof, clock)
+      VenueDashboardStatus.LOADED ->
+          Dashboard(state, onApprove, onDecline, onOpenProof, clock, showOfflineBanner)
+    }
+    if (showOfflineBanner && state.status != VenueDashboardStatus.LOADED) {
+      OfflineBanner(Modifier.align(Alignment.TopCenter).padding(AroundSpacing.ScreenHorizontal))
     }
     SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
   }
@@ -147,6 +159,7 @@ private fun Dashboard(
     onDecline: (String) -> Unit,
     onOpenProof: (String) -> Unit,
     clock: Clock,
+    showOfflineBanner: Boolean,
 ) {
   // Many pending requests would push "Upcoming" far down, so only the first few show at first
   var showAllPending by rememberSaveable { mutableStateOf(false) }
@@ -158,6 +171,14 @@ private fun Dashboard(
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
     item { Header(state.venueName, state.avatar, clock) }
+    if (showOfflineBanner) {
+      // Sticky, so the venue still sees why Approve and Decline are off after scrolling down
+      stickyHeader {
+        Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+          OfflineBanner()
+        }
+      }
+    }
     item { Summary(state, Modifier.padding(top = AroundSpacing.ExtraSmall)) }
     if (state.isEmpty) {
       item { NoReservations() }
