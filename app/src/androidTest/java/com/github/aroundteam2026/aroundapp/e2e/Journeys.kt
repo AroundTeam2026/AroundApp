@@ -28,19 +28,20 @@ fun ComposeTestRule.waitUntilGone(tag: String) =
 fun ComposeTestRule.findTheQuestNearby(questTitle: String) {
   onNodeWithTag(C.Tag.MAP_TAB).performClick()
   onNodeWithTag(C.Tag.NEARBY_BUTTON).performClick()
-  // "View quest" opens the venue of the page shown, so the quest must be the one shown
+  // Only the page shown can be tapped, so the quest must be the one shown
   val nearbyQuest = hasTestTag(C.Tag.NEARBY_QUEST_TITLE) and hasText(questTitle)
   waitFor(nearbyQuest)
   onNode(nearbyQuest, useUnmergedTree = true).assertIsDisplayed()
 }
 
 /**
- * Opens the shown quest's venue page and waits for it to be [venueName]'s, listing [questTitle].
+ * Taps the shown quest in the nearby quests and waits for its details, at [venueName], to show
+ * [questTitle].
  */
-fun ComposeTestRule.viewTheVenuesPage(venueName: String, questTitle: String) {
-  onNodeWithTag(C.Tag.NEARBY_VIEW).performClick()
-  waitFor(hasTestTag(C.Tag.VENUE_PAGE_NAME) and hasText(venueName))
-  waitFor(hasTestTag(C.Tag.VENUE_QUEST_ROW_TITLE) and hasText(questTitle))
+fun ComposeTestRule.openTheShownQuest(venueName: String, questTitle: String) {
+  onNodeWithTag(C.Tag.NEARBY_PAGE).performClick()
+  waitFor(hasTestTag(C.Tag.QUEST_DETAIL_TITLE) and hasText(questTitle))
+  waitFor(hasTestTag(C.Tag.QUEST_DETAIL_VENUE_NAME) and hasText(venueName))
 }
 
 /**
