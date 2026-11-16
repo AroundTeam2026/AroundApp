@@ -1128,21 +1128,29 @@ class VenuePageAcceptTest {
   fun offlineSurvivesAFailedLoadAndARetry() = test {
     var loads = 0
     val venues = FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))
-    // The venue fails to load once, then loads
+    // The first load fails only once the page already knows it is offline
+    val firstLoad = CompletableDeferred<Unit>()
     venueRepository =
         object : VenueRepository by venues {
           override fun observeVenue(venueId: String): Flow<Venue?> =
-              if (loads++ == 0) flow { throw IOException("No venue") }
-              else venues.observeVenue(venueId)
+              if (loads++ > 0) venues.observeVenue(venueId)
+              else
+                  flow {
+                    firstLoad.await()
+                    throw IOException("No venue")
+                  }
         }
     viewModel
     goOffline()
+    assertTrue(state.offline)
+
+    firstLoad.complete(Unit)
+    runCurrent()
     assertEquals(VenuePageStatus.FAILED, state.status)
     assertTrue(state.offline)
 
     viewModel.onRetry()
     runCurrent()
-
     assertEquals(VenuePageStatus.LOADED, state.status)
     assertTrue(state.offline)
   }
