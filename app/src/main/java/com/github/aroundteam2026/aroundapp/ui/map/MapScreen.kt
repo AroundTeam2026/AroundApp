@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
@@ -47,7 +48,8 @@ import com.google.maps.android.compose.MapUiSettings
  * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
  * @param onOpenQuest Opens the details of the quest with this id on its venue's page, when the
  *   quest is tapped in the nearby quests.
- * @param showOfflineBanner Overlays the shared offline banner near the top of the map.
+ * @param showOfflineBanner Overlays the shared offline banner at the top of the map; by default,
+ *   while the shell says the device is offline.
  */
 @Composable
 fun MapScreen(
@@ -55,7 +57,7 @@ fun MapScreen(
     cameraPositionState: CameraPositionState = rememberMapCamera(),
     onOpenVenue: (venueId: String, venueName: String) -> Unit,
     onOpenQuest: (venueId: String, questId: String) -> Unit,
-    showOfflineBanner: Boolean = false,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsState()
   RequestLocationPermission(viewModel::onLocationPermissionResult)

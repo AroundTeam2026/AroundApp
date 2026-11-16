@@ -88,6 +88,33 @@ class VenueDashboardScreenTest {
     assertTrue(bannerTop >= headerBottom)
   }
 
+  // Offline at a cold start is when the dashboard is stuck loading, so the banner explains why
+  @Test
+  fun offlineBannerShowsOverTheSpinnerWhileLoading() {
+    show(VenueDashboardUiState(), showOfflineBanner = true)
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_LOADING).assertIsDisplayed()
+  }
+
+  @Test
+  fun offlineBannerShowsOverTryAgainWhenLoadingFailed() {
+    show(VenueDashboardUiState(status = VenueDashboardStatus.FAILED), showOfflineBanner = true)
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_RETRY).assertIsDisplayed()
+  }
+
+  // Approve and Decline are off offline, so the banner must still say why further down the list
+  @Test
+  fun offlineBannerStaysInViewWhenTheListScrolls() {
+    show(loaded(upcoming = (1..20).map { pending("r$it") }), showOfflineBanner = true)
+
+    scrollTo("${C.Tag.DASHBOARD_ROW}_r20")
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_VENUE).assertDoesNotExist()
+  }
+
   private fun string(id: Int, vararg args: Any) =
       ApplicationProvider.getApplicationContext<Context>().getString(id, *args)
 

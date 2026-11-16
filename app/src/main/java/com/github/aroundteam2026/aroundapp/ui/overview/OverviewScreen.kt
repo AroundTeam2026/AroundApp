@@ -43,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundHeader
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -60,6 +61,8 @@ import java.time.Clock
  * @param onJoinParty Opens the screen where the explorer joins a friend's party by its code.
  * @param onSendNewProof Opens the proof form of the reservation with this id, at the venue with
  *   this name, to replace the party's proof.
+ * @param showOfflineBanner Shows the offline banner under the title; by default, while the shell
+ *   says the device is offline.
  */
 @Composable
 fun OverviewScreen(
@@ -67,7 +70,7 @@ fun OverviewScreen(
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     onJoinParty: () -> Unit,
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
-    showOfflineBanner: Boolean = false,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) =
     OverviewScreen(
         viewModel(factory = OverviewViewModel.factory(explorerUid)),
@@ -85,7 +88,7 @@ fun OverviewScreen(
     onJoinParty: () -> Unit,
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
-    showOfflineBanner: Boolean = false,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   OverviewContent(

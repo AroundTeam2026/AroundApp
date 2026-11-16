@@ -52,6 +52,9 @@ enum class VenueTab(
 /** The tab the venue home opens on, the leftmost one, and that Back returns to. */
 private val VENUE_START_TAB = VenueTab.DASHBOARD
 
+/** The tabs whose screens place the offline banner themselves, where Figma draws it. */
+private val VENUE_INLINE_BANNER_TABS = setOf(VenueTab.DASHBOARD)
+
 /**
  * The venue's home, where a signed-in venue lands: the selected tab's screen above a bottom bar of
  * Dashboard, Quests and Profile (see [BottomTabScaffold]).
@@ -69,7 +72,7 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
  * @param onOpenProof opens the Review proof screen of a completion's id.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
- * @param connectivityRepository reports offline changes to the shared banner; tests pass a fake.
+ * @param connectivityRepository tells the shell when the device is offline; tests pass a fake.
  */
 @Composable
 fun VenueHome(
@@ -80,7 +83,17 @@ fun VenueHome(
     onOpenProof: (String) -> Unit = {},
     onEditQuest: (String) -> Unit = {},
     navController: NavHostController = rememberNavController(),
-    screen: (@Composable (VenueTab) -> Unit)? = null,
+    screen: @Composable (VenueTab) -> Unit = {
+      VenueTabScreen(
+          it,
+          onCreateQuest,
+          onSignOut,
+          venueQuestsFactory,
+          dashboardFactory,
+          onOpenProof,
+          onEditQuest,
+      )
+    },
     connectivityRepository: ConnectivityRepository? = null,
 ) {
   BottomTabScaffold(
@@ -88,23 +101,10 @@ fun VenueHome(
       startTab = VENUE_START_TAB,
       navController = navController,
       navBarTag = C.Tag.VENUE_NAV_BAR,
-      screen = { tab, showBanner ->
-        if (screen == null)
-            VenueTabScreen(
-                tab,
-                onCreateQuest,
-                onSignOut,
-                venueQuestsFactory,
-                dashboardFactory,
-                onOpenProof,
-                onEditQuest,
-                showBanner,
-            )
-        else screen(tab)
-      },
+      screen = screen,
       modifier = Modifier.testTag(C.Tag.VENUE_HOME),
       connectivityRepository = connectivityRepository,
-      inlineBannerTabs = if (screen == null) setOf(VenueTab.DASHBOARD) else emptySet(),
+      inlineBannerTabs = VENUE_INLINE_BANNER_TABS,
   )
 }
 
@@ -118,7 +118,6 @@ private fun VenueTabScreen(
     dashboardFactory: ViewModelProvider.Factory,
     onOpenProof: (String) -> Unit,
     onEditQuest: (String) -> Unit,
-    showBanner: Boolean,
 ) =
     when (tab) {
       VenueTab.DASHBOARD ->
@@ -126,7 +125,6 @@ private fun VenueTabScreen(
               viewModel(factory = dashboardFactory),
               Modifier.testTag(tab.screenTag),
               onOpenProof = onOpenProof,
-              showOfflineBanner = showBanner,
           )
       VenueTab.QUESTS ->
           VenueQuestsScreen(

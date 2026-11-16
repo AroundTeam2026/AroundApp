@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
@@ -70,7 +71,9 @@ import kotlinx.coroutines.launch
  * today's date, the pending and active quests counts, then the proofs to review, the reservations
  * that need an answer and the approved ones. Approve and Decline answer a pending reservation: its
  * buttons are disabled while the answer is saved, and a failed answer shows a snackbar once.
- * Tapping a proof calls [onOpenProof] with its completion's id.
+ * Tapping a proof calls [onOpenProof] with its completion's id. With [showOfflineBanner], by
+ * default while the shell says the device is offline, the offline banner sits under the header and
+ * stays at the top while the list scrolls.
  *
  * Figma's "Today" count is left out: reservations have no visit time yet (see
  * [VenueDashboardUiState]).
@@ -80,7 +83,7 @@ fun VenueDashboardScreen(
     viewModel: VenueDashboardViewModel,
     modifier: Modifier = Modifier,
     onOpenProof: (String) -> Unit = {},
-    showOfflineBanner: Boolean = false,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -169,7 +172,12 @@ private fun Dashboard(
   ) {
     item { Header(state.venueName, state.avatar, clock) }
     if (showOfflineBanner) {
-      item { OfflineBanner() }
+      // Sticky, so the venue still sees why Approve and Decline are off after scrolling down
+      stickyHeader {
+        Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+          OfflineBanner()
+        }
+      }
     }
     item { Summary(state, Modifier.padding(top = AroundSpacing.ExtraSmall)) }
     if (state.isEmpty) {

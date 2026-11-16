@@ -73,7 +73,6 @@ class MapScreenNearbyTest {
   /** Shows the map; unless [locationOn], the explorer refuses the location permission. */
   private fun show(
       locationOn: Boolean = false,
-      onOpenVenue: (venueId: String, venueName: String) -> Unit = { _, _ -> },
       showOfflineBanner: Boolean = false,
       onOpenQuest: (venueId: String, questId: String) -> Unit = { _, _ -> },
   ) {
@@ -87,7 +86,7 @@ class MapScreenNearbyTest {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
         MapScreen(
             viewModel,
-            onOpenVenue = onOpenVenue,
+            onOpenVenue = { _, _ -> },
             onOpenQuest = onOpenQuest,
             showOfflineBanner = showOfflineBanner,
         )
@@ -98,13 +97,17 @@ class MapScreenNearbyTest {
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
 
+  // As in Figma, the offline banner comes first in the map's top column, above the location banner
+  // that shows here since the permission is refused
   @Test
-  fun offlineBannerOverlaysTheMapNearItsTop() {
+  fun offlineBannerComesFirstAtTheTopOfTheMap() {
     show(showOfflineBanner = true)
 
     val mapTop = node(C.Tag.MAP).getBoundsInRoot().top
-    val bannerTop = node(C.Tag.OFFLINE_BANNER).getBoundsInRoot().top
-    assertTrue(bannerTop >= mapTop)
+    val banner = node(C.Tag.OFFLINE_BANNER).getBoundsInRoot()
+    val locationTop = node(C.Tag.LOCATION_BANNER).getBoundsInRoot().top
+    assertTrue(banner.top >= mapTop)
+    assertTrue(banner.bottom <= locationTop)
     node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
   }
 
