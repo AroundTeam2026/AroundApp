@@ -23,6 +23,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import java.time.Duration
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
@@ -30,7 +31,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 
-/** Tests the banner that says the map is offline, showing the quests saved on the phone. */
+/** Tests the app's offline banner on the map, which shows what's saved on the phone. */
 @RunWith(AndroidJUnit4::class)
 class MapScreenOfflineTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
@@ -60,21 +61,20 @@ class MapScreenOfflineTest {
       }
     }
     // The map says it's offline once the device has been for a moment
-    shadowOf(Looper.getMainLooper())
-        .idleFor(Duration.ofMillis(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS))
+    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(OFFLINE_HINT_DELAY_MS))
     composeTestRule.waitForIdle()
   }
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
 
   @Test
-  fun offlineShowsTheBannerWithTheMapsCaption() {
+  fun offlineShowsTheAppsOfflineBanner() {
     show()
 
-    node(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
     composeTestRule.onNodeWithText(app.getString(R.string.offline_hint_title)).assertIsDisplayed()
     composeTestRule
-        .onNodeWithText(app.getString(R.string.offline_map_saved_quests))
+        .onNodeWithText(app.getString(R.string.offline_banner_caption))
         .assertIsDisplayed()
   }
 
@@ -83,7 +83,7 @@ class MapScreenOfflineTest {
     venueRepository.failing = true
     show()
 
-    node(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
     node(C.Tag.VENUES_ERROR_BANNER).assertDoesNotExist()
     node(C.Tag.VENUES_TRY_AGAIN).assertDoesNotExist()
   }
@@ -92,7 +92,7 @@ class MapScreenOfflineTest {
   fun theLocationBannerShowsAlongsideTheOfflineOne() {
     show(answer = mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
 
-    node(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
     node(C.Tag.LOCATION_BANNER).assertIsDisplayed()
   }
 
@@ -103,6 +103,6 @@ class MapScreenOfflineTest {
     connectivity.online.value = true
     composeTestRule.waitForIdle()
 
-    node(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+    node(C.Tag.OFFLINE_BANNER).assertDoesNotExist()
   }
 }

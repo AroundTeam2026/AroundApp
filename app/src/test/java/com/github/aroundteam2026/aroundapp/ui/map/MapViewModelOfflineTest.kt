@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -89,11 +90,9 @@ class MapViewModelOfflineTest {
     waitForTheOfflineBanner()
   }
 
-  /**
-   * Lets [MapViewModel.OFFLINE_BANNER_DELAY_MILLIS] pass, after which the map says it's offline.
-   */
+  /** Lets [OFFLINE_HINT_DELAY_MS] pass, after which the map says it's offline. */
   private fun TestScope.waitForTheOfflineBanner() {
-    advanceTimeBy(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS)
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
     runCurrent()
   }
 
@@ -103,7 +102,7 @@ class MapViewModelOfflineTest {
 
     connectivity.online.value = false
     runCurrent()
-    advanceTimeBy(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS - 1)
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
     runCurrent()
     assertFalse(state.offline)
 
@@ -123,7 +122,7 @@ class MapViewModelOfflineTest {
 
     connectivity.online.value = false
     runCurrent()
-    advanceTimeBy(MapViewModel.OFFLINE_BANNER_DELAY_MILLIS - 1)
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
     connectivity.online.value = true
     runCurrent()
     waitForTheOfflineBanner()

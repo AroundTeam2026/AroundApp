@@ -6,7 +6,6 @@
     <string name="offline_needs_connection">This action needs a connection.</string>
     <string name="offline_cancel_needs_connection">Cancelling needs a connection.</string>
     <string name="offline_leave_needs_connection">Leaving the party needs a connection.</string>
-    <string name="offline_map_saved_quests">Showing the quests saved on this phone.</string>
     <string name="offline_photo_needs_connection">Sending a photo needs a connection.</string>
     <!-- Caption of the app-wide offline banner, OfflineBanner -->
     <string name="offline_banner_caption">Showing what\'s saved on this phone.</string>

@@ -23,6 +23,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -67,9 +69,8 @@ import kotlinx.coroutines.launch
  *   then shows what Firestore kept on the phone and loads the rest once back online.
  * @property retrying Whether what failed is being listened to again after [MapViewModel.onRetry],
  *   until it answers.
- * @property offline Whether the device has been offline for
- *   [MapViewModel.OFFLINE_BANNER_DELAY_MILLIS], so the map says it shows the quests saved on the
- *   phone.
+ * @property offline Whether the device has been offline for [OFFLINE_HINT_DELAY_MS], so the map
+ *   says it shows what's saved on the phone.
  */
 data class MapUiState(
     val areaToFrame: GeoBounds?,
@@ -147,15 +148,15 @@ class MapViewModel(
   private val online =
       connectivityRepository.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
   /**
-   * Whether to say the device is offline: once it has been for [OFFLINE_BANNER_DELAY_MILLIS], as a
+   * Whether to say the device is offline: once it has been for [OFFLINE_HINT_DELAY_MS], as a
    * handover to a network the system hasn't validated yet briefly counts as offline. Only the
-   * banner waits; the pins and the error follow [online] at once.
+   * banner waits; the pins and the error follow [online] at once. False until then, so the map
+   * shows without waiting for it.
    */
-  @OptIn(ExperimentalCoroutinesApi::class)
-  private val showsOffline = online.transformLatest {
-    if (!it) delay(OFFLINE_BANNER_DELAY_MILLIS)
-    emit(!it)
-  }
+  private val showsOffline =
+      connectivityRepository
+          .observeOffline(TAG)
+          .stateIn(viewModelScope, SharingStarted.Eagerly, false)
   /**
    * The pins of every venue with valid quests, on screen or not, and the nearby list, built
    * together from each snapshot of [mapData], so the screen never shows one newer than the other.
@@ -480,12 +481,6 @@ class MapViewModel(
 
     /** A tap on a nearby quest frames this distance around its venue, so 500 m across. */
     const val VENUE_FRAME_RADIUS_METERS = 250.0
-
-    /**
-     * How long the device must stay offline before the map says so, enough for a handover between
-     * Wi-Fi and mobile data to be validated.
-     */
-    const val OFFLINE_BANNER_DELAY_MILLIS = 2_000L
 
     /** Builds the [MapViewModel] with the app's repositories. */
     val factory: ViewModelProvider.Factory = viewModelFactory {
