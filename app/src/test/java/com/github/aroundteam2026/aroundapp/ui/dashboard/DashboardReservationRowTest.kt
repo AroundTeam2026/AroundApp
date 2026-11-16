@@ -43,6 +43,7 @@ class DashboardReservationRowTest {
       reservation: DashboardReservation,
       clock: Clock = CLOCK,
       saving: Boolean = false,
+      offline: Boolean = false,
   ) {
     compose.setContent {
       AroundAppTheme {
@@ -51,6 +52,7 @@ class DashboardReservationRowTest {
             onDecline = { declines++ },
             onApprove = { approvals++ },
             saving = saving,
+            offline = offline,
             clock = clock,
         )
       }
@@ -96,6 +98,19 @@ class DashboardReservationRowTest {
   @Test
   fun aRowWhoseAnswerIsSavingDisablesBothButtons() {
     show(pending(), saving = true)
+
+    node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    node(C.Tag.DASHBOARD_ROW_DECLINE).assertIsNotEnabled()
+    node(C.Tag.DASHBOARD_ROW_APPROVE).performClick()
+    node(C.Tag.DASHBOARD_ROW_DECLINE).performClick()
+
+    assertEquals(0, approvals)
+    assertEquals(0, declines)
+  }
+
+  @Test
+  fun anOfflineRowDisablesBothButtons() {
+    show(pending(), offline = true)
 
     node(C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
     node(C.Tag.DASHBOARD_ROW_DECLINE).assertIsNotEnabled()

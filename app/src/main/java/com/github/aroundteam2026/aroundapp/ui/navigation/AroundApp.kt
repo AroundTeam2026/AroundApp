@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.completion.Completion
 import com.github.aroundteam2026.aroundapp.ui.completion.CompletionViewModel
@@ -23,6 +25,7 @@ import com.github.aroundteam2026.aroundapp.ui.joinparty.JoinPartyViewModel
 import com.github.aroundteam2026.aroundapp.ui.joinparty.joinPartyDestination
 import com.github.aroundteam2026.aroundapp.ui.joinparty.navigateToJoinParty
 import com.github.aroundteam2026.aroundapp.ui.map.MapScreen
+import com.github.aroundteam2026.aroundapp.ui.map.NearbyAcceptViewModel
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 import com.github.aroundteam2026.aroundapp.ui.venuepage.VenuePage
@@ -57,6 +60,9 @@ enum class Tab(
 /** The tab the app opens on, and that Back returns to before leaving the app. */
 private val START_TAB = Tab.QUESTS
 
+/** The tabs whose screens place the offline banner themselves, where Figma draws it. */
+private val INLINE_BANNER_TABS = setOf(Tab.QUESTS, Tab.MAP)
+
 /**
  * The explorer's home: the selected tab's screen above a bottom navigation bar (see
  * [BottomTabScaffold]).
@@ -75,6 +81,7 @@ private val START_TAB = Tab.QUESTS
  * @param completion draws the screen where the explorer completes a reservation's quest, given the
  *   reservation's id, the venue's name and what closes it; tests pass their own so it doesn't read
  *   Firestore.
+ * @param connectivityRepository tells the shell when the device is offline; tests pass a fake.
  */
 @Composable
 fun AroundApp(
@@ -109,7 +116,10 @@ fun AroundApp(
           OverviewScreen(explorerUid, onOpenQuest, onJoinParty, navController::navigateToCompletion)
         },
     profileScreen: @Composable () -> Unit = { ProfileScreen(onSignOut) },
-    screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, profileScreen) },
+    screen: @Composable (Tab) -> Unit = {
+      TabScreen(it, navController, explorerUid, overview, profileScreen)
+    },
+    connectivityRepository: ConnectivityRepository? = null,
 ) {
   BottomTabScaffold(
       tabs = Tab.entries,
@@ -118,6 +128,8 @@ fun AroundApp(
       navBarTag = C.Tag.NAV_BAR,
       screen = screen,
       modifier = Modifier.testTag(C.Tag.APP),
+      connectivityRepository = connectivityRepository,
+      inlineBannerTabs = INLINE_BANNER_TABS,
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
     venuePageDestination(
@@ -154,6 +166,7 @@ internal fun NavHostController.openVenue(venueId: String, questId: String? = nul
  * @param navController opens a venue's page when its card on the map is tapped, a quest's details
  *   on it when the quest is tapped in the map's nearby quests or its row in the overview is, and
  *   the Join a party screen from the overview.
+ * @param explorerUid the signed-in explorer, who accepts quests from the map's nearby quests.
  * @param overview draws the Quests tab's overview, given what opens a quest's details and the Join
  *   a party screen.
  * @param profileScreen draws the Profile tab.
@@ -162,6 +175,7 @@ internal fun NavHostController.openVenue(venueId: String, questId: String? = nul
 private fun TabScreen(
     tab: Tab,
     navController: NavHostController,
+    explorerUid: String,
     overview:
         @Composable
         (
@@ -175,6 +189,7 @@ private fun TabScreen(
           MapScreen(
               onOpenVenue = navController::openVenueFromMap,
               onOpenQuest = navController::openVenue,
+              acceptViewModel = viewModel(factory = NearbyAcceptViewModel.factory(explorerUid)),
           )
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS ->

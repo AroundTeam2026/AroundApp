@@ -68,6 +68,8 @@ import kotlinx.coroutines.delay
  * @param onApprove Approves it; only a pending reservation offers it.
  * @param saving Whether its answer is being saved: both buttons are disabled meanwhile, so the
  *   venue can't answer twice.
+ * @param offline Whether the device is offline: both buttons are disabled, since answering needs a
+ *   connection. The dashboard shows why, once, above the rows.
  * @param clock Tells how long ago it was requested; read again each time the minute shown changes,
  *   so a dashboard left open keeps up.
  */
@@ -78,6 +80,7 @@ internal fun DashboardReservationRow(
     onApprove: () -> Unit,
     modifier: Modifier = Modifier,
     saving: Boolean = false,
+    offline: Boolean = false,
     clock: Clock = Clock.systemDefaultZone(),
 ) {
   val colors = MaterialTheme.colorScheme
@@ -117,7 +120,7 @@ internal fun DashboardReservationRow(
             background = colors.background,
             content = colors.onSurface,
             tag = C.Tag.DASHBOARD_ROW_DECLINE,
-            enabled = !saving,
+            enabled = !saving && !offline,
             onClick = onDecline,
         )
         RowButton(
@@ -126,7 +129,7 @@ internal fun DashboardReservationRow(
             background = colors.primary,
             content = colors.onPrimary,
             tag = C.Tag.DASHBOARD_ROW_APPROVE,
-            enabled = !saving && reservation.approveBlock == null,
+            enabled = !saving && !offline && reservation.approveBlock == null,
             onClick = onApprove,
         )
       }

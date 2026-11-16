@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.annotation.DrawableRes
@@ -11,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
@@ -50,6 +52,9 @@ enum class VenueTab(
 /** The tab the venue home opens on, the leftmost one, and that Back returns to. */
 private val VENUE_START_TAB = VenueTab.DASHBOARD
 
+/** The tabs whose screens place the offline banner themselves, where Figma draws it. */
+private val VENUE_INLINE_BANNER_TABS = setOf(VenueTab.DASHBOARD)
+
 /**
  * The venue's home, where a signed-in venue lands: the selected tab's screen above a bottom bar of
  * Dashboard, Quests and Profile (see [BottomTabScaffold]).
@@ -67,6 +72,7 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
  * @param onOpenProof opens the Review proof screen of a completion's id.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
+ * @param connectivityRepository tells the shell when the device is offline; tests pass a fake.
  */
 @Composable
 fun VenueHome(
@@ -88,6 +94,7 @@ fun VenueHome(
           onEditQuest,
       )
     },
+    connectivityRepository: ConnectivityRepository? = null,
 ) {
   BottomTabScaffold(
       tabs = VenueTab.entries,
@@ -96,6 +103,8 @@ fun VenueHome(
       navBarTag = C.Tag.VENUE_NAV_BAR,
       screen = screen,
       modifier = Modifier.testTag(C.Tag.VENUE_HOME),
+      connectivityRepository = connectivityRepository,
+      inlineBannerTabs = VENUE_INLINE_BANNER_TABS,
   )
 }
 
