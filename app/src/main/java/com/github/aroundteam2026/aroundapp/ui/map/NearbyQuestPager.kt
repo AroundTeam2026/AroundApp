@@ -59,8 +59,8 @@ private const val MAX_DOTS = 5
 private val AVATAR_SIZE = 60.dp
 private val LINE_SPACING = 3.dp
 private val TITLE_SPACING = 2.dp
-private val BUTTON_HEIGHT = 52.dp
-private val CHEVRON_SIZE = 20.dp
+private val PIN_SIZE = 52.dp
+private val ICON_SIZE = 20.dp
 private val SMALL_BUTTON_SIZE = 36.dp
 private val DOT_SIZE = 6.dp
 private val SHOWN_DOT_WIDTH = 18.dp
@@ -336,7 +336,7 @@ private fun QuestPage(
       Icon(
           painterResource(R.drawable.ic_chevron_right),
           contentDescription = null,
-          Modifier.size(CHEVRON_SIZE),
+          Modifier.size(ICON_SIZE),
           tint = colors.onSurfaceVariant,
       )
     }
@@ -347,8 +347,8 @@ private fun QuestPage(
       RoundButton(
           R.drawable.ic_address_pin,
           R.string.map_nearby_show_on_map,
-          BUTTON_HEIGHT,
-          CHEVRON_SIZE,
+          PIN_SIZE,
+          ICON_SIZE,
           Modifier.testTag(C.Tag.NEARBY_SHOW_ON_MAP),
           onClick = onShowOnMap,
       )
@@ -407,7 +407,7 @@ private fun Navigation(pagerState: PagerState, shown: Int) {
         R.drawable.ic_chevron_left,
         R.string.map_nearby_previous,
         SMALL_BUTTON_SIZE,
-        CHEVRON_SIZE,
+        ICON_SIZE,
         enabled = count > 1,
     ) {
       pageBy(-1)
@@ -417,7 +417,7 @@ private fun Navigation(pagerState: PagerState, shown: Int) {
         R.drawable.ic_chevron_right,
         R.string.map_nearby_next,
         SMALL_BUTTON_SIZE,
-        CHEVRON_SIZE,
+        ICON_SIZE,
         enabled = count > 1,
     ) {
       pageBy(1)
