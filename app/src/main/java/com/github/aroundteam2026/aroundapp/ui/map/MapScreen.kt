@@ -40,18 +40,21 @@ import com.google.maps.android.compose.MapUiSettings
  * asks again or opens the settings, and while the venues fail to load, another's "Try again" loads
  * them again. Each venue on screen with valid quests gets a pin that opens into a card; the card
  * opens the venue's page and tapping the map closes it. A "Nearby quests" pill opens the nearby
- * quests over the map, closed by Back or by opening a card. Tapping a quest frames its venue and
- * opens its card, "View quest" opens its page, and filters narrow the list, not the pins.
+ * quests over the map, closed by Back or by opening a card. Tapping a quest opens its details, its
+ * pin frames its venue and opens its card, and filters narrow the list, not the pins.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
- * @param onOpenVenue Opens the page of the venue with this id and name, when its card or "View
- *   quest" is tapped.
+ * @param onOpenVenue Opens the page of the venue with this id and name, when its card is tapped.
+ * @param onOpenQuest Opens the details of the quest with this id on its venue's page, when the
+ *   quest is tapped in the nearby quests.
+ * @param showOfflineBanner Overlays the shared offline banner near the top of the map.
  */
 @Composable
 fun MapScreen(
     viewModel: MapViewModel = viewModel(factory = MapViewModel.factory),
     cameraPositionState: CameraPositionState = rememberMapCamera(),
     onOpenVenue: (venueId: String, venueName: String) -> Unit,
+    onOpenQuest: (venueId: String, questId: String) -> Unit,
     showOfflineBanner: Boolean = false,
 ) {
   val state by viewModel.uiState.collectAsState()
@@ -103,9 +106,9 @@ fun MapScreen(
       NearbyQuestOverlay(
           state.nearby,
           locationOn = state.showsUserLocation,
-          onQuestClick = viewModel::onNearbyQuestClick,
-          // The quests stay open, so Back from the venue's page finds them where they were
-          onViewQuest = { onOpenVenue(it.venueId, it.venueName) },
+          // The quests stay open, so Back from the details finds them where they were
+          onOpenQuest = { onOpenQuest(it.venueId, it.questId) },
+          onShowOnMap = viewModel::onShowOnMap,
           onClose = viewModel::onNearbyClose,
           filters = state.filters,
           onFiltersChange = viewModel::onFiltersChange,

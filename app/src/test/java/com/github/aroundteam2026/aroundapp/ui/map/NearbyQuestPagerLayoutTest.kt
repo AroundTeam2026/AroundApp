@@ -105,8 +105,14 @@ class NearbyQuestPagerLayoutTest {
     val dots = composeTestRule.onAllNodesWithTag(C.Tag.NEARBY_DOT, useUnmergedTree = true)[0]
     val previous = button(R.string.map_nearby_previous).getBoundsInRoot()
     assertDpEquals("header to page", 20.dp, pages.top - bounds(C.Tag.NEARBY_COUNTER).bottom)
-    assertDpEquals("page to dots", 20.dp, dots.getBoundsInRoot().top - pages.bottom)
-    assertDpEquals("dots to arrows", 20.dp, previous.top - dots.getBoundsInRoot().bottom)
+    assertDpEquals("page to arrows", 20.dp, previous.top - pages.bottom)
+    val dot = dots.getBoundsInRoot()
+    // The dots sit between the arrows, centred on them
+    assertDpEquals(
+        "dots on the arrows",
+        (previous.top + previous.bottom) / 2,
+        (dot.top + dot.bottom) / 2,
+    )
   }
 
   @Test
@@ -129,21 +135,31 @@ class NearbyQuestPagerLayoutTest {
   }
 
   @Test
-  fun viewQuestFillsTheRowBetweenTwoFiftyTwoDpArrows() {
+  fun thirtySixDpArrowsSitAtEitherEndWithTheDotsCentredBetween() {
     show()
 
     val width = composeTestRule.onRoot().getBoundsInRoot().right
     val previous = button(R.string.map_nearby_previous).getBoundsInRoot()
     val next = button(R.string.map_nearby_next).getBoundsInRoot()
-    val view = bounds(C.Tag.NEARBY_VIEW)
-    assertDpEquals("previous width", 52.dp, previous.right - previous.left)
-    assertDpEquals("previous height", 52.dp, previous.bottom - previous.top)
-    assertDpEquals("next width", 52.dp, next.right - next.left)
-    assertDpEquals("view height", 52.dp, view.bottom - view.top)
+    val dots = composeTestRule.onAllNodesWithTag(C.Tag.NEARBY_DOT, useUnmergedTree = true)
+    val firstDot = dots[0].getBoundsInRoot()
+    val lastDot = dots[2].getBoundsInRoot()
+    assertDpEquals("previous width", 36.dp, previous.right - previous.left)
+    assertDpEquals("previous height", 36.dp, previous.bottom - previous.top)
+    assertDpEquals("next width", 36.dp, next.right - next.left)
     assertDpEquals("previous at the start", 0.dp, previous.left)
-    assertDpEquals("previous to view", 10.dp, view.left - previous.right)
-    assertDpEquals("view to next", 10.dp, next.left - view.right)
     assertDpEquals("next at the end", width, next.right)
+    assertDpEquals("dots centred", width / 2, (firstDot.left + lastDot.right) / 2)
+  }
+
+  @Test
+  fun theFiftyTwoDpPinSitsTwentyDpUnderTheCard() {
+    show()
+
+    val pin = bounds(C.Tag.NEARBY_SHOW_ON_MAP)
+    assertDpEquals("pin width", 52.dp, pin.right - pin.left)
+    assertDpEquals("pin height", 52.dp, pin.bottom - pin.top)
+    assertDpEquals("card to pin", 20.dp, pin.top - bounds(C.Tag.NEARBY_PAGE).bottom)
   }
 
   @Test

@@ -88,7 +88,12 @@ class QuestMarkersDeviceTest {
     composeTestRule.setContent {
       val height = mapHeight
       Box(if (height == null) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(height)) {
-        MapScreen(viewModel, camera, onOpenVenue = { id, name -> opened += id to name })
+        MapScreen(
+            viewModel,
+            camera,
+            onOpenVenue = { id, name -> opened += id to name },
+            onOpenQuest = { _, _ -> },
+        )
       }
     }
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
