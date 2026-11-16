@@ -571,4 +571,6 @@ private class RecordingVenueRepository(
       radiusMeters: Int,
       address: String?,
   ) = Result.success(Unit)
+
+  override suspend fun setName(venueId: String, name: String) = Result.success(Unit)
 }
