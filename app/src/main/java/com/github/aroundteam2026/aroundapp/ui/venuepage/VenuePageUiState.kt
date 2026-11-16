@@ -57,6 +57,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property partyMembers The joined members of the explorer's parties here, by reservation id.
  * @property joinedPartyIds Ids of the reservations whose party the explorer joined rather than
  *   created, known as soon as the parties are read.
+ * @property offline Whether the device is offline, so cancelling, which needs a connection, is
+ *   unavailable.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -84,6 +86,7 @@ data class VenuePageUiState(
     val partyCodes: Map<String, String> = emptyMap(),
     val partyMembers: Map<String, List<PartyMemberUi>> = emptyMap(),
     val joinedPartyIds: Set<String> = emptySet(),
+    val offline: Boolean = false,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?

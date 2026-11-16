@@ -319,6 +319,15 @@ class QuestDetailsScreenTest {
     assertEquals(0, cancels)
   }
 
+  @Test
+  fun offlineTheHintShowsAndCancellingIsDisabled() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(offline = true))
+
+    node(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).assertIsNotEnabled()
+  }
+
   // Figma's "Quest details · submit proof": the venue approved, so the bar sends the proof
   @Test
   fun anApprovedReservationOffersToSubmitTheProof() {

@@ -153,7 +153,7 @@ fun QuestDetailsScreen(
           state.cancelStatus,
           state.venueName,
           onCancel,
-          offline = false,
+          offline = state.offline,
           horizontalAlignment = Alignment.CenterHorizontally,
           leave = state.leavesParty,
       )

@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
@@ -64,6 +65,7 @@ class VenuePageViewModelTest {
         testUsers("explorer"),
         party,
         FakeCompletionRepository(),
+        FakeConnectivityRepository(),
         "explorer",
         clock,
         arrival,

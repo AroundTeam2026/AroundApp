@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
@@ -26,6 +27,9 @@ import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.model.venue.Venue
+import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import java.io.IOException
@@ -76,16 +80,20 @@ class VenuePageAcceptTest {
   private var partyRepository: PartyRepository = party
   private val completions = FakeCompletionRepository { START }
   private var completionRepository: CompletionRepository = completions
+  private val connectivity = FakeConnectivityRepository()
+  private var venueRepository: VenueRepository =
+      FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))
 
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE_ID,
-        FakeVenueRepository(listOf(testVenue(id = VENUE_ID))),
+        venueRepository,
         ScriptedQuestRepository(activeQuestsByVenue = { flowOf(quests) }),
         reservationRepository,
         userRepository,
         partyRepository,
         completionRepository,
+        connectivity,
         EXPLORER,
         clock,
     )
@@ -1078,6 +1086,65 @@ class VenuePageAcceptTest {
     assertTrue(state.acceptAvailable)
     assertTrue(state.proofsAvailable)
     assertEquals(1, listeners)
+  }
+
+  /** Takes the device offline for long enough that the page says so. */
+  private fun TestScope.goOffline() {
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    runCurrent()
+  }
+
+  @Test
+  fun offlineCancellingIsUnavailable() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+    goOffline()
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertTrue(state.offline)
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertEquals(ReservationStatus.PENDING, stored().single { it.id == id }.status)
+  }
+
+  @Test
+  fun backOnlineCancellingIsAvailableAgain() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+    goOffline()
+    connectivity.online.value = true
+    runCurrent()
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertFalse(state.offline)
+    assertEquals(ReservationStatus.CANCELLED, stored().single { it.id == id }.status)
+  }
+
+  @Test
+  fun offlineSurvivesAFailedLoadAndARetry() = test {
+    var loads = 0
+    val venues = FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))
+    // The venue fails to load once, then loads
+    venueRepository =
+        object : VenueRepository by venues {
+          override fun observeVenue(venueId: String): Flow<Venue?> =
+              if (loads++ == 0) flow { throw IOException("No venue") }
+              else venues.observeVenue(venueId)
+        }
+    viewModel
+    goOffline()
+    assertEquals(VenuePageStatus.FAILED, state.status)
+    assertTrue(state.offline)
+
+    viewModel.onRetry()
+    runCurrent()
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertTrue(state.offline)
   }
 
   private companion object {
