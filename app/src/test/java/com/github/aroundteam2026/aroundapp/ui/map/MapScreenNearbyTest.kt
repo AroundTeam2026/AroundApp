@@ -82,7 +82,7 @@ class MapScreenNearbyTest {
         PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = onOpenQuest)
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = onOpenQuest)
       }
     }
     composeTestRule.waitForIdle()

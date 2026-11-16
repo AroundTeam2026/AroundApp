@@ -39,7 +39,7 @@ class MapColoursDeviceTest {
     // Lausanne: the town and the lake fill the screen, in the style's land and water colours
     val viewModel = MapViewModel(LocatedAt(LAUSANNE), FakeQuestRepository(), FakeVenueRepository())
     composeTestRule.setContent {
-      AroundAppTheme { MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> }) }
+      AroundAppTheme { MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> }) }
     }
 
     composeTestRule.awaitMapColours(lightPalette, "the light style's land and water") { pixels ->
@@ -67,7 +67,7 @@ class DarkMapColoursDeviceTest {
     // A style draws on every Maps renderer, so this runs on CI's legacy renderer too
     val viewModel = MapViewModel(LocatedAt(LAUSANNE), FakeQuestRepository(), FakeVenueRepository())
     composeTestRule.setContent {
-      AroundAppTheme { MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> }) }
+      AroundAppTheme { MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> }) }
     }
 
     composeTestRule.awaitMapColours(

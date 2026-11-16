@@ -149,7 +149,8 @@ class AroundAppTest {
           explorerUid = "explorer",
           onSignOut = {},
           screen = { tab ->
-            if (tab == Tab.MAP) MapScreen(map, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+            if (tab == Tab.MAP)
+                MapScreen(map, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
             else Text(tab.route, Modifier.testTag(tab.screenTag))
           },
       )

@@ -177,7 +177,7 @@ private fun TabScreen(
     when (tab) {
       Tab.MAP ->
           MapScreen(
-              onOpenVenue = navController::openVenueFromMap,
+              onFocusQuest = navController::openVenueFromMap,
               onOpenQuest = navController::openVenue,
           )
       // The tab keeps its own tag, whatever the overview becomes

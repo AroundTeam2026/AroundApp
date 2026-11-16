@@ -91,7 +91,7 @@ class QuestMarkersDeviceTest {
         MapScreen(
             viewModel,
             camera,
-            onOpenVenue = { id, questId -> opened += id to questId },
+            onFocusQuest = { id, questId -> opened += id to questId },
             onOpenQuest = { _, _ -> },
         )
       }

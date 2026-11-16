@@ -59,7 +59,7 @@ class MapScreenVenuesErrorTest {
     val dialog = PermissionDialog(answer)
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = { _, _ -> })
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     composeTestRule.waitForIdle()
