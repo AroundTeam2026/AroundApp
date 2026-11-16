@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.completion.Completion
 import com.github.aroundteam2026.aroundapp.ui.completion.CompletionViewModel
@@ -57,6 +58,9 @@ enum class Tab(
 /** The tab the app opens on, and that Back returns to before leaving the app. */
 private val START_TAB = Tab.QUESTS
 
+/** The tabs whose screens place the offline banner themselves, where Figma draws it. */
+private val INLINE_BANNER_TABS = setOf(Tab.QUESTS, Tab.MAP)
+
 /**
  * The explorer's home: the selected tab's screen above a bottom navigation bar (see
  * [BottomTabScaffold]).
@@ -75,6 +79,7 @@ private val START_TAB = Tab.QUESTS
  * @param completion draws the screen where the explorer completes a reservation's quest, given the
  *   reservation's id, the venue's name and what closes it; tests pass their own so it doesn't read
  *   Firestore.
+ * @param connectivityRepository tells the shell when the device is offline; tests pass a fake.
  */
 @Composable
 fun AroundApp(
@@ -111,6 +116,7 @@ fun AroundApp(
         },
     profileScreen: @Composable () -> Unit = { ProfileScreen(onSignOut) },
     screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, profileScreen) },
+    connectivityRepository: ConnectivityRepository? = null,
 ) {
   BottomTabScaffold(
       tabs = Tab.entries,
@@ -119,6 +125,8 @@ fun AroundApp(
       navBarTag = C.Tag.NAV_BAR,
       screen = screen,
       modifier = Modifier.testTag(C.Tag.APP),
+      connectivityRepository = connectivityRepository,
+      inlineBannerTabs = INLINE_BANNER_TABS,
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
     venuePageDestination(

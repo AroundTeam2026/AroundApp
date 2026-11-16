@@ -23,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
@@ -264,6 +265,7 @@ class CompletionDestinationTest {
             FakeLocationRepository(venue.location),
             completions,
             FakeProofPhotoRepository(),
+            FakeConnectivityRepository(),
         )
       }
     }

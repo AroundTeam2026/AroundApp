@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.util.Log
@@ -31,10 +32,10 @@ import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -44,7 +45,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -86,22 +86,11 @@ class OverviewViewModel(
     listen()
   }
 
-  /**
-   * Follows [connectivityRepository] into [OverviewUiState.offline]. Going offline shows only after
-   * [OFFLINE_HINT_DELAY_MS], since a handover between networks briefly reports offline, while
-   * coming back online shows at once. If watching fails, the overview counts as online, so
-   * cancelling stays available rather than blocked for good.
-   */
-  @OptIn(FlowPreview::class)
   private fun watchConnectivity() {
     viewModelScope.launch {
-      connectivityRepository.isOnline
-          .catch {
-            Log.w(TAG, "Watching connectivity failed", it)
-            emit(true)
-          }
-          .debounce { online -> if (online) 0L else OFFLINE_HINT_DELAY_MS }
-          .collect { online -> mutableUiState.update { it.copy(offline = !online) } }
+      connectivityRepository.observeOffline(TAG).collect { offline ->
+        mutableUiState.update { it.copy(offline = offline) }
+      }
     }
   }
 
@@ -235,9 +224,6 @@ class OverviewViewModel(
     }
   }
 }
-
-/** How long the device must stay offline before the cards say so, in milliseconds. */
-internal const val OFFLINE_HINT_DELAY_MS = 2_000L
 
 /**
  * The [ReservationStatus.isActive] reservations among [reservations], soonest slot first, then the
