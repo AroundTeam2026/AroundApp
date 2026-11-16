@@ -8,11 +8,13 @@ import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.app.Application
 import android.location.LocationManager
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -38,8 +41,10 @@ import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.IOException
+import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
@@ -66,6 +71,7 @@ class CompletionScreenFlowTest {
   private val reservations = FakeReservationRepository()
   private val completions = FakeCompletionRepository()
   private val photos = FakeProofPhotoRepository()
+  private val connectivity = FakeConnectivityRepository()
   private val venue = testVenue()
   private val locations = FakeLocationRepository(venue.location)
   private val store = ViewModelStore()
@@ -109,6 +115,7 @@ class CompletionScreenFlowTest {
               locations,
               completions,
               photos,
+              connectivity,
           )
       store.put("completion", viewModel)
     }
@@ -200,6 +207,27 @@ class CompletionScreenFlowTest {
     compose.onNodeWithTag(C.Tag.PROOF_PHOTO_GALLERY).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).assertIsNotEnabled()
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun photoFormShowsTheConnectionHintUntilOnlineAgain() {
+    show(proofType = ProofType.PHOTO)
+    compose.runOnIdle { viewModel.pickPhoto(testImage(app, 80, 60)) }
+    val submit = compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT)
+    val hint = compose.onNodeWithTag(C.Tag.OFFLINE_HINT)
+    submit.assertIsEnabled()
+    hint.assertDoesNotExist()
+
+    compose.runOnIdle { connectivity.online.value = false }
+    compose.waitForIdle()
+    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(OFFLINE_HINT_DELAY_MS))
+    hint.assertIsDisplayed()
+    submit.assertIsNotEnabled()
+
+    compose.runOnIdle { connectivity.online.value = true }
+    hint.assertDoesNotExist()
+    submit.assertIsEnabled()
   }
 
   // A readable photo, decoded with native graphics: the picker retakes a photo it can't preview,

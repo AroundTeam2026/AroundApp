@@ -290,6 +290,7 @@ object C {
     const val CANCEL_RESERVATION_CONFIRM = "cancel_reservation_confirm"
     const val CANCEL_RESERVATION_KEEP = "cancel_reservation_keep"
     const val OFFLINE_HINT = "offline_hint"
+    const val OFFLINE_BANNER = "offline_banner"
     const val CREATE_QUEST_REWARD_NONE = "create_quest_reward_none"
     const val CREATE_QUEST_REWARD_DISCOUNT = "create_quest_reward_discount"
     const val CREATE_QUEST_REWARD_AMOUNT = "create_quest_reward_amount"

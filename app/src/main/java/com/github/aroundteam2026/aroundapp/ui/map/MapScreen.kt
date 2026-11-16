@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.activity.compose.BackHandler
@@ -21,6 +22,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -47,6 +50,8 @@ import com.google.maps.android.compose.MapUiSettings
  *   quest is tapped in the nearby quests.
  * @param acceptViewModel Accepts the nearby quests from their "Accept quest"; without it, they
  *   offer none.
+ * @param showOfflineBanner Overlays the shared offline banner at the top of the map; by default,
+ *   while the shell says the device is offline.
  */
 @Composable
 fun MapScreen(
@@ -55,6 +60,7 @@ fun MapScreen(
     onOpenVenue: (venueId: String, venueName: String) -> Unit,
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     acceptViewModel: NearbyAcceptViewModel? = null,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsState()
   val acceptState = acceptViewModel?.uiState?.collectAsState()?.value
@@ -127,6 +133,7 @@ fun MapScreen(
         Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
+      if (showOfflineBanner) OfflineBanner()
       if (state.loadFailed) VenuesErrorBanner(viewModel::onRetry, retrying = state.retrying)
       if (state.locationRefused) LocationBanner(turnOnLocation)
     }
