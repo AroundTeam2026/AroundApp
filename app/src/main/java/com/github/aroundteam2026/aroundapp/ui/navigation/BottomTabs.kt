@@ -1,9 +1,11 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -12,16 +14,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 
 /** A tab of a bottom navigation bar. */
 interface BottomTab {
@@ -51,8 +60,10 @@ interface BottomTab {
  * @param tabs the tabs, in the order of the bar.
  * @param startTab the tab the home opens on, and that Back returns to before leaving the app.
  * @param navBarTag test tag of the bar.
- * @param screen draws the screen of a tab.
+ * @param screen draws the screen of a tab, with the current offline-banner state.
  * @param modifier modifier applied to the whole home.
+ * @param connectivityRepository reports when the device goes offline; tests provide a fake.
+ * @param inlineBannerTabs tabs that draw the banner within their own layout.
  * @param destinations registers the screens the tabs open, besides the tabs' own screens.
  */
 @Composable
@@ -61,16 +72,39 @@ internal fun <T : BottomTab> BottomTabScaffold(
     startTab: T,
     navController: NavHostController,
     navBarTag: String,
-    screen: @Composable (T) -> Unit,
+    screen: @Composable (T, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    connectivityRepository: ConnectivityRepository? = null,
+    inlineBannerTabs: Set<T> = emptySet(),
     destinations: NavGraphBuilder.() -> Unit = {},
 ) {
+  val context = LocalContext.current
+  val repository =
+      connectivityRepository
+          ?: remember(context) { ConnectivityRepositoryProvider.repository(context) }
+  val offline: OfflineBannerViewModel =
+      viewModel(factory = OfflineBannerViewModel.factory(repository))
+  val showBanner by offline.showBanner.collectAsStateWithLifecycle()
   val backStackEntry by navController.currentBackStackEntryAsState()
   // Recomputed whenever the shown screen changes, since it reads backStackEntry
   val currentTab = backStackEntry?.let { navController.tabOfCurrentScreen(tabs, startTab) }
 
   Scaffold(
       modifier = modifier,
+      topBar = {
+        val drawsInline =
+            currentTab in inlineBannerTabs &&
+                backStackEntry?.destination?.route == currentTab?.route
+        if (showBanner && !drawsInline) {
+          OfflineBanner(
+              Modifier.fillMaxWidth()
+                  .padding(
+                      horizontal = AroundSpacing.ScreenHorizontal,
+                      vertical = AroundSpacing.Medium,
+                  )
+          )
+        }
+      },
       bottomBar = {
         NavigationBar(modifier = Modifier.testTag(navBarTag)) {
           tabs.forEach { tab ->
@@ -92,7 +126,7 @@ internal fun <T : BottomTab> BottomTabScaffold(
         // Screens that read the insets themselves must not add the bars' room a second time
         modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
     ) {
-      tabs.forEach { tab -> composable(tab.route) { screen(tab) } }
+      tabs.forEach { tab -> composable(tab.route) { screen(tab, showBanner) } }
       destinations()
     }
   }

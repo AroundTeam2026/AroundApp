@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
@@ -42,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundHeader
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -65,12 +67,14 @@ fun OverviewScreen(
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     onJoinParty: () -> Unit,
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
+    showOfflineBanner: Boolean = false,
 ) =
     OverviewScreen(
         viewModel(factory = OverviewViewModel.factory(explorerUid)),
         onOpenQuest,
         onJoinParty,
         onSendNewProof,
+        showOfflineBanner = showOfflineBanner,
     )
 
 /** The overview showing what [viewModel] holds; see the other [OverviewScreen]. */
@@ -81,6 +85,7 @@ fun OverviewScreen(
     onJoinParty: () -> Unit,
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
+    showOfflineBanner: Boolean = false,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   OverviewContent(
@@ -91,6 +96,7 @@ fun OverviewScreen(
       onJoinParty,
       onSendNewProof,
       modifier,
+      showOfflineBanner = showOfflineBanner,
   )
 }
 
@@ -118,10 +124,19 @@ fun OverviewContent(
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
+    showOfflineBanner: Boolean = false,
 ) {
   Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     AroundHeader()
     Title(state, onJoinParty)
+    if (showOfflineBanner) {
+      OfflineBanner(
+          Modifier.padding(
+              horizontal = AroundSpacing.ScreenHorizontal,
+              vertical = AroundSpacing.Medium,
+          )
+      )
+    }
     when (state.status) {
       OverviewStatus.LOADING ->
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.OVERVIEW_LOADING)) }

@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
 import androidx.annotation.DrawableRes
@@ -11,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
@@ -67,6 +69,7 @@ private val VENUE_START_TAB = VenueTab.DASHBOARD
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
  * @param onOpenProof opens the Review proof screen of a completion's id.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
+ * @param connectivityRepository reports offline changes to the shared banner; tests pass a fake.
  */
 @Composable
 fun VenueHome(
@@ -77,25 +80,31 @@ fun VenueHome(
     onOpenProof: (String) -> Unit = {},
     onEditQuest: (String) -> Unit = {},
     navController: NavHostController = rememberNavController(),
-    screen: @Composable (VenueTab) -> Unit = {
-      VenueTabScreen(
-          it,
-          onCreateQuest,
-          onSignOut,
-          venueQuestsFactory,
-          dashboardFactory,
-          onOpenProof,
-          onEditQuest,
-      )
-    },
+    screen: (@Composable (VenueTab) -> Unit)? = null,
+    connectivityRepository: ConnectivityRepository? = null,
 ) {
   BottomTabScaffold(
       tabs = VenueTab.entries,
       startTab = VENUE_START_TAB,
       navController = navController,
       navBarTag = C.Tag.VENUE_NAV_BAR,
-      screen = screen,
+      screen = { tab, showBanner ->
+        if (screen == null)
+            VenueTabScreen(
+                tab,
+                onCreateQuest,
+                onSignOut,
+                venueQuestsFactory,
+                dashboardFactory,
+                onOpenProof,
+                onEditQuest,
+                showBanner,
+            )
+        else screen(tab)
+      },
       modifier = Modifier.testTag(C.Tag.VENUE_HOME),
+      connectivityRepository = connectivityRepository,
+      inlineBannerTabs = if (screen == null) setOf(VenueTab.DASHBOARD) else emptySet(),
   )
 }
 
@@ -109,6 +118,7 @@ private fun VenueTabScreen(
     dashboardFactory: ViewModelProvider.Factory,
     onOpenProof: (String) -> Unit,
     onEditQuest: (String) -> Unit,
+    showBanner: Boolean,
 ) =
     when (tab) {
       VenueTab.DASHBOARD ->
@@ -116,6 +126,7 @@ private fun VenueTabScreen(
               viewModel(factory = dashboardFactory),
               Modifier.testTag(tab.screenTag),
               onOpenProof = onOpenProof,
+              showOfflineBanner = showBanner,
           )
       VenueTab.QUESTS ->
           VenueQuestsScreen(

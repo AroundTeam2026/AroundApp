@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -73,6 +74,7 @@ class MapScreenNearbyTest {
   private fun show(
       locationOn: Boolean = false,
       onOpenVenue: (venueId: String, venueName: String) -> Unit = { _, _ -> },
+      showOfflineBanner: Boolean = false,
   ) {
     if (locationOn) {
       shadowOf(ApplicationProvider.getApplicationContext<Application>())
@@ -82,13 +84,23 @@ class MapScreenNearbyTest {
         PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = onOpenVenue)
+        MapScreen(viewModel, onOpenVenue = onOpenVenue, showOfflineBanner = showOfflineBanner)
       }
     }
     composeTestRule.waitForIdle()
   }
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
+
+  @Test
+  fun offlineBannerOverlaysTheMapNearItsTop() {
+    show(showOfflineBanner = true)
+
+    val mapTop = node(C.Tag.MAP).getBoundsInRoot().top
+    val bannerTop = node(C.Tag.OFFLINE_BANNER).getBoundsInRoot().top
+    assertTrue(bannerTop >= mapTop)
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+  }
 
   private fun openNearby() {
     node(C.Tag.NEARBY_BUTTON).performClick()

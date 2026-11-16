@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.Context
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -45,7 +47,7 @@ class VenueDashboardScreenTest {
   private var retries = 0
   private val opened = mutableListOf<String>()
 
-  private fun show(state: VenueDashboardUiState) {
+  private fun show(state: VenueDashboardUiState, showOfflineBanner: Boolean = false) {
     compose.setContent {
       AroundAppTheme {
         VenueDashboardContent(
@@ -55,6 +57,7 @@ class VenueDashboardScreenTest {
             onRetry = { retries++ },
             onOpenProof = { opened += it },
             clock = CLOCK,
+            showOfflineBanner = showOfflineBanner,
         )
       }
     }
@@ -74,6 +77,16 @@ class VenueDashboardScreenTest {
           activeQuestsCount = 4,
           proofsToReview = proofs,
       )
+
+  @Test
+  fun offlineBannerAppearsBelowTheDashboardHeader() {
+    show(loaded(), showOfflineBanner = true)
+
+    val headerBottom =
+        compose.onNodeWithTag(C.Tag.DASHBOARD_VENUE).getUnclippedBoundsInRoot().bottom
+    val bannerTop = compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).getUnclippedBoundsInRoot().top
+    assertTrue(bannerTop >= headerBottom)
+  }
 
   private fun string(id: Int, vararg args: Any) =
       ApplicationProvider.getApplicationContext<Context>().getString(id, *args)

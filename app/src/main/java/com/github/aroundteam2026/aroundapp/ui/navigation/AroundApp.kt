@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.completion.Completion
 import com.github.aroundteam2026.aroundapp.ui.completion.CompletionViewModel
@@ -75,6 +76,7 @@ private val START_TAB = Tab.QUESTS
  * @param completion draws the screen where the explorer completes a reservation's quest, given the
  *   reservation's id, the venue's name and what closes it; tests pass their own so it doesn't read
  *   Firestore.
+ * @param connectivityRepository reports offline changes to the shared banner; tests pass a fake.
  */
 @Composable
 fun AroundApp(
@@ -100,24 +102,31 @@ fun AroundApp(
       JoinParty(close, JoinPartyViewModel.factory(explorerUid))
     },
     overview:
-        @Composable
+        (@Composable
         (
             onOpenQuest: (venueId: String, questId: String) -> Unit,
             onJoinParty: () -> Unit,
-        ) -> Unit =
-        { onOpenQuest, onJoinParty ->
-          OverviewScreen(explorerUid, onOpenQuest, onJoinParty, navController::navigateToCompletion)
-        },
+        ) -> Unit)? =
+        null,
     profileScreen: @Composable () -> Unit = { ProfileScreen(onSignOut) },
-    screen: @Composable (Tab) -> Unit = { TabScreen(it, navController, overview, profileScreen) },
+    screen: (@Composable (Tab) -> Unit)? = null,
+    connectivityRepository: ConnectivityRepository? = null,
 ) {
   BottomTabScaffold(
       tabs = Tab.entries,
       startTab = START_TAB,
       navController = navController,
       navBarTag = C.Tag.NAV_BAR,
-      screen = screen,
+      screen = { tab, showBanner ->
+        if (screen == null)
+            TabScreen(tab, navController, overview, profileScreen, explorerUid, showBanner)
+        else screen(tab)
+      },
       modifier = Modifier.testTag(C.Tag.APP),
+      connectivityRepository = connectivityRepository,
+      inlineBannerTabs =
+          if (screen == null && overview == null) setOf(Tab.QUESTS, Tab.MAP)
+          else if (screen == null) setOf(Tab.MAP) else emptySet(),
   ) {
     // Explorer screens only: the venue's screens belong to the venue's own NavHost
     venuePageDestination(
@@ -162,19 +171,30 @@ private fun TabScreen(
     tab: Tab,
     navController: NavHostController,
     overview:
-        @Composable
+        (@Composable
         (
             onOpenQuest: (venueId: String, questId: String) -> Unit,
             onJoinParty: () -> Unit,
-        ) -> Unit,
+        ) -> Unit)?,
     profileScreen: @Composable () -> Unit,
+    explorerUid: String,
+    showBanner: Boolean,
 ) =
     when (tab) {
-      Tab.MAP -> MapScreen(onOpenVenue = navController::openVenueFromMap)
+      Tab.MAP ->
+          MapScreen(onOpenVenue = navController::openVenueFromMap, showOfflineBanner = showBanner)
       // The tab keeps its own tag, whatever the overview becomes
       Tab.QUESTS ->
           Box(Modifier.fillMaxSize().testTag(tab.screenTag)) {
-            overview(navController::openVenue, navController::navigateToJoinParty)
+            if (overview == null)
+                OverviewScreen(
+                    explorerUid,
+                    navController::openVenue,
+                    navController::navigateToJoinParty,
+                    navController::navigateToCompletion,
+                    showOfflineBanner = showBanner,
+                )
+            else overview(navController::openVenue, navController::navigateToJoinParty)
           }
       Tab.PROFILE -> profileScreen()
     }

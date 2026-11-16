@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -23,6 +24,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -49,7 +51,9 @@ class BottomTabScaffoldTest {
           startTab = VenueTab.DASHBOARD,
           navController = rememberNavController(),
           navBarTag = C.Tag.VENUE_NAV_BAR,
-          screen = {
+          // This test measures system insets without an offline banner changing the top edge.
+          connectivityRepository = FakeConnectivityRepository(),
+          screen = { _, _ ->
             Box(Modifier.fillMaxSize()) {
               Probe(TOP_PROBE, Modifier.align(Alignment.TopStart))
               Probe(BOTTOM_PROBE, Modifier.align(Alignment.BottomStart))
