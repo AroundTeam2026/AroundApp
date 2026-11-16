@@ -28,8 +28,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.bookQuest
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
-import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
@@ -46,7 +46,6 @@ import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
 import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -219,16 +218,7 @@ class VenuePageViewModel(
     refusing -= id
     viewModelScope.launch {
       val result =
-          explorerName()
-              .fold(
-                  onSuccess = { name ->
-                    reservationRepository.createReservation(
-                        newPendingReservation(id, venueId, name, clock()),
-                        explorerUid,
-                    )
-                  },
-                  onFailure = { Result.failure(it) },
-              )
+          reservationRepository.bookQuest(userRepository, explorerUid, id, venueId, clock())
       unconfirmed -= id
       result
           .onSuccess { reservationId ->
@@ -287,22 +277,6 @@ class VenuePageViewModel(
       }
     }
   }
-
-  /**
-   * The display name in the explorer's profile, which the venue sees on their reservation, or a
-   * failure if the profile is missing or can't be read.
-   */
-  private suspend fun explorerName(): Result<String> =
-      try {
-        val profile =
-            userRepository.getUser(explorerUid)
-                ?: throw NoSuchElementException("No profile for $explorerUid")
-        Result.success(profile.displayName)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        Result.failure(e)
-      }
 
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
   fun onRetry() {
