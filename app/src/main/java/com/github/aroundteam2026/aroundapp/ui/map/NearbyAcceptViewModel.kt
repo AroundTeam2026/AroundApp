@@ -66,10 +66,11 @@ class NearbyAcceptViewModel(
   val uiState: StateFlow<NearbyAcceptUiState> = _uiState.asStateFlow()
 
   init {
+    // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
     viewModelScope.launch {
       reservationRepository
           .observeForExplorer(explorerUid)
-          .catch {
+          .catch { // NOSONAR
             Log.w(TAG, "Listening to the reservations of $explorerUid failed", it)
             _uiState.update { state -> state.copy(available = false) }
           }
