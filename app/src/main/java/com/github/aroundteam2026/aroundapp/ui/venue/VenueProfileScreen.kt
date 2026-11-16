@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,8 +39,8 @@ import com.github.aroundteam2026.aroundapp.ui.venuepage.venueAvatarStyle
 
 /**
  * The venue's Profile tab: the venue's avatar, name and address in a card, then "Sign out", in the
- * same cards as the explorer's profile. Sign-out stays reachable while the venue loads or can't be
- * read.
+ * same cards as the explorer's profile. Sign-out stays reachable while the venue loads, can't be
+ * read, or is missing.
  *
  * @param viewModel Holds the signed-in venue's profile.
  * @param onSignOut Ends the current session.
@@ -64,7 +67,8 @@ internal fun VenueProfileContent(
       modifier
           .fillMaxSize()
           .background(MaterialTheme.colorScheme.background)
-          .testTag(C.Tag.PROFILE_SCREEN)
+          // So "Sign out" stays reachable on a small screen or with large fonts
+          .verticalScroll(rememberScrollState())
           .padding(AroundSpacing.ScreenHorizontal),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
   ) {
@@ -79,6 +83,13 @@ internal fun VenueProfileContent(
             CircularProgressIndicator(Modifier.testTag(C.Tag.VENUE_PROFILE_LOADING))
           }
       VenueProfileStatus.FAILED -> LoadFailed(onRetry)
+      VenueProfileStatus.MISSING ->
+          Text(
+              stringResource(R.string.venue_profile_missing),
+              Modifier.fillMaxWidth().testTag(C.Tag.VENUE_PROFILE_MISSING),
+              color = MaterialTheme.colorScheme.onBackground,
+              textAlign = TextAlign.Center,
+          )
       VenueProfileStatus.LOADED -> VenueCard(state.name, state.address)
     }
     SignOutCard(onSignOut)
@@ -103,6 +114,8 @@ private fun VenueCard(name: String, address: String?) {
           Modifier.testTag(C.Tag.VENUE_PROFILE_ADDRESS),
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           style = MaterialTheme.typography.bodySmall,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
       )
     }
   }
@@ -121,7 +134,7 @@ private fun LoadFailed(onRetry: () -> Unit) {
         color = MaterialTheme.colorScheme.onBackground,
     )
     Button(onRetry, Modifier.testTag(C.Tag.VENUE_PROFILE_RETRY)) {
-      Text(stringResource(R.string.venue_profile_retry))
+      Text(stringResource(R.string.dashboard_retry))
     }
   }
 }

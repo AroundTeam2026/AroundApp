@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
@@ -28,8 +27,10 @@ import kotlinx.coroutines.flow.update
 enum class VenueProfileStatus {
   LOADING,
   LOADED,
-  /** The venue couldn't be read, or doesn't exist; [VenueProfileViewModel.retry] reads it again. */
+  /** The venue couldn't be read; [VenueProfileViewModel.retry] reads it again. */
   FAILED,
+  /** The venue doesn't exist, so reading it again wouldn't help. */
+  MISSING,
 }
 
 /**
@@ -71,11 +72,9 @@ class VenueProfileViewModel(
       venueRepository
           .observeVenue(venueId)
           .map { venue ->
-            if (venue == null) VenueProfileUiState(VenueProfileStatus.FAILED)
+            if (venue == null) VenueProfileUiState(VenueProfileStatus.MISSING)
             else VenueProfileUiState(VenueProfileStatus.LOADED, venue.name, venue.address)
           }
-          // A retry shows the spinner again while the venue is read
-          .onStart { emit(VenueProfileUiState()) }
           .catch {
             Log.w(TAG, "Listening to venue $venueId failed", it)
             emit(VenueProfileUiState(VenueProfileStatus.FAILED))

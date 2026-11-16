@@ -4,5 +4,6 @@
     <!-- Under the venue's name on its Profile tab, before it has picked an address -->
     <string name="venue_profile_no_address">No address yet</string>
     <string name="venue_profile_failed">Couldn\'t load your venue.</string>
-    <string name="venue_profile_retry">Try again</string>
+    <!-- When the signed-in account has no venue, so trying again wouldn't help -->
+    <string name="venue_profile_missing">We couldn\'t find your venue. Sign out, then sign in again.</string>
 </resources>

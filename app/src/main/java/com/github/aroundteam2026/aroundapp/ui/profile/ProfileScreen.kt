@@ -48,8 +48,8 @@ private val ROW_ICON_SIZE = 20.dp
 
 /**
  * The Profile tab. With a [model] and [pictures], the Explorer's profile: their picture, name and
- * join date, an action that opens the edit form, and sign-out. Without them, the sign-out-only
- * placeholder venues still use.
+ * join date, an action that opens the edit form, and sign-out. Without them, a sign-out-only
+ * placeholder; the venue's Profile tab is `VenueProfileScreen`.
  *
  * @param onSignOut ends the current session.
  * @param model the Explorer's profile, shared with the setup gate so a save shows here at once.

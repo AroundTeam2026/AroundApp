@@ -10,13 +10,16 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -77,13 +80,13 @@ class VenueProfileViewModelTest {
       }
 
   @Test
-  fun aMissingVenueFails() =
+  fun aMissingVenueIsMissingNotFailed() =
       runTest(dispatcher) {
         val model = VenueProfileViewModel(FakeAuthRepository("v"), FakeVenueRepository())
         watch(model)
         advanceUntilIdle()
 
-        assertEquals(VenueProfileStatus.FAILED, model.uiState.value.status)
+        assertEquals(VenueProfileStatus.MISSING, model.uiState.value.status)
       }
 
   @Test
@@ -107,6 +110,34 @@ class VenueProfileViewModelTest {
         assertEquals(VenueProfileStatus.LOADED, model.uiState.value.status)
         assertEquals("Café", model.uiState.value.name)
         assertEquals(2, reads)
+      }
+
+  // The screen stops listening 5 s after leaving the tab. Coming back starts a new listener, which
+  // takes a moment to answer, so the tab must keep showing the venue meanwhile, not a spinner.
+  @Test
+  fun comingBackToTheTabKeepsTheVenueWhileListeningAgain() =
+      runTest(dispatcher) {
+        val stored = FakeVenueRepository(listOf(testVenue(id = "v", name = "Café")))
+        var listens = 0
+        val slowSecondTime =
+            object : VenueRepository by stored {
+              override fun observeVenue(venueId: String): Flow<Venue?> =
+                  if (listens++ == 0) stored.observeVenue(venueId) else flow { awaitCancellation() }
+            }
+        val model = VenueProfileViewModel(FakeAuthRepository("v"), slowSecondTime)
+        val firstVisit = launch { model.uiState.collect {} }
+        advanceUntilIdle()
+        firstVisit.cancel()
+        // Long enough for WhileSubscribed to stop listening
+        advanceTimeBy(6_000)
+        runCurrent()
+
+        val secondVisit = launch { model.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(2, listens)
+        assertEquals(VenueProfileUiState(VenueProfileStatus.LOADED, "Café"), model.uiState.value)
+        secondVisit.cancel()
       }
 
   @Test

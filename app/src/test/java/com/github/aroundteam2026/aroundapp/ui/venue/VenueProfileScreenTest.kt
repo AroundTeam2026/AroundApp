@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import org.junit.Assert.assertEquals
@@ -72,6 +73,27 @@ class VenueProfileScreenTest {
     compose.onNodeWithTag(C.Tag.VENUE_PROFILE_RETRY).performClick()
     assertEquals(1, retries)
     signOut()
+  }
+
+  // Trying again can't make a missing venue appear, so there's no button for it
+  @Test
+  fun aMissingVenueSaysSoWithoutTryAgainButCanSignOut() {
+    show(VenueProfileUiState(VenueProfileStatus.MISSING))
+
+    compose
+        .onNodeWithTag(C.Tag.VENUE_PROFILE_MISSING)
+        .assertTextEquals("We couldn't find your venue. Sign out, then sign in again.")
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_RETRY).assertDoesNotExist()
+    signOut()
+  }
+
+  // On a short screen with large fonts, Sign out must still be reachable by scrolling
+  @Test
+  @Config(qualifiers = "en-w320dp-h320dp-mdpi", fontScale = 2f)
+  fun signOutCanBeScrolledToOnASmallScreenWithLargeFonts() {
+    show(VenueProfileUiState(VenueProfileStatus.FAILED))
+
+    compose.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performScrollTo().assertIsDisplayed()
   }
 
   @Test

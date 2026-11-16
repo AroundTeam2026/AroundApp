@@ -129,5 +129,10 @@ private fun VenueTabScreen(
               Modifier.testTag(tab.screenTag),
               onEditQuest = onEditQuest,
           )
-      VenueTab.PROFILE -> VenueProfileScreen(viewModel(factory = venueProfileFactory), onSignOut)
+      VenueTab.PROFILE ->
+          VenueProfileScreen(
+              viewModel(factory = venueProfileFactory),
+              onSignOut,
+              Modifier.testTag(tab.screenTag),
+          )
     }

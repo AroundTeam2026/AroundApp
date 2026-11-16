@@ -19,7 +19,6 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueAreaScreen
-import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
 
 /**
  * Draws the area step of onboarding for the venue [venueId].
@@ -57,7 +56,7 @@ fun VenueEntryNavigation(
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
-    venueProfileFactory: ViewModelProvider.Factory = VenueProfileViewModel.factory(),
+    venueProfileFactory: ViewModelProvider.Factory,
     start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {

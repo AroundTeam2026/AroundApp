@@ -13,19 +13,18 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.navigateToEditQuest
 import com.github.aroundteam2026.aroundapp.ui.review.defaultReviewProofFactory
 import com.github.aroundteam2026.aroundapp.ui.review.navigateToReviewProof
 import com.github.aroundteam2026.aroundapp.ui.review.reviewProofDestination
-import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
 
 /**
  * Builds the ViewModels of the venue home's tabs, kept together so [venueDestinations] stays short.
  *
  * @property quests builds the Quests tab's ViewModel.
  * @property dashboard builds the Dashboard tab's ViewModel.
- * @property profile builds the Profile tab's ViewModel; the app's own unless a test passes one.
+ * @property profile builds the Profile tab's ViewModel.
  */
 class VenueTabFactories(
     val quests: ViewModelProvider.Factory,
     val dashboard: ViewModelProvider.Factory,
-    val profile: ViewModelProvider.Factory = VenueProfileViewModel.factory(),
+    val profile: ViewModelProvider.Factory,
 )
 
 /**

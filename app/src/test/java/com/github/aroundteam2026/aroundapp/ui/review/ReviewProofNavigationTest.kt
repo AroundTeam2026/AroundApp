@@ -52,6 +52,8 @@ class ReviewProofNavigationTest {
                 VenueTabFactories(
                     quests = viewModelFactory {},
                     dashboard = fakes.dashboardFactory(),
+                    // Not opened here either
+                    profile = viewModelFactory {},
                 ),
             reviewProofFactory = fakes::reviewProofFactory,
         )

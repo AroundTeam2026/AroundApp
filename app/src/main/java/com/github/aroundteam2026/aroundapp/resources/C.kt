@@ -42,6 +42,7 @@ object C {
     const val VENUE_PROFILE_LOADING = "venue_profile_loading"
     const val VENUE_PROFILE_FAILED = "venue_profile_failed"
     const val VENUE_PROFILE_RETRY = "venue_profile_retry"
+    const val VENUE_PROFILE_MISSING = "venue_profile_missing"
     const val VENUE_PROFILE_NAME = "venue_profile_name"
     const val VENUE_PROFILE_ADDRESS = "venue_profile_address"
     const val VENUE_NAV_BAR = "venue_nav_bar"
