@@ -1,8 +1,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.res.Configuration
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +34,7 @@ import com.github.aroundteam2026.aroundapp.model.party.isJoined
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.ProfilePhoto
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -114,11 +114,9 @@ internal fun MemberSeat(member: PartyMemberUi, size: Dp) {
       val picture = member.picture
       if (picture != null) {
         // The name below says who it is
-        Image(
+        ProfilePhoto(
             picture,
-            contentDescription = null,
             Modifier.fillMaxSize().testTag(C.Tag.QUEST_DETAIL_MEMBER_PICTURE),
-            contentScale = ContentScale.Crop,
         )
       } else {
         Text(

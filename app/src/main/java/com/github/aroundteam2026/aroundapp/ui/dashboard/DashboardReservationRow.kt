@@ -1,11 +1,11 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.res.Configuration
 import android.text.format.DateUtils
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -45,6 +44,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.ProfilePhoto
+import com.github.aroundteam2026.aroundapp.ui.profileAvatarOutline
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -337,6 +338,7 @@ private fun Avatar(
           .padding(AVATAR_RING)
           .clip(AroundPillShape)
           .background(background)
+          .then(if (picture == null) Modifier.profileAvatarOutline() else Modifier)
           .clearAndSetSemantics {
             testTag =
                 if (picture != null) C.Tag.DASHBOARD_ROW_PICTURE else C.Tag.DASHBOARD_ROW_INITIALS
@@ -344,12 +346,7 @@ private fun Avatar(
       contentAlignment = Alignment.Center,
   ) {
     if (picture != null) {
-      Image(
-          picture,
-          contentDescription = null,
-          Modifier.fillMaxSize(),
-          contentScale = ContentScale.Crop,
-      )
+      ProfilePhoto(picture, Modifier.fillMaxSize())
     } else {
       Text(
           member.name?.let(::initialsOf) ?: stringResource(R.string.dashboard_unknown_initials),
