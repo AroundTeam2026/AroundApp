@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
@@ -124,6 +125,7 @@ class VenuePagePartyTest {
         userRepository,
         partyRepository,
         FakeCompletionRepository(),
+        FakeConnectivityRepository(),
         ME,
         clock = { NOW },
         pictureRepository = pictures.takeIf { withPictures },

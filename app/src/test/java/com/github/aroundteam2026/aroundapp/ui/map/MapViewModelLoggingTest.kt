@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -51,6 +52,7 @@ class MapViewModelLoggingTest {
                 FakeLocationRepository(null),
                 ScriptedQuestRepository.of(MutableStateFlow(listOf(testQuest(venueId = "cafe")))),
                 venues,
+                FakeConnectivityRepository(),
             )
 
         viewModel.onVisibleAreaChanged(
@@ -72,6 +74,7 @@ class MapViewModelLoggingTest {
                 FakeLocationRepository(null),
                 ScriptedQuestRepository(activeQuests = flow { throw offline }),
                 FakeVenueRepository(),
+                FakeConnectivityRepository(),
             )
 
         viewModel.onVisibleAreaChanged(

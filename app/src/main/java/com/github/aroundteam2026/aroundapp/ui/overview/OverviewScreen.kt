@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
@@ -42,6 +43,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundHeader
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -58,6 +61,8 @@ import java.time.Clock
  * @param onJoinParty Opens the screen where the explorer joins a friend's party by its code.
  * @param onSendNewProof Opens the proof form of the reservation with this id, at the venue with
  *   this name, to replace the party's proof.
+ * @param showOfflineBanner Shows the offline banner under the title; by default, while the shell
+ *   says the device is offline.
  */
 @Composable
 fun OverviewScreen(
@@ -65,12 +70,14 @@ fun OverviewScreen(
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     onJoinParty: () -> Unit,
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) =
     OverviewScreen(
         viewModel(factory = OverviewViewModel.factory(explorerUid)),
         onOpenQuest,
         onJoinParty,
         onSendNewProof,
+        showOfflineBanner = showOfflineBanner,
     )
 
 /** The overview showing what [viewModel] holds; see the other [OverviewScreen]. */
@@ -81,6 +88,7 @@ fun OverviewScreen(
     onJoinParty: () -> Unit,
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   OverviewContent(
@@ -91,6 +99,7 @@ fun OverviewScreen(
       onJoinParty,
       onSendNewProof,
       modifier,
+      showOfflineBanner = showOfflineBanner,
   )
 }
 
@@ -118,10 +127,19 @@ fun OverviewContent(
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
+    showOfflineBanner: Boolean = false,
 ) {
   Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     AroundHeader()
     Title(state, onJoinParty)
+    if (showOfflineBanner) {
+      OfflineBanner(
+          Modifier.padding(
+              horizontal = AroundSpacing.ScreenHorizontal,
+              vertical = AroundSpacing.Medium,
+          )
+      )
+    }
     when (state.status) {
       OverviewStatus.LOADING ->
           Centered { CircularProgressIndicator(Modifier.testTag(C.Tag.OVERVIEW_LOADING)) }

@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
@@ -29,8 +31,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.bookQuest
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
-import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
@@ -42,12 +44,12 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
 import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -76,10 +78,12 @@ import kotlinx.coroutines.launch
  * accepting is unavailable ([VenuePageUiState.acceptAvailable]) until the page reopens, and if the
  * proofs fail, so is sending one ([VenuePageUiState.proofsAvailable]). Accepting names the explorer
  * as in their profile. Given [arrivalQuestId], the page opens that quest's details the first time
- * it shows the venue; see [VenuePageUiState.arrivingAt].
+ * it shows the venue; see [VenuePageUiState.arrivingAt]. Given [focusQuestId], it scrolls to and
+ * picks that quest instead; see [VenuePageUiState.focusingOn].
  *
  * It also shows who is in each party, downloading their pictures through [pictureRepository];
- * without one, members show their initials.
+ * without one, members show their initials. While [VenuePageUiState.offline] says the device is
+ * offline, which it follows from [connectivityRepository], the explorer can't [cancel].
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -89,9 +93,11 @@ class VenuePageViewModel(
     private val userRepository: UserRepository,
     private val partyRepository: PartyRepository,
     private val completionRepository: CompletionRepository,
+    connectivityRepository: ConnectivityRepository,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
     arrivalQuestId: String? = null,
+    focusQuestId: String? = null,
     pictureRepository: UserPictureRepository? = null,
     decodePicture: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
 ) : ViewModel() {
@@ -110,6 +116,9 @@ class VenuePageViewModel(
    * [VenuePageUiState.arrivalQuestId], or missed, as [VenuePageUiState.arrivalMissed].
    */
   private var arriving: String? = arrivalQuestId
+
+  /** The quest the page scrolls to and picks the first time it shows the venue; null afterwards. */
+  private var focusing: String? = focusQuestId
 
   /**
    * The reservations this page created, by reservation id. One that was shown as pending and then
@@ -165,6 +174,11 @@ class VenuePageViewModel(
   )
 
   init {
+    viewModelScope.launch {
+      connectivityRepository.observeOffline(TAG).collect { offline ->
+        mutableUiState.update { it.copy(offline = offline) }
+      }
+    }
     listen()
     // The page shows itself again as each picture arrives
     viewModelScope.launch { pictures.pictures.collect { show() } }
@@ -178,6 +192,11 @@ class VenuePageViewModel(
   /** Called when the explorer opens the details of the quest [questId]. */
   fun onQuestDetailsOpened(questId: String) {
     mutableUiState.update { it.withQuestDetails(questId) }
+  }
+
+  /** Called once the page has scrolled to [VenuePageUiState.focusQuestId]. */
+  fun onFocusShown() {
+    mutableUiState.update { it.copy(focusQuestId = null) }
   }
 
   /** Called once the page has said that the quest it was to arrive at is no longer listed. */
@@ -220,16 +239,7 @@ class VenuePageViewModel(
     refusing -= id
     viewModelScope.launch {
       val result =
-          explorerName()
-              .fold(
-                  onSuccess = { name ->
-                    reservationRepository.createReservation(
-                        newPendingReservation(id, venueId, name, clock()),
-                        explorerUid,
-                    )
-                  },
-                  onFailure = { Result.failure(it) },
-              )
+          reservationRepository.bookQuest(userRepository, explorerUid, id, venueId, clock())
       unconfirmed -= id
       result
           .onSuccess { reservationId ->
@@ -254,16 +264,16 @@ class VenuePageViewModel(
    * Called when the explorer cancels their reservation for the picked quest, once they confirmed,
    * or leaves its party when someone else made it ([VenuePageUiState.leavesParty]). Does nothing
    * without such a reservation, or when which of the two it is isn't known, or while it is being
-   * cancelled, so a double tap cancels once. It shows as cancelling until the reservations no
-   * longer list it. A failure, such as being offline, shows [CancelStatus.FAILED]; calling this
-   * again retries.
+   * cancelled, so a double tap cancels once, or while the device is offline, since cancelling needs
+   * a connection. It shows as cancelling until the reservations no longer list it. A failure, such
+   * as being offline, shows [CancelStatus.FAILED]; calling this again retries.
    */
   fun cancel() {
     val current = mutableUiState.value
     val reservationId = current.cancellableReservationId ?: return
     // Without the explorer's membership, cancelling for everyone might not be theirs to do
     val leaving = current.leavesParty ?: return
-    if (reservationId in current.cancellingIds) return
+    if (current.offline || reservationId in current.cancellingIds) return
     mutableUiState.update {
       it.copy(
           cancellingIds = it.cancellingIds + reservationId,
@@ -291,26 +301,11 @@ class VenuePageViewModel(
     }
   }
 
-  /**
-   * The display name in the explorer's profile, which the venue sees on their reservation, or a
-   * failure if the profile is missing or can't be read.
-   */
-  private suspend fun explorerName(): Result<String> =
-      try {
-        val profile =
-            userRepository.getUser(explorerUid)
-                ?: throw NoSuchElementException("No profile for $explorerUid")
-        Result.success(profile.displayName)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        Result.failure(e)
-      }
-
   /** Called when the explorer asks to try again after a failure; does nothing otherwise. */
   fun onRetry() {
     if (mutableUiState.value.status != VenuePageStatus.FAILED) return
-    mutableUiState.value = VenuePageUiState()
+    // Whether the device is offline doesn't depend on the venue
+    mutableUiState.update { VenuePageUiState(offline = it.offline) }
     written.clear()
     refusing.clear()
     latest = null
@@ -404,7 +399,9 @@ class VenuePageViewModel(
           .catch {
             Log.w(TAG, "Listening to venue $venueId failed", it)
             latest = null
-            mutableUiState.value = VenuePageUiState(status = VenuePageStatus.FAILED)
+            mutableUiState.update {
+              VenuePageUiState(status = VenuePageStatus.FAILED, offline = it.offline)
+            }
           }
           .collect { page ->
             latest = page
@@ -454,6 +451,10 @@ class VenuePageViewModel(
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
     }
+    focusing?.let { questId ->
+      focusing = null
+      mutableUiState.update { it.focusingOn(questId) }
+    }
   }
 
   /**
@@ -487,12 +488,14 @@ class VenuePageViewModel(
 
     /**
      * Builds the [VenuePageViewModel] of the venue [venueId] for the explorer [explorerUid], with
-     * the app's repositories, opening the details of [arrivalQuestId] if given.
+     * the app's repositories, opening the details of [arrivalQuestId] if given, or scrolled to
+     * [focusQuestId] if given.
      */
     fun factory(
         venueId: String,
         explorerUid: String,
         arrivalQuestId: String? = null,
+        focusQuestId: String? = null,
     ): ViewModelProvider.Factory = viewModelFactory {
       initializer {
         VenuePageViewModel(
@@ -503,8 +506,12 @@ class VenuePageViewModel(
             UserRepositoryProvider.repository,
             PartyRepositoryProvider.repository,
             CompletionRepositoryProvider.repository,
+            ConnectivityRepositoryProvider.repository(
+                this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+            ),
             explorerUid,
             arrivalQuestId = arrivalQuestId,
+            focusQuestId = focusQuestId,
             pictureRepository =
                 this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]?.let {
                   UserPictureRepositoryProvider.repository(it)
@@ -639,7 +646,7 @@ private fun VenuePageUiState.showing(
     proofs: Proofs?,
 ): VenuePageUiState =
     if (venue == null) {
-      VenuePageUiState(status = VenuePageStatus.NOT_FOUND)
+      VenuePageUiState(status = VenuePageStatus.NOT_FOUND, offline = offline)
     } else {
       copy(
               status = VenuePageStatus.LOADED,

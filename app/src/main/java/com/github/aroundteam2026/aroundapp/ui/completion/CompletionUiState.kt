@@ -21,6 +21,7 @@ import com.github.aroundteam2026.aroundapp.ui.SaveState
  * @property saveState Where submitting stands: [SaveState.Saved] once the proof is submitted, also
  *   when it was submitted earlier.
  * @property locationError Why the last location check blocked submission, or null otherwise.
+ * @property offline Whether the device has no validated internet connection.
  * @property sentByTeammate Whether the venue approved the proof another member of the party sent:
  *   the form is locked, and [saveState] doesn't become [SaveState.Saved], which is kept for a proof
  *   this explorer sent.
@@ -35,6 +36,7 @@ data class CompletionUiState(
     val requirements: String = "",
     val locationError: CompletionLocationError? = null,
     val sentByTeammate: Boolean = false,
+    val offline: Boolean = false,
 ) {
   /**
    * Whether the form can still be changed: the quest is ready, nothing is saving or saved, and no
@@ -50,13 +52,17 @@ data class CompletionUiState(
   val answerTooLong: Boolean
     get() = answer.trim().length > MAX_TEXT_ANSWER_LENGTH
 
+  /** Whether sending the current proof is blocked by the connection. */
+  val photoBlockedOffline: Boolean
+    get() = proofType == ProofType.PHOTO && offline
+
   /** Whether the proof the quest asks for is filled in and the form can be submitted. */
   val canSubmit: Boolean
     get() =
         isEditable &&
             when (proofType) {
               ProofType.TEXT -> answer.isNotBlank() && !answerTooLong
-              ProofType.PHOTO -> photo != null
+              ProofType.PHOTO -> photo != null && !photoBlockedOffline
               null -> false
             }
 }

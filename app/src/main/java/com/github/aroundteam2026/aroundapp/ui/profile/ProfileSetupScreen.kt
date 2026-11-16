@@ -45,7 +45,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -57,6 +56,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.ProfilePhoto
 import com.github.aroundteam2026.aroundapp.ui.completion.ProofPhotos
 import com.github.aroundteam2026.aroundapp.ui.navigation.ProfileError
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
@@ -365,8 +365,9 @@ internal fun ProfileAvatar(
           .background(MaterialTheme.colorScheme.primaryContainer),
       contentAlignment = Alignment.Center,
   ) {
-    if (preview != null) {
-      Image(preview!!, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    val picture = preview
+    if (picture != null) {
+      ProfilePhoto(picture, Modifier.fillMaxSize())
     } else {
       Image(
           painterResource(R.drawable.ic_profile),

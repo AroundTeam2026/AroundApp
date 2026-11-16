@@ -13,6 +13,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
+import com.github.aroundteam2026.aroundapp.ui.venue.venueProfileFactoryOnFakes
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
@@ -35,6 +36,7 @@ class VenueHomeTest {
           onSignOut = { signOuts++ },
           venueQuestsFactory = venueQuestsFactoryOnFakes(),
           dashboardFactory = venueDashboardFactoryOnFakes(),
+          venueProfileFactory = venueProfileFactoryOnFakes(),
       )
     }
   }

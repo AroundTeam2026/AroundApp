@@ -71,4 +71,21 @@ class FakeVenueRepository(initialVenues: List<Venue> = emptyList()) : VenueRepos
       Result.failure(IllegalArgumentException("Venue not found"))
     }
   }
+
+  /**
+   * Replaces the name of the venue with [venueId] in one atomic step, deciding the result from the
+   * state before the write. Fails with [IllegalArgumentException] if the venue does not exist,
+   * without creating it. Does not check [name] against [VenueLimits].
+   */
+  override suspend fun setName(venueId: String, name: String): Result<Unit> {
+    val previous = venues.getAndUpdate { current ->
+      val venue = current[venueId]
+      if (venue == null) current else current + (venueId to venue.copy(name = name))
+    }
+    return if (venueId in previous) {
+      Result.success(Unit)
+    } else {
+      Result.failure(IllegalArgumentException("Venue not found"))
+    }
+  }
 }

@@ -24,14 +24,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,8 +51,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
@@ -206,23 +204,20 @@ private fun ArchiveDialog(title: String, onClose: () -> Unit, onArchive: () -> U
   AlertDialog(
       onDismissRequest = onClose,
       confirmButton = {
-        TextButton(
+        AroundTextButton(
             onClick = {
               onClose()
               onArchive()
             },
-            colors =
-                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            contentColor = MaterialTheme.colorScheme.error,
             modifier = Modifier.testTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM),
         ) {
           Text(stringResource(R.string.venue_quests_archive_confirm))
         }
       },
       dismissButton = {
-        TextButton(
+        AroundTextButton(
             onClick = onClose,
-            // The default primary colour is unreadable on the dark background
-            colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
             modifier = Modifier.testTag(C.Tag.VENUE_QUEST_ARCHIVE_KEEP),
         ) {
           Text(stringResource(R.string.venue_quests_archive_keep))

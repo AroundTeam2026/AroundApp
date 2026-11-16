@@ -22,6 +22,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -42,7 +43,13 @@ class MapScreenTest {
 
   private val zurich = Location(47.3769, 8.5417)
   private val repository = FakeLocationRepository(zurich)
-  private val viewModel = MapViewModel(repository, FakeQuestRepository(), FakeVenueRepository())
+  private val viewModel =
+      MapViewModel(
+          repository,
+          FakeQuestRepository(),
+          FakeVenueRepository(),
+          FakeConnectivityRepository(),
+      )
   private val state
     get() = viewModel.uiState.value
 
@@ -51,7 +58,7 @@ class MapScreenTest {
     val dialog = PermissionDialog(answer)
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> })
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
       }
     }
     composeTestRule.waitForIdle()
@@ -109,7 +116,8 @@ class MapScreenTest {
             explorerUid = "explorer",
             onSignOut = {},
             screen = { tab ->
-              if (tab == Tab.MAP) MapScreen(viewModel, onOpenVenue = { _, _ -> })
+              if (tab == Tab.MAP)
+                  MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
               else Text(tab.route)
             },
         )

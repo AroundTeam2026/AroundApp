@@ -40,7 +40,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +70,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
@@ -508,12 +508,10 @@ private fun ColumnScope.AuthFormActions(
     onVenue: () -> Unit,
 ) {
   if (viewModel.supportsRegistration && mode == AuthFormMode.EXPLORER_SIGN_UP) {
-    TextButton(
+    AroundTextButton(
         onClick = onVenue,
         enabled = !state.isLoading,
         modifier = Modifier.fillMaxWidth().testTag(C.Tag.AUTH_VENUE_LINK),
-        // The default primary colour is unreadable on the dark background.
-        colors = ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
     ) {
       Text(stringResource(R.string.auth_venue_link))
     }

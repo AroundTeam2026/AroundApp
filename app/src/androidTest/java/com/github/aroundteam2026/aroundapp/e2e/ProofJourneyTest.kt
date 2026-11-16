@@ -214,13 +214,10 @@ class ProofJourneyTest : TestCase() {
     composeTestRule.signOut()
   }
 
-  /** Opens the quest's details from its venue's page, which the map's nearby quests lead to. */
+  /** Opens the quest's details from the map's nearby quests. */
   private fun openTheQuestsDetails() {
     composeTestRule.findTheQuestNearby(questTitle)
-    composeTestRule.viewTheVenuesPage(venueName, questTitle)
-    // The venue has this one quest, so one row offers details
-    composeTestRule.onNodeWithTag(C.Tag.VENUE_QUEST_ROW_DETAILS).performClick()
-    composeTestRule.waitFor(hasTestTag(C.Tag.QUEST_DETAIL_SCREEN))
+    composeTestRule.openTheShownQuest(venueName, questTitle)
   }
 
   /**

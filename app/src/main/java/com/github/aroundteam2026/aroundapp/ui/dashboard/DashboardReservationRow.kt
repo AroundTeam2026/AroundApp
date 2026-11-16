@@ -1,11 +1,11 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.res.Configuration
 import android.text.format.DateUtils
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -45,6 +44,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.ProfilePhoto
+import com.github.aroundteam2026.aroundapp.ui.profileAvatarOutline
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -68,6 +69,8 @@ import kotlinx.coroutines.delay
  * @param onApprove Approves it; only a pending reservation offers it.
  * @param saving Whether its answer is being saved: both buttons are disabled meanwhile, so the
  *   venue can't answer twice.
+ * @param offline Whether the device is offline: both buttons are disabled, since answering needs a
+ *   connection. The dashboard shows why, once, above the rows.
  * @param clock Tells how long ago it was requested; read again each time the minute shown changes,
  *   so a dashboard left open keeps up.
  */
@@ -78,6 +81,7 @@ internal fun DashboardReservationRow(
     onApprove: () -> Unit,
     modifier: Modifier = Modifier,
     saving: Boolean = false,
+    offline: Boolean = false,
     clock: Clock = Clock.systemDefaultZone(),
 ) {
   val colors = MaterialTheme.colorScheme
@@ -117,7 +121,7 @@ internal fun DashboardReservationRow(
             background = colors.background,
             content = colors.onSurface,
             tag = C.Tag.DASHBOARD_ROW_DECLINE,
-            enabled = !saving,
+            enabled = !saving && !offline,
             onClick = onDecline,
         )
         RowButton(
@@ -126,7 +130,7 @@ internal fun DashboardReservationRow(
             background = colors.primary,
             content = colors.onPrimary,
             tag = C.Tag.DASHBOARD_ROW_APPROVE,
-            enabled = !saving && reservation.approveBlock == null,
+            enabled = !saving && !offline && reservation.approveBlock == null,
             onClick = onApprove,
         )
       }
@@ -334,6 +338,7 @@ private fun Avatar(
           .padding(AVATAR_RING)
           .clip(AroundPillShape)
           .background(background)
+          .then(if (picture == null) Modifier.profileAvatarOutline() else Modifier)
           .clearAndSetSemantics {
             testTag =
                 if (picture != null) C.Tag.DASHBOARD_ROW_PICTURE else C.Tag.DASHBOARD_ROW_INITIALS
@@ -341,12 +346,7 @@ private fun Avatar(
       contentAlignment = Alignment.Center,
   ) {
     if (picture != null) {
-      Image(
-          picture,
-          contentDescription = null,
-          Modifier.fillMaxSize(),
-          contentScale = ContentScale.Crop,
-      )
+      ProfilePhoto(picture, Modifier.fillMaxSize())
     } else {
       Text(
           member.name?.let(::initialsOf) ?: stringResource(R.string.dashboard_unknown_initials),

@@ -100,11 +100,13 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  *
  * @param quests The quests to page through, already ordered.
  * @param locationOn Whether the explorer's location is on, so [quests] are closest first.
- * @param onQuestClick Called with a page's quest when the explorer taps the page.
- * @param onViewQuest Called with the shown quest when the explorer taps "View quest".
+ * @param onOpenQuest Called with a page's quest when the explorer taps the page.
+ * @param onShowOnMap Called with a page's quest when the explorer taps its pin.
  * @param onClose Called when the explorer closes the overlay.
  * @param filters The filters [quests] already passed.
  * @param onFiltersChange Called with the filters the explorer picks in the pager.
+ * @param acceptState Where accepting each quest stands; "Accept quest" shows only when given.
+ * @param onAccept Called with a page's quest when the explorer taps its "Accept quest".
  * @param modifier Places the overlay; the map puts it along its bottom edge, and the overlay keeps
  *   its own margin inside it.
  */
@@ -112,12 +114,14 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 fun NearbyQuestOverlay(
     quests: List<NearbyQuest>,
     locationOn: Boolean,
-    onQuestClick: (NearbyQuest) -> Unit,
-    onViewQuest: (NearbyQuest) -> Unit,
+    onOpenQuest: (NearbyQuest) -> Unit,
+    onShowOnMap: (NearbyQuest) -> Unit,
     onClose: () -> Unit,
     filters: NearbyFilters,
     onFiltersChange: (NearbyFilters) -> Unit,
     modifier: Modifier = Modifier,
+    acceptState: NearbyAcceptUiState? = null,
+    onAccept: (NearbyQuest) -> Unit = {},
 ) {
   val colors = MaterialTheme.colorScheme
   val closingFling = with(LocalDensity.current) { CLOSING_FLING.toPx() }
@@ -169,11 +173,13 @@ fun NearbyQuestOverlay(
     NearbyQuestPager(
         quests,
         locationOn,
-        onQuestClick,
-        onViewQuest,
+        onOpenQuest,
+        onShowOnMap,
         onClose = onClose,
         filters = filters,
         onFiltersChange = onFiltersChange,
+        acceptState = acceptState,
+        onAccept = onAccept,
     )
   }
 }

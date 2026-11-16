@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest
 
 import androidx.compose.runtime.getValue
@@ -43,6 +44,24 @@ class CancelReservationActionTest {
     offline = false
 
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).assertIsEnabled()
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+  }
+
+  @Test
+  fun withoutItsHintOfflineOnlyTheButtonIsDisabled() {
+    compose.setContent {
+      AroundAppTheme {
+        CancelReservationAction(
+            CancelStatus.NONE,
+            "Café Lumière",
+            onCancel = {},
+            offline = true,
+            showOfflineHint = false,
+        )
+      }
+    }
+
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
   }
 

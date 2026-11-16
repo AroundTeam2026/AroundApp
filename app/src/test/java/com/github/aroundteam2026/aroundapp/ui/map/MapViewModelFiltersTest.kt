@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
@@ -69,6 +70,7 @@ class MapViewModelFiltersTest {
                 testVenue(id = "pub", location = Location(46.5210, 6.6340)),
             )
         ),
+        FakeConnectivityRepository(),
         clock = { 1_000L },
     )
   }

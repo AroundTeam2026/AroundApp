@@ -41,8 +41,8 @@ val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
  * Business setup reuses an existing venue instead of overwriting it, and saving its location
  * replaces onboarding with the home, so Back cannot reopen setup. The session gate clears the graph
  * on sign-out, and [VenueEntry] chooses [start] from the venue's saved state. Tests isolate Maps
- * through the location slot, and the form, quest list and dashboard through [createQuestFactory],
- * [venueQuestsFactory] and [dashboardFactory].
+ * through the location slot, and the form, quest list, dashboard and profile through
+ * [createQuestFactory], [venueQuestsFactory], [dashboardFactory] and [venueProfileFactory].
  *
  * @param start where the graph opens: business setup, its area, or the home of a venue already set
  *   up. A venue resuming on its area starts at business setup with the area opened above it.
@@ -56,6 +56,7 @@ fun VenueEntryNavigation(
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
+    venueProfileFactory: ViewModelProvider.Factory,
     start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -88,9 +89,18 @@ fun VenueEntryNavigation(
         navController,
         profile::signOut,
         createQuestFactory,
-        venueQuestsFactory,
-        dashboardFactory,
+        VenueTabFactories(venueQuestsFactory, dashboardFactory, venueProfileFactory),
     )
+    // Editing from the profile: saving the area returns to the Profile tab
+    venueOnboardingDestinations(navController, authRepository, venueRepository, editing = true) {
+        venueId,
+        onBack ->
+      locationScreen(
+          venueId,
+          { navController.popBackStack(VenueOnboardingRoutes.EDIT, inclusive = true) },
+          onBack,
+      )
+    }
   }
   if (start is VenueEntryStart.Area) ResumeOnArea(start.venueId, navController)
 }

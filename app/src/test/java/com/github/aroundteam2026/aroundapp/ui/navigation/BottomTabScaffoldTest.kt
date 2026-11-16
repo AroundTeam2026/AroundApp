@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -23,9 +24,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import org.junit.Assert.assertEquals
-import org.junit.Before
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,16 +41,17 @@ class BottomTabScaffoldTest {
 
   /**
    * A tab screen that pads itself for the system bars, as a full-screen form does: one probe at its
-   * top and one at its bottom.
+   * top and one at its bottom. With [offline], the scaffold shows the offline banner at the top.
    */
-  @Before
-  fun launch() {
+  private fun launch(offline: Boolean = false) {
+    val connectivity = FakeConnectivityRepository().apply { online.value = !offline }
     composeTestRule.setContent {
       BottomTabScaffold(
           tabs = VenueTab.entries,
           startTab = VenueTab.DASHBOARD,
           navController = rememberNavController(),
           navBarTag = C.Tag.VENUE_NAV_BAR,
+          connectivityRepository = connectivity,
           screen = {
             Box(Modifier.fillMaxSize()) {
               Probe(TOP_PROBE, Modifier.align(Alignment.TopStart))
@@ -81,6 +84,7 @@ class BottomTabScaffoldTest {
   // The scaffold already makes room for the status bar; the screen must not add it again
   @Test
   fun aTabScreenGetsTheStatusBarOnlyOnce() {
+    launch()
     val top = composeTestRule.onNodeWithTag(TOP_PROBE).getUnclippedBoundsInRoot().top
 
     assertEquals(STATUS_BAR.dp, top)
@@ -89,10 +93,33 @@ class BottomTabScaffoldTest {
   // Nor does it add the navigation bar's room above the bottom bar
   @Test
   fun aTabScreenEndsOnTheBottomBar() {
+    launch()
     val probeBottom = composeTestRule.onNodeWithTag(BOTTOM_PROBE).getUnclippedBoundsInRoot().bottom
     val barTop = composeTestRule.onNodeWithTag(C.Tag.VENUE_NAV_BAR).getUnclippedBoundsInRoot().top
 
     assertEquals(barTop, probeBottom)
+  }
+
+  // The top bar gets no window insets, so the banner must clear the status bar itself
+  @Test
+  fun theOfflineBannerStartsBelowTheStatusBar() {
+    launch(offline = true)
+
+    val bannerTop =
+        composeTestRule.onNodeWithTag(C.Tag.OFFLINE_BANNER).getUnclippedBoundsInRoot().top
+    assertTrue("The banner starts at $bannerTop", bannerTop >= STATUS_BAR.dp)
+  }
+
+  // And the screen starts under the banner, without adding the status bar a second time
+  @Test
+  fun aTabScreenStartsBelowTheOfflineBanner() {
+    launch(offline = true)
+
+    val bannerBottom =
+        composeTestRule.onNodeWithTag(C.Tag.OFFLINE_BANNER).getUnclippedBoundsInRoot().bottom
+    val top = composeTestRule.onNodeWithTag(TOP_PROBE).getUnclippedBoundsInRoot().top
+    assertTrue("The screen starts at $top, the banner ends at $bannerBottom", top >= bannerBottom)
+    assertTrue("The screen starts at $top", top < bannerBottom + STATUS_BAR.dp)
   }
 
   private companion object {

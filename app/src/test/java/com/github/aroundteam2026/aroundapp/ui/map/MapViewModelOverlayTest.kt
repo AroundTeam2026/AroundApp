@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -55,6 +56,7 @@ class MapViewModelOverlayTest {
         locating,
         ScriptedQuestRepository.of(quests),
         FakeVenueRepository(listOf(testVenue(id = "cafe", location = venueLocation))),
+        FakeConnectivityRepository(),
         clock = { 1_000L },
     )
   }
@@ -136,7 +138,7 @@ class MapViewModelOverlayTest {
     runCurrent()
     assertTrue("the venue is off screen", state.pins.isEmpty())
 
-    viewModel.onNearbyQuestClick(state.nearby.single())
+    viewModel.onShowOnMap(state.nearby.single())
     runCurrent()
 
     assertFalse(state.showsNearby)
@@ -150,7 +152,7 @@ class MapViewModelOverlayTest {
     viewModel.onNearbyOpen()
     runCurrent()
 
-    viewModel.onNearbyQuestClick(state.nearby.single())
+    viewModel.onShowOnMap(state.nearby.single())
     runCurrent()
 
     assertEquals(
@@ -166,7 +168,7 @@ class MapViewModelOverlayTest {
     viewModel.onNearbyOpen()
     runCurrent()
 
-    viewModel.onNearbyQuestClick(state.nearby.single { it.questId == "away" })
+    viewModel.onShowOnMap(state.nearby.single { it.questId == "away" })
     runCurrent()
 
     assertEquals("away", state.selectedPinKey)
@@ -182,7 +184,7 @@ class MapViewModelOverlayTest {
     runCurrent()
     val before = state
 
-    viewModel.onNearbyQuestClick(page)
+    viewModel.onShowOnMap(page)
     runCurrent()
 
     assertEquals(before, state)
@@ -191,7 +193,7 @@ class MapViewModelOverlayTest {
 
   @Test
   fun aPageTappedBeforeTheExplorerIsLocatedKeepsItsVenueFramed() = pickBeforeLocated {
-    viewModel.onNearbyQuestClick(state.nearby.single())
+    viewModel.onShowOnMap(state.nearby.single())
   }
 
   @Test
