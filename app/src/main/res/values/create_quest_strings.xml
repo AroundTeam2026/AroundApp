@@ -65,6 +65,7 @@
     <string name="create_quest_reward_amount_too_large_percent">Use %1$s %% or less.</string>
     <string name="create_quest_reward_amount_too_large_chf">Use CHF %1$s or less.</string>
     <string name="create_quest_reward_free_item">Free item</string>
+    <string name="create_quest_reward_item_preview">Will be shown as: %1$s</string>
     <string name="create_quest_reward_other">Other</string>
     <string name="create_quest_reward_specifics">Specifics</string>
     <string name="create_quest_reward_description">Describe the reward</string>
