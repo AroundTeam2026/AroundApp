@@ -219,10 +219,17 @@ service cloud.firestore {
       return /databases/$(database)/documents/completions/$(reservationId);
     }
 
-    // The membership [data] is the creator's: the creator's membership is written in one batch with
-    // the reservation and joined at its creation time, which no later join may have.
+    // The [membership] was joined at [createdAt], the creation time of its reservation, which marks
+    // the creator: the creator's membership is written in one batch with the reservation and joined
+    // at its creation time, which no later join may have. The one place that tells the creator, so
+    // isCreatorMembership and isCreatorOf can't disagree on who it is.
+    function joinedAtCreation(membership, createdAt) {
+      return membership.joinedAt == createdAt;
+    }
+
+    // The membership [data] is the creator's. Costs one read, for the reservation's createdAt.
     function isCreatorMembership(data) {
-      return data.joinedAt == get(reservation(data.reservationId)).data.createdAt;
+      return joinedAtCreation(data, get(reservation(data.reservationId)).data.createdAt);
     }
 
     // [code] is a party code: 6 characters out of the digits 2 to 9 and the capital letters but I,
@@ -250,11 +257,11 @@ service cloud.firestore {
     }
 
     // The signed-in user created the reservation [data], stored as [reservationId]: their own
-    // joined membership is joined at its createdAt, which no later join may be (#536). The
-    // createdAt comes from [data], so this costs no read beyond isJoinedMember's.
+    // joined membership is joined at its createdAt (#536). The createdAt comes from [data], so this
+    // costs no read beyond isJoinedMember's.
     function isCreatorOf(reservationId, data) {
       return isJoinedMember(reservationId)
-          && get(ownMembership(reservationId)).data.joinedAt == data.createdAt;
+          && joinedAtCreation(get(ownMembership(reservationId)).data, data.createdAt);
     }
 
     // The signed-in user is a joined member of the party of [reservationId] once this write is
