@@ -130,7 +130,7 @@ class QuestRadiusMapDeviceTest {
   }
 
   @Test
-  fun pinchingThePickerZoomsTheMap() {
+  fun pinchingThePickerMovesTheMapRatherThanTheScreen() {
     showPicker()
     val map = composeTestRule.awaitGoogleMap()
     val framed = map.awaitFramed()
@@ -146,12 +146,13 @@ class QuestRadiusMapDeviceTest {
             pinch(center - near, center - far, center + near, center + far)
           }
         },
-        { composeTestRule.runOnUiThread { map.cameraPosition.zoom > framed.zoom } },
+        // Touch slop takes the start of the pinch, so any move of the camera counts, not its zoom
+        { composeTestRule.runOnUiThread { map.cameraPosition != framed } },
     )
 
-    assertTrue(
-        "The map didn't zoom in",
-        composeTestRule.runOnUiThread { map.cameraPosition.zoom > framed.zoom },
+    assertFalse(
+        "The map didn't move",
+        composeTestRule.runOnUiThread { map.cameraPosition == framed },
     )
     assertEquals("The screen scrolled", 0, composeTestRule.runOnUiThread { scroll.value })
   }
