@@ -233,10 +233,11 @@ jobs:
       # action only waits for sys.boot_completed (see the script). When they fail, print the
       # device's crash log and its process deaths, low-memory kills included, before the emulator
       # shuts down: Gradle can't fetch the logcat of a test whose process crashed or was killed, so
-      # this is the only trace of why. The log is cleared first, so it only holds this run, not the
-      # snapshot's boot. Each read gives up after 30 s: when the emulator itself died, adb waits for
-      # it forever. The action runs the script one line at a time, so the Gradle command stays on
-      # one line.
+      # this is the only trace of why. The device's whole log and its memory use are saved too, for
+      # a later step to upload: the deaths only say what was killed, not what used the memory
+      # (#393). The log is cleared first, so it only holds this run, not the snapshot's boot. Each
+      # read gives up after 30 s: when the emulator itself died, adb waits for it forever. The
+      # action runs the script one line at a time, so the Gradle command stays on one line.
       - name: Run instrumented tests
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
@@ -254,7 +255,7 @@ jobs:
           script: |
             sh .github/scripts/settle-emulator.sh
             adb logcat -c
-            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { timeout 30 adb logcat -d -b crash; timeout 30 adb logcat -d -b main -b system | grep -E 'has died|Killing|lowmemorykiller|ANR in'; exit 1; }
+            ./gradlew connectedCheck --parallel --build-cache $SHARD_ARGS || { timeout 30 adb logcat -d -b crash; timeout 30 adb logcat -d -b all > device-logcat.txt; timeout 30 adb shell dumpsys meminfo > device-meminfo.txt; grep -E 'has died|Killing|lowmemorykiller|ANR in' device-logcat.txt; exit 1; }
 
       # When the instrumented tests fail, show what the Maps SDK saw. Google rejects a build whose key
       # or signing certificate isn't registered, and the map then never moves: the device log names
@@ -281,6 +282,19 @@ jobs:
         with:
           name: instrumented-test-results-${{ matrix.shard }}
           path: app/build/outputs/androidTest-results/connected/
+          retention-days: 7
+
+      # The device's whole log and memory use, saved when the instrumented tests failed. They're
+      # missing when an earlier step failed, before the tests ran.
+      - name: Upload the device's log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: device-log-${{ matrix.shard }}
+          path: |
+            device-logcat.txt
+            device-meminfo.txt
+          if-no-files-found: ignore
           retention-days: 7
 
       # This shard's coverage, for the report job to merge with the other shards' and the unit
