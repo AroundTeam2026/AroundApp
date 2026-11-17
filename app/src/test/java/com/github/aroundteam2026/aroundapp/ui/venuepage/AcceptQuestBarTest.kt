@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.Context
@@ -142,12 +143,12 @@ class AcceptQuestBarTest {
   }
 
   @Test
-  fun aQuestThatNeedsMorePeopleSaysHowManyAndCanStillBeAccepted() {
+  fun beforeAcceptingTheNeedForMorePeopleCountsTheExplorerAndTheQuestCanStillBeAccepted() {
     show(LOADED.copy(selectedQuestId = "b"))
 
     compose
         .onNodeWithTag(C.Tag.ACCEPT_QUEST_NEEDS_MORE)
-        .assertTextContains(plural(R.plurals.accept_quest_needs_more, 2))
+        .assertTextContains(plural(R.plurals.accept_quest_needs_you_and_more, 2))
     button.assertIsEnabled().performClick()
 
     assertEquals(1, accepts)

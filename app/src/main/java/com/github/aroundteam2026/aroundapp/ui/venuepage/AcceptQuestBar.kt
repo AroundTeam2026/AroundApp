@@ -91,7 +91,8 @@ internal fun QuestActionBar(
  * - Ready: the button calls [onAccept]. Failed: an error shows above it, and it says "Try again".
  * - Accepting: a pulsing skeleton that can't be tapped takes the button's place.
  * - Accepted: disabled, saying the venue is yet to approve. Unavailable: disabled, saying why.
- * - A quest that needs more people says how many, whatever the state.
+ * - A quest that needs more people says how many, whatever the state. Before it is accepted, that
+ *   count leaves out the explorer, who isn't in the party yet, and the bar says so: "You + 3 more".
  *
  * It draws nothing while no quest is picked. [footer] sits under the button.
  *
@@ -106,7 +107,7 @@ fun AcceptQuestBar(
     onSubmitProof: (() -> Unit)? = null,
     footer: @Composable ColumnScope.() -> Unit = {},
 ) {
-  if (state.selectedQuest == null) return
+  val quest = state.selectedQuest ?: return
   val status = state.acceptStatus
   QuestBar(modifier) {
     // One explanation of the button: an accepted quest is done whatever the listener does, and a
@@ -123,7 +124,12 @@ fun AcceptQuestBar(
     val more = state.morePeopleNeeded
     if (more > 0) {
       Note(
-          pluralStringResource(R.plurals.accept_quest_needs_more, more, more),
+          pluralStringResource(
+              if (quest.questId in state.acceptedParties) R.plurals.accept_quest_needs_more
+              else R.plurals.accept_quest_needs_you_and_more,
+              more,
+              more,
+          ),
           C.Tag.ACCEPT_QUEST_NEEDS_MORE,
       )
     }
