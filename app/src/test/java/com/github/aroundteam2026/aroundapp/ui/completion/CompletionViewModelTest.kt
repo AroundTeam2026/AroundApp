@@ -96,6 +96,7 @@ class CompletionViewModelTest {
   private val locations = FakeLocationRepository(VENUE_LOCATION)
   private val connectivity = FakeConnectivityRepository()
   private var connectivityRepository: ConnectivityRepository = connectivity
+  private val discarded = mutableListOf<Uri>()
 
   private val viewModel by lazy {
     CompletionViewModel(
@@ -108,6 +109,7 @@ class CompletionViewModelTest {
         completions,
         photoRepository,
         connectivityRepository,
+        discardPhoto = { discarded.add(it) },
     )
   }
 
@@ -807,6 +809,24 @@ class CompletionViewModelTest {
 
     assertEquals(1, photos.uploads.size)
     assertEquals(Proof.Photo(location(1)), stored().single().proof)
+  }
+
+  // App storage keeps the copy until its proof is saved, then it isn't needed anymore
+  @Test
+  fun theAppsCopyOfAPhotoIsDeletedOnceItsProofIsSaved() = test {
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    fakeCompletions.forcedFailure = IOException("offline")
+    viewModel.submit()
+    runCurrent()
+    // A failed submit keeps the copy, so trying again sends the same photo
+    assertEquals(emptyList<Uri>(), discarded)
+
+    fakeCompletions.forcedFailure = null
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(listOf(PHOTO), discarded)
   }
 
   @Test

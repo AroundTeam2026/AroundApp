@@ -371,11 +371,23 @@ class ProofPhotoPickerTest {
     node(C.Tag.PROOF_PHOTO_TAKE).assertIsDisplayed()
   }
 
+  @Test
+  fun openingThePickerDeletesThePhotosLeftBehind() {
+    val old =
+        File(File(app.filesDir, "proofs").apply { mkdirs() }, "proof-old.jpg").apply {
+          writeText("photo")
+          setLastModified(0)
+        }
+    show(FakeActivityResults())
+
+    assertFalse(old.exists())
+  }
+
   // Otherwise the box stays empty, as if the photo were still loading, and the copy is sent
   @Test
   fun aPhotoThatCantBeShownIsDroppedAndTheBoxSaysWhy() {
     val broken =
-        File(File(app.cacheDir, "proofs").apply { mkdirs() }, "proof-broken.jpg").apply {
+        File(File(app.filesDir, "proofs").apply { mkdirs() }, "proof-broken.jpg").apply {
           writeText("not a photo")
         }
     show(FakeActivityResults(), photo = Uri.fromFile(broken))
