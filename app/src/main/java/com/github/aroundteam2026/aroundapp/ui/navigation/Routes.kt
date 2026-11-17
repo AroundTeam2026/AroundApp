@@ -22,13 +22,20 @@ object Routes {
    */
   const val QUEST_ID = "questId"
 
+  /**
+   * Optional argument of [VENUE_PAGE]: a quest of the venue the page scrolls to and picks, without
+   * opening its details, as when the explorer taps its card on the map.
+   */
+  const val FOCUS_QUEST_ID = "focusQuestId"
+
   private const val VENUE_PAGE_PREFIX = "venue_page"
 
   /**
-   * A venue's page, with its quests, or with the details of [QUEST_ID] open when given. Build the
-   * route to one venue with [venuePage].
+   * A venue's page, with its quests, or with the details of [QUEST_ID] open when given, or scrolled
+   * to [FOCUS_QUEST_ID] when given. Build the route to one venue with [venuePage].
    */
-  const val VENUE_PAGE = "$VENUE_PAGE_PREFIX/{$VENUE_ID}?$QUEST_ID={$QUEST_ID}"
+  const val VENUE_PAGE =
+      "$VENUE_PAGE_PREFIX/{$VENUE_ID}?$QUEST_ID={$QUEST_ID}&$FOCUS_QUEST_ID={$FOCUS_QUEST_ID}"
 
   /** Argument of [COMPLETE_QUEST]: the id of the reservation whose quest the explorer completes. */
   const val RESERVATION_ID = "reservationId"
@@ -87,12 +94,20 @@ object Routes {
    * @param venueId id of the venue; it is encoded, so it may contain any character.
    * @param questId id of a quest of the venue whose details the page opens at once, or null for the
    *   page's list of quests; encoded too.
+   * @param focusQuestId id of a quest of the venue the page's list scrolls to and picks, or null;
+   *   encoded too.
    * @throws IllegalArgumentException if [venueId] is blank, which no route could match.
    */
-  fun venuePage(venueId: String, questId: String? = null): String {
+  fun venuePage(venueId: String, questId: String? = null, focusQuestId: String? = null): String {
     require(venueId.isNotBlank()) { "A venue page needs a venue id" }
+    val query =
+        listOfNotNull(
+                questId?.let { "$QUEST_ID=${Uri.encode(it)}" },
+                focusQuestId?.let { "$FOCUS_QUEST_ID=${Uri.encode(it)}" },
+            )
+            .joinToString("&")
     val page = "$VENUE_PAGE_PREFIX/${Uri.encode(venueId)}"
-    return if (questId == null) page else "$page?$QUEST_ID=${Uri.encode(questId)}"
+    return if (query.isEmpty()) page else "$page?$query"
   }
 
   /**

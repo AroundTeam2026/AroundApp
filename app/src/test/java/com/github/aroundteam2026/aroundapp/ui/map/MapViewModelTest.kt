@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -34,7 +35,12 @@ class MapViewModelTest {
 
   private val repository = FakeLocationRepository(zurich)
   private val viewModel by lazy {
-    MapViewModel(repository, FakeQuestRepository(), FakeVenueRepository())
+    MapViewModel(
+        repository,
+        FakeQuestRepository(),
+        FakeVenueRepository(),
+        FakeConnectivityRepository(),
+    )
   }
 
   private val state

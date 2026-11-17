@@ -3,6 +3,7 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -126,12 +127,8 @@ fun AcceptQuestBar(
           C.Tag.ACCEPT_QUEST_NEEDS_MORE,
       )
     }
-    when {
-      onSubmitProof != null -> SubmitProofButton(onSubmitProof)
-      status == AcceptStatus.ACCEPTING ->
-          AcceptingSkeleton(stringResource(R.string.accept_quest_accepting))
-      else -> AcceptButton(status, enabled = state.acceptAvailable, onAccept)
-    }
+    if (onSubmitProof != null) SubmitProofButton(onSubmitProof)
+    else AcceptQuestButton(status, enabled = state.acceptAvailable, onAccept)
     footer()
   }
 }
@@ -193,9 +190,40 @@ private fun SubmitProofButton(onSubmitProof: () -> Unit) {
   }
 }
 
+/**
+ * The button that accepts a quest, as [status] says: "Accept quest", a pulsing placeholder while
+ * accepting, "Try again" after a failure, or "Accepted", disabled. Without [enabled], it can't be
+ * tapped. The venue page's bar and the map's nearby quests both use it.
+ *
+ * @param tag Tags the button, or the placeholder that stands for it.
+ * @param acceptedLabel What it says once accepted; a narrow button passes a shorter one.
+ */
+@Composable
+fun AcceptQuestButton(
+    status: AcceptStatus,
+    enabled: Boolean,
+    onAccept: () -> Unit,
+    modifier: Modifier = Modifier,
+    tag: String = C.Tag.ACCEPT_QUEST_BUTTON,
+    @StringRes acceptedLabel: Int = R.string.accept_quest_accepted,
+) {
+  if (status == AcceptStatus.ACCEPTING) {
+    AcceptingSkeleton(stringResource(R.string.accept_quest_accepting), modifier, tag)
+  } else {
+    AcceptButton(status, enabled, onAccept, modifier, tag, acceptedLabel)
+  }
+}
+
 /** The button: "Accept quest", "Try again" after a failure, or disabled once accepted. */
 @Composable
-private fun AcceptButton(status: AcceptStatus, enabled: Boolean, onAccept: () -> Unit) {
+private fun AcceptButton(
+    status: AcceptStatus,
+    enabled: Boolean,
+    onAccept: () -> Unit,
+    modifier: Modifier,
+    tag: String,
+    @StringRes acceptedLabel: Int,
+) {
   Button(
       onClick = onAccept,
       enabled = enabled && status != AcceptStatus.ACCEPTED,
@@ -210,7 +238,7 @@ private fun AcceptButton(status: AcceptStatus, enabled: Boolean, onAccept: () ->
           } else {
             ButtonDefaults.buttonColors()
           },
-      modifier = Modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(C.Tag.ACCEPT_QUEST_BUTTON),
+      modifier = modifier.fillMaxWidth().height(BUTTON_HEIGHT).testTag(tag),
   ) {
     when (status) {
       AcceptStatus.ACCEPTED -> {
@@ -220,7 +248,7 @@ private fun AcceptButton(status: AcceptStatus, enabled: Boolean, onAccept: () ->
             Modifier.size(CHECK_ICON_SIZE),
         )
         Spacer(Modifier.width(AroundSpacing.Small))
-        Text(stringResource(R.string.accept_quest_accepted), style = AroundTextStyles.Button)
+        Text(stringResource(acceptedLabel), style = AroundTextStyles.Button)
       }
       // Without a working button there is nothing to try again
       AcceptStatus.FAILED if enabled ->
@@ -232,10 +260,10 @@ private fun AcceptButton(status: AcceptStatus, enabled: Boolean, onAccept: () ->
 
 /**
  * A pulsing placeholder in the shape of the button while the quest is being accepted, in place of a
- * spinner. It stands for the button: same tag and size, disabled, described as [description].
+ * spinner. It stands for the button: same [tag] and size, disabled, described as [description].
  */
 @Composable
-private fun AcceptingSkeleton(description: String) {
+private fun AcceptingSkeleton(description: String, modifier: Modifier, tag: String) {
   val pulse = rememberInfiniteTransition(label = "accepting")
   val alpha by
       pulse.animateFloat(
@@ -245,11 +273,12 @@ private fun AcceptingSkeleton(description: String) {
           label = "accepting alpha",
       )
   Box(
-      Modifier.fillMaxWidth()
+      modifier
+          .fillMaxWidth()
           .height(BUTTON_HEIGHT)
           .clip(AroundPillShape)
           .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
-          .testTag(C.Tag.ACCEPT_QUEST_BUTTON)
+          .testTag(tag)
           .semantics {
             contentDescription = description
             disabled()

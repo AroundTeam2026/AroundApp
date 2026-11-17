@@ -41,6 +41,14 @@ class RewardFormStateTest {
   }
 
   @Test
+  fun aLeadingFreeIsSavedAsTyped() {
+    assertEquals(
+        Reward.FreeItem(NAME_WITH_FREE, null),
+        freeItem.copy(itemName = NAME_WITH_FREE).toReward(),
+    )
+  }
+
+  @Test
   fun discountKeepsItsUnitAndReadsACommaAsADecimalPoint() {
     assertEquals(Reward.Discount(15.0, DiscountUnit.PERCENT, null), discount.toReward())
     assertEquals(
@@ -229,5 +237,6 @@ class RewardFormStateTest {
 
   private companion object {
     val TODAY: LocalDate = LocalDate.of(2026, 11, 9)
+    const val NAME_WITH_FREE = "Free muffin"
   }
 }

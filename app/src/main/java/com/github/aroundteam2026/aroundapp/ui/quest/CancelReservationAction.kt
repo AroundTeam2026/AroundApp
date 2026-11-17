@@ -24,8 +24,8 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
-import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /** The disabled action uses half-opacity muted text in both Figma themes. */
 private const val OFFLINE_LABEL_ALPHA = 0.5f
@@ -53,6 +53,8 @@ enum class CancelStatus {
  *   progress.
  * @param horizontalAlignment Where the button and the error sit across the width.
  * @param leave Whether [onCancel] leaves the party rather than cancelling the reservation.
+ * @param showOfflineHint Whether the hint shows above the button while [offline]; off for a screen
+ *   that already shows it at the top, as the quest details do.
  */
 @Composable
 internal fun CancelReservationAction(
@@ -62,6 +64,7 @@ internal fun CancelReservationAction(
     offline: Boolean,
     horizontalAlignment: Alignment.Horizontal = Alignment.End,
     leave: Boolean = false,
+    showOfflineHint: Boolean = true,
 ) {
   val colors = MaterialTheme.colorScheme
   val texts = if (leave) LEAVE_TEXTS else CANCEL_TEXTS
@@ -74,11 +77,7 @@ internal fun CancelReservationAction(
       horizontalAlignment = horizontalAlignment,
   ) {
     if (needsConnection) {
-      OfflineHint(
-          message =
-              if (leave) R.string.offline_leave_needs_connection
-              else R.string.offline_cancel_needs_connection,
-      )
+      if (showOfflineHint) OfflineHint(message = texts.offline)
     } else if (status == CancelStatus.FAILED) {
       Text(
           stringResource(texts.failed),
@@ -116,23 +115,20 @@ internal fun CancelReservationAction(
     AlertDialog(
         onDismissRequest = { asking = false },
         confirmButton = {
-          TextButton(
+          AroundTextButton(
               onClick = {
                 asking = false
                 onCancel()
               },
-              colors = ButtonDefaults.textButtonColors(contentColor = colors.error),
+              contentColor = colors.error,
               modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_CONFIRM),
           ) {
             Text(stringResource(texts.confirm))
           }
         },
         dismissButton = {
-          TextButton(
+          AroundTextButton(
               onClick = { asking = false },
-              // The default primary colour is unreadable on the dark background
-              colors =
-                  ButtonDefaults.textButtonColors(contentColor = AroundTheme.colors.accentText),
               modifier = Modifier.testTag(C.Tag.CANCEL_RESERVATION_KEEP),
           ) {
             Text(stringResource(texts.keep))
@@ -145,7 +141,18 @@ internal fun CancelReservationAction(
   }
 }
 
-/** The strings of a [CancelReservationAction], but its "Try again": its button and its dialog. */
+/**
+ * The caption of the offline hint that says cancelling, or with [leave] leaving the party, needs a
+ * connection.
+ */
+@StringRes
+internal fun offlineCancelHint(leave: Boolean): Int =
+    (if (leave) LEAVE_TEXTS else CANCEL_TEXTS).offline
+
+/**
+ * The strings of a [CancelReservationAction], but its "Try again": its button, its dialog and its
+ * offline hint.
+ */
 private class ActionTexts(
     @StringRes val label: Int,
     @StringRes val running: Int,
@@ -154,6 +161,7 @@ private class ActionTexts(
     @StringRes val text: Int,
     @StringRes val confirm: Int,
     @StringRes val keep: Int,
+    @StringRes val offline: Int,
 )
 
 private val CANCEL_TEXTS =
@@ -165,6 +173,7 @@ private val CANCEL_TEXTS =
         R.string.cancel_reservation_text,
         R.string.cancel_reservation_confirm,
         R.string.cancel_reservation_keep,
+        R.string.offline_cancel_needs_connection,
     )
 
 private val LEAVE_TEXTS =
@@ -176,4 +185,5 @@ private val LEAVE_TEXTS =
         R.string.leave_party_text,
         R.string.leave_party_confirm,
         R.string.leave_party_stay,
+        R.string.offline_leave_needs_connection,
     )

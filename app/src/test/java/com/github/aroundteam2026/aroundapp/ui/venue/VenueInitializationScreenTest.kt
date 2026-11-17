@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
@@ -91,6 +92,24 @@ class VenueInitializationScreenTest {
     val image = field.captureToImage()
     // Inside the left border, halfway down
     assertEquals(expected, image.toPixelMap()[1, image.height / 2])
+  }
+
+  @Test
+  fun editingShowsItsOwnTitle() {
+    compose.setContent {
+      AroundAppTheme {
+        VenueInitializationContent(
+            VenueInitializationUiState(businessName = "Café", hasVenue = true, editing = true),
+            onNameChange = {},
+            onSubmit = {},
+            onBack = {},
+        )
+      }
+    }
+
+    compose.onNodeWithText("Edit your venue").assertIsDisplayed()
+    compose.onNodeWithText("Set up your venue").assertDoesNotExist()
+    compose.onNodeWithText("Save and continue").assertIsDisplayed()
   }
 
   @Test
@@ -243,6 +262,8 @@ class VenueInitializationScreenTest {
         radiusMeters: Int,
         address: String?,
     ) = delegate.setArea(venueId, location, radiusMeters, address)
+
+    override suspend fun setName(venueId: String, name: String) = delegate.setName(venueId, name)
 
     override suspend fun getVenue(venueId: String) = delegate.getVenue(venueId)
 

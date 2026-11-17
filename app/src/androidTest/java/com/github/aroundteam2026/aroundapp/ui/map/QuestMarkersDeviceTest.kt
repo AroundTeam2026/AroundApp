@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.LocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -73,6 +74,7 @@ class QuestMarkersDeviceTest {
           },
           FakeQuestRepository(initialQuests = listOf(cafe, bar, geneva)),
           FakeVenueRepository(venues.values.toList()),
+          FakeConnectivityRepository(),
       )
   private val camera = CameraPositionState()
   // Written on the main thread, read on the test thread
@@ -91,7 +93,7 @@ class QuestMarkersDeviceTest {
         MapScreen(
             viewModel,
             camera,
-            onOpenVenue = { id, name -> opened += id to name },
+            onFocusQuest = { id, questId -> opened += id to questId },
             onOpenQuest = { _, _ -> },
         )
       }
@@ -193,7 +195,8 @@ class QuestMarkersDeviceTest {
     tapCard(cafe)
 
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { opened.isNotEmpty() }
-    assertEquals(listOf("cafe" to "Café Zürich"), opened)
+    // The card passes its quest, which the venue page scrolls to
+    assertEquals(listOf("cafe" to cafe.id), opened)
   }
 
   @Test

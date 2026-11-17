@@ -16,7 +16,9 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -31,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.venue.venueProfileFactoryOnFakes
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -75,6 +78,7 @@ class VenueEntryNavigationTest {
             createQuestFactory = createQuestFactoryOnFakes(),
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
             dashboardFactory = venueDashboardFactoryOnFakes(),
+            venueProfileFactory = venueProfileFactoryOnFakes(),
             start = start,
         )
       }
@@ -209,6 +213,46 @@ class VenueEntryNavigationTest {
   /**
    * The real home's sign-out callback must reach the session gate and dispose protected content.
    */
+  private fun openEditDetails() {
+    runBlocking { venues.createVenue(testVenue(id = "venue-owner", name = "Cafe")).getOrThrow() }
+    launch(start = VenueEntryStart.Home)
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_TAB).performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_EDIT).performClick()
+    compose.onNodeWithText("Edit your venue").assertIsDisplayed()
+  }
+
+  /**
+   * "Edit details" reopens setup's two steps: the renamed venue goes on to its area, back from the
+   * area returns to the name, and saving the area returns to the Profile tab.
+   */
+  @Test
+  fun editDetailsRenamesThenOpensTheAreaAndReturnsToTheProfile() {
+    openEditDetails()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextClearance()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput("Café Lumière")
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose.onNodeWithTag("location").assertTextEquals("venue-owner")
+    assertEquals("Café Lumière", runBlocking { venues.getVenue("venue-owner")?.name })
+
+    compose.onNodeWithTag("location-back").performClick()
+    compose.onNodeWithText("Edit your venue").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose.onNodeWithTag("location").performClick()
+
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_SCREEN).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_EDIT).assertIsDisplayed()
+  }
+
+  // Unlike right after sign-up, back from editing returns to the profile instead of signing out
+  @Test
+  fun backFromEditDetailsReturnsToTheProfileWithoutSigningOut() {
+    openEditDetails()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_BACK).performClick()
+
+    compose.onNodeWithTag(C.Tag.VENUE_PROFILE_EDIT).assertIsDisplayed()
+    assertEquals("venue-owner", auth.currentUserId.value)
+  }
+
   @Test
   fun realVenueHomeSignOutDisposesTheVenueGraph() {
     compose.setContent {
@@ -222,6 +266,7 @@ class VenueEntryNavigationTest {
                   createQuestFactory = createQuestFactoryOnFakes(),
                   venueQuestsFactory = venueQuestsFactoryOnFakes(),
                   dashboardFactory = venueDashboardFactoryOnFakes(),
+                  venueProfileFactory = venueProfileFactoryOnFakes(),
                   locationScreen = { uid, onSaved, _ ->
                     Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
                   },
@@ -262,6 +307,7 @@ class VenueEntryNavigationTest {
             createQuestFactory = viewModelFactory { initializer { form } },
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
             dashboardFactory = venueDashboardFactoryOnFakes(),
+            venueProfileFactory = venueProfileFactoryOnFakes(),
         )
       }
     }

@@ -292,14 +292,26 @@ class OverviewQuestRowTest {
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
   }
 
+  // A member who cancelled here would cancel the reservation for the whole party
+  @Test
+  fun aMemberSeesLeavePartyAndLeavingAsksFirst() {
+    showCancellable(row = row().copy(leave = true))
+
+    cancelButton().assert(hasText("Leave party")).performClick()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
+
+    assertEquals(1, cancels)
+  }
+
   private var cancels = 0
 
-  /** Shows the card with its cancel button, cancelling as [status] says. */
-  private fun showCancellable(status: CancelStatus = CancelStatus.NONE) {
+  /** Shows the card of [row] with its cancel button, cancelling as [status] says. */
+  private fun showCancellable(status: CancelStatus = CancelStatus.NONE, row: OverviewRow = row()) {
     compose.setContent {
       AroundAppTheme {
         OverviewQuestRow(
-            row(),
+            row,
             onClick = { clicks++ },
             clock = CLOCK,
             cancelStatus = status,

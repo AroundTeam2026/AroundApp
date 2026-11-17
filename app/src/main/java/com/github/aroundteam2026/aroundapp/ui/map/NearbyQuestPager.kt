@@ -47,6 +47,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptQuestButton
+import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptStatus
 import kotlinx.coroutines.launch
 
 /** The most dots the pager shows; past that, they slide along with the shown page. */
@@ -57,8 +59,8 @@ private const val MAX_DOTS = 5
 private val AVATAR_SIZE = 60.dp
 private val LINE_SPACING = 3.dp
 private val TITLE_SPACING = 2.dp
-private val BUTTON_HEIGHT = 52.dp
-private val CHEVRON_SIZE = 20.dp
+private val PIN_SIZE = 52.dp
+private val ICON_SIZE = 20.dp
 private val SMALL_BUTTON_SIZE = 36.dp
 private val DOT_SIZE = 6.dp
 private val SHOWN_DOT_WIDTH = 18.dp
@@ -67,8 +69,9 @@ private val SHOWN_DOT_WIDTH = 18.dp
  * The quests near the explorer, one per page in the order of [quests], with a counter and up to
  * five dots marking the shown page.
  *
- * Tapping a page opens its quest's details; the pin under it shows the quest on the map instead.
- * The explorer swipes or uses the arrows either side of the dots, which wrap around. When [quests]
+ * Tapping a page opens its quest's details; under it, the pin shows the quest on the map instead,
+ * and with [acceptState], "Accept quest" accepts it as the bar of its venue's page does. The
+ * explorer swipes or uses the arrows either side of the dots, which wrap around. When [quests]
  * change, the shown quest stays shown wherever it moved; if it is gone, the one now in its place
  * shows, or the last one when the list got shorter, and quests arriving after it emptied start from
  * the first. Without [locationOn], a hint asks for the location, which orders the quests closest
@@ -85,6 +88,8 @@ private val SHOWN_DOT_WIDTH = 18.dp
  *   place of the order.
  * @param onFiltersChange Called with the filters the explorer picks. The filter button, which opens
  *   and closes the filters under the header, shows only when given.
+ * @param acceptState Where accepting each quest stands. "Accept quest" shows only when given.
+ * @param onAccept Called with a page's quest when the explorer taps its "Accept quest".
  */
 @Composable
 fun NearbyQuestPager(
@@ -97,6 +102,8 @@ fun NearbyQuestPager(
     onClose: (() -> Unit)? = null,
     filters: NearbyFilters = NearbyFilters(),
     onFiltersChange: ((NearbyFilters) -> Unit)? = null,
+    acceptState: NearbyAcceptUiState? = null,
+    onAccept: (NearbyQuest) -> Unit = {},
 ) {
   // Saved, so the filters stay open over rotation; they close with the pager
   var filtersOpen by rememberSaveable { mutableStateOf(false) }
@@ -122,7 +129,18 @@ fun NearbyQuestPager(
           style = AroundTextStyles.BodyMedium,
       )
     } else {
-      Pages(quests, locationOn, summary, header, onOpenQuest, onShowOnMap, style)
+      Pages(quests, locationOn, summary, header) { quest ->
+        QuestPage(
+            quest,
+            style,
+            onOpen = { onOpenQuest(quest) },
+            onShowOnMap = { onShowOnMap(quest) },
+            accept =
+                acceptState?.let { state ->
+                  Accept(state.statusOf(quest.questId), state.available) { onAccept(quest) }
+                },
+        )
+      }
     }
   }
 }
@@ -208,8 +226,9 @@ private fun Header(
 }
 
 /**
- * The [header] with its counter, the pages of [quests], their dots and the arrows. Composed only
- * while there are quests, so quests arriving after an empty list start again from the first.
+ * The [header] with its counter, the pages of [quests], each drawn by [page], their dots and the
+ * arrows. Composed only while there are quests, so quests arriving after an empty list start again
+ * from the first.
  *
  * @param summary The filters in words, which the counter names in place of the order, or null.
  */
@@ -219,9 +238,7 @@ private fun Pages(
     locationOn: Boolean,
     summary: String?,
     header: @Composable (counter: String) -> Unit,
-    onOpenQuest: (NearbyQuest) -> Unit,
-    onShowOnMap: (NearbyQuest) -> Unit,
-    style: MarkerStyle,
+    page: @Composable (NearbyQuest) -> Unit,
 ) {
   val pagerState = rememberPagerState { quests.size }
   // For a frame after the list shrinks, the pager's page can still be past its end
@@ -238,9 +255,8 @@ private fun Pages(
       pagerState,
       Modifier.testTag(C.Tag.NEARBY_PAGES).fillMaxWidth(),
       key = { quests[it].questId },
-  ) { page ->
-    val quest = quests[page]
-    QuestPage(quest, style, onOpen = { onOpenQuest(quest) }, onShowOnMap = { onShowOnMap(quest) })
+  ) {
+    page(quests[it])
   }
   Navigation(pagerState, shown)
 }
@@ -258,9 +274,15 @@ private fun LocationHint(locationOn: Boolean) {
 }
 
 /**
+ * A quest's "Accept quest": where accepting it [status] stands, whether it [enabled], and what a
+ * tap does.
+ */
+private class Accept(val status: AcceptStatus, val enabled: Boolean, val onAccept: () -> Unit)
+
+/**
  * One quest's page: its venue's avatar, then its title, its venue's name and its chips, which open
  * the quest's details when tapped, as the chevron at the end says. Under them, its pin shows the
- * quest on the map.
+ * quest on the map, beside "Accept quest" when [accept] is given.
  */
 @Composable
 private fun QuestPage(
@@ -268,6 +290,7 @@ private fun QuestPage(
     style: MarkerStyle,
     onOpen: () -> Unit,
     onShowOnMap: () -> Unit,
+    accept: Accept?,
 ) {
   val colors = style.colors
   Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.SectionGap)) {
@@ -312,18 +335,33 @@ private fun QuestPage(
       Icon(
           painterResource(R.drawable.ic_chevron_right),
           contentDescription = null,
-          Modifier.size(CHEVRON_SIZE),
+          Modifier.size(ICON_SIZE),
           tint = colors.onSurfaceVariant,
       )
     }
-    RoundButton(
-        R.drawable.ic_address_pin,
-        R.string.map_nearby_show_on_map,
-        BUTTON_HEIGHT,
-        CHEVRON_SIZE,
-        Modifier.testTag(C.Tag.NEARBY_SHOW_ON_MAP),
-        onClick = onShowOnMap,
-    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      RoundButton(
+          R.drawable.ic_address_pin,
+          R.string.map_nearby_show_on_map,
+          PIN_SIZE,
+          ICON_SIZE,
+          Modifier.testTag(C.Tag.NEARBY_SHOW_ON_MAP),
+          onClick = onShowOnMap,
+      )
+      accept?.let {
+        AcceptQuestButton(
+            it.status,
+            it.enabled,
+            it.onAccept,
+            Modifier.weight(1f),
+            tag = C.Tag.NEARBY_ACCEPT,
+            acceptedLabel = R.string.accept_quest_accepted_short,
+        )
+      }
+    }
   }
 }
 
@@ -368,7 +406,7 @@ private fun Navigation(pagerState: PagerState, shown: Int) {
         R.drawable.ic_chevron_left,
         R.string.map_nearby_previous,
         SMALL_BUTTON_SIZE,
-        CHEVRON_SIZE,
+        ICON_SIZE,
         enabled = count > 1,
     ) {
       pageBy(-1)
@@ -378,7 +416,7 @@ private fun Navigation(pagerState: PagerState, shown: Int) {
         R.drawable.ic_chevron_right,
         R.string.map_nearby_next,
         SMALL_BUTTON_SIZE,
-        CHEVRON_SIZE,
+        ICON_SIZE,
         enabled = count > 1,
     ) {
       pageBy(1)

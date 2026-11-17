@@ -290,6 +290,50 @@ class VenueRepositoryFirestoreTest {
     assertEquals(original, ownerRepository.getVenue(readerUid))
   }
 
+  /** Bug: setName writes fields other than the name, or ignores its argument. */
+  @Test
+  fun setName_replacesOnlyTheName() = withTimeoutBlocking {
+    val original = venue(ownerUid).copy(address = "Place 1")
+    ownerRepository.createVenue(original).getOrThrow()
+
+    ownerRepository.setName(ownerUid, "Café Lumière").getOrThrow()
+
+    assertEquals(original.copy(name = "Café Lumière"), readerRepository.getVenue(ownerUid))
+  }
+
+  /** Bug: setName on a missing venue creates a partial one, or does not report the failure. */
+  @Test
+  fun setName_forAMissingVenue_failsWithoutCreatingIt() = withTimeoutBlocking {
+    val result = ownerRepository.setName(ownerUid, "Café Lumière")
+
+    assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    assertFalse(storedVenue(ownerUid).exists())
+  }
+
+  /** Bug: setName renames another account's venue, or an exception escapes instead of a failure. */
+  @Test
+  fun setName_onAnotherAccountsVenue_failsWithPermissionDeniedAndKeepsIt() = withTimeoutBlocking {
+    val original = venue(readerUid)
+    readerRepository.createVenue(original).getOrThrow()
+
+    val result = ownerRepository.setName(readerUid, "Café Lumière")
+
+    assertPermissionDenied(result)
+    assertEquals(original, ownerRepository.getVenue(readerUid))
+  }
+
+  /** The repository leaves the length to the ViewModel, so the rules are what keep it at 100. */
+  @Test
+  fun setName_overTheRulesLimit_failsWithPermissionDeniedAndKeepsTheName() = withTimeoutBlocking {
+    val original = venue(ownerUid)
+    ownerRepository.createVenue(original).getOrThrow()
+
+    val result = ownerRepository.setName(ownerUid, "x".repeat(101))
+
+    assertPermissionDenied(result)
+    assertEquals(original, readerRepository.getVenue(ownerUid))
+  }
+
   /** The venue document [id] as the server stores it, read by the reader. */
   private suspend fun storedVenue(id: String) =
       readerDb.collection(VENUES).document(id).get(Source.SERVER).await()

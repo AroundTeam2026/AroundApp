@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.Context
@@ -9,11 +10,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
@@ -45,7 +48,7 @@ class VenueDashboardScreenTest {
   private var retries = 0
   private val opened = mutableListOf<String>()
 
-  private fun show(state: VenueDashboardUiState) {
+  private fun show(state: VenueDashboardUiState, showOfflineBanner: Boolean = false) {
     compose.setContent {
       AroundAppTheme {
         VenueDashboardContent(
@@ -55,6 +58,7 @@ class VenueDashboardScreenTest {
             onRetry = { retries++ },
             onOpenProof = { opened += it },
             clock = CLOCK,
+            showOfflineBanner = showOfflineBanner,
         )
       }
     }
@@ -74,6 +78,53 @@ class VenueDashboardScreenTest {
           activeQuestsCount = 4,
           proofsToReview = proofs,
       )
+
+  @Test
+  fun offlineBannerAppearsBelowTheDashboardHeader() {
+    show(loaded(), showOfflineBanner = true)
+
+    val headerBottom =
+        compose.onNodeWithTag(C.Tag.DASHBOARD_VENUE).getUnclippedBoundsInRoot().bottom
+    val bannerTop = compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).getUnclippedBoundsInRoot().top
+    assertTrue(bannerTop >= headerBottom)
+  }
+
+  // Offline at a cold start is when the dashboard is stuck loading, so the banner explains why
+  @Test
+  fun offlineBannerShowsOverTheSpinnerWhileLoading() {
+    show(VenueDashboardUiState(), showOfflineBanner = true)
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_LOADING).assertIsDisplayed()
+  }
+
+  @Test
+  fun offlineBannerShowsOverTryAgainWhenLoadingFailed() {
+    show(VenueDashboardUiState(status = VenueDashboardStatus.FAILED), showOfflineBanner = true)
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_RETRY).assertIsDisplayed()
+  }
+
+  // Approve and Decline are off offline, so the banner must still say why further down the list
+  @Test
+  fun offlineBannerStaysInViewWhenTheListScrolls() {
+    show(loaded(upcoming = (1..20).map { pending("r$it") }), showOfflineBanner = true)
+
+    scrollTo("${C.Tag.DASHBOARD_ROW}_r20")
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_VENUE).assertDoesNotExist()
+  }
+
+  // One offline card, not two: the answer hint takes the banner's place while there is one
+  @Test
+  fun offlineWithAnswersToGiveTheHintReplacesTheBanner() {
+    show(loaded(needsAnswer = listOf(pending("a"))).copy(offline = true), showOfflineBanner = true)
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    compose.onNodeWithText(string(R.string.offline_answer_needs_connection)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertDoesNotExist()
+  }
 
   private fun string(id: Int, vararg args: Any) =
       ApplicationProvider.getApplicationContext<Context>().getString(id, *args)
@@ -261,6 +312,23 @@ class VenueDashboardScreenTest {
     compose.onNodeWithTag(C.Tag.DASHBOARD_PROOFS).assertIsDisplayed()
     proofRow("p").assertIsDisplayed()
     assertTrue(top(C.Tag.DASHBOARD_PROOFS) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
+  }
+
+  @Test
+  fun theOfflinePreviewShowsTheHintAboveTheRowsAndDisablesTheButtons() {
+    compose.setContent { VenueDashboardOfflinePreview() }
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    assertTrue(top(C.Tag.OFFLINE_HINT) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
+    inRow("a", C.Tag.DASHBOARD_ROW_APPROVE).assertIsNotEnabled()
+    inRow("a", C.Tag.DASHBOARD_ROW_DECLINE).assertIsNotEnabled()
+  }
+
+  @Test
+  fun offlineWithNothingToAnswerShowsNoHint() {
+    show(loaded(upcoming = listOf(pending("u").copy(approved = true))).copy(offline = true))
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
   }
 
   /** Where the node tagged [tag] starts, from the top of the screen. */
