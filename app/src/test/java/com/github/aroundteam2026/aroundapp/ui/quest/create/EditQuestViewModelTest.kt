@@ -321,6 +321,7 @@ class EditQuestViewModelTest {
   @Test
   fun aQuestWithoutReservationsHasNoActiveOnes() {
     open()
+    assertFalse(state.proofTypeLocked)
     assertFalse(state.hasActiveReservations)
   }
 

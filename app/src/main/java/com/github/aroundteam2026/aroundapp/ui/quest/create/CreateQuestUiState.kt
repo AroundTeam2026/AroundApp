@@ -99,7 +99,7 @@ internal fun shownQuestTextError(value: String, maxLength: Int, touched: Boolean
  * @property partySizeLocked Whether the party size can't change, as the quest being edited has
  *   pending reservations.
  * @property proofTypeLocked Whether the proof type can't change, as the quest being edited has
- *   reservations explorers made for it.
+ *   reservations explorers made for it; also true until its reservations are read.
  * @property hasActiveReservations Whether the quest being edited is known to have pending or
  *   approved reservations, so explorers will see the edits; false until its reservations are read.
  */

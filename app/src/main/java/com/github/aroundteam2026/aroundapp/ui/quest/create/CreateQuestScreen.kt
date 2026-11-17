@@ -212,6 +212,7 @@ private fun ReservedBanner() {
           .padding(AroundSpacing.Medium)
           .testTag(C.Tag.CREATE_QUEST_RESERVED_BANNER),
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
+      verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(
         painterResource(R.drawable.ic_info_filled),
