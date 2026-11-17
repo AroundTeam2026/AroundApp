@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 class ProofPhotosTest {
   private val app = ApplicationProvider.getApplicationContext<Application>()
   private val photos = ProofPhotos(app, Dispatchers.Unconfined)
-  private val folder = File(app.cacheDir, "proofs").apply { mkdirs() }
+  private val folder = File(app.filesDir, "proofs").apply { mkdirs() }
 
   private fun shrink(source: Uri, with: ProofPhotos = photos) = runBlocking { with.shrink(source) }
 
@@ -120,6 +120,21 @@ class ProofPhotosTest {
   }
 
   // Deleting touches the disk, so it mustn't run on the screen's thread
+  // App storage isn't cleared for the app, so the copies an old visit left behind are deleted
+  @Test
+  fun discardStaleDeletesOldPhotosAndKeepsRecentOnes() {
+    val now = 100L * ProofPhotos.STALE_AFTER_MILLIS
+    val old = File(folder, "proof-old.jpg").apply { writeText("photo") }
+    val recent = File(folder, "camera-recent.jpg").apply { writeText("photo") }
+    old.setLastModified(now - ProofPhotos.STALE_AFTER_MILLIS - 1)
+    recent.setLastModified(now - ProofPhotos.STALE_AFTER_MILLIS)
+
+    assertEquals(1, runBlocking { photos.discardStale(now) })
+
+    assertFalse(old.exists())
+    assertTrue(recent.exists())
+  }
+
   @Test
   fun discardDeletesOnItsIoDispatcher() {
     val io = RecordingDispatcher()

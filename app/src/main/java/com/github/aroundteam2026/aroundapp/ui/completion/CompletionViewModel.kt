@@ -59,7 +59,8 @@ import kotlinx.coroutines.launch
  * already uploaded stays in storage. If loading the reservation fails, it is
  * [CompletionFormStatus.FAILED] until [onRetry]; if listening to completions fails, it stays
  * usable, as the repository refuses to replace an approved one. A photo is uploaded through
- * [proofPhotoRepository] first, and not again when only the submit failed.
+ * [proofPhotoRepository] first, and not again when only the submit failed. Once its proof is saved,
+ * the app's copy of the photo is deleted with [discardPhoto], `ProofPhotos.discard` in the app.
  */
 class CompletionViewModel(
     private val reservationId: String,
@@ -71,6 +72,7 @@ class CompletionViewModel(
     private val completionRepository: CompletionRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
     connectivityRepository: ConnectivityRepository,
+    private val discardPhoto: suspend (Uri) -> Boolean = { false },
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(CompletionUiState())
   /** What the completion screen shows now; the screen observes it. */
@@ -140,7 +142,11 @@ class CompletionViewModel(
         proofOf(form)
             ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
             ?.fold(
-                { SaveState.Saved(it) },
+                { completionId ->
+                  // The photo is uploaded and its proof saved: the app's copy isn't needed anymore
+                  form.photo?.let { discardPhoto(it) }
+                  SaveState.Saved(completionId)
+                },
                 {
                   Log.w(TAG, "Submitting the completion of $reservationId failed", it)
                   SaveState.Failed
@@ -312,6 +318,7 @@ class CompletionViewModel(
                 CompletionRepositoryProvider.repository,
                 ProofPhotoRepositoryProvider.repository(app),
                 ConnectivityRepositoryProvider.repository(app),
+                ProofPhotos(app)::discard,
             )
           }
         }

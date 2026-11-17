@@ -169,11 +169,9 @@ class ProfileSetupScreenTest {
     return Uri.fromFile(file)
   }
 
-  /**
-   * The shrunk copies ProofPhotos keeps in its cache folder ("proofs") until they are discarded.
-   */
+  /** The shrunk copies ProofPhotos keeps in its folder ("proofs") until they are discarded. */
   private fun preparedCopies(): List<File> =
-      File(compose.activity.cacheDir, "proofs").listFiles()?.toList().orEmpty()
+      File(compose.activity.filesDir, "proofs").listFiles()?.toList().orEmpty()
 
   /** Whether the avatar's centre is mostly red, as the test photo is, rather than the fallback. */
   private fun SemanticsNodeInteraction.showsRed(): Boolean {
