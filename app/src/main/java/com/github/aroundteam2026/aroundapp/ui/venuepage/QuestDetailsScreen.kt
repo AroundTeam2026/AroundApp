@@ -64,14 +64,18 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.overview.slotFormat
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
+import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
 import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
+import com.github.aroundteam2026.aroundapp.ui.quest.offlineCancelHint
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -98,6 +102,9 @@ import java.util.Date
  * @param onCancel Cancels the quest's reservation, or leaves its party, once confirmed.
  * @param clock Tells the time zone the reward's expiry is written in.
  * @param onSubmitProof Opens the proof form of the approved reservation with the given id.
+ * @param showOfflineBanner Shows the offline banner under the top bar, as the shell says the device
+ *   is offline. Offline with a reservation to cancel, that slot says instead that cancelling, or
+ *   leaving the party, needs a connection, so the explorer sees one offline card, not two.
  */
 @Composable
 fun QuestDetailsScreen(
@@ -109,6 +116,7 @@ fun QuestDetailsScreen(
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
     onSubmitProof: (reservationId: String) -> Unit = {},
+    showOfflineBanner: Boolean = false,
 ) {
   BackHandler(onBack = onBack)
   Column(
@@ -118,6 +126,7 @@ fun QuestDetailsScreen(
           .testTag(C.Tag.QUEST_DETAIL_SCREEN)
   ) {
     VenuePageTopBar(onBack, R.string.quest_detail_title)
+    OfflineCard(state, showOfflineBanner)
     Column(
         Modifier.weight(1f)
             .fillMaxWidth()
@@ -153,17 +162,38 @@ fun QuestDetailsScreen(
           state.cancelStatus,
           state.venueName,
           onCancel,
-          offline = false,
+          offline = state.offline,
           horizontalAlignment = Alignment.CenterHorizontally,
-          leave = state.leavesParty,
+          leave = state.leavesParty == true,
+          // The card under the top bar already says why
+          showOfflineHint = false,
       )
     }
     QuestActionBar(
         state,
         onAccept,
         onSubmitProof,
-        footer = cancelAction.takeIf { state.cancellableReservationId != null },
+        // Without the explorer's membership, neither cancelling nor leaving is known to be safe
+        footer = cancelAction.takeIf { state.leavesParty != null },
     )
+  }
+}
+
+/**
+ * The one offline card under the top bar, as in Figma: offline with a reservation to cancel, the
+ * hint that cancelling it needs a connection; else, with [showOfflineBanner], the app-wide banner.
+ */
+@Composable
+private fun OfflineCard(state: VenuePageUiState, showOfflineBanner: Boolean) {
+  val modifier =
+      Modifier.padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.Medium)
+  // Null without a reservation to cancel or leave, as then there's no button to explain
+  val leave = state.leavesParty
+  val cancelBlocked =
+      state.offline && leave != null && state.cancelStatus != CancelStatus.CANCELLING
+  when {
+    cancelBlocked -> OfflineHint(offlineCancelHint(leave == true), modifier)
+    showOfflineBanner -> OfflineBanner(modifier)
   }
 }
 

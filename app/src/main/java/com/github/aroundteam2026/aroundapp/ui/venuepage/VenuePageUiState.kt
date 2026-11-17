@@ -32,6 +32,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   its list, since the explorer never saw that list. Null otherwise.
  * @property arrivalMissed The page was to arrive at a quest it doesn't list, such as one whose
  *   reward expired, and shows its list instead; true until the page has said so once.
+ * @property focusQuestId Id of the quest the page scrolls to as it arrives, as from a card on the
+ *   map, until it has; null otherwise.
  * @property pickBeforeDetails What closing the details picks: the pick from before they opened, or
  *   their quest once the explorer accepted it. Null while they are closed.
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
@@ -55,8 +57,11 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property partyCodes The party codes of the reservations the explorer created and friends can
  *   still join, by reservation id.
  * @property partyMembers The joined members of the explorer's parties here, by reservation id.
- * @property joinedPartyIds Ids of the reservations whose party the explorer joined rather than
- *   created, known as soon as the parties are read.
+ * @property leavesParties Whether the explorer joined the party of each reservation rather than
+ *   created it, by reservation id, known as soon as the parties are read. A reservation whose party
+ *   doesn't list the explorer as joined isn't in it.
+ * @property offline Whether the device is offline, so cancelling, which needs a connection, is
+ *   unavailable.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -69,6 +74,7 @@ data class VenuePageUiState(
     val detailQuestId: String? = null,
     val arrivalQuestId: String? = null,
     val arrivalMissed: Boolean = false,
+    val focusQuestId: String? = null,
     val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
     val reservationIds: Map<String, String> = emptyMap(),
@@ -83,7 +89,8 @@ data class VenuePageUiState(
     val proofsAvailable: Boolean = true,
     val partyCodes: Map<String, String> = emptyMap(),
     val partyMembers: Map<String, List<PartyMemberUi>> = emptyMap(),
-    val joinedPartyIds: Set<String> = emptySet(),
+    val leavesParties: Map<String, Boolean> = emptyMap(),
+    val offline: Boolean = false,
 ) {
   /** The picked quest, or null when none is picked or it is no longer in [quests]. */
   val selectedQuest: VenuePageQuest?
@@ -121,10 +128,11 @@ data class VenuePageUiState(
   /**
    * Whether the explorer leaves the party of [cancellableReservationId] rather than cancelling it,
    * since someone else made it. The rules would let any joined member cancel it, but the app only
-   * lets its creator, so a member can't cancel everyone's reservation.
+   * lets its creator, so a member can't cancel everyone's reservation. Null without such a
+   * reservation, or when the explorer's membership isn't found, so neither is known to be safe.
    */
-  val leavesParty: Boolean
-    get() = cancellableReservationId in joinedPartyIds
+  val leavesParty: Boolean?
+    get() = cancellableReservationId?.let(leavesParties::get)
 
   /**
    * The reservation whose quest the explorer can complete, for the picked quest: the one they can
@@ -194,6 +202,7 @@ data class VenuePageUiState(
         selectedQuestId = pick.ifListed(),
         detailQuestId = detailQuestId.ifListed(),
         arrivalQuestId = arrivalQuestId.takeIf { !detailsClosed },
+        focusQuestId = focusQuestId.ifListed(),
         pickBeforeDetails = pickBeforeDetails.ifListed().takeIf { !detailsClosed },
     )
   }
@@ -210,6 +219,18 @@ data class VenuePageUiState(
         status != VenuePageStatus.LOADED -> this
         quests.none { it.questId == questId } -> copy(arrivalMissed = true)
         else -> withQuestDetails(questId).copy(arrivalQuestId = questId)
+      }
+
+  /**
+   * This page arriving at the quest [questId] in its list, as from a card on the map: picked, and
+   * the [focusQuestId] the list scrolls to. A quest it doesn't list, or a page that isn't loaded,
+   * changes nothing, leaving the list at its top.
+   */
+  fun focusingOn(questId: String): VenuePageUiState =
+      if (status == VenuePageStatus.LOADED && quests.any { it.questId == questId }) {
+        copy(selectedQuestId = questId, focusQuestId = questId)
+      } else {
+        this
       }
 
   /** Whether closing the open details leaves the page, since it arrived at them. */

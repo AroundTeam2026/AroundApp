@@ -21,6 +21,15 @@ object VenueOnboardingRoutes {
 
   /** The route to the location step of the venue [venueId], encoded so any id fits. */
   fun location(venueId: String): String = "venue_location/${android.net.Uri.encode(venueId)}"
+
+  /** The same two steps, opened from "Edit details" on the venue's Profile tab. */
+  const val EDIT = "venue_edit"
+  const val EDIT_LOCATION = "venue_edit_location/{venueId}"
+}
+
+/** Opens the venue's details for editing, from "Edit details" on its Profile tab. */
+fun NavHostController.navigateToVenueEdit() {
+  navigate(VenueOnboardingRoutes.EDIT) { launchSingleTop = true }
 }
 
 /** Called by the auth screen after a successful Venue sign-up. */
@@ -35,29 +44,36 @@ fun NavHostController.navigateToVenueInitialization() {
  * Initialization is scoped to its back-stack entry, so its name and saved venue survive Back from
  * location. Returning to it does not immediately navigate forward again. Pass null for
  * [initializationOnBack] when initialization is the graph root, so system Back leaves the flow.
+ * With [editing], the same steps edit an existing venue from its profile, on their own routes.
  */
 fun NavGraphBuilder.venueOnboardingDestinations(
     navController: NavHostController,
     authRepository: AuthRepository,
     venueRepository: VenueRepository,
     initializationOnBack: (() -> Unit)? = { navController.popBackStack() },
+    editing: Boolean = false,
     locationScreen: @Composable (venueId: String, onBack: () -> Unit) -> Unit,
 ) {
-  composable(VenueOnboardingRoutes.INITIALIZATION) { entry ->
+  val start = if (editing) VenueOnboardingRoutes.EDIT else VenueOnboardingRoutes.INITIALIZATION
+  val location =
+      if (editing) VenueOnboardingRoutes.EDIT_LOCATION else VenueOnboardingRoutes.LOCATION
+  composable(start) { entry ->
     val initializationViewModel =
         viewModel<VenueInitializationViewModel>(viewModelStoreOwner = entry) {
-          VenueInitializationViewModel(authRepository, venueRepository)
+          VenueInitializationViewModel(authRepository, venueRepository, editing = editing)
         }
     VenueInitializationScreen(
         viewModel = initializationViewModel,
         onBack = initializationOnBack,
         onContinueToLocation = { venueId ->
-          navController.navigate(VenueOnboardingRoutes.location(venueId)) { launchSingleTop = true }
+          navController.navigate(location.replace("{venueId}", android.net.Uri.encode(venueId))) {
+            launchSingleTop = true
+          }
         },
     )
   }
   composable(
-      VenueOnboardingRoutes.LOCATION,
+      location,
       arguments = listOf(navArgument("venueId") { type = NavType.StringType }),
   ) { entry ->
     locationScreen(requireNotNull(entry.arguments?.getString("venueId"))) {

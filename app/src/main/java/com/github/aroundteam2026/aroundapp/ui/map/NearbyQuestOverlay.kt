@@ -105,6 +105,8 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * @param onClose Called when the explorer closes the overlay.
  * @param filters The filters [quests] already passed.
  * @param onFiltersChange Called with the filters the explorer picks in the pager.
+ * @param acceptState Where accepting each quest stands; "Accept quest" shows only when given.
+ * @param onAccept Called with a page's quest when the explorer taps its "Accept quest".
  * @param modifier Places the overlay; the map puts it along its bottom edge, and the overlay keeps
  *   its own margin inside it.
  */
@@ -118,6 +120,8 @@ fun NearbyQuestOverlay(
     filters: NearbyFilters,
     onFiltersChange: (NearbyFilters) -> Unit,
     modifier: Modifier = Modifier,
+    acceptState: NearbyAcceptUiState? = null,
+    onAccept: (NearbyQuest) -> Unit = {},
 ) {
   val colors = MaterialTheme.colorScheme
   val closingFling = with(LocalDensity.current) { CLOSING_FLING.toPx() }
@@ -174,6 +178,8 @@ fun NearbyQuestOverlay(
         onClose = onClose,
         filters = filters,
         onFiltersChange = onFiltersChange,
+        acceptState = acceptState,
+        onAccept = onAccept,
     )
   }
 }

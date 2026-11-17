@@ -6,6 +6,8 @@ package com.github.aroundteam2026.aroundapp.ui.completion
 import android.net.Uri
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -29,6 +31,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservati
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
@@ -40,6 +43,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -90,6 +94,8 @@ class CompletionViewModelTest {
   private var photoRepository: ProofPhotoRepository = photos
   private var venues = FakeVenueRepository(listOf(testVenue(id = CAFE)))
   private val locations = FakeLocationRepository(VENUE_LOCATION)
+  private val connectivity = FakeConnectivityRepository()
+  private var connectivityRepository: ConnectivityRepository = connectivity
 
   private val viewModel by lazy {
     CompletionViewModel(
@@ -101,6 +107,7 @@ class CompletionViewModelTest {
         locations,
         completions,
         photoRepository,
+        connectivityRepository,
     )
   }
 
@@ -139,6 +146,12 @@ class CompletionViewModelTest {
   }
 
   private suspend fun stored() = fakeCompletions.observeForReservation(reservationId).first()
+
+  private fun TestScope.waitForOfflineState() {
+    runCurrent()
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    runCurrent()
+  }
 
   /** Where the fake stores the [upload]th photo of the reservation. */
   private fun location(upload: Int) = "gs://fake-bucket/proofs/$reservationId/photo-$upload"
@@ -553,6 +566,112 @@ class CompletionViewModelTest {
     runCurrent()
 
     assertEquals(0, completions.calls)
+  }
+
+  @Test
+  fun offlinePhotoCanBeSubmittedAfterReconnect() = test {
+    connectivity.online.value = false
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    waitForOfflineState()
+
+    assertFalse(state.canSubmit)
+    viewModel.submit()
+    runCurrent()
+    assertTrue(photos.uploads.isEmpty())
+    assertEquals(0, completions.calls)
+
+    connectivity.online.value = true
+    runCurrent()
+    assertTrue(state.canSubmit)
+    viewModel.submit()
+    runCurrent()
+    assertEquals(Proof.Photo(location(1)), stored().single().proof)
+  }
+
+  @Test
+  fun writtenProofCanBeSubmittedOfflineAndRemainsEnabledAfterReconnect() = test {
+    connectivity.online.value = false
+    open("fox")
+    viewModel.updateAnswer("Mochi")
+    waitForOfflineState()
+    assertTrue(state.offline)
+    assertTrue(state.canSubmit)
+
+    connectivity.online.value = true
+    runCurrent()
+    assertTrue(state.canSubmit)
+
+    connectivity.online.value = false
+    waitForOfflineState()
+    viewModel.submit()
+    runCurrent()
+    assertEquals(Proof.Text("Mochi"), stored().single().proof)
+  }
+
+  @Test
+  fun losingConnectivityWhileCheckingLocationStopsThePhotoUpload() = test {
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+
+    viewModel.submit()
+    runCurrent()
+    assertEquals(SaveState.Saving, state.saveState)
+    connectivity.online.value = false
+    waitForOfflineState()
+    gate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Idle, state.saveState)
+    assertEquals(PHOTO, state.photo)
+    assertTrue(photos.uploads.isEmpty())
+    assertEquals(0, completions.calls)
+  }
+
+  @Test
+  fun briefNetworkHandoverDuringLocationCheckDoesNotAbortThePhoto() = test {
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
+    viewModel.submit()
+    runCurrent()
+
+    connectivity.online.value = false
+    runCurrent()
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
+    assertFalse(state.offline)
+    connectivity.online.value = true
+    runCurrent()
+    gate.complete(Unit)
+    runCurrent()
+
+    assertEquals(Proof.Photo(location(1)), stored().single().proof)
+  }
+
+  @Test
+  fun aFailedConnectivityObserverDoesNotLeaveThePhotoBlocked() = test {
+    val fail = CompletableDeferred<Unit>()
+    connectivityRepository =
+        object : ConnectivityRepository {
+          override val isOnline = flow {
+            emit(false)
+            fail.await()
+            throw IOException("Connectivity observer failed")
+          }
+        }
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    waitForOfflineState()
+    assertFalse(state.canSubmit)
+
+    fail.complete(Unit)
+    runCurrent()
+
+    assertTrue(state.canSubmit)
+    viewModel.submit()
+    runCurrent()
+    assertEquals(Proof.Photo(location(1)), stored().single().proof)
   }
 
   @Test

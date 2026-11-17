@@ -11,6 +11,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
@@ -75,6 +77,10 @@ import kotlinx.coroutines.flow.update
  * through an [AnswerSaver]; a failure sets [VenueDashboardUiState.updateFailed] until
  * [clearUpdateError]. A pending reservation whose party doesn't have its quest's size has an
  * [ApproveBlock], and [approve] ignores it. Proofs are reviewed on their own screen.
+ *
+ * Approving and declining are Firestore transactions, which fail offline: while
+ * [connectivityRepository] says the device is offline, [VenueDashboardUiState.offline] is set and
+ * [approve] and [decline] do nothing.
  */
 class VenueDashboardViewModel(
     authRepository: AuthRepository,
@@ -85,6 +91,7 @@ class VenueDashboardViewModel(
     private val completionRepository: CompletionRepository,
     private val userRepository: UserRepository,
     private val pictureRepository: UserPictureRepository,
+    connectivityRepository: ConnectivityRepository,
     private val decode: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
 ) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listeners, even for the same venue. */
@@ -105,11 +112,13 @@ class VenueDashboardViewModel(
                     if (venueId == null) flowOf(VenueDashboardUiState()) else listen(venueId)
                   },
               answers.state,
-          ) { listened, answers ->
+              connectivityRepository.isOnline.distinctUntilChanged(),
+          ) { listened, answers, online ->
             val pending = listened.needsAnswer.mapTo(HashSet()) { it.reservationId }
             listened.copy(
                 savingIds = answers.savingAmong(pending),
                 updateFailed = answers.failed,
+                offline = !online,
             )
           }
           .stateIn(
@@ -142,12 +151,14 @@ class VenueDashboardViewModel(
   /**
    * Moves the reservation [reservationId] to [status], saved by [answers]: a double tap saves once,
    * it stays saving until the listener shows it is no longer pending, and a failure sets
-   * [VenueDashboardUiState.updateFailed].
+   * [VenueDashboardUiState.updateFailed]. Does nothing offline, where the transaction would fail.
    */
-  private fun answer(reservationId: String, status: ReservationStatus) =
-      answers.answer(reservationId, "reservation $reservationId with $status") {
-        reservationRepository.updateStatus(reservationId, status)
-      }
+  private fun answer(reservationId: String, status: ReservationStatus) {
+    if (uiState.value.offline) return
+    answers.answer(reservationId, "reservation $reservationId with $status") {
+      reservationRepository.updateStatus(reservationId, status)
+    }
+  }
 
   /**
    * The dashboard of the venue [venueId], from the venue, its reservations, their parties and the
@@ -225,6 +236,7 @@ class VenueDashboardViewModel(
     /** Builds the [VenueDashboardViewModel] of the signed-in venue with the app's repositories. */
     fun factory(): ViewModelProvider.Factory = viewModelFactory {
       initializer {
+        val application = this[APPLICATION_KEY]!!
         VenueDashboardViewModel(
             AuthRepositoryProvider.repository,
             ReservationRepositoryProvider.repository,
@@ -233,7 +245,8 @@ class VenueDashboardViewModel(
             PartyRepositoryProvider.repository,
             CompletionRepositoryProvider.repository,
             UserRepositoryProvider.repository,
-            UserPictureRepositoryProvider.repository(this[APPLICATION_KEY]!!),
+            UserPictureRepositoryProvider.repository(application),
+            ConnectivityRepositoryProvider.repository(application),
         )
       }
     }

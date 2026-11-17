@@ -31,6 +31,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   shown by the listener yet; their buttons are disabled meanwhile.
  * @property updateFailed Whether the last approve or decline failed. The screen shows it once, then
  *   calls [VenueDashboardViewModel.clearUpdateError].
+ * @property offline Whether the device is offline. Approving and declining are Firestore
+ *   transactions, which fail offline, so their buttons are disabled and a hint says why.
  */
 data class VenueDashboardUiState(
     val status: VenueDashboardStatus = VenueDashboardStatus.LOADING,
@@ -43,6 +45,7 @@ data class VenueDashboardUiState(
     val rejectedProofs: List<DashboardProof> = emptyList(),
     val savingIds: Set<String> = emptySet(),
     val updateFailed: Boolean = false,
+    val offline: Boolean = false,
 ) {
   /** How many reservations wait for the venue's answer. */
   val pendingCount: Int
@@ -58,6 +61,10 @@ data class VenueDashboardUiState(
             upcoming.isEmpty() &&
             proofsToReview.isEmpty() &&
             rejectedProofs.isEmpty()
+
+  /** Whether to show the offline hint: offline, with reservations waiting for an answer. */
+  val showsOfflineHint: Boolean
+    get() = offline && needsAnswer.isNotEmpty()
 }
 
 /**

@@ -73,8 +73,8 @@ import java.util.TimeZone
  * One accepted quest in the overview, as the Figma card `Overview/Quest card` (after the active
  * quest card of F3): where the reservation stands and its slot, then the venue's avatar, the
  * quest's title, the venue's name and address, the party size and the reward chip. Tapping it opens
- * the venue's page. With [onCancel], it ends with a button to cancel the reservation, and with
- * [onSendNewProof], with one to send a new proof.
+ * the venue's page. With [onCancel], it ends with a button to cancel the reservation, or to leave
+ * the party on an [OverviewRow.leave] row, and with [onSendNewProof], with one to send a new proof.
  *
  * @param row The accepted quest to draw.
  * @param onClick Opens the venue's page, or null for a card that can't be tapped.
@@ -172,7 +172,13 @@ fun OverviewQuestRow(
     }
     if (onSendNewProof != null) NewProofButton(onSendNewProof)
     if (onCancel != null) {
-      CancelReservationAction(cancelStatus, row.venueName, onCancel, offline)
+      CancelReservationAction(
+          cancelStatus,
+          row.venueName,
+          onCancel,
+          offline,
+          leave = row.leave == true,
+      )
     }
   }
 }

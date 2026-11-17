@@ -66,3 +66,23 @@ fun List<PartyMember>.creatorFirst(reservation: Reservation?): List<PartyMember>
  * find a membership with one read and an explorer can't join a party twice.
  */
 fun partyMemberId(reservationId: String, uid: String) = "${reservationId}_$uid"
+
+/**
+ * Whether [explorerUid] leaves the party of each of the [reservations] rather than cancelling it,
+ * by reservation id: true when they joined someone else's party, false when they created it, as
+ * their memberships in [parties] tell. A reservation whose party doesn't list them as joined isn't
+ * in it, since then neither is known to be safe: cancelling would end it for everyone.
+ */
+fun leavesPartiesOf(
+    reservations: List<Reservation>,
+    parties: Map<String, List<PartyMember>>,
+    explorerUid: String,
+): Map<String, Boolean> =
+    reservations
+        .mapNotNull { reservation ->
+          parties[reservation.id]
+              .orEmpty()
+              .find { it.uid == explorerUid && it.isJoined }
+              ?.let { reservation.id to !it.createdParty(reservation) }
+        }
+        .toMap()

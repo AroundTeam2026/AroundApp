@@ -58,6 +58,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.SaveState
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
@@ -124,6 +125,7 @@ fun CompletionContent(
 ) {
   val saving = state.saveState == SaveState.Saving
   val saved = state.saveState is SaveState.Saved
+  val showOfflineHint = state.isEditable && state.photoBlockedOffline
   Scaffold(
       modifier = modifier.testTag(C.Tag.COMPLETION_SCREEN).imePadding(),
       containerColor = MaterialTheme.colorScheme.background,
@@ -211,6 +213,7 @@ fun CompletionContent(
         CompletionFormStatus.UNAVAILABLE ->
             CompletionMessage(stringResource(R.string.completion_unavailable))
         CompletionFormStatus.READY -> {
+          if (showOfflineHint) OfflineHint(message = R.string.offline_photo_needs_connection)
           Row(
               horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
               verticalAlignment = Alignment.CenterVertically,
@@ -332,6 +335,7 @@ fun CompletionContent(
           }
           if (
               state.saveState == SaveState.Failed &&
+                  !showOfflineHint &&
                   state.locationError == null &&
                   !preciseLocationRefused
           ) {

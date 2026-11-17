@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -25,13 +26,18 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -67,12 +73,15 @@ class MapScreenNearbyTest {
                   testVenue(id = "bar", name = "Bar Nocturne"),
               )
           ),
+          FakeConnectivityRepository(),
       )
 
   /** Shows the map; unless [locationOn], the explorer refuses the location permission. */
   private fun show(
       locationOn: Boolean = false,
+      showOfflineBanner: Boolean = false,
       onOpenQuest: (venueId: String, questId: String) -> Unit = { _, _ -> },
+      acceptViewModel: NearbyAcceptViewModel? = null,
   ) {
     if (locationOn) {
       shadowOf(ApplicationProvider.getApplicationContext<Application>())
@@ -82,13 +91,51 @@ class MapScreenNearbyTest {
         PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
     composeTestRule.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
-        MapScreen(viewModel, onOpenVenue = { _, _ -> }, onOpenQuest = onOpenQuest)
+        MapScreen(
+            viewModel,
+            onFocusQuest = { _, _ -> },
+            onOpenQuest = onOpenQuest,
+            acceptViewModel = acceptViewModel,
+            showOfflineBanner = showOfflineBanner,
+        )
       }
     }
     composeTestRule.waitForIdle()
   }
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
+
+  // The shell leaves the Map's banner to the screen, so the screen must show it by default offline
+  @Test
+  fun theMapShowsTheBannerWhileTheShellSaysItIsOffline() {
+    val dialog =
+        PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+    composeTestRule.setContent {
+      CompositionLocalProvider(
+          LocalActivityResultRegistryOwner provides dialog,
+          LocalShowOfflineBanner provides true,
+      ) {
+        MapScreen(viewModel, onFocusQuest = { _, _ -> }, onOpenQuest = { _, _ -> })
+      }
+    }
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+  }
+
+  // As in Figma, the offline banner comes first in the map's top column, above the location banner
+  // that shows here since the permission is refused
+  @Test
+  fun offlineBannerComesFirstAtTheTopOfTheMap() {
+    show(showOfflineBanner = true)
+
+    val mapTop = node(C.Tag.MAP).getBoundsInRoot().top
+    val banner = node(C.Tag.OFFLINE_BANNER).getBoundsInRoot()
+    val locationTop = node(C.Tag.LOCATION_BANNER).getBoundsInRoot().top
+    assertTrue(banner.top >= mapTop)
+    assertTrue(banner.bottom <= locationTop)
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+  }
 
   private fun openNearby() {
     node(C.Tag.NEARBY_BUTTON).performClick()
@@ -163,6 +210,32 @@ class MapScreenNearbyTest {
 
     assertEquals(listOf("bar" to "bar-1"), opened)
     // Back from the details finds the quests where the explorer left them
+    node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+  }
+
+  @Test
+  fun withoutAnAcceptViewModelThePagesOfferNoAccept() {
+    show()
+    openNearby()
+
+    node(C.Tag.NEARBY_ACCEPT).assertDoesNotExist()
+  }
+
+  @Test
+  fun acceptOnAPageBooksItsQuestAndSaysItIsAccepted() {
+    val reservations = FakeReservationRepository({ 0L })
+    val accept = NearbyAcceptViewModel(reservations, testUsers(EXPLORER), EXPLORER)
+    show(acceptViewModel = accept)
+    openNearby()
+
+    composeTestRule.onNodeWithTag(C.Tag.NEARBY_ACCEPT).performClick()
+    composeTestRule.waitUntil { accept.uiState.value.statusOf("bar-1") == AcceptStatus.ACCEPTED }
+
+    // Without the location the quests go by venue name, so the first page is the bar's
+    composeTestRule
+        .onNodeWithTag(C.Tag.NEARBY_ACCEPT)
+        .assertTextEquals(context.getString(R.string.accept_quest_accepted_short))
+    // The quests stay open, so the explorer can go on to the next one
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
   }
 
@@ -300,5 +373,9 @@ class MapScreenNearbyTest {
         18.dp,
         node(C.Tag.NEARBY_COUNTER).getBoundsInRoot().left - overlay.left,
     )
+  }
+
+  private companion object {
+    const val EXPLORER = "explorer"
   }
 }

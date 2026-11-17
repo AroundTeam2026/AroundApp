@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.res.Configuration
@@ -48,6 +49,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
+import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
@@ -68,8 +72,12 @@ import kotlinx.coroutines.launch
  * today's date, the pending and active quests counts, then the proofs to review, the reservations
  * that need an answer, the approved ones and the proofs the venue rejected, as `M2 · Dashboard ·
  * rejected proofs`. Approve and Decline answer a pending reservation: its buttons are disabled
- * while the answer is saved, and a failed answer shows a snackbar once. Tapping a proof, to review
- * or rejected, calls [onOpenProof] with its completion's id.
+ * while the answer is saved, and a failed answer shows a snackbar once. Offline, both buttons are
+ * disabled. Tapping a proof, to review or rejected, calls [onOpenProof] with its completion's id.
+ * With [showOfflineBanner], by default while the shell says the device is offline, the offline
+ * banner sits under the header and stays at the top while the list scrolls. While reservations wait
+ * for an answer offline, that slot says instead that Approve and Decline need a connection, so the
+ * venue sees one offline card, not two.
  *
  * Figma's "Today" count is left out: reservations have no visit time yet (see
  * [VenueDashboardUiState]).
@@ -79,6 +87,7 @@ fun VenueDashboardScreen(
     viewModel: VenueDashboardViewModel,
     modifier: Modifier = Modifier,
     onOpenProof: (String) -> Unit = {},
+    showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -100,6 +109,7 @@ fun VenueDashboardScreen(
       onRetry = viewModel::retry,
       modifier = modifier,
       onOpenProof = onOpenProof,
+      showOfflineBanner = showOfflineBanner,
       snackbarHostState = snackbarHostState,
   )
 }
@@ -119,6 +129,7 @@ internal fun VenueDashboardContent(
     onOpenProof: (String) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     clock: Clock = Clock.systemDefaultZone(),
+    showOfflineBanner: Boolean = false,
 ) {
   Box(
       modifier
@@ -134,7 +145,11 @@ internal fun VenueDashboardContent(
       VenueDashboardStatus.LOADING ->
           CircularProgressIndicator(Modifier.testTag(C.Tag.DASHBOARD_LOADING))
       VenueDashboardStatus.FAILED -> LoadFailed(onRetry)
-      VenueDashboardStatus.LOADED -> Dashboard(state, onApprove, onDecline, onOpenProof, clock)
+      VenueDashboardStatus.LOADED ->
+          Dashboard(state, onApprove, onDecline, onOpenProof, clock, showOfflineBanner)
+    }
+    if (showOfflineBanner && state.status != VenueDashboardStatus.LOADED) {
+      OfflineBanner(Modifier.align(Alignment.TopCenter).padding(AroundSpacing.ScreenHorizontal))
     }
     SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
   }
@@ -148,6 +163,7 @@ private fun Dashboard(
     onDecline: (String) -> Unit,
     onOpenProof: (String) -> Unit,
     clock: Clock,
+    showOfflineBanner: Boolean,
 ) {
   // Many pending requests would push "Upcoming" far down, so only the first few show at first
   var showAllPending by rememberSaveable { mutableStateOf(false) }
@@ -159,6 +175,16 @@ private fun Dashboard(
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
     item { Header(state.venueName, state.avatar, clock) }
+    if (showOfflineBanner || state.showsOfflineHint) {
+      // Sticky, so the venue still sees why Approve and Decline are off after scrolling down
+      stickyHeader {
+        Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+          // One card: the answer hint replaces the app-wide banner rather than stacking under it
+          if (state.showsOfflineHint) OfflineHint(R.string.offline_answer_needs_connection)
+          else OfflineBanner()
+        }
+      }
+    }
     item { Summary(state, Modifier.padding(top = AroundSpacing.ExtraSmall)) }
     if (state.isEmpty) {
       item { NoReservations() }
@@ -172,7 +198,7 @@ private fun Dashboard(
         DashboardProofRow(it, onOpen = { onOpenProof(it.completionId) }, clock = clock)
       }
       section(R.string.dashboard_needs_answer, state.needsAnswer.size, C.Tag.DASHBOARD_NEEDS_ANSWER)
-      reservations(pending, state.savingIds, onApprove, onDecline, clock)
+      reservations(pending, state.savingIds, state.offline, onApprove, onDecline, clock)
       if (pending.size < state.needsAnswer.size) {
         item {
           TextButton(
@@ -188,7 +214,7 @@ private fun Dashboard(
         }
       }
       section(R.string.dashboard_upcoming, state.upcoming.size, C.Tag.DASHBOARD_UPCOMING)
-      reservations(state.upcoming, state.savingIds, onApprove, onDecline, clock)
+      reservations(state.upcoming, state.savingIds, state.offline, onApprove, onDecline, clock)
       // Nothing left to do there, so its count is grey rather than purple
       section(
           R.string.dashboard_rejected_proofs,
@@ -313,10 +339,14 @@ private fun LazyListScope.section(
   }
 }
 
-/** The rows of [reservations]; those in [savingIds] have their buttons disabled. */
+/**
+ * The rows of [reservations]; those in [savingIds] have their buttons disabled, and all of them
+ * while [offline].
+ */
 private fun LazyListScope.reservations(
     reservations: List<DashboardReservation>,
     savingIds: Set<String>,
+    offline: Boolean,
     onApprove: (String) -> Unit,
     onDecline: (String) -> Unit,
     clock: Clock,
@@ -327,6 +357,7 @@ private fun LazyListScope.reservations(
         onDecline = { onDecline(it.reservationId) },
         onApprove = { onApprove(it.reservationId) },
         saving = it.reservationId in savingIds,
+        offline = offline,
         clock = clock,
     )
   }
@@ -435,6 +466,37 @@ internal fun VenueDashboardPreview() {
                         sentAt = now - 2 * DateUtils.MINUTE_IN_MILLIS,
                     )
                 ),
+        ),
+        onApprove = {},
+        onDecline = {},
+        onRetry = {},
+    )
+  }
+}
+
+// Internal, not private, so a test can draw it
+@Preview(name = "Offline, light")
+@Preview(name = "Offline, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+internal fun VenueDashboardOfflinePreview() {
+  AroundAppTheme {
+    VenueDashboardContent(
+        VenueDashboardUiState(
+            status = VenueDashboardStatus.LOADED,
+            venueName = "Café Lumière",
+            avatar = VenueAvatar.Initials("CL"),
+            needsAnswer =
+                listOf(
+                    DashboardReservation(
+                        reservationId = "a",
+                        questTitle = "Find the hidden fox",
+                        explorerName = "Yusuf S.",
+                        partySize = 3,
+                        requestedAt = System.currentTimeMillis(),
+                        approved = false,
+                    )
+                ),
+            offline = true,
         ),
         onApprove = {},
         onDecline = {},

@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -73,6 +74,9 @@ class VenueDashboardViewModelTest {
 
   private val completions = FakeCompletionRepository { createdAt }
 
+  /** Whether the device is online; tests take it offline. */
+  private val connectivity = FakeConnectivityRepository()
+
   /** The explorers' profiles, which name the party's members. */
   private val users = FakeUserRepository()
 
@@ -98,6 +102,7 @@ class VenueDashboardViewModelTest {
         completions,
         users,
         FakeUserPictureRepository(),
+        connectivity,
     )
   }
 
@@ -582,6 +587,7 @@ class VenueDashboardViewModelTest {
             failing,
             users,
             FakeUserPictureRepository(),
+            connectivity,
         )
     backgroundScope.launch { failingViewModel.uiState.collect {} }
 
@@ -708,6 +714,63 @@ class VenueDashboardViewModelTest {
 
     // Nothing on the dashboard blocks it, so the repository answers, here with "missing"
     assertEquals(1, gated.calls)
+  }
+
+  @Test
+  fun goingOfflineDisablesAnsweringAndComingBackEnablesIt() = test {
+    reserve()
+    watch()
+    assertFalse(state.offline)
+    assertFalse(state.showsOfflineHint)
+
+    connectivity.online.value = false
+    assertTrue(state.offline)
+    assertTrue(state.showsOfflineHint)
+
+    connectivity.online.value = true
+    assertFalse(state.offline)
+    assertFalse(state.showsOfflineHint)
+  }
+
+  @Test
+  fun approvingOrDecliningOfflineSavesNothing() = test {
+    val id = reserve()
+    watch()
+    connectivity.online.value = false
+
+    viewModel.approve(id)
+    viewModel.decline(id)
+
+    assertEquals(0, gated.calls)
+    assertTrue(state.savingIds.isEmpty())
+    assertFalse(state.updateFailed)
+    assertEquals(listOf(id), ids(state.needsAnswer))
+  }
+
+  @Test
+  fun approvingWorksAgainOnceBackOnline() = test {
+    val id = reserve()
+    watch()
+    connectivity.online.value = false
+    viewModel.approve(id)
+
+    connectivity.online.value = true
+    viewModel.approve(id)
+
+    assertEquals(1, gated.calls)
+    assertEquals(ReservationStatus.APPROVED, gated.lastStatus)
+    assertEquals(listOf(id), ids(state.upcoming))
+  }
+
+  @Test
+  fun offlineWithNothingToAnswerShowsNoHint() = test {
+    reserve(status = ReservationStatus.APPROVED)
+    watch()
+
+    connectivity.online.value = false
+
+    assertTrue(state.offline)
+    assertFalse(state.showsOfflineHint)
   }
 
   @Test

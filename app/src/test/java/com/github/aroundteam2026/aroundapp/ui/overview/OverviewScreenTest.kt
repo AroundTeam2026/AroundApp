@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.app.Application
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -40,6 +42,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,7 +62,7 @@ class OverviewScreenTest {
   private val cancelled = mutableListOf<String>()
   private val newProofs = mutableListOf<Pair<String, String>>()
 
-  private fun show(state: OverviewUiState) {
+  private fun show(state: OverviewUiState, showOfflineBanner: Boolean = false) {
     compose.setContent {
       AroundAppTheme {
         OverviewContent(
@@ -72,6 +75,7 @@ class OverviewScreenTest {
               newProofs += reservationId to venueName
             },
             clock = CLOCK,
+            showOfflineBanner = showOfflineBanner,
         )
       }
     }
@@ -79,6 +83,15 @@ class OverviewScreenTest {
 
   private fun loaded(vararg rows: OverviewRow) =
       OverviewUiState(OverviewStatus.LOADED, rows.toList())
+
+  @Test
+  fun offlineBannerAppearsBelowTheQuestsTitle() {
+    show(loaded(), showOfflineBanner = true)
+
+    val titleBottom = compose.onNodeWithTag(C.Tag.OVERVIEW_TITLE).getUnclippedBoundsInRoot().bottom
+    val bannerTop = compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).getUnclippedBoundsInRoot().top
+    assertTrue(bannerTop >= titleBottom)
+  }
 
   @Test
   fun everyStateOfTheOverviewOffersJoiningAParty() {
@@ -178,6 +191,15 @@ class OverviewScreenTest {
 
     cancelButtonOf("approved").assertExists()
     listOf("sent", "completed", "rejected").forEach { cancelButtonOf(it).assertDoesNotExist() }
+  }
+
+  // Without the explorer's membership, neither cancelling nor leaving is known to be safe
+  @Test
+  fun aCardWhoseLeaveIsUnknownCannotBeCancelled() {
+    show(loaded(row(id = "known"), row(id = "unknown").copy(leave = null)))
+
+    cancelButtonOf("known").assertExists()
+    cancelButtonOf("unknown").assertDoesNotExist()
   }
 
   // Until the venue approves a proof, the party can send a new one, as in the Figma frame
