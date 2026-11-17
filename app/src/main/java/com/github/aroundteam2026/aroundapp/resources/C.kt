@@ -218,7 +218,7 @@ object C {
     const val CREATE_QUEST_REQUIREMENTS_ERROR = "create_quest_requirements_error"
     const val CREATE_QUEST_PROOF_PHOTO = "create_quest_proof_photo"
     const val CREATE_QUEST_PROOF_TEXT = "create_quest_proof_text"
-    const val CREATE_QUEST_EXPLORER_PREVIEW = "create_quest_explorer_preview"
+    const val CREATE_QUEST_RESERVED_BANNER = "create_quest_reserved_banner"
     const val CREATE_QUEST_RADIUS = "create_quest_radius"
     /** Followed by `_` and the preset's meters, e.g. `create_quest_radius_preset_50`. */
     const val CREATE_QUEST_RADIUS_PRESET = "create_quest_radius_preset"
@@ -309,6 +309,7 @@ object C {
     const val CREATE_QUEST_REWARD_ITEM = "create_quest_reward_item"
     const val CREATE_QUEST_REWARD_ITEM_COUNTER = "create_quest_reward_item_counter"
     const val CREATE_QUEST_REWARD_ITEM_ERROR = "create_quest_reward_item_error"
+    const val CREATE_QUEST_REWARD_ITEM_PREVIEW = "create_quest_reward_item_preview"
     const val CREATE_QUEST_REWARD_SPECIFICS = "create_quest_reward_specifics"
     const val CREATE_QUEST_REWARD_SPECIFICS_COUNTER = "create_quest_reward_specifics_counter"
     const val CREATE_QUEST_REWARD_SPECIFICS_ERROR = "create_quest_reward_specifics_error"

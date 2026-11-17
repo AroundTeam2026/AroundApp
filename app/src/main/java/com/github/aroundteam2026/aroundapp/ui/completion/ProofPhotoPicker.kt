@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.TakePicture
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -69,6 +70,8 @@ fun ProofPhotoPicker(
   var shrinking by remember { mutableStateOf(false) }
   // The file the camera app writes into, kept in case the activity is recreated while it's open
   var cameraTarget by rememberSaveable { mutableStateOf<String?>(null) }
+  // App storage is never cleared for us, so delete the photos left behind when the picker opens
+  LaunchedEffect(photos) { photos.discardStale() }
 
   val usePhoto: (Uri) -> Unit = { source ->
     shrinking = true

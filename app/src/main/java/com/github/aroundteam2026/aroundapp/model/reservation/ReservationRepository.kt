@@ -5,6 +5,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
 import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
+import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
 import kotlinx.coroutines.flow.Flow
 
@@ -81,9 +82,12 @@ interface ReservationRepository {
    * Moves a reservation to [status], changing nothing else.
    *
    * The security rules let the venue that owns the reservation make any change while it is pending,
-   * and a joined member of the party only cancel it (E21). The Firestore implementation therefore
-   * fails when an explorer asks for any other status, even though the fake allows it. The rules
-   * also refuse to approve a party without the size its quest asks for ([meetsPartySize]).
+   * and the explorer who created it only cancel it (E21), until the party sends its proof. The
+   * other members of the party can't cancel it: they leave the party through
+   * [PartyRepository.withdraw] instead (#536). The Firestore implementation therefore fails when an
+   * explorer asks for any other status, or when a member who isn't the creator cancels, even though
+   * the fake allows both. The rules also refuse to approve a party without the size its quest asks
+   * for ([meetsPartySize]).
    *
    * @param id id of the reservation.
    * @param status the new status; the change must be allowed by [canTransition].

@@ -177,8 +177,8 @@ data class VenuePageUiState(
 
   /**
    * How many more people the picked quest needs: its minimum party size less the party's size,
-   * never below 0. Until the quest is accepted the party is the explorer alone. 0 when none is
-   * picked.
+   * never below 0. Until the quest is accepted it counts the explorer's own seat, though the party
+   * card shows 0 joined then, so the bar says the explorer is included. 0 when none is picked.
    */
   val morePeopleNeeded: Int
     get() {

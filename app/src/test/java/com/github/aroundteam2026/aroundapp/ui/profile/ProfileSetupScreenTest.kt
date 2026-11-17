@@ -169,9 +169,7 @@ class ProfileSetupScreenTest {
     return Uri.fromFile(file)
   }
 
-  /**
-   * The shrunk copies ProofPhotos keeps in its cache folder ("proofs") until they are discarded.
-   */
+  /** The shrunk copies the profile keeps in the cache's "proofs" folder until they're discarded. */
   private fun preparedCopies(): List<File> =
       File(compose.activity.cacheDir, "proofs").listFiles()?.toList().orEmpty()
 

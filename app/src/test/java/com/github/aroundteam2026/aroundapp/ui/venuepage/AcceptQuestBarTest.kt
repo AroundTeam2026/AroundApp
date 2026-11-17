@@ -150,12 +150,12 @@ class AcceptQuestBarTest {
   }
 
   @Test
-  fun aQuestThatNeedsMorePeopleSaysHowManyAndCanStillBeAccepted() {
+  fun beforeAcceptingTheNeedForMorePeopleCountsTheExplorerAndTheQuestCanStillBeAccepted() {
     show(LOADED.copy(selectedQuestId = "b"))
 
     compose
         .onNodeWithTag(C.Tag.ACCEPT_QUEST_NEEDS_MORE)
-        .assertTextContains(plural(R.plurals.accept_quest_needs_more, 2))
+        .assertTextContains(plural(R.plurals.accept_quest_needs_you_and_more, 2))
     button.assertIsEnabled().performClick()
 
     assertEquals(1, accepts)

@@ -24,17 +24,25 @@ import kotlinx.coroutines.withContext
 class ProofPhotoTooBigException : IOException("The proof photo is still too big once shrunk")
 
 /**
- * Prepares proof photos on the phone, under the app's cache: a file the camera app writes a new
- * photo into, a smaller JPEG copy of a taken or picked photo, and a preview to show it.
+ * Prepares proof photos on the phone, in the app's private storage: a file the camera app writes a
+ * new photo into, a smaller JPEG copy of a taken or picked photo, and a preview to show it.
+ *
+ * Unlike the cache, which the system may clear at any time, app storage keeps the copy readable
+ * until its proof is uploaded: while its screen is open for now, and as groundwork for uploading it
+ * later (#413). It is never cleared for the app, so a copy is deleted with [discard] once its proof
+ * is submitted, and [discardStale] deletes the ones left behind. A screen that uploads at once, as
+ * the profile does, passes the cache as [root] instead, which the system clears.
  *
  * The copy keeps uploads under the [PROOF_PHOTO_LIMIT_BYTES] that `storage.rules` allow, and fast
  * on mobile data: a full-resolution photo from the camera or the gallery can be bigger than that.
  *
- * @param context Gives the cache folder and reads the photos.
+ * @param context Reads the photos.
+ * @param root Holds the photos' folder: app storage by default. The FileProvider only shares camera
+ *   targets there, so another [root], such as the cache, is for screens that don't use the camera.
  * @param io Where photos are decoded and written, off the main thread.
  * @param limitBytes A copy of this many bytes or more fails with [ProofPhotoTooBigException].
- * @param share Turns a file of the cache folder into the [Uri] the camera app writes to; the app's
- *   FileProvider unless a test needs a plain file.
+ * @param share Turns a file of the photos' folder into the [Uri] the camera app writes to; the
+ *   app's FileProvider unless a test needs a plain file.
  * @param compress Writes a bitmap as a JPEG and tells whether it could; [Bitmap.compress] unless a
  *   test needs it to fail.
  */
@@ -48,9 +56,10 @@ class ProofPhotos(
     private val compress: (Bitmap, OutputStream) -> Boolean = { bitmap, out ->
       bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
     },
+    private val root: File = context.filesDir,
 ) {
   private val folder: File
-    get() = File(context.cacheDir, FOLDER).apply { mkdirs() }
+    get() = File(root, FOLDER).apply { mkdirs() }
 
   /**
    * A new, empty file for the camera app to write a photo into. Other apps can only write to it
@@ -62,7 +71,7 @@ class ProofPhotos(
    * Writes a JPEG copy of [source] whose longer side is at most [MAX_EDGE] pixels, turned upright
    * if the photo says it was taken on its side. A smaller photo keeps its size.
    *
-   * @return the copy, a `file://` [Uri] in the cache.
+   * @return the copy, a `file://` [Uri] in the app's storage.
    * @throws ProofPhotoTooBigException if the copy is still too big to upload; nothing is written.
    * @throws IOException if [source] can't be read or isn't an image, or the copy can't be
    *   compressed; nothing is written.
@@ -95,7 +104,7 @@ class ProofPhotos(
       withContext(io) { decode(photo, PREVIEW_EDGE).asImageBitmap() }
 
   /**
-   * Deletes [photo] if it is one of this cache's files: a camera target or a shrunk copy. Anything
+   * Deletes [photo] if it is one of this folder's files: a camera target or a shrunk copy. Anything
    * else, such as a photo from the gallery, is left alone. Runs on [io], off the main thread, as
    * deleting touches the disk.
    *
@@ -116,6 +125,20 @@ class ProofPhotos(
           file != null && file.canonicalFile.parentFile == folder.canonicalFile && file.delete()
         } catch (_: IOException) {
           false
+        }
+      }
+
+  /**
+   * Deletes the camera targets and copies last written more than [STALE_AFTER_MILLIS] before [now]:
+   * ones the app was closed on, or that a crash left behind. A photo still being used is younger.
+   * Runs on [io]; a file that can't be deleted is left for next time.
+   *
+   * @return how many files were deleted.
+   */
+  suspend fun discardStale(now: Long = System.currentTimeMillis()): Int =
+      withContext(io) {
+        folder.listFiles().orEmpty().count {
+          now - it.lastModified() > STALE_AFTER_MILLIS && it.delete()
         }
       }
 
@@ -142,6 +165,13 @@ class ProofPhotos(
 
     /** The longest side of the photo shown on screen, in pixels. */
     const val PREVIEW_EDGE = 1024
+
+    /**
+     * How long a camera target or copy is kept before [discardStale] deletes it, 7 days. For now a
+     * proof's photo is only kept while its screen is open, so this only clears what a closed app
+     * left behind; 7 days leave room for a later upload of a proof waiting for a connection (#413).
+     */
+    const val STALE_AFTER_MILLIS = 7L * 24 * 60 * 60 * 1000
 
     private const val JPEG_QUALITY = 85
     private const val FOLDER = "proofs"

@@ -116,6 +116,7 @@ class CompletionScreenFlowTest {
               completions,
               photos,
               connectivity,
+              discardPhoto = { true },
           )
       store.put("completion", viewModel)
     }

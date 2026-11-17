@@ -117,7 +117,8 @@ internal fun ProfileForm(
   val form by model.form.collectAsStateWithLifecycle()
   val profile by model.profile.collectAsStateWithLifecycle()
   val context = LocalContext.current.applicationContext
-  val photos = remember(context) { ProofPhotos(context) }
+  // Uploaded at once, so its copies stay in the cache, which the system clears
+  val photos = remember(context) { ProofPhotos(context, root = context.cacheDir) }
   val scope = rememberCoroutineScope()
   var preparingPhoto by remember { mutableStateOf(false) }
   var photoError by remember { mutableStateOf(false) }
@@ -338,7 +339,8 @@ internal fun ProfileAvatar(
     io: CoroutineDispatcher = Dispatchers.IO,
 ) {
   val context = LocalContext.current.applicationContext
-  val photos = remember(context) { ProofPhotos(context) }
+  // Uploaded at once, so its copies stay in the cache, which the system clears
+  val photos = remember(context) { ProofPhotos(context, root = context.cacheDir) }
   val preview by
       produceState<ImageBitmap?>(null, pictureUrl, photo) {
         value =

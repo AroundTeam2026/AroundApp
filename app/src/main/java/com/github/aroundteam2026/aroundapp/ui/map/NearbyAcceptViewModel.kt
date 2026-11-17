@@ -7,8 +7,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
+import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.bookQuest
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
@@ -51,8 +54,9 @@ data class NearbyAcceptUiState(
  * does.
  *
  * It keeps up with the explorer's reservations: a quest with one that still stands is accepted. A
- * quest being accepted stays so until its reservation shows up, and one whose booking failed shows
- * the failure until it is accepted again. If the reservations can't be read, accepting is
+ * quest being accepted stays so until the server answered and its reservation shows up. One whose
+ * booking failed shows the failure until it is accepted again, and so does one whose reservation
+ * the server refused after the app wrote it. If the reservations can't be read, accepting is
  * unavailable until the map is opened again.
  */
 class NearbyAcceptViewModel(
@@ -65,6 +69,24 @@ class NearbyAcceptViewModel(
   /** Where accepting each nearby quest stands. */
   val uiState: StateFlow<NearbyAcceptUiState> = _uiState.asStateFlow()
 
+  /** The explorer's reservations, as last listed; null until listed. */
+  private var latest: List<Reservation>? = null
+
+  /** The reservations this ViewModel created, to tell which ones the server then refused. */
+  private val writes = RefusedWrites()
+
+  /**
+   * The quests whose reservation is being created and the backend hasn't answered yet. Firestore
+   * lists such a write at once, so it doesn't count as accepted until the booking returns.
+   */
+  private val unconfirmed = mutableSetOf<String>()
+
+  /**
+   * The quests whose booking just failed. Firestore may still list the failed write, as pending, so
+   * the quest doesn't count as accepted until no pending reservation is listed for it.
+   */
+  private val refusing = mutableSetOf<String>()
+
   init {
     // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
     viewModelScope.launch {
@@ -75,15 +97,34 @@ class NearbyAcceptViewModel(
             _uiState.update { state -> state.copy(available = false) }
           }
           .collect { reservations ->
-            val accepted = reservations.filter { it.status.isActive }.map { it.questId }.toSet()
-            _uiState.update {
-              it.copy(
-                  acceptedQuestIds = accepted,
-                  acceptingQuestIds = it.acceptingQuestIds - accepted,
-                  available = true,
-              )
+            latest = reservations
+            // A failed write is over once Firestore no longer lists it as pending; an earlier
+            // reservation of the quest, cancelled and still listed, doesn't keep it
+            refusing.retainAll { quest ->
+              reservations.any { it.questId == quest && it.status == ReservationStatus.PENDING }
             }
+            show()
           }
+    }
+  }
+
+  /**
+   * Shows what the reservations last listed: a quest with one that still stands is accepted, unless
+   * its booking is [unconfirmed] or [refusing]. A reservation the server refused after the app
+   * wrote it shows as failed.
+   */
+  private fun show() {
+    val listed = latest ?: return
+    val refused = writes.refusedIn(listed)
+    val accepted =
+        listed.filter { it.status.isActive }.map { it.questId }.toSet() - unconfirmed - refusing
+    _uiState.update {
+      it.copy(
+          acceptedQuestIds = accepted,
+          acceptingQuestIds = it.acceptingQuestIds - accepted - refused,
+          failedQuestIds = it.failedQuestIds + refused,
+          available = true,
+      )
     }
   }
 
@@ -91,10 +132,6 @@ class NearbyAcceptViewModel(
    * Books [quest] as a pending reservation, with the explorer as its party's first member. Does
    * nothing while accepting is unavailable, or once the quest is accepted or being accepted, so a
    * double tap books once.
-   *
-   * Known limit: a booking the server refuses after the app wrote it only drops out of the accepted
-   * quests, without "Try again". The venue page's bar tells the two apart; the map could do the
-   * same if it needs to.
    */
   fun accept(quest: NearbyQuest) {
     val id = quest.questId
@@ -108,18 +145,28 @@ class NearbyAcceptViewModel(
           failedQuestIds = it.failedQuestIds - id,
       )
     }
+    unconfirmed += id
+    refusing -= id
     viewModelScope.launch {
-      // On success, the quest stays "accepting" until the reservation shows up in the listener
-      reservationRepository
-          .bookQuest(userRepository, explorerUid, id, quest.venueId, clock())
+      val result =
+          reservationRepository.bookQuest(userRepository, explorerUid, id, quest.venueId, clock())
+      unconfirmed -= id
+      result
+          .onSuccess { reservationId ->
+            // The quest stays "accepting" until the reservation shows up in the listener
+            writes.record(reservationId, id)
+            show()
+          }
           .onFailure {
             Log.w(TAG, "Accepting quest $id failed", it)
+            refusing += id
             _uiState.update { state ->
               state.copy(
                   acceptingQuestIds = state.acceptingQuestIds - id,
                   failedQuestIds = state.failedQuestIds + id,
               )
             }
+            show()
           }
     }
   }

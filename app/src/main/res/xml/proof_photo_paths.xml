@@ -2,7 +2,8 @@
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <!-- The only folder the proof photos' FileProvider shares: see ProofPhotos -->
 <paths>
-    <cache-path
+    <!-- App storage, not the cache, so the photo is still there when its proof is uploaded -->
+    <files-path
         name="proofs"
         path="proofs/" />
 </paths>

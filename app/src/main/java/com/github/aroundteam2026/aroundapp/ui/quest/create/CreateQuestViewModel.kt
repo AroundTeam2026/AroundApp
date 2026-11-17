@@ -352,7 +352,8 @@ class CreateQuestViewModel(
 
   /**
    * Locks the party size while quest [id] has pending reservations, and the proof type while it has
-   * active ones, putting back the quest's own. Both stay locked if they can't be read.
+   * active ones, putting back the quest's own. Both stay locked if they can't be read, but the
+   * reserved banner stays hidden, as no active reservation is known.
    */
   private suspend fun watchPendingParties(id: String) {
     val venueId = authRepository.currentUserId.value ?: return
@@ -366,7 +367,12 @@ class CreateQuestViewModel(
           val proofLocked = ofQuest.any { it.status.isActive }
           val quest = editedQuest
           mutableUiState.update {
-            val locked = it.copy(partySizeLocked = partyLocked, proofTypeLocked = proofLocked)
+            val locked =
+                it.copy(
+                    partySizeLocked = partyLocked,
+                    proofTypeLocked = proofLocked,
+                    hasActiveReservations = proofLocked,
+                )
             when {
               quest == null -> locked
               else ->
