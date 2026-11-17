@@ -361,10 +361,11 @@ class QuestDetailsScreenTest {
   }
 
   @Test
-  fun offlineWithNothingToCancelShowsTheAppWideBanner() {
+  fun offlineWithAQuestToAcceptShowsTheBarsHintInsteadOfTheBanner() {
     show(state = state(quest()).copy(offline = true), showOfflineBanner = true)
 
-    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    nodes(C.Tag.OFFLINE_HINT).assertCountEquals(1)
+    node(C.Tag.OFFLINE_BANNER).assertDoesNotExist()
   }
 
   // Without the explorer's membership there is no button, so no hint about it either
