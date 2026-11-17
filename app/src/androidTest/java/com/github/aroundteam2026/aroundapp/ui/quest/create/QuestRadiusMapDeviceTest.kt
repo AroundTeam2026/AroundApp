@@ -140,7 +140,10 @@ class QuestRadiusMapDeviceTest {
         tag,
         {
           composeTestRule.onNodeWithTag(tag).performTouchInput {
-            pinch(center, center, centerLeft, centerRight)
+            // Two fingers spread apart from near the centre, as a user zooms in
+            val near = Offset(width * PINCH_START, 0f)
+            val far = Offset(width * PINCH_END, 0f)
+            pinch(center - near, center - far, center + near, center + far)
           }
         },
         { composeTestRule.runOnUiThread { map.cameraPosition.zoom > framed.zoom } },
@@ -204,6 +207,9 @@ class QuestRadiusMapDeviceTest {
     const val WALK_MINUTES = 3
     const val ZOOM_IN = 2f
     const val OFF_PIN = 0.2f
+    // How far each finger of the pinch is from the centre, as a fraction of the map's width
+    const val PINCH_START = 0.05f
+    const val PINCH_END = 0.4f
     val SPACE_ABOVE = 100.dp
     val SPACE_BELOW = 2000.dp
   }
