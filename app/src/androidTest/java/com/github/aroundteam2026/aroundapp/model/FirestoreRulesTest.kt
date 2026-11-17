@@ -611,7 +611,7 @@ class FirestoreRulesTest {
     assertSucceeds(reservation.update("status", "APPROVED"))
   }
 
-  /** The venue can always say no, and a member can always cancel, whatever the party's size. */
+  /** The venue can always say no, and the creator can always cancel, whatever the party's size. */
   @Test
   fun aPartyBelowTheQuestsSizeIsStillRejectedOrCancelled() {
     val venue = newUser(Role.VENUE)
@@ -693,7 +693,7 @@ class FirestoreRulesTest {
   }
 
   @Test
-  fun joinedMemberCancelsButNeverAnswers() {
+  fun creatorCancelsButNeverAnswers() {
     val venue = newUser(Role.VENUE)
     val explorer = newUser(Role.EXPLORER)
     val pending = pendingReservationOf(explorer, venue)
@@ -715,6 +715,31 @@ class FirestoreRulesTest {
         pending.update(mapOf("status" to "CANCELLED", "slotStart" to Timestamp.now())),
         "the explorer moving the slot while cancelling",
     )
+    assertSucceeds(pending.update("status", "CANCELLED"))
+    assertSucceeds(approved.update("status", "CANCELLED"))
+  }
+
+  /** #536: a member who isn't the creator leaves the party instead of cancelling it for all. */
+  @Test
+  fun onlyTheCreatorCancelsAPendingOrApprovedReservation() {
+    val venue = newUser(Role.VENUE)
+    val explorer = newUser(Role.EXPLORER)
+    val pending = pendingReservationOf(explorer, venue)
+    val approved = pendingReservationOf(explorer, venue)
+    val friend = newUser(Role.EXPLORER)
+    joinAll(pending, friend)
+    joinAll(approved, friend)
+    signInAs(venue)
+    assertSucceeds(approved.update("status", "APPROVED"))
+
+    signInAs(friend)
+    assertDenied(pending.update("status", "CANCELLED"), "a joined member cancelling a pending one")
+    assertDenied(
+        approved.update("status", "CANCELLED"),
+        "a joined member cancelling an approved one",
+    )
+    assertSucceeds(withdraw(pending.id, friend))
+    signInAs(explorer)
     assertSucceeds(pending.update("status", "CANCELLED"))
     assertSucceeds(approved.update("status", "CANCELLED"))
   }
