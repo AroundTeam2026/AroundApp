@@ -5,6 +5,7 @@ package com.github.aroundteam2026.aroundapp.ui.profile
 import android.graphics.Bitmap
 import android.graphics.Color.RED
 import android.net.Uri
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -13,6 +14,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
@@ -22,20 +25,24 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.ByteArrayOutputStream
+import java.time.Duration
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
@@ -45,6 +52,7 @@ class ProfileEditScreenTest {
   private val users = FakeUserRepository()
   // Every uploaded picture is a red square, so the avatar's colour tells it from the placeholder
   private val pictures = FakeUserPictureRepository { redPhoto() }
+  private val connectivity = FakeConnectivityRepository()
 
   private fun redPhoto(): ByteArray {
     val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(RED) }
@@ -74,7 +82,7 @@ class ProfileEditScreenTest {
     runBlocking {
       users.createUser(User("explorer", "Ada", Role.EXPLORER, createdAt, pictureUrl)).getOrThrow()
     }
-    val model = ProfileSetupViewModel("explorer", repository, pictures)
+    val model = ProfileSetupViewModel("explorer", repository, pictures, connectivity)
     compose.setContent { AroundAppTheme { ProfileScreen({}, model, pictures) } }
     compose.waitUntil(5_000) { model.destination.value == ProfileSetupDestination.HOME }
     return model
@@ -87,6 +95,25 @@ class ProfileEditScreenTest {
     compose.onNodeWithText("Ada").assertIsDisplayed()
     compose.onNodeWithText("Explorer · since October 2025").assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_NAME).assertDoesNotExist()
+  }
+
+  @Test
+  fun offlineTheFormShowsTheHintAndCantSaveUntilBackOnline() {
+    launch()
+    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).performClick()
+    val save = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_CONTINUE)
+    save.assertIsEnabled()
+
+    compose.runOnIdle { connectivity.online.value = false }
+    compose.waitForIdle()
+    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(OFFLINE_HINT_DELAY_MS))
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    compose.onNodeWithText("Saving your profile needs a connection.").assertIsDisplayed()
+    save.assertIsNotEnabled()
+
+    compose.runOnIdle { connectivity.online.value = true }
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+    save.assertIsEnabled()
   }
 
   @Test

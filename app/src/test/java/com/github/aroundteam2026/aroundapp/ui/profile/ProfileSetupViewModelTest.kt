@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.profile
 
 import android.net.Uri
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.Role
@@ -36,6 +37,7 @@ class ProfileSetupViewModelTest {
   private val dispatcher = StandardTestDispatcher()
   private val users = FakeUserRepository()
   private val pictures = FakeUserPictureRepository()
+  private val connectivity = FakeConnectivityRepository()
   private val uid = "explorer"
 
   @Before
@@ -56,7 +58,7 @@ class ProfileSetupViewModelTest {
   fun blankSavedNameRequiresSetupAndANameAlreadySavedOpensHome() =
       runTest(dispatcher) {
         create()
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         assertEquals(ProfileSetupDestination.SETUP, model.destination.value)
         users.updateProfile(uid, "Ada", null).getOrThrow()
@@ -64,10 +66,35 @@ class ProfileSetupViewModelTest {
         assertEquals(ProfileSetupDestination.HOME, model.destination.value)
       }
 
+  // Saving uploads the picture and writes on the server, so it waits for a connection
+  @Test
+  fun offlineSavingDoesNothingAndWorksAgainBackOnline() =
+      runTest(dispatcher) {
+        create()
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
+        advanceUntilIdle()
+        connectivity.online.value = false
+        advanceUntilIdle()
+        assertTrue(model.offline.value)
+
+        model.setName("Ada")
+        model.save()
+        advanceUntilIdle()
+        assertEquals(ProfileSetupDestination.SETUP, model.destination.value)
+        assertFalse(model.form.value.saving)
+
+        connectivity.online.value = true
+        advanceUntilIdle()
+        assertFalse(model.offline.value)
+        model.save()
+        advanceUntilIdle()
+        assertEquals(ProfileSetupDestination.HOME, model.destination.value)
+      }
+
   @Test
   fun missingProfileDoesNotOpenHome() =
       runTest(dispatcher) {
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         assertEquals(ProfileSetupDestination.ERROR, model.destination.value)
       }
@@ -83,7 +110,7 @@ class ProfileSetupViewModelTest {
                   if (reads++ == 0) flow { throw IllegalStateException("offline") }
                   else users.observeUser(uid)
             }
-        val model = ProfileSetupViewModel(uid, flaky, pictures)
+        val model = ProfileSetupViewModel(uid, flaky, pictures, connectivity)
         advanceUntilIdle()
         assertEquals(ProfileSetupDestination.ERROR, model.destination.value)
 
@@ -97,7 +124,7 @@ class ProfileSetupViewModelTest {
   fun rejectsBlankAndOverlongNamesWithoutWriting() =
       runTest(dispatcher) {
         create()
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         model.setName("  ")
         model.save()
@@ -112,7 +139,7 @@ class ProfileSetupViewModelTest {
   fun savesTrimmedNameWithoutPhotoAndPreservesRoleAndCreationTime() =
       runTest(dispatcher) {
         create()
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         model.setName("  Ada  ")
         model.save()
@@ -127,7 +154,7 @@ class ProfileSetupViewModelTest {
       runTest(dispatcher) {
         create()
         pictures.failure = IllegalStateException("offline")
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         val photo = Uri.parse("content://photos/avatar")
         model.setName("Ada")
@@ -167,7 +194,7 @@ class ProfileSetupViewModelTest {
                   if (refuseWrite) Result.failure(IllegalStateException("offline"))
                   else users.updateProfile(uid, displayName, pictureUrl)
             }
-        val model = ProfileSetupViewModel(uid, profileRepository, pictureRepository)
+        val model = ProfileSetupViewModel(uid, profileRepository, pictureRepository, connectivity)
         advanceUntilIdle()
         model.setName("Ada")
         model.setPhoto(Uri.parse("content://photos/avatar"))
@@ -196,7 +223,7 @@ class ProfileSetupViewModelTest {
                 return pictures.upload(uid, photo)
               }
             }
-        val model = ProfileSetupViewModel(uid, users, delayedPictures)
+        val model = ProfileSetupViewModel(uid, users, delayedPictures, connectivity)
         advanceUntilIdle()
         model.setName("Ada")
         model.setPhoto(Uri.parse("content://photos/avatar"))
@@ -214,7 +241,7 @@ class ProfileSetupViewModelTest {
   fun editingOnlyTheNameKeepsTheSavedPictureRoleAndCreationTime() =
       runTest(dispatcher) {
         create("Ada", "gs://old-picture")
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         model.startEditing()
         assertEquals("Ada", model.form.value.name)
@@ -229,7 +256,7 @@ class ProfileSetupViewModelTest {
   fun replacingAndRemovingThePictureUseTheSameProfileWrite() =
       runTest(dispatcher) {
         create("Ada", "gs://old-picture")
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         model.startEditing()
         model.setPhoto(Uri.parse("content://photos/new"))
@@ -259,7 +286,7 @@ class ProfileSetupViewModelTest {
                   if (fail) Result.failure(IllegalStateException("offline"))
                   else users.updateProfile(uid, displayName, pictureUrl)
             }
-        val model = ProfileSetupViewModel(uid, failing, pictures)
+        val model = ProfileSetupViewModel(uid, failing, pictures, connectivity)
         advanceUntilIdle()
         model.startEditing()
         model.setName("Bea")
@@ -284,7 +311,7 @@ class ProfileSetupViewModelTest {
   fun removingAPickedPhotoClearsItAndSavesNoPicture() =
       runTest(dispatcher) {
         create("Ada", "gs://old-picture")
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         model.startEditing()
         model.setPhoto(Uri.parse("content://photos/new"))
@@ -300,7 +327,7 @@ class ProfileSetupViewModelTest {
   fun pickingAPhotoAfterRemovingUploadsIt() =
       runTest(dispatcher) {
         create("Ada", "gs://old-picture")
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         model.startEditing()
         model.removePhoto()
@@ -324,7 +351,7 @@ class ProfileSetupViewModelTest {
                   pictureUrl: String?,
               ) = written.await().also { users.updateProfile(uid, displayName, pictureUrl) }
             }
-        val model = ProfileSetupViewModel(uid, slow, pictures)
+        val model = ProfileSetupViewModel(uid, slow, pictures, connectivity)
         advanceUntilIdle()
         model.startEditing()
         model.setName("Bea")
@@ -343,7 +370,7 @@ class ProfileSetupViewModelTest {
   fun editingOnlyOpensOnceTheProfileIsComplete() =
       runTest(dispatcher) {
         create()
-        val model = ProfileSetupViewModel(uid, users, pictures)
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
         advanceUntilIdle()
         assertEquals(ProfileSetupDestination.SETUP, model.destination.value)
         model.setName("Draft")
