@@ -29,11 +29,11 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 
 /**
- * A still map of the unlock radius: the quest's pin at [center] and the circle of [radiusMeters]
- * around it. At the venue, [venue] is null and the chip says about how many minutes, [walkMinutes],
- * it takes to walk across the circle. Elsewhere, the venue's own pin shows at [venue], the chip
- * says how far the quest is from [venueName]. With [onMoved], tapping the map or dragging the pin
- * calls it.
+ * A map of the unlock radius: the quest's pin at [center] and the circle of [radiusMeters] around
+ * it. At the venue, [venue] is null and the chip says about how many minutes, [walkMinutes], it
+ * takes to walk across the circle. Elsewhere, the venue's own pin shows at [venue], the chip says
+ * how far the quest is from [venueName]. With [onMoved], tapping the map or dragging the pin calls
+ * it, and the venue can drag and pinch-zoom the map; without it, the map stays still.
  */
 @Composable
 internal fun QuestRadiusMap(
