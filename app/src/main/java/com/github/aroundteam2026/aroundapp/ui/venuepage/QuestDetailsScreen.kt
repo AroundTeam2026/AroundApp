@@ -164,7 +164,7 @@ fun QuestDetailsScreen(
           onCancel,
           offline = state.offline,
           horizontalAlignment = Alignment.CenterHorizontally,
-          leave = state.leavesParty,
+          leave = state.leavesParty == true,
           // The card under the top bar already says why
           showOfflineHint = false,
       )
@@ -173,7 +173,8 @@ fun QuestDetailsScreen(
         state,
         onAccept,
         onSubmitProof,
-        footer = cancelAction.takeIf { state.cancellableReservationId != null },
+        // Without the explorer's membership, neither cancelling nor leaving is known to be safe
+        footer = cancelAction.takeIf { state.leavesParty != null },
     )
   }
 }
@@ -186,12 +187,12 @@ fun QuestDetailsScreen(
 private fun OfflineCard(state: VenuePageUiState, showOfflineBanner: Boolean) {
   val modifier =
       Modifier.padding(horizontal = AroundSpacing.ScreenHorizontal, vertical = AroundSpacing.Medium)
+  // Null without a reservation to cancel or leave, as then there's no button to explain
+  val leave = state.leavesParty
   val cancelBlocked =
-      state.offline &&
-          state.cancellableReservationId != null &&
-          state.cancelStatus != CancelStatus.CANCELLING
+      state.offline && leave != null && state.cancelStatus != CancelStatus.CANCELLING
   when {
-    cancelBlocked -> OfflineHint(offlineCancelHint(state.leavesParty), modifier)
+    cancelBlocked -> OfflineHint(offlineCancelHint(leave == true), modifier)
     showOfflineBanner -> OfflineBanner(modifier)
   }
 }

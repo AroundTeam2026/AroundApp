@@ -249,8 +249,11 @@ private fun Rows(
           onClick = { onOpenQuest(row.venueId, row.questId) },
           clock = clock,
           cancelStatus = state.cancelStatusOf(row.reservationId),
-          // Once the proof is sent, the quest is done on the explorer's side
-          onCancel = if (row.status.cancellable) ({ onCancel(row.reservationId) }) else null,
+          // Once the proof is sent, the quest is done on the explorer's side. Without their
+          // membership, neither cancelling nor leaving is known to be safe
+          onCancel =
+              if (row.status.cancellable && row.leave != null) ({ onCancel(row.reservationId) })
+              else null,
           offline = state.offline,
           onSendNewProof =
               if (row.status.proofReplaceable)

@@ -86,7 +86,11 @@ class QuestDetailsScreenTest {
 
   private fun accepted(quest: VenuePageQuest, party: Int = 1) =
       state(quest)
-          .copy(acceptedParties = mapOf(QUEST to party), reservationIds = mapOf(QUEST to "r"))
+          .copy(
+              acceptedParties = mapOf(QUEST to party),
+              reservationIds = mapOf(QUEST to "r"),
+              leavesParties = mapOf("r" to false),
+          )
 
   private fun show(
       quest: VenuePageQuest = quest(),
@@ -313,6 +317,14 @@ class QuestDetailsScreenTest {
   }
 
   @Test
+  fun withoutTheExplorersMembershipThereIsNothingToCancelOrLeave() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(leavesParties = emptyMap()))
+
+    node(C.Tag.CANCEL_RESERVATION).assertDoesNotExist()
+  }
+
+  @Test
   fun cancellingAsksFirstAndKeepingItChangesNothing() {
     val quest = quest()
     show(quest, accepted(quest))
@@ -341,7 +353,7 @@ class QuestDetailsScreenTest {
   @Test
   fun offlineAMemberIsToldLeavingNeedsAConnection() {
     val quest = quest()
-    show(quest, accepted(quest).copy(offline = true, joinedPartyIds = setOf("r")))
+    show(quest, accepted(quest).copy(offline = true, leavesParties = mapOf("r" to true)))
 
     compose
         .onNodeWithText(app.getString(R.string.offline_leave_needs_connection))
@@ -353,6 +365,20 @@ class QuestDetailsScreenTest {
     show(state = state(quest()).copy(offline = true), showOfflineBanner = true)
 
     node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+  }
+
+  // Without the explorer's membership there is no button, so no hint about it either
+  @Test
+  fun offlineWithoutTheExplorersMembershipShowsTheAppWideBanner() {
+    val quest = quest()
+    show(
+        quest,
+        accepted(quest).copy(offline = true, leavesParties = emptyMap()),
+        showOfflineBanner = true,
+    )
+
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    node(C.Tag.OFFLINE_HINT).assertDoesNotExist()
   }
 
   // Figma's "Quest details · submit proof": the venue approved, so the bar sends the proof

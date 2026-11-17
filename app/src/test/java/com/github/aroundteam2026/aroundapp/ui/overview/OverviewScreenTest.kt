@@ -193,6 +193,15 @@ class OverviewScreenTest {
     listOf("sent", "completed", "rejected").forEach { cancelButtonOf(it).assertDoesNotExist() }
   }
 
+  // Without the explorer's membership, neither cancelling nor leaving is known to be safe
+  @Test
+  fun aCardWhoseLeaveIsUnknownCannotBeCancelled() {
+    show(loaded(row(id = "known"), row(id = "unknown").copy(leave = null)))
+
+    cancelButtonOf("known").assertExists()
+    cancelButtonOf("unknown").assertDoesNotExist()
+  }
+
   // Until the venue approves a proof, the party can send a new one, as in the Figma frame
   @Test
   fun aProofSentOrRejectedCanBeSentAgainButNotOnceApproved() {

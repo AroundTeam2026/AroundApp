@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
@@ -28,6 +29,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -37,7 +39,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -59,11 +60,19 @@ class VenuePagePartyTest {
 
   /** Whether withdrawing fails, as offline. */
   private var withdrawFails = false
+
+  /** The member whose membership the parties never list, though it is stored. */
+  private var hiddenUid: String? = null
   private val partyRepository =
       object : PartyRepository by party {
         override suspend fun withdraw(reservationId: String, uid: String): Result<Unit> =
             if (withdrawFails) Result.failure(IOException("offline"))
             else party.withdraw(reservationId, uid)
+
+        override fun observeMembers(reservationId: String): Flow<List<PartyMember>> =
+            party.observeMembers(reservationId).map { members ->
+              members.filter { it.uid != hiddenUid }
+            }
       }
   private val users =
       FakeUserRepository().apply {
@@ -284,7 +293,7 @@ class VenuePagePartyTest {
   fun aMemberWhoCancelsLeavesThePartyInstead() = test {
     val id = reservationBy(FRIEND, ME)
     openDetails()
-    assertTrue(state.leavesParty)
+    assertEquals(true, state.leavesParty)
 
     viewModel.cancel()
     runCurrent()
@@ -303,7 +312,25 @@ class VenuePagePartyTest {
     openDetails()
 
     assertTrue(state.members.isEmpty())
-    assertTrue(state.leavesParty)
+    assertEquals(true, state.leavesParty)
+  }
+
+  @Test
+  fun withoutTheirMembershipAMemberNeitherCancelsNorLeaves() = test {
+    hiddenUid = ME
+    val id = reservationBy(FRIEND, ME)
+    openDetails()
+    assertEquals(id, state.cancellableReservationId)
+    assertNull(state.leavesParty)
+
+    viewModel.cancel()
+    runCurrent()
+
+    val me = party.observeMembers(id).first().single { it.uid == ME }
+    assertEquals(PartyMemberStatus.JOINED, me.status)
+    val reservation = reservations.observeForExplorer(FRIEND).first().single()
+    assertEquals(ReservationStatus.PENDING, reservation.status)
+    assertEquals(emptySet<String>(), state.cancellingIds)
   }
 
   @Test
@@ -316,7 +343,7 @@ class VenuePagePartyTest {
     runCurrent()
 
     assertEquals(CancelStatus.FAILED, state.cancelStatus)
-    assertTrue(state.leavesParty)
+    assertEquals(true, state.leavesParty)
     val me = party.observeMembers(id).first().single { it.uid == ME }
     assertEquals(PartyMemberStatus.JOINED, me.status)
 
@@ -331,7 +358,7 @@ class VenuePagePartyTest {
   fun theCreatorCancelsTheReservation() = test {
     val id = reservationBy(ME, FRIEND)
     openDetails()
-    assertFalse(state.leavesParty)
+    assertEquals(false, state.leavesParty)
 
     viewModel.cancel()
     runCurrent()
