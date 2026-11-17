@@ -106,10 +106,9 @@ class AcceptQuestBarTest {
   }
 
   @Test
-  fun offlineTheBarShowsTheHintAndCannotAccept() {
+  fun offlineTheButtonCannotAccept() {
     show(LOADED.copy(selectedQuestId = "a", offline = true))
 
-    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
     button.assertIsNotEnabled()
   }
 

@@ -144,18 +144,6 @@ data class VenuePageUiState(
       it in approvedIds && proofsAvailable && it !in completions
     }
 
-  /**
-   * Whether the bar would offer to accept the picked quest but can't, since the device is
-   * [offline]. An accept already under way keeps showing as such.
-   */
-  val acceptBlockedOffline: Boolean
-    get() =
-        offline &&
-            proof == null &&
-            completableReservationId == null &&
-            acceptStatus in setOf(AcceptStatus.NONE, AcceptStatus.FAILED) &&
-            selectedQuest != null
-
   /** The party's proof for the picked quest, or null when there is none. */
   val proof: Completion?
     get() = selectedQuestId?.let(reservationIds::get)?.let(completions::get)
