@@ -16,6 +16,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -39,6 +40,7 @@ class NearbyAcceptViewModelTest {
   private val gated = GatedReservations(fake)
   private val users = ScriptedUserRepository(testUsers(EXPLORER))
   private var reservations: ReservationRepository = gated
+  private val local = LocalWrites(fake)
 
   private val viewModel by lazy {
     NearbyAcceptViewModel(reservations, users, EXPLORER, clock = { NOW })
@@ -204,6 +206,94 @@ class NearbyAcceptViewModelTest {
     assertEquals(emptyList<Reservation>(), stored())
   }
 
+  @Test
+  fun aBookingTheServerRefusesAfterTheAppWroteItShowsTryAgain() = test {
+    reservations = local
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+
+    // The server refuses the write: Firestore rolls it back, so it vanishes from the list
+    local.refuse("local-1")
+    runCurrent()
+
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+    viewModel.accept(quest("a"))
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
+  @Test
+  fun aReservationCancelledElsewhereFreesTheQuestWithoutTryAgain() = test {
+    reservations = local
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    // Cancelled from the Quests tab: it stays listed, with its new status
+    local.cancel("local-1")
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.statusOf("a"))
+    assertEquals(emptySet<String>(), state.failedQuestIds)
+  }
+
+  @Test
+  fun aWriteListedBeforeTheBookingReturnsStaysAccepting() = test {
+    reservations = local
+    local.gate = CompletableDeferred()
+    open()
+
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    assertEquals(1, local.listed.value.size)
+    assertEquals(AcceptStatus.ACCEPTING, state.statusOf("a"))
+    local.gate!!.complete(Unit)
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
+  @Test
+  fun aFailedBookingStillListedIsNotAccepted() = test {
+    reservations = local
+    local.failure = IOException("refused")
+    open()
+
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    // Firestore still lists the write the booking failed for
+    assertEquals(1, local.listed.value.size)
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+    local.refuse("local-1")
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+  }
+
+  @Test
+  fun aCancelledReservationOfTheQuestDoesntKeepAFailedWriteFromCounting() = test {
+    reservations = local
+    val cancelled =
+        newPendingReservation("a", VENUE_ID, "Ada", NOW)
+            .copy(id = "old", status = ReservationStatus.CANCELLED)
+    local.listed.value = listOf(cancelled)
+    local.failure = IOException("refused")
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+
+    // Firestore drops the failed write, then lists a booking made elsewhere, say on the venue page
+    local.refuse("local-1")
+    runCurrent()
+    local.listed.value += newPendingReservation("a", VENUE_ID, "Ada", NOW).copy(id = "elsewhere")
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
   private fun quest(id: String) =
       NearbyQuest(
           venueId = VENUE_ID,
@@ -238,5 +328,41 @@ private class GatedReservations(private val inner: ReservationRepository) :
     calls++
     gate?.await()
     return inner.createReservation(reservation, creatorUid)
+  }
+}
+
+/**
+ * Lists [listed] as the explorer's reservations and adds each booking to it as pending at once, as
+ * Firestore lists a write before the server answers it. Each booking then waits for [gate], if set,
+ * and fails with [failure], if set, while staying listed.
+ */
+private class LocalWrites(private val inner: ReservationRepository) :
+    ReservationRepository by inner {
+  val listed = MutableStateFlow<List<Reservation>>(emptyList())
+  var gate: CompletableDeferred<Unit>? = null
+  var failure: Throwable? = null
+  private var next = 0
+
+  override fun observeForExplorer(uid: String): Flow<List<Reservation>> = listed
+
+  override suspend fun createReservation(
+      reservation: Reservation,
+      creatorUid: String,
+  ): Result<String> {
+    val id = "local-${++next}"
+    listed.value += reservation.copy(id = id)
+    gate?.await()
+    return failure?.let { Result.failure(it) } ?: Result.success(id)
+  }
+
+  /** The server refuses the reservation [id]: Firestore rolls it back. */
+  fun refuse(id: String) {
+    listed.value = listed.value.filterNot { it.id == id }
+  }
+
+  /** The explorer cancels the reservation [id]. */
+  fun cancel(id: String) {
+    listed.value =
+        listed.value.map { if (it.id == id) it.copy(status = ReservationStatus.CANCELLED) else it }
   }
 }
