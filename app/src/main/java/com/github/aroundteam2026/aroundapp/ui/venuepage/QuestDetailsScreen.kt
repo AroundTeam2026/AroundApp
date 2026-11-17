@@ -181,7 +181,8 @@ fun QuestDetailsScreen(
 
 /**
  * The one offline card under the top bar, as in Figma: offline with a reservation to cancel, the
- * hint that cancelling it needs a connection; else, with [showOfflineBanner], the app-wide banner.
+ * hint that cancelling it needs a connection; else, with [showOfflineBanner], the app-wide banner,
+ * unless the accept bar already shows its hint.
  */
 @Composable
 private fun OfflineCard(state: VenuePageUiState, showOfflineBanner: Boolean) {
@@ -193,7 +194,7 @@ private fun OfflineCard(state: VenuePageUiState, showOfflineBanner: Boolean) {
       state.offline && leave != null && state.cancelStatus != CancelStatus.CANCELLING
   when {
     cancelBlocked -> OfflineHint(offlineCancelHint(leave == true), modifier)
-    showOfflineBanner -> OfflineBanner(modifier)
+    showOfflineBanner && !state.acceptBlockedOffline -> OfflineBanner(modifier)
   }
 }
 

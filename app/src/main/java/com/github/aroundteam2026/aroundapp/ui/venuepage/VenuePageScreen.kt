@@ -188,7 +188,8 @@ fun VenuePageContent(
           .testTag(C.Tag.VENUE_PAGE_SCREEN)
   ) {
     VenuePageTopBar(onBack)
-    if (showOfflineBanner) {
+    // The accept bar's hint already says it, and a screen shows one offline card
+    if (showOfflineBanner && !state.acceptBlockedOffline) {
       OfflineBanner(
           Modifier.padding(
               horizontal = AroundSpacing.ScreenHorizontal,

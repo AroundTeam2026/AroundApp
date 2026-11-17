@@ -60,8 +60,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property leavesParties Whether the explorer joined the party of each reservation rather than
  *   created it, by reservation id, known as soon as the parties are read. A reservation whose party
  *   doesn't list the explorer as joined isn't in it.
- * @property offline Whether the device is offline, so cancelling, which needs a connection, is
- *   unavailable.
+ * @property offline Whether the device is offline, so cancelling and accepting, which need a
+ *   connection, are unavailable.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,
@@ -143,6 +143,18 @@ data class VenuePageUiState(
     get() = cancellableReservationId?.takeIf {
       it in approvedIds && proofsAvailable && it !in completions
     }
+
+  /**
+   * Whether the bar would offer to accept the picked quest but can't, since the device is
+   * [offline]. An accept already under way keeps showing as such.
+   */
+  val acceptBlockedOffline: Boolean
+    get() =
+        offline &&
+            proof == null &&
+            completableReservationId == null &&
+            acceptStatus in setOf(AcceptStatus.NONE, AcceptStatus.FAILED) &&
+            selectedQuest != null
 
   /** The party's proof for the picked quest, or null when there is none. */
   val proof: Completion?

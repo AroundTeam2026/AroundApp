@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.content.Context
@@ -102,6 +103,14 @@ class AcceptQuestBarTest {
     button.performClick()
 
     assertEquals(1, accepts)
+  }
+
+  @Test
+  fun offlineTheBarShowsTheHintAndCannotAccept() {
+    show(LOADED.copy(selectedQuestId = "a", offline = true))
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    button.assertIsNotEnabled()
   }
 
   @Test

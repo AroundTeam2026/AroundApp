@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -91,6 +92,8 @@ internal fun QuestActionBar(
  * - Ready: the button calls [onAccept]. Failed: an error shows above it, and it says "Try again".
  * - Accepting: a pulsing skeleton that can't be tapped takes the button's place.
  * - Accepted: disabled, saying the venue is yet to approve. Unavailable: disabled, saying why.
+ * - Offline ([VenuePageUiState.acceptBlockedOffline]): disabled, under the hint that it needs a
+ *   connection.
  * - A quest that needs more people says how many, whatever the state.
  *
  * It draws nothing while no quest is picked. [footer] sits under the button.
@@ -109,6 +112,7 @@ fun AcceptQuestBar(
   if (state.selectedQuest == null) return
   val status = state.acceptStatus
   QuestBar(modifier) {
+    if (state.acceptBlockedOffline) OfflineHint()
     // One explanation of the button: an accepted quest is done whatever the listener does, and a
     // failure can't be retried while accepting is unavailable
     if (!state.acceptAvailable && status != AcceptStatus.ACCEPTED) {
@@ -128,7 +132,7 @@ fun AcceptQuestBar(
       )
     }
     if (onSubmitProof != null) SubmitProofButton(onSubmitProof)
-    else AcceptQuestButton(status, enabled = state.acceptAvailable, onAccept)
+    else AcceptQuestButton(status, enabled = state.acceptAvailable && !state.offline, onAccept)
     footer()
   }
 }
