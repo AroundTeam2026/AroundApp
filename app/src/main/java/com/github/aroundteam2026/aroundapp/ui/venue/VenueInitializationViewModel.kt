@@ -29,21 +29,32 @@ data class VenueInitializationUiState(
     val venueId: String? = null,
     val isLoading: Boolean = false,
     val hasVenue: Boolean = false,
+    /** Whether an existing venue is editing its details, rather than setting it up. */
+    val editing: Boolean = false,
 ) {
   val canContinue: Boolean
     get() = !isLoading && !isSaving && venueId == null
 
   val canEditName: Boolean
-    get() = canContinue && !hasVenue
+    get() = canContinue && (editing || !hasVenue)
 }
 
-/** Creates the signed-in venue's profile once, before its location is configured. */
+/**
+ * Creates the signed-in venue's profile once, before its location is configured. With [editing],
+ * the venue edits its details from its profile instead: the name stays editable and is saved with
+ * [VenueRepository.setName] before moving on to the location.
+ */
 class VenueInitializationViewModel(
     private val authRepository: AuthRepository,
     private val venueRepository: VenueRepository,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
+    editing: Boolean = false,
 ) : ViewModel() {
-  private val mutableUiState = MutableStateFlow(VenueInitializationUiState(isLoading = true))
+  private val mutableUiState =
+      MutableStateFlow(VenueInitializationUiState(isLoading = true, editing = editing))
+
+  /** The name as loaded, so editing skips the write when it's unchanged. */
+  private var loadedName: String? = null
   val uiState = mutableUiState.asStateFlow()
 
   init {
@@ -52,6 +63,7 @@ class VenueInitializationViewModel(
         val uid = authRepository.currentUserId.value
         val venue = if (uid.isNullOrBlank()) null else venueRepository.getVenue(uid)
         if (venue != null) {
+          loadedName = venue.name
           mutableUiState.value = uiState.value.copy(businessName = venue.name, hasVenue = true)
         }
       } catch (cancelled: CancellationException) {
@@ -83,12 +95,10 @@ class VenueInitializationViewModel(
     val state = uiState.value
     if (!state.canContinue) return
     val name = state.businessName.trim()
-    if (!state.hasVenue && name.isEmpty()) {
-      mutableUiState.value = state.copy(error = VenueInitializationError.EMPTY_NAME)
-      return
-    }
-    if (!state.hasVenue && name.length > VenueLimits.MAX_NAME_LENGTH) {
-      mutableUiState.value = state.copy(error = VenueInitializationError.NAME_TOO_LONG)
+    // An existing venue's name is only checked when editing; setup keeps it as it is
+    val invalid = if (state.editing || !state.hasVenue) nameError(name) else null
+    if (invalid != null) {
+      mutableUiState.value = state.copy(error = invalid)
       return
     }
     val uid = authRepository.currentUserId.value
@@ -100,12 +110,12 @@ class VenueInitializationViewModel(
     mutableUiState.value = state.copy(isSaving = true, error = null)
     viewModelScope.launch {
       try {
-        val savedVenue = getOrCreateVenue(uid, name)
+        val savedName = save(uid, name, state.editing)
         mutableUiState.value =
             uiState.value.copy(
                 isSaving = false,
                 venueId = uid,
-                businessName = savedVenue.name,
+                businessName = savedName,
                 hasVenue = true,
             )
       } catch (cancelled: CancellationException) {
@@ -116,6 +126,23 @@ class VenueInitializationViewModel(
             uiState.value.copy(isSaving = false, error = VenueInitializationError.SAVE_FAILED)
       }
     }
+  }
+
+  private fun nameError(name: String): VenueInitializationError? =
+      when {
+        name.isEmpty() -> VenueInitializationError.EMPTY_NAME
+        name.length > VenueLimits.MAX_NAME_LENGTH -> VenueInitializationError.NAME_TOO_LONG
+        else -> null
+      }
+
+  /**
+   * Saves [name] and returns the venue's name. Editing always renames, even if the first read
+   * failed, unless the name is unchanged; setup creates the venue unless it already exists.
+   */
+  private suspend fun save(uid: String, name: String, editing: Boolean): String {
+    if (!editing) return getOrCreateVenue(uid, name).name
+    if (name != loadedName) venueRepository.setName(uid, name).getOrThrow()
+    return name
   }
 
   private suspend fun getOrCreateVenue(uid: String, name: String): Venue {

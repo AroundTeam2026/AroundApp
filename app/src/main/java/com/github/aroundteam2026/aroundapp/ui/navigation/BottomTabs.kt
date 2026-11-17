@@ -36,8 +36,8 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityReposi
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 
 /**
- * Whether the device is offline, for a tab screen that places the offline banner itself, as Figma
- * draws it on some tabs. [BottomTabScaffold] provides it to the tabs' own screens.
+ * Whether the device is offline, for a screen that places the offline banner itself, as Figma draws
+ * it on some screens. [BottomTabScaffold] provides it to every screen it shows.
  */
 val LocalShowOfflineBanner = compositionLocalOf { false }
 
@@ -70,11 +70,13 @@ interface BottomTab {
  * @param startTab the tab the home opens on, and that Back returns to before leaving the app.
  * @param navBarTag test tag of the bar.
  * @param screen draws the screen of a tab. Tabs in [inlineBannerTabs] read [LocalShowOfflineBanner]
- *   to place the offline banner themselves.
+ *   to place the offline banner themselves, as do the screens in [inlineBannerRoutes].
  * @param modifier modifier applied to the whole home.
  * @param connectivityRepository reports when the device goes offline; tests provide a fake.
  * @param inlineBannerTabs tabs whose own screens draw the banner, where Figma places it; on any
  *   other screen the scaffold draws it at the top.
+ * @param inlineBannerRoutes routes of screens the tabs open that draw the banner themselves, such
+ *   as a venue's page, which shows a quest's own offline hint in its place.
  * @param destinations registers the screens the tabs open, besides the tabs' own screens.
  */
 @Composable
@@ -87,6 +89,7 @@ internal fun <T : BottomTab> BottomTabScaffold(
     modifier: Modifier = Modifier,
     connectivityRepository: ConnectivityRepository? = null,
     inlineBannerTabs: Set<T> = emptySet(),
+    inlineBannerRoutes: Set<String> = emptySet(),
     destinations: NavGraphBuilder.() -> Unit = {},
 ) {
   val offline: OfflineBannerViewModel =
@@ -101,9 +104,10 @@ internal fun <T : BottomTab> BottomTabScaffold(
   Scaffold(
       modifier = modifier,
       topBar = {
+        val route = backStackEntry?.destination?.route
         val drawsInline =
-            currentTab in inlineBannerTabs &&
-                backStackEntry?.destination?.route == currentTab?.route
+            route in inlineBannerRoutes ||
+                (currentTab in inlineBannerTabs && route == currentTab?.route)
         if (showBanner && !drawsInline) {
           OfflineBanner(
               // The top bar gets no window insets, so the banner clears the status bar itself
@@ -131,18 +135,16 @@ internal fun <T : BottomTab> BottomTabScaffold(
         }
       },
   ) { innerPadding ->
-    NavHost(
-        navController = navController,
-        startDestination = startTab.route,
-        // Screens that read the insets themselves must not add the bars' room a second time
-        modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
-    ) {
-      tabs.forEach { tab ->
-        composable(tab.route) {
-          CompositionLocalProvider(LocalShowOfflineBanner provides showBanner) { screen(tab) }
-        }
+    CompositionLocalProvider(LocalShowOfflineBanner provides showBanner) {
+      NavHost(
+          navController = navController,
+          startDestination = startTab.route,
+          // Screens that read the insets themselves must not add the bars' room a second time
+          modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
+      ) {
+        tabs.forEach { tab -> composable(tab.route) { screen(tab) } }
+        destinations()
       }
-      destinations()
     }
   }
 }

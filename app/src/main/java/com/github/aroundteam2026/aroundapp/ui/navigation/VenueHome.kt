@@ -72,6 +72,7 @@ private val VENUE_INLINE_BANNER_TABS = setOf(VenueTab.DASHBOARD)
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
  * @param venueProfileFactory builds the Profile tab's ViewModel; tests pass one on fakes.
+ * @param onEditDetails opens the venue's details form, from "Edit details" on the Profile tab.
  * @param onOpenProof opens the Review proof screen of a completion's id.
  * @param screen draws the screen of a tab; tests pass their own to check the navigation alone.
  * @param connectivityRepository tells the shell when the device is offline; tests pass a fake.
@@ -85,6 +86,7 @@ fun VenueHome(
     onOpenProof: (String) -> Unit = {},
     onEditQuest: (String) -> Unit = {},
     venueProfileFactory: ViewModelProvider.Factory = VenueProfileViewModel.factory(),
+    onEditDetails: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
     screen: @Composable (VenueTab) -> Unit = {
       VenueTabScreen(
@@ -96,6 +98,7 @@ fun VenueHome(
           onOpenProof,
           onEditQuest,
           venueProfileFactory,
+          onEditDetails,
       )
     },
     connectivityRepository: ConnectivityRepository? = null,
@@ -123,6 +126,7 @@ private fun VenueTabScreen(
     onOpenProof: (String) -> Unit,
     onEditQuest: (String) -> Unit,
     venueProfileFactory: ViewModelProvider.Factory,
+    onEditDetails: () -> Unit,
 ) =
     when (tab) {
       VenueTab.DASHBOARD ->
@@ -143,5 +147,6 @@ private fun VenueTabScreen(
               viewModel(factory = venueProfileFactory),
               onSignOut,
               Modifier.testTag(tab.screenTag),
+              onEditDetails,
           )
     }

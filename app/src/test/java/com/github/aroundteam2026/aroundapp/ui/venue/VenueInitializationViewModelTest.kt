@@ -37,8 +37,13 @@ class VenueInitializationViewModelTest {
     Dispatchers.resetMain()
   }
 
-  private fun viewModel() =
-      VenueInitializationViewModel(authRepository, repository, currentTimeMillis = { 123_456L })
+  private fun viewModel(editing: Boolean = false) =
+      VenueInitializationViewModel(
+              authRepository,
+              repository,
+              currentTimeMillis = { 123_456L },
+              editing = editing,
+          )
           .also { dispatcher.scheduler.runCurrent() }
 
   @Test
@@ -154,6 +159,97 @@ class VenueInitializationViewModelTest {
         assertTrue(repository.created.isEmpty())
         assertEquals(original, repository.getVenue("owner-1"))
         assertEquals("owner-1", viewModel.uiState.value.venueId)
+      }
+
+  // From "Edit details": the name stays editable and is renamed, not created
+  @Test
+  fun editingRenamesTheExistingVenueAndContinues() =
+      runTest(dispatcher) {
+        val original = Venue("owner-1", "Original", null, 75, "Existing address", 1L)
+        repository.seed(original)
+        val viewModel = viewModel(editing = true)
+        assertEquals("Original", viewModel.uiState.value.businessName)
+        assertTrue(viewModel.uiState.value.canEditName)
+
+        viewModel.updateBusinessName("  Café Lumière  ")
+        viewModel.submit()
+        runCurrent()
+
+        assertTrue(repository.created.isEmpty())
+        assertEquals(original.copy(name = "Café Lumière"), repository.getVenue("owner-1"))
+        assertEquals("owner-1", viewModel.uiState.value.venueId)
+        assertEquals("Café Lumière", viewModel.uiState.value.businessName)
+      }
+
+  @Test
+  fun editingStillRejectsBlankAndOverlongNames() =
+      runTest(dispatcher) {
+        val original = Venue("owner-1", "Original", null, 75, null, 1L)
+        repository.seed(original)
+        val viewModel = viewModel(editing = true)
+        listOf(
+                " " to VenueInitializationError.EMPTY_NAME,
+                "x".repeat(VenueLimits.MAX_NAME_LENGTH + 1) to
+                    VenueInitializationError.NAME_TOO_LONG,
+            )
+            .forEach { (name, error) ->
+              viewModel.updateBusinessName(name)
+              viewModel.submit()
+              runCurrent()
+              assertEquals(error, viewModel.uiState.value.error)
+            }
+        assertEquals(original, repository.getVenue("owner-1"))
+        assertNull(viewModel.uiState.value.venueId)
+      }
+
+  // The first read failed, so the venue looks new: Continue must still rename it, not keep the old
+  // name
+  @Test
+  fun editingAfterAFailedFirstReadStillRenames() =
+      runTest(dispatcher) {
+        val original = Venue("owner-1", "Original", null, 75, null, 1L)
+        repository.seed(original)
+        repository.readFailure = IllegalStateException("offline")
+        val viewModel = viewModel(editing = true)
+        repository.readFailure = null
+
+        viewModel.updateBusinessName("Café Lumière")
+        viewModel.submit()
+        runCurrent()
+
+        assertEquals(original.copy(name = "Café Lumière"), repository.getVenue("owner-1"))
+        assertEquals("owner-1", viewModel.uiState.value.venueId)
+      }
+
+  // Only moving the marker: an unchanged name isn't written, so it can't fail
+  @Test
+  fun editingWithAnUnchangedNameContinuesWithoutWriting() =
+      runTest(dispatcher) {
+        repository.seed(Venue("owner-1", "Original", null, 75, null, 1L))
+        repository.renameFailure = IllegalStateException("offline")
+        val viewModel = viewModel(editing = true)
+
+        viewModel.submit()
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.error)
+        assertEquals("owner-1", viewModel.uiState.value.venueId)
+      }
+
+  @Test
+  fun aFailedRenameKeepsTheNameForRetry() =
+      runTest(dispatcher) {
+        repository.seed(Venue("owner-1", "Original", null, 75, null, 1L))
+        repository.renameFailure = IllegalStateException("offline")
+        val viewModel = viewModel(editing = true)
+        viewModel.updateBusinessName("Café Lumière")
+        viewModel.submit()
+        runCurrent()
+
+        assertEquals(VenueInitializationError.SAVE_FAILED, viewModel.uiState.value.error)
+        assertEquals("Café Lumière", viewModel.uiState.value.businessName)
+        assertFalse(viewModel.uiState.value.isSaving)
+        assertNull(viewModel.uiState.value.venueId)
       }
 
   @Test
@@ -293,7 +389,10 @@ class VenueInitializationViewModelTest {
         address: String?,
     ) = delegate.setArea(venueId, location, radiusMeters, address)
 
-    override suspend fun setName(venueId: String, name: String) = delegate.setName(venueId, name)
+    var renameFailure: Exception? = null
+
+    override suspend fun setName(venueId: String, name: String): Result<Unit> =
+        renameFailure?.let { Result.failure(it) } ?: delegate.setName(venueId, name)
 
     override suspend fun getVenue(venueId: String): Venue? {
       reads++

@@ -31,6 +31,7 @@ import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -75,6 +76,7 @@ class VenuePageScreenTest {
       state: VenuePageUiState,
       questRow: VenuePageQuestRow = DefaultQuestRow,
       bottomBar: @Composable (VenuePageQuest?) -> Unit = {},
+      showOfflineBanner: Boolean = false,
   ) {
     compose.setContent {
       AroundAppTheme {
@@ -88,9 +90,17 @@ class VenuePageScreenTest {
             onCancel = { cancels++ },
             questRow = questRow,
             bottomBar = bottomBar,
+            showOfflineBanner = showOfflineBanner,
         )
       }
     }
+  }
+
+  @Test
+  fun offlineThePageShowsTheBannerItself() {
+    show(VenuePageUiState(), showOfflineBanner = true)
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
   }
 
   @Test
@@ -490,6 +500,7 @@ class VenuePageScreenTest {
             testUsers("explorer"),
             party,
             FakeCompletionRepository(),
+            FakeConnectivityRepository(),
             "explorer",
         )
     compose.setContent {

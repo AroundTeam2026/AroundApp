@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.app.Application
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -87,7 +88,11 @@ class QuestDetailsScreenTest {
       state(quest)
           .copy(acceptedParties = mapOf(QUEST to party), reservationIds = mapOf(QUEST to "r"))
 
-  private fun show(quest: VenuePageQuest = quest(), state: VenuePageUiState = state(quest)) {
+  private fun show(
+      quest: VenuePageQuest = quest(),
+      state: VenuePageUiState = state(quest),
+      showOfflineBanner: Boolean = false,
+  ) {
     compose.setContent {
       AroundAppTheme {
         QuestDetailsScreen(
@@ -98,6 +103,7 @@ class QuestDetailsScreenTest {
             onCancel = { cancels++ },
             clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
             onSubmitProof = { proofsOpened += it },
+            showOfflineBanner = showOfflineBanner,
         )
       }
     }
@@ -317,6 +323,36 @@ class QuestDetailsScreenTest {
 
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_DIALOG).assertDoesNotExist()
     assertEquals(0, cancels)
+  }
+
+  @Test
+  fun offlineOneCardSaysCancellingNeedsAConnection() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(offline = true), showOfflineBanner = true)
+
+    nodes(C.Tag.OFFLINE_HINT).assertCountEquals(1)
+    node(C.Tag.OFFLINE_BANNER).assertDoesNotExist()
+    compose
+        .onNodeWithText(app.getString(R.string.offline_cancel_needs_connection))
+        .assertIsDisplayed()
+    node(C.Tag.CANCEL_RESERVATION).assertIsNotEnabled()
+  }
+
+  @Test
+  fun offlineAMemberIsToldLeavingNeedsAConnection() {
+    val quest = quest()
+    show(quest, accepted(quest).copy(offline = true, joinedPartyIds = setOf("r")))
+
+    compose
+        .onNodeWithText(app.getString(R.string.offline_leave_needs_connection))
+        .assertIsDisplayed()
+  }
+
+  @Test
+  fun offlineWithNothingToCancelShowsTheAppWideBanner() {
+    show(state = state(quest()).copy(offline = true), showOfflineBanner = true)
+
+    node(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
   }
 
   // Figma's "Quest details · submit proof": the venue approved, so the bar sends the proof

@@ -62,6 +62,7 @@ fun NavGraphBuilder.venueDestinations(
         dashboardFactory = tabFactories.dashboard,
         onOpenProof = navController::navigateToReviewProof,
         venueProfileFactory = tabFactories.profile,
+        onEditDetails = navController::navigateToVenueEdit,
     )
   }
   // By route: a second tap on X during the form's exit fade must not also pop the home
