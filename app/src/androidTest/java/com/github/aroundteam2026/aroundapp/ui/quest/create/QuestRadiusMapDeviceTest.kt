@@ -1,6 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Column
@@ -18,10 +21,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
@@ -109,6 +112,77 @@ class QuestRadiusMapDeviceTest {
     }
   }
 
+  /**
+   * Spreads two fingers apart from near the centre of the node tagged [tag], as a user zooms in.
+   * The Maps SDK doesn't zoom on a pinch from `performTouchInput`, so it goes through the system's
+   * input, as a real one does.
+   */
+  private fun pinchOpen(tag: String) {
+    val bounds = composeTestRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+    val root = IntArray(2)
+    composeTestRule.runOnUiThread {
+      composeTestRule.activity.window.decorView.getLocationOnScreen(root)
+    }
+    val center = Offset(root[0] + bounds.center.x, root[1] + bounds.center.y)
+    val near = bounds.width * PINCH_START
+    val far = bounds.width * PINCH_END
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+    val start = SystemClock.uptimeMillis()
+    // Each finger at [spread] from the centre, both fingers when [both]
+    fun event(time: Long, action: Int, spread: Float, both: Boolean): MotionEvent {
+      val fingers = if (both) 2 else 1
+      val properties =
+          Array(fingers) { finger ->
+            MotionEvent.PointerProperties().apply {
+              id = finger
+              toolType = MotionEvent.TOOL_TYPE_FINGER
+            }
+          }
+      val coords =
+          Array(fingers) { finger ->
+            MotionEvent.PointerCoords().apply {
+              x = if (finger == 0) center.x - spread else center.x + spread
+              y = center.y
+              pressure = 1f
+              size = 1f
+            }
+          }
+      return MotionEvent.obtain(
+          start,
+          time,
+          action,
+          fingers,
+          properties,
+          coords,
+          0,
+          0,
+          1f,
+          1f,
+          0,
+          0,
+          InputDevice.SOURCE_TOUCHSCREEN,
+          0,
+      )
+    }
+    val second = 1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT
+    val events = buildList {
+      add(event(start, MotionEvent.ACTION_DOWN, near, both = false))
+      add(event(start, MotionEvent.ACTION_POINTER_DOWN or second, near, both = true))
+      for (step in 1..PINCH_STEPS) {
+        val time = start + PINCH_MILLIS * step / PINCH_STEPS
+        val spread = near + (far - near) * step / PINCH_STEPS
+        add(event(time, MotionEvent.ACTION_MOVE, spread, both = true))
+      }
+      val end = start + PINCH_MILLIS
+      add(event(end, MotionEvent.ACTION_POINTER_UP or second, far, both = true))
+      add(event(end, MotionEvent.ACTION_UP, far, both = false))
+    }
+    events.forEach {
+      automation.injectInputEvent(it, true)
+      it.recycle()
+    }
+  }
+
   @Test
   fun draggingThePickerMovesTheMapRatherThanTheScreen() {
     showPicker()
@@ -138,15 +212,7 @@ class QuestRadiusMapDeviceTest {
     val tag = C.Tag.CREATE_QUEST_RADIUS_MAP
     gestureUntil(
         tag,
-        {
-          composeTestRule.onNodeWithTag(tag).performTouchInput {
-            // Two fingers spread apart from near the centre, as a user zooms in
-            val near = Offset(width * PINCH_START, 0f)
-            val far = Offset(width * PINCH_END, 0f)
-            pinch(center - near, center - far, center + near, center + far)
-          }
-        },
-        // Touch slop takes the start of the pinch, so any move of the camera counts, not its zoom
+        { pinchOpen(tag) },
         { composeTestRule.runOnUiThread { map.cameraPosition != framed } },
     )
 
@@ -209,8 +275,10 @@ class QuestRadiusMapDeviceTest {
     const val ZOOM_IN = 2f
     const val OFF_PIN = 0.2f
     // How far each finger of the pinch is from the centre, as a fraction of the map's width
-    const val PINCH_START = 0.05f
-    const val PINCH_END = 0.4f
+    const val PINCH_START = 0.1f
+    const val PINCH_END = 0.45f
+    const val PINCH_STEPS = 30
+    const val PINCH_MILLIS = 600L
     val SPACE_ABOVE = 100.dp
     val SPACE_BELOW = 2000.dp
   }
