@@ -119,7 +119,6 @@ class ProofPhotosTest {
     assertFalse(target.exists())
   }
 
-  // Deleting touches the disk, so it mustn't run on the screen's thread
   // App storage isn't cleared for the app, so the copies an old visit left behind are deleted
   @Test
   fun discardStaleDeletesOldPhotosAndKeepsRecentOnes() {
@@ -135,6 +134,7 @@ class ProofPhotosTest {
     assertTrue(recent.exists())
   }
 
+  // Deleting touches the disk, so it mustn't run on the screen's thread
   @Test
   fun discardDeletesOnItsIoDispatcher() {
     val io = RecordingDispatcher()

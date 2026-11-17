@@ -72,7 +72,7 @@ class CompletionViewModel(
     private val completionRepository: CompletionRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
     connectivityRepository: ConnectivityRepository,
-    private val discardPhoto: suspend (Uri) -> Boolean = { false },
+    private val discardPhoto: suspend (Uri) -> Boolean,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(CompletionUiState())
   /** What the completion screen shows now; the screen observes it. */
@@ -143,7 +143,8 @@ class CompletionViewModel(
             ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
             ?.fold(
                 { completionId ->
-                  // The photo is uploaded and its proof saved: the app's copy isn't needed anymore
+                  // The photo is uploaded and its proof saved: the app's copy isn't needed anymore.
+                  // If the listener showed it saved first, this doesn't run; discardStale clears it
                   form.photo?.let { discardPhoto(it) }
                   SaveState.Saved(completionId)
                 },

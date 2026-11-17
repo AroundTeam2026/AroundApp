@@ -28,13 +28,17 @@ class ProofPhotoTooBigException : IOException("The proof photo is still too big 
  * new photo into, a smaller JPEG copy of a taken or picked photo, and a preview to show it.
  *
  * Unlike the cache, which the system may clear at any time, app storage keeps the copy readable
- * until its proof is uploaded. It is never cleared for the app, so a copy is deleted with [discard]
- * once its proof is submitted, and [discardStale] deletes the ones left behind.
+ * until its proof is uploaded: while its screen is open for now, and as groundwork for uploading it
+ * later (#413). It is never cleared for the app, so a copy is deleted with [discard] once its proof
+ * is submitted, and [discardStale] deletes the ones left behind. A screen that uploads at once, as
+ * the profile does, passes the cache as [root] instead, which the system clears.
  *
  * The copy keeps uploads under the [PROOF_PHOTO_LIMIT_BYTES] that `storage.rules` allow, and fast
  * on mobile data: a full-resolution photo from the camera or the gallery can be bigger than that.
  *
- * @param context Gives the app's storage and reads the photos.
+ * @param context Reads the photos.
+ * @param root Holds the photos' folder: app storage by default. The FileProvider only shares camera
+ *   targets there, so another [root], such as the cache, is for screens that don't use the camera.
  * @param io Where photos are decoded and written, off the main thread.
  * @param limitBytes A copy of this many bytes or more fails with [ProofPhotoTooBigException].
  * @param share Turns a file of the photos' folder into the [Uri] the camera app writes to; the
@@ -52,9 +56,10 @@ class ProofPhotos(
     private val compress: (Bitmap, OutputStream) -> Boolean = { bitmap, out ->
       bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
     },
+    private val root: File = context.filesDir,
 ) {
   private val folder: File
-    get() = File(context.filesDir, FOLDER).apply { mkdirs() }
+    get() = File(root, FOLDER).apply { mkdirs() }
 
   /**
    * A new, empty file for the camera app to write a photo into. Other apps can only write to it
@@ -162,8 +167,9 @@ class ProofPhotos(
     const val PREVIEW_EDGE = 1024
 
     /**
-     * How long a camera target or copy is kept before [discardStale] deletes it, 7 days: long
-     * enough for a proof to wait for a connection, so a later upload still finds its photo.
+     * How long a camera target or copy is kept before [discardStale] deletes it, 7 days. For now a
+     * proof's photo is only kept while its screen is open, so this only clears what a closed app
+     * left behind; 7 days leave room for a later upload of a proof waiting for a connection (#413).
      */
     const val STALE_AFTER_MILLIS = 7L * 24 * 60 * 60 * 1000
 
