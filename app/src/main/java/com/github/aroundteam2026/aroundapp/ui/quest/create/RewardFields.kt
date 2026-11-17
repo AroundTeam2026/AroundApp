@@ -50,9 +50,11 @@ import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
+import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.quest.formatRewardAmountInput
+import com.github.aroundteam2026.aroundapp.ui.quest.rewardText
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -206,17 +208,21 @@ private fun RewardDetails(
           RewardSpecifics(reward, actions.onSpecificsChange)
         }
         RewardType.FREE_ITEM -> {
-          QuestTextField(
-              label = stringResource(R.string.create_quest_reward_free_item),
-              value = reward.itemName,
-              onValueChange = actions.onItemNameChange,
-              error = reward.itemNameError,
-              maxLength = QuestLimits.REWARD_ITEM_MAX_LENGTH,
-              singleLine = true,
-              tag = C.Tag.CREATE_QUEST_REWARD_ITEM,
-              errorTag = C.Tag.CREATE_QUEST_REWARD_ITEM_ERROR,
-              counterTag = C.Tag.CREATE_QUEST_REWARD_ITEM_COUNTER,
-          )
+          // Small, as inside the field, so the preview reads as part of the item field
+          Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small)) {
+            QuestTextField(
+                label = stringResource(R.string.create_quest_reward_free_item),
+                value = reward.itemName,
+                onValueChange = actions.onItemNameChange,
+                error = reward.itemNameError,
+                maxLength = QuestLimits.REWARD_ITEM_MAX_LENGTH,
+                singleLine = true,
+                tag = C.Tag.CREATE_QUEST_REWARD_ITEM,
+                errorTag = C.Tag.CREATE_QUEST_REWARD_ITEM_ERROR,
+                counterTag = C.Tag.CREATE_QUEST_REWARD_ITEM_COUNTER,
+            )
+            FreeItemPreview(reward.itemName)
+          }
           RewardSpecifics(reward, actions.onSpecificsChange)
         }
         RewardType.OTHER ->
@@ -487,3 +493,22 @@ private fun RewardSpecifics(reward: RewardFormState, onChange: (String) -> Unit)
 private val UNIT_HEIGHT: Dp = 36.dp
 private val EXPIRY_HEIGHT: Dp = 46.dp
 private val CLEAR_SIZE: Dp = 28.dp
+
+/**
+ * How the reward chip will read with [itemName], e.g. "Will be shown as: Free muffin", so the venue
+ * types only the item and not "Free" too. The item is trimmed, as it is when the quest is saved.
+ * Draws nothing while [itemName] is blank.
+ */
+@Composable
+private fun FreeItemPreview(itemName: String) {
+  if (itemName.isBlank()) return
+  Text(
+      stringResource(
+          R.string.create_quest_reward_item_preview,
+          rewardText(Reward.FreeItem(itemName.trim(), specifics = null)),
+      ),
+      style = AroundTextStyles.Small,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.testTag(C.Tag.CREATE_QUEST_REWARD_ITEM_PREVIEW),
+  )
+}

@@ -309,6 +309,7 @@ object C {
     const val CREATE_QUEST_REWARD_ITEM = "create_quest_reward_item"
     const val CREATE_QUEST_REWARD_ITEM_COUNTER = "create_quest_reward_item_counter"
     const val CREATE_QUEST_REWARD_ITEM_ERROR = "create_quest_reward_item_error"
+    const val CREATE_QUEST_REWARD_ITEM_PREVIEW = "create_quest_reward_item_preview"
     const val CREATE_QUEST_REWARD_SPECIFICS = "create_quest_reward_specifics"
     const val CREATE_QUEST_REWARD_SPECIFICS_COUNTER = "create_quest_reward_specifics_counter"
     const val CREATE_QUEST_REWARD_SPECIFICS_ERROR = "create_quest_reward_specifics_error"
