@@ -11,6 +11,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.bookQuest
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
@@ -81,8 +82,8 @@ class NearbyAcceptViewModel(
   private val unconfirmed = mutableSetOf<String>()
 
   /**
-   * The quests whose booking just failed. Firestore may still list the failed write, so the quest
-   * doesn't count as accepted until the reservations no longer list it.
+   * The quests whose booking just failed. Firestore may still list the failed write, as pending, so
+   * the quest doesn't count as accepted until no pending reservation is listed for it.
    */
   private val refusing = mutableSetOf<String>()
 
@@ -97,8 +98,11 @@ class NearbyAcceptViewModel(
           }
           .collect { reservations ->
             latest = reservations
-            // A failed write is over once Firestore no longer lists it
-            refusing.retainAll { quest -> reservations.any { it.questId == quest } }
+            // A failed write is over once Firestore no longer lists it as pending; an earlier
+            // reservation of the quest, cancelled and still listed, doesn't keep it
+            refusing.retainAll { quest ->
+              reservations.any { it.questId == quest && it.status == ReservationStatus.PENDING }
+            }
             show()
           }
     }

@@ -952,6 +952,28 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun aCancelledReservationOfTheQuestDoesntKeepARefusedWriteFromCounting() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    val cancelled =
+        newPendingReservation("a", VENUE_ID, NAME, START)
+            .copy(id = "old", status = ReservationStatus.CANCELLED)
+    server.list.value = listOf(cancelled)
+    server.answer = CompletableDeferred(Result.failure<Unit>(IOException("denied")))
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
+
+    // Firestore drops the refused copy, then lists a booking made elsewhere, say from the map
+    server.list.value = listOf(cancelled)
+    runCurrent()
+    server.list.value += newPendingReservation("a", VENUE_ID, NAME, START).copy(id = "elsewhere")
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+  }
+
+  @Test
   fun aReservationTheVenueAnswersIsNotARefusal() = test {
     openAndPick("a")
     viewModel.accept()

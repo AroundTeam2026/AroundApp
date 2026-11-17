@@ -272,6 +272,28 @@ class NearbyAcceptViewModelTest {
     assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
   }
 
+  @Test
+  fun aCancelledReservationOfTheQuestDoesntKeepAFailedWriteFromCounting() = test {
+    reservations = local
+    val cancelled =
+        newPendingReservation("a", VENUE_ID, "Ada", NOW)
+            .copy(id = "old", status = ReservationStatus.CANCELLED)
+    local.listed.value = listOf(cancelled)
+    local.failure = IOException("refused")
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+
+    // Firestore drops the failed write, then lists a booking made elsewhere, say on the venue page
+    local.refuse("local-1")
+    runCurrent()
+    local.listed.value += newPendingReservation("a", VENUE_ID, "Ada", NOW).copy(id = "elsewhere")
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
   private fun quest(id: String) =
       NearbyQuest(
           venueId = VENUE_ID,

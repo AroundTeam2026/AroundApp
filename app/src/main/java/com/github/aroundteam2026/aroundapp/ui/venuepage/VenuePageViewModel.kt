@@ -148,9 +148,9 @@ class VenuePageViewModel(
   private val unconfirmed = mutableSetOf<String>()
 
   /**
-   * The quests whose reservation the backend just refused. Firestore may list the refused write
-   * before or after the refusal arrives, so the quest doesn't count as accepted until the
-   * reservations no longer list anything for it.
+   * The quests whose reservation the backend just refused. Firestore may list the refused write, as
+   * pending, before or after the refusal arrives, so the quest doesn't count as accepted until no
+   * pending reservation is listed for it.
    */
   private val refusing = mutableSetOf<String>()
 
@@ -399,10 +399,15 @@ class VenuePageViewModel(
           }
           .collect { page ->
             latest = page
-            // A refused write is over once Firestore no longer lists anything for its quest
+            // A refused write is over once Firestore no longer lists it as pending; an earlier
+            // reservation of the quest, cancelled and still listed, doesn't keep it
             page.booked?.reservations?.let { listed ->
               refusing.retainAll { quest ->
-                listed.any { it.questId == quest && it.venueId == venueId }
+                listed.any {
+                  it.questId == quest &&
+                      it.venueId == venueId &&
+                      it.status == ReservationStatus.PENDING
+                }
               }
             }
             show()
