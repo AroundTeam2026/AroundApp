@@ -51,6 +51,7 @@ class RejectProofSheetTest {
   private val rejected = mutableListOf<String>()
   private var dismissals = 0
   private var saving by mutableStateOf(false)
+  private var offline by mutableStateOf(false)
   private val snackbar = SnackbarHostState()
 
   /** Shows the sheet until it is dismissed, as the Review proof screen does. */
@@ -63,6 +64,7 @@ class RejectProofSheetTest {
               explorerName,
               proofType,
               saving,
+              offline,
               onReject = { rejected += it },
               onDismiss = {
                 dismissals++
@@ -112,6 +114,26 @@ class RejectProofSheetTest {
 
   private fun writeNote(note: String) {
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_NOTE).performTextInput(note)
+  }
+
+  @Test
+  fun offlineTheHintShowsAndRejectingStaysOffUntilBackOnline() {
+    show()
+    reason(RejectReason.NO_MATCH).performClick()
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+
+    offline = true
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    confirm().assertIsNotEnabled()
+
+    offline = false
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+    confirm().performClick()
+    assertEquals(listOf(string(R.string.reject_proof_reason_no_match)), rejected)
   }
 
   @Test

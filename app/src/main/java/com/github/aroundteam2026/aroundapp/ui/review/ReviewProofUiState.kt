@@ -29,6 +29,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
  *   meanwhile, so the venue can't answer twice.
  * @property updateFailed Whether saving the last answer failed: the screen shows it once, then
  *   calls [ReviewProofViewModel.clearUpdateError].
+ * @property offline Whether the device is offline. Approving and rejecting are Firestore
+ *   transactions, which fail offline, so both are disabled and a hint says why.
  */
 data class ReviewProofUiState(
     val status: ReviewProofStatus = ReviewProofStatus.LOADING,
@@ -43,10 +45,11 @@ data class ReviewProofUiState(
     val reviewed: Boolean = false,
     val saving: Boolean = false,
     val updateFailed: Boolean = false,
+    val offline: Boolean = false,
 ) {
-  /** Whether Reject can be tapped: the proof is shown, pending, and not saving. */
+  /** Whether Reject can be tapped: the proof is shown, pending, not saving, and online. */
   val canReject: Boolean
-    get() = status == ReviewProofStatus.LOADED && !reviewed && !saving
+    get() = status == ReviewProofStatus.LOADED && !reviewed && !saving && !offline
 
   /**
    * Whether Approve can be tapped: as [canReject], and a photo proof's photo is shown. An approval
@@ -54,6 +57,10 @@ data class ReviewProofUiState(
    */
   val canApprove: Boolean
     get() = canReject && (proof !is Proof.Photo || photo is ProofPhoto.Loaded)
+
+  /** Whether to say that answering needs a connection: offline, with a proof left to answer. */
+  val showsOfflineHint: Boolean
+    get() = offline && status == ReviewProofStatus.LOADED && !reviewed
 }
 
 /** Where the Review proof screen stands. */

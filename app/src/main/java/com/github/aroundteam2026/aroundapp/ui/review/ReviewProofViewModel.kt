@@ -14,6 +14,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
@@ -33,6 +35,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.dashboard.AnswerSaver
 import com.github.aroundteam2026.aroundapp.ui.dashboard.savingAmong
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -70,6 +73,10 @@ import kotlinx.coroutines.withContext
  *
  * [approve] and [reject] save through an [AnswerSaver]: a double tap saves once, and a failure is
  * reported until [clearUpdateError].
+ *
+ * Approving and rejecting are Firestore transactions, which fail offline: while
+ * [connectivityRepository] says the device is offline, [ReviewProofUiState.offline] is set and
+ * [approve] and [reject] do nothing.
  */
 class ReviewProofViewModel(
     private val completionId: String,
@@ -79,6 +86,7 @@ class ReviewProofViewModel(
     private val partyRepository: PartyRepository,
     private val questRepository: QuestRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
+    connectivityRepository: ConnectivityRepository,
     private val decode: suspend (ByteArray) -> ImageBitmap? = { decodePhoto(it) },
 ) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listeners and the photo's download. */
@@ -114,7 +122,8 @@ class ReviewProofViewModel(
               answers.state,
               reloading,
               writing,
-          ) { listened, answers, reloading, writing ->
+              connectivityRepository.observeOffline(TAG),
+          ) { listened, answers, reloading, writing, offline ->
             val shown = if (reloading) ReviewProofUiState() else listened
             val pending =
                 if (shown.status == ReviewProofStatus.LOADED && !shown.reviewed) setOf(completionId)
@@ -124,6 +133,7 @@ class ReviewProofViewModel(
             shown.copy(
                 saving = writing || answers.savingAmong(pending).isNotEmpty(),
                 updateFailed = answers.failed,
+                offline = offline,
             )
           }
           .stateIn(
@@ -132,7 +142,7 @@ class ReviewProofViewModel(
               ReviewProofUiState(),
           )
 
-  /** Approves the proof, which gives the party the quest's reward. */
+  /** Approves the proof, which gives the party the quest's reward. Does nothing offline. */
   fun approve() {
     if (!uiState.value.canApprove) return
     answers.answer(completionId, "proof $completionId with an approval") {
@@ -142,7 +152,7 @@ class ReviewProofViewModel(
 
   /**
    * Rejects the proof for [reason], which the explorer sees. Does nothing for a blank reason, or
-   * one over [MAX_REJECT_REASON_LENGTH] characters, which the repository would refuse.
+   * one over [MAX_REJECT_REASON_LENGTH] characters, which the repository would refuse, and offline.
    */
   fun reject(reason: String) {
     val trimmed = reason.trim()
@@ -329,6 +339,7 @@ class ReviewProofViewModel(
         photos: (Context) -> ProofPhotoRepository = ProofPhotoRepositoryProvider::repository,
     ): ViewModelProvider.Factory = viewModelFactory {
       initializer {
+        val application = this[APPLICATION_KEY]!!
         ReviewProofViewModel(
             completionId,
             AuthRepositoryProvider.repository,
@@ -336,7 +347,8 @@ class ReviewProofViewModel(
             ReservationRepositoryProvider.repository,
             PartyRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
-            photos(this[APPLICATION_KEY]!!),
+            photos(application),
+            ConnectivityRepositoryProvider.repository(application),
         )
       }
     }
