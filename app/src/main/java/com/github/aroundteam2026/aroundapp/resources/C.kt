@@ -275,6 +275,7 @@ object C {
     const val DASHBOARD_PROOF_SENT = "dashboard_proof_sent"
     const val DASHBOARD_PROOF_ICON = "dashboard_proof_icon"
     const val DASHBOARD_REJECTED_PROOFS = "dashboard_rejected_proofs"
+    const val DASHBOARD_SHOW_ALL_REJECTED = "dashboard_show_all_rejected"
     /** Why the venue rejected a proof, on its dashboard row and on the Review proof screen. */
     const val PROOF_REJECT_REASON = "proof_reject_reason"
     const val AROUND_HEADER = "around_header"

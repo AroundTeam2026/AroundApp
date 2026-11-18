@@ -4,12 +4,14 @@ package com.github.aroundteam2026.aroundapp.ui.dashboard
 
 import android.content.Context
 import android.text.format.DateUtils
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -25,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -37,6 +40,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
@@ -316,6 +320,8 @@ class VenueDashboardScreenTest {
     assertTrue(top(C.Tag.DASHBOARD_PROOFS) < top(C.Tag.DASHBOARD_NEEDS_ANSWER))
   }
 
+  // Native graphics, to read the badge's colour
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
   @Test
   fun rejectedProofsComeLastWithAGreyCountAndTheirReason() {
     val rejected =
@@ -323,9 +329,17 @@ class VenueDashboardScreenTest {
     show(loaded(upcoming = listOf(pending("a").copy(approved = true)), rejected = rejected))
     scrollTo(C.Tag.DASHBOARD_REJECTED_PROOFS)
 
-    compose
-        .onNode(hasText("2") and hasAnyAncestor(hasTestTag(C.Tag.DASHBOARD_REJECTED_PROOFS)), true)
-        .assertExists()
+    val badge =
+        compose
+            .onNode(
+                hasText("2") and hasAnyAncestor(hasTestTag(C.Tag.DASHBOARD_REJECTED_PROOFS)),
+                true,
+            )
+            .captureToImage()
+            .toPixelMap()
+    // The digit's box sits in the badge's padding, so its first column, before the digit, is the
+    // badge's colour
+    assertEquals(AroundColors.InkMuted, badge[0, badge.height / 2])
     assertTrue(top(C.Tag.DASHBOARD_UPCOMING) < top(C.Tag.DASHBOARD_REJECTED_PROOFS))
     scrollTo("${C.Tag.DASHBOARD_PROOF_ROW}_r1")
     compose
@@ -338,6 +352,35 @@ class VenueDashboardScreenTest {
     proofRow("r1").performClick()
 
     assertEquals(listOf("r1"), opened)
+  }
+
+  @Test
+  fun manyRejectedProofsShowTheFirstFewUntilShowAll() {
+    show(loaded(rejected = (1..5).map { proof("r$it").copy(rejectReason = "Blurry") }))
+
+    scrollTo(C.Tag.DASHBOARD_SHOW_ALL_REJECTED)
+    compose
+        .onNodeWithTag(C.Tag.DASHBOARD_SHOW_ALL_REJECTED)
+        .assertTextEquals(string(R.string.dashboard_show_all, 5))
+    assertThrows(AssertionError::class.java) { scrollTo("${C.Tag.DASHBOARD_PROOF_ROW}_r4") }
+
+    compose.onNodeWithTag(C.Tag.DASHBOARD_SHOW_ALL_REJECTED).performClick()
+
+    scrollTo("${C.Tag.DASHBOARD_PROOF_ROW}_r5")
+    proofRow("r5").assertExists()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_SHOW_ALL_REJECTED).assertDoesNotExist()
+  }
+
+  @Test
+  fun aFewRejectedProofsNeedNoShowAll() {
+    show(
+        loaded(
+            rejected = (1..REJECTED_SHOWN_FIRST).map { proof("r$it").copy(rejectReason = "Blurry") }
+        )
+    )
+
+    compose.onNodeWithTag(C.Tag.DASHBOARD_REJECTED_PROOFS).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.DASHBOARD_SHOW_ALL_REJECTED).assertDoesNotExist()
   }
 
   @Test

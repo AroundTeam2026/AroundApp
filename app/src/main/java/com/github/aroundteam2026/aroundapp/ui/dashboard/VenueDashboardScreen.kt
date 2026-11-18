@@ -169,6 +169,10 @@ private fun Dashboard(
   var showAllPending by rememberSaveable { mutableStateOf(false) }
   val pending =
       if (showAllPending) state.needsAnswer else state.needsAnswer.take(PENDING_SHOWN_FIRST)
+  // Rejected proofs stay until their party sends a new one, so they could pile up the same way
+  var showAllRejected by rememberSaveable { mutableStateOf(false) }
+  val rejected =
+      if (showAllRejected) state.rejectedProofs else state.rejectedProofs.take(REJECTED_SHOWN_FIRST)
   LazyColumn(
       Modifier.fillMaxSize().testTag(C.Tag.DASHBOARD_LIST),
       contentPadding = PaddingValues(AroundSpacing.ScreenHorizontal),
@@ -199,19 +203,8 @@ private fun Dashboard(
       }
       section(R.string.dashboard_needs_answer, state.needsAnswer.size, C.Tag.DASHBOARD_NEEDS_ANSWER)
       reservations(pending, state.savingIds, state.offline, onApprove, onDecline, clock)
-      if (pending.size < state.needsAnswer.size) {
-        item {
-          TextButton(
-              onClick = { showAllPending = true },
-              modifier = Modifier.fillMaxWidth().testTag(C.Tag.DASHBOARD_SHOW_ALL),
-          ) {
-            Text(
-                stringResource(R.string.dashboard_show_all, state.needsAnswer.size),
-                color = AroundTheme.colors.accentText,
-                style = AroundTextStyles.Subtitle,
-            )
-          }
-        }
+      showAll(pending.size, state.needsAnswer.size, C.Tag.DASHBOARD_SHOW_ALL) {
+        showAllPending = true
       }
       section(R.string.dashboard_upcoming, state.upcoming.size, C.Tag.DASHBOARD_UPCOMING)
       reservations(state.upcoming, state.savingIds, state.offline, onApprove, onDecline, clock)
@@ -222,8 +215,11 @@ private fun Dashboard(
           C.Tag.DASHBOARD_REJECTED_PROOFS,
           muted = true,
       )
-      items(state.rejectedProofs, key = { REJECTED_KEY_PREFIX + it.completionId }) {
+      items(rejected, key = { REJECTED_KEY_PREFIX + it.completionId }) {
         DashboardProofRow(it, onOpen = { onOpenProof(it.completionId) }, clock = clock)
+      }
+      showAll(rejected.size, state.rejectedProofs.size, C.Tag.DASHBOARD_SHOW_ALL_REJECTED) {
+        showAllRejected = true
       }
     }
   }
@@ -303,6 +299,23 @@ private fun RowScope.Stat(value: Int, @StringRes label: Int, color: Color, tag: 
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+  }
+}
+
+/**
+ * "Show all [total]" under a section that shows only [shown] of its rows, which calls [onClick];
+ * left out once every row shows.
+ */
+private fun LazyListScope.showAll(shown: Int, total: Int, tag: String, onClick: () -> Unit) {
+  if (shown >= total) return
+  item(key = tag) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag(tag)) {
+      Text(
+          stringResource(R.string.dashboard_show_all, total),
+          color = AroundTheme.colors.accentText,
+          style = AroundTextStyles.Subtitle,
+      )
+    }
   }
 }
 
@@ -410,6 +423,9 @@ private fun LoadFailed(onRetry: () -> Unit) {
 
 /** How many pending reservations show before "Show all", as the Figma note on long lists asks. */
 internal const val PENDING_SHOWN_FIRST = 3
+
+/** How many rejected proofs show before "Show all", as for the pending reservations. */
+internal const val REJECTED_SHOWN_FIRST = 3
 /** The weekday, day and month, in the order of the device's language. */
 private const val DAY_SKELETON = "EEEdMMM"
 
