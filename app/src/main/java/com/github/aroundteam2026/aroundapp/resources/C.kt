@@ -372,6 +372,8 @@ object C {
     const val REVIEW_PROOF_RETRY = "review_proof_retry"
     const val REVIEW_PROOF_EXPLORER = "review_proof_explorer"
     const val REVIEW_PROOF_SENT = "review_proof_sent"
+    /** Where the proof stands: the Pending, Rejected or Approved tag. */
+    const val REVIEW_PROOF_STATUS = "review_proof_status"
     const val REVIEW_PROOF_QUEST = "review_proof_quest"
     const val REVIEW_PROOF_REQUIREMENTS = "review_proof_requirements"
     const val REVIEW_PROOF_PHOTO = "review_proof_photo"

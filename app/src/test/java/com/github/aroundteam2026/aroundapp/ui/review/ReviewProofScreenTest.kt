@@ -7,13 +7,16 @@ import android.text.format.DateUtils
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -22,9 +25,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import java.io.ByteArrayOutputStream
 import java.time.Clock
 import java.time.Instant
@@ -79,6 +84,12 @@ class ReviewProofScreenTest {
 
   private fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true)
 
+  /** The colour just inside the start of the tag saying where the proof stands. */
+  private fun statusTagColor(): Color {
+    val tag = node(C.Tag.REVIEW_PROOF_STATUS).captureToImage().toPixelMap()
+    return tag[EDGE_INSET_PX, tag.height / 2]
+  }
+
   private fun SemanticsNodeInteraction.text() =
       fetchSemanticsNode().config[SemanticsProperties.Text].joinToString()
 
@@ -100,6 +111,7 @@ class ReviewProofScreenTest {
         node(C.Tag.REVIEW_PROOF_SENT).text(),
     )
     compose.onNodeWithText(string(R.string.review_proof_pending)).assertIsDisplayed()
+    assertEquals(AroundColors.Lavender, statusTagColor())
     assertEquals("Find the hidden fox", node(C.Tag.REVIEW_PROOF_QUEST).text())
     assertEquals(
         string(R.string.review_proof_requirements, "Order any drink."),
@@ -396,7 +408,7 @@ class ReviewProofScreenTest {
     show(PHOTO)
     openTheSheet()
 
-    state = PHOTO.copy(reviewed = true)
+    state = PHOTO.copy(proofStatus = CompletionStatus.APPROVED)
     compose.waitForIdle()
 
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_SHEET).assertDoesNotExist()
@@ -462,11 +474,14 @@ class ReviewProofScreenTest {
 
   @Test
   fun aRejectedProofShowsItsReasonAndCantBeAnswered() {
-    show(PHOTO.copy(reviewed = true, rejectReason = "Not taken at the venue"))
+    show(
+        PHOTO.copy(proofStatus = CompletionStatus.REJECTED, rejectReason = "Not taken at the venue")
+    )
 
     node(C.Tag.PROOF_REJECT_REASON).assertIsDisplayed()
     compose.onNodeWithText("Not taken at the venue").assertIsDisplayed()
     compose.onNodeWithText(string(R.string.review_proof_rejected)).assertIsDisplayed()
+    assertEquals(AroundColors.Error, statusTagColor())
     compose.onNodeWithText(string(R.string.review_proof_pending)).assertDoesNotExist()
     // The photo is still there to look at
     node(C.Tag.REVIEW_PROOF_PHOTO).assertIsDisplayed()
@@ -476,9 +491,10 @@ class ReviewProofScreenTest {
 
   @Test
   fun anApprovedProofSaysSoWithoutAReason() {
-    show(ANSWER.copy(reviewed = true))
+    show(ANSWER.copy(proofStatus = CompletionStatus.APPROVED))
 
     compose.onNodeWithText(string(R.string.review_proof_approved)).assertIsDisplayed()
+    assertEquals(AroundColors.Tertiary, statusTagColor())
     node(C.Tag.PROOF_REJECT_REASON).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertDoesNotExist()
   }
@@ -513,6 +529,8 @@ class ReviewProofScreenTest {
     const val EXPLORER = "yusuf.s"
     const val NOW = 1_800_000_000_000L
     val CLOCK: Clock = Clock.fixed(Instant.ofEpochMilli(NOW), ZoneId.of("UTC"))
+    // How far into the status tag to read its colour, clear of its rounded ends and its text
+    const val EDGE_INSET_PX = 3
     val TWO_MIN_AGO =
         DateUtils.getRelativeTimeSpanString(
                 NOW - 2 * DateUtils.MINUTE_IN_MILLIS,

@@ -63,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.partyLabel
@@ -226,7 +227,9 @@ private fun TopBar(onBack: () -> Unit, enabled: Boolean) {
 }
 
 /**
- * Who sent the proof, their party and when, then where it stands: Pending, Rejected or Approved.
+ * Who sent the proof, their party and when, then where it stands: Pending on lavender, Rejected on
+ * the error colour of the reason's box, or Approved on the tertiary colour of the dashboard's
+ * Approved pill.
  */
 @Composable
 private fun Explorer(state: ReviewProofUiState, clock: Clock) {
@@ -264,19 +267,28 @@ private fun Explorer(state: ReviewProofUiState, clock: Clock) {
           style = AroundTextStyles.Caption,
       )
     }
+    val colors = MaterialTheme.colorScheme
+    val (label, color, contentColor) =
+        when (state.proofStatus) {
+          CompletionStatus.PENDING ->
+              Triple(
+                  R.string.review_proof_pending,
+                  AroundTheme.colors.lavender,
+                  AroundTheme.colors.accentText,
+              )
+          CompletionStatus.REJECTED ->
+              Triple(R.string.review_proof_rejected, colors.error, colors.onError)
+          CompletionStatus.APPROVED ->
+              Triple(R.string.review_proof_approved, colors.tertiary, colors.onTertiary)
+        }
     Surface(
+        Modifier.testTag(C.Tag.REVIEW_PROOF_STATUS),
         shape = AroundPillShape,
-        color = AroundTheme.colors.lavender,
-        contentColor = AroundTheme.colors.accentText,
+        color = color,
+        contentColor = contentColor,
     ) {
       Text(
-          stringResource(
-              when {
-                !state.reviewed -> R.string.review_proof_pending
-                state.rejectReason != null -> R.string.review_proof_rejected
-                else -> R.string.review_proof_approved
-              }
-          ),
+          stringResource(label),
           Modifier.padding(horizontal = AroundSpacing.Medium, vertical = TAG_VERTICAL_PADDING),
           style = AroundTextStyles.Badge,
       )
