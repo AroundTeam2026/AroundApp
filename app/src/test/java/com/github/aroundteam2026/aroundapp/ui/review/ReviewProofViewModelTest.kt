@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.review
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
@@ -26,6 +27,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +84,9 @@ class ReviewProofViewModelTest {
       )
   private val photos = FakeProofPhotoRepository { PHOTO_BYTES }
 
+  /** Whether the device is online; tests take it offline. */
+  private val connectivity = FakeConnectivityRepository()
+
   // The repositories the ViewModel uses: the fakes above unless a test wraps them
   private var reviewed: CompletionRepository = completions
   private var readReservations: ReservationRepository = reservations
@@ -111,6 +116,7 @@ class ReviewProofViewModelTest {
         readParty,
         readQuests,
         downloaded,
+        connectivity,
         decoding,
     )
   }
@@ -314,9 +320,57 @@ class ReviewProofViewModelTest {
   }
 
   @Test
+  fun offlineApproveAndRejectAreUnavailableUntilBackOnline() = test {
+    sendProof(reserve())
+    watch()
+    assertTrue(state.canApprove)
+
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS + 1)
+
+    assertTrue(state.offline)
+    assertTrue(state.showsOfflineHint)
+    assertFalse(state.canApprove)
+    assertFalse(state.canReject)
+    viewModel.approve()
+    viewModel.reject("Photo is blurry")
+    assertEquals(CompletionStatus.PENDING, stored().status)
+
+    connectivity.online.value = true
+
+    assertFalse(state.offline)
+    assertTrue(state.canReject)
+    viewModel.approve()
+    assertEquals(CompletionStatus.APPROVED, stored().status)
+  }
+
+  @Test
+  fun goingOfflineWhileTheScreenIsStoppedKeepsTheProofUnanswered() = test {
+    sendProof(reserve())
+    val watching = backgroundScope.launch { viewModel.uiState.collect {} }
+    assertTrue(state.canApprove)
+
+    watching.cancel()
+    advanceTimeBy(STOPPED_LONG_ENOUGH_MS)
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS + 1)
+    watch()
+
+    viewModel.approve()
+    viewModel.reject("Photo is blurry")
+    assertEquals(CompletionStatus.PENDING, stored().status)
+    assertTrue(state.offline)
+    assertFalse(state.canReject)
+  }
+
+  @Test
   fun rejectingSendsTheTrimmedReason() = test {
     sendProof(reserve())
     watch()
+    // Back online after a disconnect, rejecting works again
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS + 1)
+    connectivity.online.value = true
 
     viewModel.reject("  Photo is blurry  ")
 

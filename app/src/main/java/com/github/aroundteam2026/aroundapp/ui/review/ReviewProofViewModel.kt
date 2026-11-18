@@ -14,6 +14,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.observeJoinedCounts
@@ -33,6 +35,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.dashboard.AnswerSaver
 import com.github.aroundteam2026.aroundapp.ui.dashboard.savingAmong
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,6 +56,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -70,6 +74,10 @@ import kotlinx.coroutines.withContext
  *
  * [approve] and [reject] save through an [AnswerSaver]: a double tap saves once, and a failure is
  * reported until [clearUpdateError].
+ *
+ * Approving and rejecting are Firestore transactions, which fail offline: while
+ * [connectivityRepository] says the device is offline, [ReviewProofUiState.offline] is set and
+ * [approve] and [reject] do nothing.
  */
 class ReviewProofViewModel(
     private val completionId: String,
@@ -79,6 +87,7 @@ class ReviewProofViewModel(
     private val partyRepository: PartyRepository,
     private val questRepository: QuestRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
+    connectivityRepository: ConnectivityRepository,
     private val decode: suspend (ByteArray) -> ImageBitmap? = { decodePhoto(it) },
 ) : ViewModel() {
   /** Bumped by [retry]: each new value restarts the listeners and the photo's download. */
@@ -99,6 +108,18 @@ class ReviewProofViewModel(
   /** Whether the venue's answer is being written, until the repository returns. */
   private val writing = MutableStateFlow(false)
 
+  /**
+   * Whether the device is offline, followed for as long as the ViewModel lives rather than only
+   * while the screen watches [uiState], so it is current when the screen comes back.
+   */
+  private val offline = MutableStateFlow(false)
+
+  init {
+    viewModelScope.launch {
+      connectivityRepository.observeOffline(TAG).collect { offline.value = it }
+    }
+  }
+
   /** What the screen shows now; the screen observes it. */
   @OptIn(ExperimentalCoroutinesApi::class)
   val uiState: StateFlow<ReviewProofUiState> =
@@ -114,7 +135,8 @@ class ReviewProofViewModel(
               answers.state,
               reloading,
               writing,
-          ) { listened, answers, reloading, writing ->
+              offline,
+          ) { listened, answers, reloading, writing, offline ->
             val shown = if (reloading) ReviewProofUiState() else listened
             val pending =
                 if (shown.status == ReviewProofStatus.LOADED && !shown.reviewed) setOf(completionId)
@@ -124,6 +146,7 @@ class ReviewProofViewModel(
             shown.copy(
                 saving = writing || answers.savingAmong(pending).isNotEmpty(),
                 updateFailed = answers.failed,
+                offline = offline,
             )
           }
           .stateIn(
@@ -132,9 +155,10 @@ class ReviewProofViewModel(
               ReviewProofUiState(),
           )
 
-  /** Approves the proof, which gives the party the quest's reward. */
+  /** Approves the proof, which gives the party the quest's reward. Does nothing offline. */
   fun approve() {
-    if (!uiState.value.canApprove) return
+    // The state can be stale while the screen resumes, so offline is read where it is followed
+    if (offline.value || !uiState.value.canApprove) return
     answers.answer(completionId, "proof $completionId with an approval") {
       whileWriting { completionRepository.approve(completionId) }
     }
@@ -142,12 +166,15 @@ class ReviewProofViewModel(
 
   /**
    * Rejects the proof for [reason], which the explorer sees. Does nothing for a blank reason, or
-   * one over [MAX_REJECT_REASON_LENGTH] characters, which the repository would refuse.
+   * one over [MAX_REJECT_REASON_LENGTH] characters, which the repository would refuse, and offline.
    */
   fun reject(reason: String) {
     val trimmed = reason.trim()
     if (
-        trimmed.isEmpty() || trimmed.length > MAX_REJECT_REASON_LENGTH || !uiState.value.canReject
+        trimmed.isEmpty() ||
+            trimmed.length > MAX_REJECT_REASON_LENGTH ||
+            offline.value ||
+            !uiState.value.canReject
     ) {
       return
     }
@@ -329,6 +356,7 @@ class ReviewProofViewModel(
         photos: (Context) -> ProofPhotoRepository = ProofPhotoRepositoryProvider::repository,
     ): ViewModelProvider.Factory = viewModelFactory {
       initializer {
+        val application = this[APPLICATION_KEY]!!
         ReviewProofViewModel(
             completionId,
             AuthRepositoryProvider.repository,
@@ -336,7 +364,8 @@ class ReviewProofViewModel(
             ReservationRepositoryProvider.repository,
             PartyRepositoryProvider.repository,
             QuestRepositoryProvider.repository,
-            photos(this[APPLICATION_KEY]!!),
+            photos(application),
+            ConnectivityRepositoryProvider.repository(application),
         )
       }
     }

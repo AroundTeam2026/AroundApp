@@ -31,6 +31,7 @@ class ReviewProofOnFakes {
   val party = FakePartyRepository()
   val reservations = FakeReservationRepository(party = party)
   val completions = FakeCompletionRepository()
+  val connectivity = FakeConnectivityRepository()
   val quests =
       FakeQuestRepository(
           initialQuests =
@@ -68,6 +69,7 @@ class ReviewProofOnFakes {
           party,
           quests,
           FakeProofPhotoRepository(),
+          connectivity,
       )
 
   /** Builds [reviewProof] for a completion's id, as navigation does. */
