@@ -166,6 +166,13 @@ class ProofUploadWorkerTest {
   }
 
   @Test
+  fun uploadFailingWithIllegalState_isRetried() = runBlocking {
+    photos.forcedFailure = IllegalStateException("not ready")
+
+    assertEquals(ListenableWorker.Result.retry(), worker().doWork())
+  }
+
+  @Test
   fun failedSubmission_isRetriedAndKeepsTheCopy() = runBlocking {
     completions.forcedFailure = IOException("offline")
 

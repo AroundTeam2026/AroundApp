@@ -77,6 +77,8 @@ class ProofUploadWorker(
           return retryOrStop(it, ERROR_UPLOAD)
         }
     completions.submit(reservationId, venueId, explorerUid, Proof.Photo(location)).onFailure {
+      // CompletionRepository.submit's way of saying the venue already approved the completion
+      if (it is IllegalStateException) return failure(ERROR_ALREADY_APPROVED)
       return retryOrStop(it, ERROR_SUBMIT)
     }
     discard(photo)
@@ -92,8 +94,6 @@ class ProofUploadWorker(
         isRulesRefusal(error) -> failure(ERROR_REFUSED)
         error is FileNotFoundException -> failure(ERROR_PHOTO_MISSING)
         error is IllegalArgumentException -> failure(ERROR_INVALID)
-        // CompletionRepository.submit's way of saying the venue already approved the completion
-        error is IllegalStateException -> failure(ERROR_ALREADY_APPROVED)
         runAttemptCount + 1 >= MAX_ATTEMPTS -> failure(lastAttemptCode)
         else -> Result.retry()
       }
