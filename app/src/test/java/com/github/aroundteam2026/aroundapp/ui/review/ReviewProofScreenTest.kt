@@ -499,7 +499,7 @@ class ReviewProofScreenTest {
   }
 
   @Test
-  fun aRejectedProofShowsItsReasonAndCantBeAnswered() {
+  fun aRejectedProofShowsItsReasonAndOnlyApprove() {
     show(
         PHOTO.copy(proofStatus = CompletionStatus.REJECTED, rejectReason = "Not taken at the venue")
     )
@@ -511,8 +511,26 @@ class ReviewProofScreenTest {
     compose.onNodeWithText(string(R.string.review_proof_pending)).assertDoesNotExist()
     // The photo is still there to look at
     node(C.Tag.REVIEW_PROOF_PHOTO).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertDoesNotExist()
+    // It can't be rejected again, but the venue can change its mind (#608)
     compose.onNodeWithTag(C.Tag.REVIEW_PROOF_REJECT).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertIsEnabled().performClick()
+    assertEquals(1, approvals)
+  }
+
+  @Test
+  fun approvingARejectedProofReturnsToTheDashboard() {
+    val fakes = ReviewProofOnFakes()
+    val id = runBlocking { fakes.sendProof() }
+    runBlocking { fakes.completions.reject(id, "Blurry").getOrThrow() }
+    val viewModel = fakes.reviewProof(id)
+    compose.setContent { AroundAppTheme { ReviewProofScreen(viewModel, onBack = { backs++ }) } }
+    compose.waitForIdle()
+    assertEquals(0, backs)
+
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).performClick()
+    compose.waitForIdle()
+
+    assertEquals(1, backs)
   }
 
   @Test

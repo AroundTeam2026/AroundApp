@@ -477,7 +477,7 @@ class ReviewProofViewModelTest {
   }
 
   @Test
-  fun aProofOpenedOnceRejectedShowsItsReasonReadOnly() = test {
+  fun aProofOpenedOnceRejectedShowsItsReasonAndCanOnlyBeApproved() = test {
     sendProof(reserve())
     completions.reject(id, "Not taken at the venue").getOrThrow()
     watch()
@@ -488,13 +488,55 @@ class ReviewProofViewModelTest {
     // The venue opened it to look at it, so the screen stays
     assertFalse(state.answered)
     assertFalse(state.canReject)
-    assertFalse(state.canApprove)
+    assertTrue(state.canApprove)
 
-    viewModel.approve()
-    viewModel.reject("Changed my mind")
+    viewModel.reject("Rejected twice")
 
     assertEquals(CompletionStatus.REJECTED, stored().status)
     assertEquals("Not taken at the venue", stored().rejectReason)
+  }
+
+  // #608: a venue that changes its mind approves a proof it rejected, and goes back
+  @Test
+  fun approvingARejectedProofApprovesItAndIsAnswered() = test {
+    sendProof(reserve())
+    completions.reject(id, "Blurry").getOrThrow()
+    watch()
+
+    viewModel.approve()
+
+    assertEquals(CompletionStatus.APPROVED, stored().status)
+    assertNull(stored().rejectReason)
+    assertTrue(state.answered)
+    assertFalse(state.canApprove)
+  }
+
+  @Test
+  fun offlineARejectedProofCantBeApprovedAndSaysWhy() = test {
+    sendProof(reserve())
+    completions.reject(id, "Blurry").getOrThrow()
+    watch()
+
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS + 1)
+
+    assertTrue(state.showsOfflineHint)
+    assertFalse(state.canApprove)
+    viewModel.approve()
+    assertEquals(CompletionStatus.REJECTED, stored().status)
+  }
+
+  @Test
+  fun anApprovedProofCantBeAnsweredAndNeedsNoOfflineHint() = test {
+    sendProof(reserve())
+    completions.approve(id).getOrThrow()
+    watch()
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS + 1)
+
+    assertFalse(state.answerable)
+    assertFalse(state.canApprove)
+    assertFalse(state.showsOfflineHint)
   }
 
   @Test

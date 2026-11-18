@@ -55,27 +55,39 @@ data class ReviewProofUiState(
     val updateFailed: Boolean = false,
     val offline: Boolean = false,
 ) {
-  /**
-   * Whether the proof was approved or rejected: it can't be answered then, so the screen shows no
-   * Approve or Reject.
-   */
+  /** Whether the proof was approved or rejected: it can't be rejected then. */
   val reviewed: Boolean
     get() = proofStatus != CompletionStatus.PENDING
+
+  /**
+   * Whether the venue can still answer the proof: while it is pending, and once rejected, as a
+   * venue that changes its mind can still approve it (#608). An approval is final.
+   */
+  val answerable: Boolean
+    get() = proofStatus != CompletionStatus.APPROVED
 
   /** Whether Reject can be tapped: the proof is shown, pending, not saving, and online. */
   val canReject: Boolean
     get() = status == ReviewProofStatus.LOADED && !reviewed && !saving && !offline
 
   /**
-   * Whether Approve can be tapped: as [canReject], and a photo proof's photo is shown. An approval
-   * is final and gives the reward, so the venue must have seen what it approves.
+   * Whether Approve can be tapped: the proof is shown, [answerable], not [answered] while shown,
+   * not saving, and online, and a photo proof's photo is shown. A proof rejected on another phone
+   * while shown is leaving the screen, so a late tap can't overrule that answer. An approval is
+   * final and gives the reward, so the venue must have seen what it approves.
    */
   val canApprove: Boolean
-    get() = canReject && (proof !is Proof.Photo || photo is ProofPhoto.Loaded)
+    get() =
+        status == ReviewProofStatus.LOADED &&
+            answerable &&
+            !answered &&
+            !saving &&
+            !offline &&
+            (proof !is Proof.Photo || photo is ProofPhoto.Loaded)
 
   /** Whether to say that answering needs a connection: offline, with a proof left to answer. */
   val showsOfflineHint: Boolean
-    get() = offline && status == ReviewProofStatus.LOADED && !reviewed
+    get() = offline && status == ReviewProofStatus.LOADED && answerable
 }
 
 /** Where the Review proof screen stands. */
