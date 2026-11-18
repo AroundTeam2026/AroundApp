@@ -77,7 +77,7 @@ class VenueQuestRowColorsTest {
   fun aDiscountIsOnThePrimaryColourInDarkMode() {
     val color = rewardChipColor(Reward.Discount(5.0, DiscountUnit.CHF, null), dark = true)
 
-    assertEquals(AroundColors.Purple, color)
+    assertEquals(AroundColors.DarkPurple, color)
   }
 
   private companion object {

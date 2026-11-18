@@ -37,11 +37,14 @@ object AroundColors {
   val InkMuted = Color(0xFF6E6C66)
   /** Hairlines and outlines. */
   val Line = Color(0xFFE3E5CF)
-  val DarkSurface = Color(0xFF383838)
+  // Dark mode, lightened so cards, panels and buttons stand apart from the background (#564)
+  /** The brand purple in dark mode: [Purple] would blend into the dark surfaces. */
+  val DarkPurple = Color(0xFF8E52D6)
+  val DarkSurface = Color(0xFF3F3F3F)
   val DarkMuted = Color(0xFFB5B6A6)
-  val DarkLine = Color(0xFF474547)
-  val DarkPanel = Color(0xFF333333)
-  val DarkLavender = Color(0xFF3F2E52)
+  val DarkLine = Color(0xFF585658)
+  val DarkPanel = Color(0xFF3A3A3A)
+  val DarkLavender = Color(0xFF533B73)
   val DarkBabyBlue = Color(0xFF2F4744)
   val DarkMapLabel = Color(0xFFC9B8A4)
   val DarkError = Color(0xFFE5736B)

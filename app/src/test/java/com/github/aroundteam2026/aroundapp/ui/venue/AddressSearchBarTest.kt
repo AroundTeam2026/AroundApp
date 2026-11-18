@@ -379,7 +379,7 @@ class AddressSearchBarTest {
     assertEquals(
         AddressSearchColors(
             surface = AroundColors.DarkSurface,
-            outline = AroundColors.Purple,
+            outline = AroundColors.DarkPurple,
             ink = AroundColors.Cream,
             muted = AroundColors.DarkMuted,
             line = AroundColors.DarkLine,

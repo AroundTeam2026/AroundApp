@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.theme
 
@@ -60,7 +61,7 @@ internal val LightColorScheme =
 
 internal val DarkColorScheme =
     darkColorScheme(
-        primary = AroundColors.Purple,
+        primary = AroundColors.DarkPurple,
         onPrimary = AroundColors.Cream,
         primaryContainer = AroundColors.DarkLavender,
         onPrimaryContainer = AroundColors.Cream,
@@ -80,7 +81,7 @@ internal val DarkColorScheme =
         onSurfaceVariant = AroundColors.DarkMuted,
         outline = AroundColors.DarkLine,
         outlineVariant = AroundColors.DarkLine,
-        surfaceTint = AroundColors.Purple,
+        surfaceTint = AroundColors.DarkPurple,
         error = AroundColors.DarkError,
         onError = AroundColors.Ink,
         errorContainer = AroundColors.DarkPanel,

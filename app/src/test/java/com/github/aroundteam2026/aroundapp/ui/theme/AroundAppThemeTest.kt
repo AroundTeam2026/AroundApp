@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.theme
@@ -9,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.text.font.FontListFontFamily
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,35 +83,52 @@ class AroundAppThemeTest {
     assertEquals(Color(0xFFF6F8DE), colors.surfaceDim)
   }
 
+  // Ece found the dark gray and purple blending together (#564): keep them apart
+  @Test
+  fun darkSurfacesAndButtonsStandApartWhileTheirTextStaysReadable() {
+    val colors = palette(true)
+    fun contrast(a: Color, b: Color): Float {
+      val (light, dark) = listOf(a.luminance(), b.luminance()).sortedDescending()
+      return (light + 0.05f) / (dark + 0.05f)
+    }
+
+    assertTrue(contrast(colors.surface, colors.background) >= 1.3f)
+    assertTrue(contrast(colors.primary, colors.background) >= 2.8f)
+    assertTrue(contrast(colors.primaryContainer, colors.background) >= 1.4f)
+    // Button text stays at the normal-text standard
+    assertTrue(contrast(colors.onPrimary, colors.primary) >= 4.5f)
+    assertTrue(contrast(colors.onSurfaceVariant, colors.surface) >= 4.5f)
+  }
+
   @Test
   fun darkPaletteMatchesFigma() {
     val colors = palette(true)
-    assertEquals(Color(0xFF4D0092), colors.primary)
+    assertEquals(Color(0xFF8E52D6), colors.primary)
     assertEquals(Color(0xFFFDFFE8), colors.onPrimary)
     assertEquals(Color(0xFFFDFFE8), colors.onSecondary)
     assertEquals(Color(0xFFFDFFE8), colors.onTertiary)
     assertEquals(Color(0xFF2D2D2D), colors.background)
-    assertEquals(Color(0xFF383838), colors.surface)
+    assertEquals(Color(0xFF3F3F3F), colors.surface)
     assertEquals(Color(0xFFFDFFE8), colors.onSurface)
     assertEquals(Color(0xFFB5B6A6), colors.onSurfaceVariant)
-    assertEquals(Color(0xFF474547), colors.outline)
+    assertEquals(Color(0xFF585658), colors.outline)
     assertEquals(Color(0xFF5EA89D), colors.tertiary)
     assertEquals(Color(0xFF62BAAD), colors.secondary)
     assertEquals(Color(0xFFE5736B), colors.error)
     assertEquals(colors.surface, colors.surfaceContainer)
-    assertEquals(Color(0xFF3F2E52), colors.primaryContainer)
+    assertEquals(Color(0xFF533B73), colors.primaryContainer)
     assertEquals(Color(0xFFFDFFE8), colors.onPrimaryContainer)
     assertEquals(Color(0xFF2F4744), colors.secondaryContainer)
     assertEquals(Color(0xFF62BAAD), colors.onSecondaryContainer)
-    assertEquals(Color(0xFF333333), colors.tertiaryContainer)
+    assertEquals(Color(0xFF3A3A3A), colors.tertiaryContainer)
     assertEquals(Color(0xFF62BAAD), colors.onTertiaryContainer)
-    assertEquals(Color(0xFF333333), colors.errorContainer)
+    assertEquals(Color(0xFF3A3A3A), colors.errorContainer)
     assertEquals(Color(0xFFE5736B), colors.onErrorContainer)
     assertEquals(Color(0xFFFFFFF6), colors.inverseSurface)
     assertEquals(Color(0xFF2D2D2D), colors.inverseOnSurface)
     assertEquals(Color(0xFF4D0092), colors.inversePrimary)
     assertEquals(Color(0xFF2D2D2D), colors.scrim)
-    assertEquals(Color(0xFF383838), colors.surfaceBright)
+    assertEquals(Color(0xFF3F3F3F), colors.surfaceBright)
     assertEquals(Color(0xFF2D2D2D), colors.surfaceDim)
   }
 
@@ -145,8 +165,8 @@ class AroundAppThemeTest {
   fun darkExtendedColorsMatchFigma() {
     val colors = extendedPalette(true)
     assertEquals(Color(0xFFFDFFE8), colors.accentText)
-    assertEquals(Color(0xFF333333), colors.panel)
-    assertEquals(Color(0xFF3F2E52), colors.lavender)
+    assertEquals(Color(0xFF3A3A3A), colors.panel)
+    assertEquals(Color(0xFF533B73), colors.lavender)
     assertEquals(Color(0xFF62BAAD), colors.sage)
     assertEquals(Color(0xFF2F4744), colors.babyBlue)
     assertEquals(Color(0xFFC9B8A4), colors.mapLabel)

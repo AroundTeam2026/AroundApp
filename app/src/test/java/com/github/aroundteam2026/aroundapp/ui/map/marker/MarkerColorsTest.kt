@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map.marker
 
@@ -47,7 +48,7 @@ class MarkerColorsTest {
   fun inDarkModeTheCardTakesTheDarkSurfacesAndThePinStaysCream() {
     assertEquals(
         MarkerColors(
-            accent = AroundColors.Purple,
+            accent = AroundColors.DarkPurple,
             onAccent = AroundColors.Cream,
             secondary = AroundColors.Tertiary,
             onSecondary = AroundColors.Cream,
@@ -57,7 +58,7 @@ class MarkerColorsTest {
             onSurface = AroundColors.Cream,
             onSurfaceVariant = AroundColors.DarkMuted,
             outline = AroundColors.DarkLine,
-            area = AroundColors.Purple.copy(alpha = MARKER_AREA_ALPHA),
+            area = AroundColors.DarkPurple.copy(alpha = MARKER_AREA_ALPHA),
         ),
         colors(darkTheme = true),
     )
