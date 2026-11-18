@@ -823,9 +823,9 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: the KDoc and the rules disagree: a joined member of the party may cancel their reservation
-   * (E21) but not answer it in the venue's place, and that refusal must come back as a failure that
-   * leaves the reservation untouched.
+   * Bug: the KDoc and the rules disagree: the explorer who created the reservation may cancel it
+   * (E21, #536) but not answer it in the venue's place, and that refusal must come back as a
+   * failure that leaves the reservation untouched.
    */
   @Test
   fun updateStatus_byTheExplorer_cancelsButCannotApprove() = withTimeoutBlocking {

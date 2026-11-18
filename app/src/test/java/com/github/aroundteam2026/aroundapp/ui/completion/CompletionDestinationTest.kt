@@ -266,6 +266,7 @@ class CompletionDestinationTest {
             completions,
             FakeProofPhotoRepository(),
             FakeConnectivityRepository(),
+            discardPhoto = { true },
         )
       }
     }

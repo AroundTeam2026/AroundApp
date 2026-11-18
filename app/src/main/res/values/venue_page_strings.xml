@@ -85,4 +85,9 @@
         <item quantity="one">Needs %1$d more person to take this quest</item>
         <item quantity="other">Needs %1$d more people to take this quest</item>
     </plurals>
+    <!-- The same before the explorer accepted: the party card shows 0 joined, and they count too -->
+    <plurals name="accept_quest_needs_you_and_more">
+        <item quantity="one">You + %1$d more person needed to take this quest</item>
+        <item quantity="other">You + %1$d more people needed to take this quest</item>
+    </plurals>
 </resources>

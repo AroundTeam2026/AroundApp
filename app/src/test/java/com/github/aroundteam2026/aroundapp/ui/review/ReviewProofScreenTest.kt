@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.review
 import android.content.Context
 import android.graphics.Bitmap
 import android.text.format.DateUtils
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -327,6 +328,22 @@ class ReviewProofScreenTest {
   }
 
   @Test
+  fun offlineTheHintShowsAndNeitherButtonCanBeTapped() {
+    show(PHOTO)
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+
+    state = PHOTO.copy(offline = true)
+    compose.waitForIdle()
+
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    compose
+        .onNodeWithText(string(R.string.offline_review_needs_connection), useUnmergedTree = true)
+        .assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_APPROVE).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_REJECT).assertIsNotEnabled()
+  }
+
+  @Test
   fun rejectOpensTheSheetWhichSendsItsReason() {
     show(ANSWER)
     openTheSheet()
@@ -435,14 +452,23 @@ class ReviewProofScreenTest {
   }
 
   @Test
-  fun thePreviewsShowAPhotoAndAnAnswer() {
-    var answer by mutableStateOf(false)
-    compose.setContent { if (answer) ReviewProofAnswerPreview() else ReviewProofPhotoPreview() }
+  fun thePreviewsShowAPhotoAnAnswerAndOffline() {
+    // Each preview, with the tag of what it must show
+    fun preview(tag: String, draw: @Composable () -> Unit) = draw to tag
+    val previews =
+        listOf(
+            preview(C.Tag.REVIEW_PROOF_PHOTO) { ReviewProofPhotoPreview() },
+            preview(C.Tag.REVIEW_PROOF_ANSWER) { ReviewProofAnswerPreview() },
+            preview(C.Tag.OFFLINE_HINT) { ReviewProofOfflinePreview() },
+        )
+    var shown by mutableStateOf(previews.first().first)
+    compose.setContent { shown() }
 
-    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_PHOTO, useUnmergedTree = true).assertIsDisplayed()
-    answer = true
-    compose.waitForIdle()
-    compose.onNodeWithTag(C.Tag.REVIEW_PROOF_ANSWER, useUnmergedTree = true).assertIsDisplayed()
+    previews.forEach { (preview, tag) ->
+      shown = preview
+      compose.waitForIdle()
+      compose.onNodeWithTag(tag, useUnmergedTree = true).assertIsDisplayed()
+    }
   }
 
   @Test

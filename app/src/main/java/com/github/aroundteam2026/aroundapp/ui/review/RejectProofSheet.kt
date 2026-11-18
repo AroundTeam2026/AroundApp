@@ -50,6 +50,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.reservation.MAX_REJECT_REASON_LENGTH
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -79,6 +80,8 @@ enum class RejectReason(@param:StringRes val label: Int, val photoOnly: Boolean 
  * @param explorerName Name of the explorer who sent the proof, or null if unknown.
  * @param proofType The kind of proof: a written answer leaves out the reasons about photos.
  * @param saving Whether the rejection is being saved.
+ * @param offline Whether the device is offline: rejecting is a transaction, which fails offline, so
+ *   "Reject proof" is disabled and a hint says why. The reason picked stays, to send once online.
  * @param onReject Called with the reason the explorer will see.
  * @param onDismiss Called once the sheet has closed without rejecting.
  * @param snackbarHostState Shows a failed rejection on the sheet, which covers the screen's own.
@@ -89,6 +92,7 @@ fun RejectProofSheet(
     explorerName: String?,
     proofType: ProofType,
     saving: Boolean,
+    offline: Boolean,
     onReject: (String) -> Unit,
     onDismiss: () -> Unit,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -123,6 +127,7 @@ fun RejectProofSheet(
         note = note,
         onNoteChange = { note = it.take(NOTE_MAX_LENGTH) },
         saving = saving,
+        offline = offline,
         onReject = onReject,
         onBack = {
           scope
@@ -136,7 +141,8 @@ fun RejectProofSheet(
 
 /**
  * What the sheet shows: [reasons] with [picked] selected, which [onPick] picks or unpicks, the
- * [note], and the buttons. [onReject] gets the reason the explorer will see.
+ * [note], and the buttons, with the offline hint above them while [offline]. [onReject] gets the
+ * reason the explorer will see.
  */
 @Composable
 private fun RejectProofForm(
@@ -147,6 +153,7 @@ private fun RejectProofForm(
     note: String,
     onNoteChange: (String) -> Unit,
     saving: Boolean,
+    offline: Boolean,
     onReject: (String) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -215,6 +222,7 @@ private fun RejectProofForm(
               ),
       )
     }
+    if (offline) OfflineHint(R.string.offline_review_needs_connection)
     Row(horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap)) {
       SecondaryButton(
           stringResource(R.string.reject_proof_back),
@@ -227,7 +235,7 @@ private fun RejectProofForm(
               if (saving) R.string.reject_proof_rejecting else R.string.reject_proof_confirm
           ),
           onClick = { onReject(reason) },
-          enabled = reason.isNotEmpty() && !saving,
+          enabled = reason.isNotEmpty() && !saving && !offline,
           tag = C.Tag.REJECT_PROOF_CONFIRM,
           busy = saving,
       )
@@ -342,6 +350,7 @@ private fun RejectProofPreview(picked: RejectReason?, note: String) {
             note = note,
             onNoteChange = {},
             saving = false,
+            offline = false,
             onReject = {},
             onBack = {},
         )

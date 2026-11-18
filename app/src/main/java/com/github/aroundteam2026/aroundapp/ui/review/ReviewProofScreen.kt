@@ -66,6 +66,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.dashboard.partyLabel
 import com.github.aroundteam2026.aroundapp.ui.dashboard.rememberNow
 import com.github.aroundteam2026.aroundapp.ui.dashboard.timeAgo
@@ -87,6 +88,8 @@ import kotlinx.coroutines.launch
  * A failed answer shows a snackbar once. Once the proof is answered while shown, here or on another
  * phone, [onBack] returns to the dashboard; while an answer is being saved, Back waits for it. A
  * proof the venue already rejected shows read-only, with the reason, and no Approve or Reject.
+ * Offline, Approve, Reject and the sheet's "Reject proof" are disabled, with a hint that they need
+ * a connection.
  *
  * @param viewModel Holds the proof the dashboard opened.
  * @param onBack Returns to the dashboard.
@@ -191,6 +194,7 @@ internal fun ReviewProofContent(
         explorerName = state.explorerName,
         proofType = state.proof?.type ?: ProofType.PHOTO,
         saving = state.saving,
+        offline = state.offline,
         onReject = onReject,
         onDismiss = { rejecting = false },
         snackbarHostState = snackbarHostState,
@@ -512,7 +516,9 @@ private fun ColumnScope.LoadFailed(onRetry: () -> Unit) {
 
 /**
  * What approving gives, then Reject and Approve, disabled unless the proof can be answered. While
- * [approving], Approve shows it; the reject sheet shows a rejection being saved.
+ * [approving], Approve shows it; the reject sheet shows a rejection being saved. Offline, a hint
+ * above says why both are disabled; here, next to the buttons, it stays in view while the proof
+ * scrolls.
  */
 @Composable
 private fun Actions(
@@ -542,6 +548,7 @@ private fun Actions(
       Modifier.fillMaxWidth().navigationBarsPadding().padding(AroundSpacing.SectionGap),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
   ) {
+    if (state.showsOfflineHint) OfflineHint(R.string.offline_review_needs_connection)
     if (hint != null) {
       Text(
           hint,
@@ -616,6 +623,18 @@ internal fun ReviewProofAnswerPreview() {
           photo = null,
       )
   )
+}
+
+@Preview(name = "Offline - Light", widthDp = 413, heightDp = 917)
+@Preview(
+    name = "Offline - Dark",
+    widthDp = 413,
+    heightDp = 917,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+internal fun ReviewProofOfflinePreview() {
+  ReviewProofPreview(PREVIEW_STATE.copy(offline = true))
 }
 
 @Composable

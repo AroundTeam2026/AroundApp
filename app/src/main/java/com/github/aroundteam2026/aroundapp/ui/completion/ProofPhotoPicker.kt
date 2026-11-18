@@ -15,24 +15,16 @@ import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.activity.result.contract.ActivityResultContracts.TakePicture
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * The proof photo of a photo quest, as the Figma "Photo" box of `S4 · Submit proof`: "Take photo"
@@ -41,8 +33,9 @@ import kotlinx.coroutines.withContext
  * "Take photo" asks for the camera permission first; after a refusal, the box offers the phone's
  * settings, and "Take photo" returns once the camera is allowed there. The gallery needs no
  * permission and always works. Every photo goes through [ProofPhotos.shrink] before [onPhotoPicked]
- * gets it, and the camera's original and a retaken copy are deleted from the cache, off the main
- * thread. A picked photo that can't be shown is dropped through [onRetake], and the box says why.
+ * gets it, and the camera's original and a retaken copy are deleted, off the main thread. A picked
+ * photo that can't be shown is dropped through [onRetake], and the box says why. Those decisions
+ * are [ProofPhotoPickerState]'s; this only wires the launchers and the box to it.
  *
  * @param venueName The venue the proof is for, named in the box's text.
  * @param photo The picked photo, as [onPhotoPicked] gave it, or null while there is none.
@@ -63,96 +56,51 @@ fun ProofPhotoPicker(
     questTitle: String = "",
 ) {
   val context = LocalContext.current
-  val scope = rememberCoroutineScope()
-  var cameraRefused by rememberSaveable { mutableStateOf(false) }
-  var error by rememberSaveable { mutableStateOf<ProofPhotoError?>(null) }
-  var shrinking by remember { mutableStateOf(false) }
-  // The file the camera app writes into, kept in case the activity is recreated while it's open
-  var cameraTarget by rememberSaveable { mutableStateOf<String?>(null) }
-
-  val usePhoto: (Uri) -> Unit = { source ->
-    shrinking = true
-    error = null
-    scope.launch {
-      try {
-        onPhotoPicked(photos.shrink(source))
-      } catch (cancelled: CancellationException) {
-        throw cancelled
-      } catch (_: ProofPhotoTooBigException) {
-        error = ProofPhotoError.TOO_BIG
-      } catch (_: Exception) {
-        error = ProofPhotoError.UNREADABLE
-      } finally {
-        shrinking = false
-        // The camera's original, whether or not the copy worked; a photo from the gallery is not
-        // ours to delete. Even once the screen is gone, which cancels this coroutine
-        withContext(NonCancellable) { photos.discard(source) }
-      }
-    }
-  }
+  val state = rememberProofPhotoPickerState(photos)
+  LaunchedEffect(state) { state.discardStale() }
   val camera =
       rememberLauncherForActivityResult(TakePicture()) { taken ->
-        val target = cameraTarget?.toUri()
-        cameraTarget = null
-        if (target != null) {
-          if (taken) usePhoto(target) else scope.launch { photos.discard(target) }
-        }
+        state.onCameraResult(taken, onPhotoPicked)
       }
   val gallery =
-      rememberLauncherForActivityResult(PickVisualMedia()) { picked -> picked?.let(usePhoto) }
+      rememberLauncherForActivityResult(PickVisualMedia()) { picked ->
+        picked?.let { state.use(it, onPhotoPicked) }
+      }
   val openCamera = {
-    val target = photos.newCameraTarget()
-    cameraTarget = target.toString()
     try {
-      camera.launch(target)
+      camera.launch(state.newCameraTarget())
     } catch (_: ActivityNotFoundException) {
-      cameraTarget = null
-      scope.launch { photos.discard(target) }
-      error = ProofPhotoError.NO_CAMERA
+      state.noCamera()
     }
   }
   val askForCamera =
       rememberLauncherForActivityResult(RequestPermission()) { granted ->
-        if (granted) openCamera() else cameraRefused = true
+        if (granted) openCamera() else state.refuseCamera()
       }
   // Back from the phone's settings, a camera allowed there brings "Take photo" back
   LifecycleResumeEffect(Unit) {
-    if (cameraRefused && cameraAllowed(context)) cameraRefused = false
+    state.onResumed(cameraAllowed(context))
     onPauseOrDispose {}
   }
   val currentOnRetake by rememberUpdatedState(onRetake)
   val preview by
-      produceState<ImageBitmap?>(null, photo) {
-        value =
-            try {
-              photo?.let { photos.preview(it) }
-            } catch (cancelled: CancellationException) {
-              throw cancelled
-            } catch (_: Exception) {
-              // A copy that can't even be shown isn't sent: it's dropped, and the box says why,
-              // instead of staying empty as if it were still loading
-              photo?.let { photos.discard(it) }
-              error = ProofPhotoError.UNREADABLE
-              currentOnRetake()
-              null
-            }
-      }
+      produceState<ImageBitmap?>(null, photo) { value = state.preview(photo) { currentOnRetake() } }
 
   ProofPhotoBox(
       venueName = venueName,
       picked = photo != null,
       preview = preview,
-      cameraRefused = cameraRefused,
-      error = error,
-      enabled = enabled && !shrinking,
+      cameraRefused = state.cameraRefused,
+      error = state.error,
+      enabled = enabled && !state.shrinking,
       questTitle = questTitle,
       onTakePhoto = {
-        error = null
+        state.clearError()
         if (cameraAllowed(context)) openCamera()
         else askForCamera.launch(Manifest.permission.CAMERA)
       },
       onChooseFromGallery = {
-        error = null
+        state.clearError()
         gallery.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
       },
       onOpenSettings = {
@@ -165,11 +113,11 @@ fun ProofPhotoPicker(
           )
         } catch (_: ActivityNotFoundException) {
           // As for a missing camera app, the gallery stays the way out
-          error = ProofPhotoError.NO_SETTINGS
+          state.noSettings()
         }
       },
       onRetake = {
-        photo?.let { scope.launch { photos.discard(it) } }
+        state.retake(photo)
         onRetake()
       },
       modifier = modifier,

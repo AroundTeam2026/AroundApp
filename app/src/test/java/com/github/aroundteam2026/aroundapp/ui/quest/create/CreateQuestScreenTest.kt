@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.create
 
+import android.content.Context
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -25,6 +26,8 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.input.ImeAction
+import androidx.test.core.app.ApplicationProvider
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
@@ -151,9 +154,7 @@ class CreateQuestScreenTest {
   fun showsTheDefaultCompletionRules() {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_PHOTO).performScrollTo().assertIsSelected()
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_PROOF_TEXT).assertIsNotSelected()
-    compose
-        .onNodeWithTag(C.Tag.CREATE_QUEST_EXPLORER_PREVIEW)
-        .assertTextContains("Will come back to this once explorer view is done", substring = true)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_RESERVED_BANNER).assertDoesNotExist()
     compose
         .onNodeWithTag(C.Tag.CREATE_QUEST_RADIUS)
         .performScrollTo()
@@ -319,6 +320,36 @@ class CreateQuestScreenTest {
         .assertTextEquals("This field is required.")
   }
 
+  private fun itemPreview(item: String): String {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    return context.getString(
+        R.string.create_quest_reward_item_preview,
+        context.getString(R.string.map_card_reward_free_item, item),
+    )
+  }
+
+  @Test
+  fun theItemPreviewShowsHowTheChipWillRead() {
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM)
+        .performScrollTo()
+        .performTextInput(" $PREVIEW_ITEM ")
+    compose
+        .onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM_PREVIEW)
+        .performScrollTo()
+        .assertTextEquals(itemPreview(PREVIEW_ITEM))
+  }
+
+  @Test
+  fun aBlankItemShowsNoPreview() {
+    viewModel.selectRewardType(RewardType.FREE_ITEM)
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performScrollTo()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM_PREVIEW).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM).performTextInput(" ")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_ITEM_PREVIEW).assertDoesNotExist()
+  }
+
   @Test
   fun discountShowsTheAmountErrorOfItsUnit() {
     compose.onNodeWithTag(C.Tag.CREATE_QUEST_REWARD_DISCOUNT).performScrollTo().performClick()
@@ -468,3 +499,5 @@ class CreateQuestScreenTest {
     error.assertTextEquals("Use at most 2 decimals.")
   }
 }
+
+private const val PREVIEW_ITEM = "muffin"
