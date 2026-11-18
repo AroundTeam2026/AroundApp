@@ -74,19 +74,23 @@ internal class QuestMarkerHitTest(
     card = key to MarkerHitArea(size, path)
   }
 
-  fun hasCard(key: String): Boolean = card?.first == key
-
-  /** Returns the visible marker at [tap], or null when the tap lands on the map. */
+  /**
+   * Returns the visible marker at [tap], or null for bare map. Uses [sdkMarker] for non-touch
+   * activation or while the map or selected card is not ready for a hit test.
+   */
   fun find(
-      tap: Offset,
+      tap: Offset?,
       pins: List<VenuePin>,
       selectedKey: String?,
-      project: (VenuePin) -> Point,
+      sdkMarker: VenuePin? = null,
+      project: ((VenuePin) -> Point)?,
   ): VenuePin? {
+    if (tap == null || project == null) return sdkMarker
     val open = pins.firstOrNull { it.key == selectedKey }
     if (open != null) {
       val area = card?.takeIf { it.first == open.key }?.second
-      if (area != null && area.contains(tap, project(open))) return open
+      if (area == null && sdkMarker?.key == open.key) return open
+      if (area?.contains(tap, project(open)) == true) return open
     }
     return pins.firstOrNull { it.key != selectedKey && pin.contains(tap, project(it)) }
   }

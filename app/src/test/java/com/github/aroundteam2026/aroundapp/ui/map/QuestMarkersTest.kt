@@ -69,10 +69,10 @@ class QuestMarkersTest {
     val pins = listOf(pin, neighbour)
 
     // The neighbour's flag lies in the first bitmap's clear corner beside its pointer.
-    assertEquals(neighbour, hits.find(Offset(18f, -7f), pins, null, ::project))
+    assertEquals(neighbour, hits.find(Offset(18f, -7f), pins, null, project = ::project))
     // Here both pin bodies overlap, so the top pin owns the visible pixel.
-    assertEquals(pin, hits.find(Offset(10f, -20f), pins, null, ::project))
-    assertNull(hits.find(Offset(-20f, -5f), pins, null, ::project))
+    assertEquals(pin, hits.find(Offset(10f, -20f), pins, null, project = ::project))
+    assertNull(hits.find(Offset(-20f, -5f), pins, null, project = ::project))
   }
 
   @Test
@@ -81,8 +81,29 @@ class QuestMarkersTest {
     val pins = listOf(pin, neighbour)
     hits.recordCardSize(pin.key, IntSize(MarkerDefaults.dimensions.cardWidth.value.toInt(), 100))
 
-    assertEquals(pin, hits.find(Offset(18f, -14f), pins, pin.key, ::project))
-    assertEquals(neighbour, hits.find(Offset(18f, -7f), pins, pin.key, ::project))
+    assertEquals(pin, hits.find(Offset(18f, -14f), pins, pin.key, project = ::project))
+    assertEquals(neighbour, hits.find(Offset(18f, -7f), pins, pin.key, project = ::project))
+  }
+
+  @Test
+  fun activatingAMarkerWithoutATouchKeepsTheSdkSelection() {
+    val hits = hitTest()
+    val pins = listOf(pin, neighbour)
+
+    assertEquals(neighbour, hits.find(null, pins, null, neighbour, ::project))
+    assertNull(hits.find(null, pins, pin.key, project = ::project))
+  }
+
+  @Test
+  fun theSdkSelectionStillWorksBeforeTheMapOrCardCanBeHitTested() {
+    val hits = hitTest()
+    val pins = listOf(pin, neighbour)
+    val neighbourFlag = Offset(18f, -7f)
+
+    assertEquals(pin, hits.find(neighbourFlag, pins, null, pin, project = null))
+    assertEquals(pin, hits.find(neighbourFlag, pins, pin.key, pin, ::project))
+    hits.recordCardSize(pin.key, IntSize(MarkerDefaults.dimensions.cardWidth.value.toInt(), 100))
+    assertEquals(neighbour, hits.find(neighbourFlag, pins, pin.key, pin, ::project))
   }
 
   @Test

@@ -26,9 +26,10 @@ internal class MapTapPosition {
 
   /** A click consumes the coordinate once. Accessibility actions can arrive without a touch. */
   fun take(): Offset? {
-    val tap = latest
+    val tap = latest ?: return null
     clear()
-    return tap?.takeIf { SystemClock.uptimeMillis() - it.second <= MAX_MAP_TAP_AGE_MILLIS }?.first
+    return if (SystemClock.uptimeMillis() - tap.second <= MAX_MAP_TAP_AGE_MILLIS) tap.first
+    else null
   }
 }
 
@@ -40,7 +41,7 @@ internal fun Modifier.observeMapTaps(taps: MapTapPosition): Modifier =
         taps.clear()
         while (true) {
           val event = awaitPointerEvent(PointerEventPass.Initial)
-          val pointer = event.changes.singleOrNull()?.takeIf { it.id == down.id } ?: break
+          val pointer = event.changes.singleOrNull() ?: break
           if ((pointer.position - down.position).getDistance() > viewConfiguration.touchSlop) break
           if (!pointer.pressed) {
             if (
