@@ -56,6 +56,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -107,6 +108,18 @@ class ReviewProofViewModel(
   /** Whether the venue's answer is being written, until the repository returns. */
   private val writing = MutableStateFlow(false)
 
+  /**
+   * Whether the device is offline, followed for as long as the ViewModel lives rather than only
+   * while the screen watches [uiState], so it is current when the screen comes back.
+   */
+  private val offline = MutableStateFlow(false)
+
+  init {
+    viewModelScope.launch {
+      connectivityRepository.observeOffline(TAG).collect { offline.value = it }
+    }
+  }
+
   /** What the screen shows now; the screen observes it. */
   @OptIn(ExperimentalCoroutinesApi::class)
   val uiState: StateFlow<ReviewProofUiState> =
@@ -122,7 +135,7 @@ class ReviewProofViewModel(
               answers.state,
               reloading,
               writing,
-              connectivityRepository.observeOffline(TAG),
+              offline,
           ) { listened, answers, reloading, writing, offline ->
             val shown = if (reloading) ReviewProofUiState() else listened
             val pending =
@@ -144,7 +157,8 @@ class ReviewProofViewModel(
 
   /** Approves the proof, which gives the party the quest's reward. Does nothing offline. */
   fun approve() {
-    if (!uiState.value.canApprove) return
+    // The state can be stale while the screen resumes, so offline is read where it is followed
+    if (offline.value || !uiState.value.canApprove) return
     answers.answer(completionId, "proof $completionId with an approval") {
       whileWriting { completionRepository.approve(completionId) }
     }
@@ -157,7 +171,10 @@ class ReviewProofViewModel(
   fun reject(reason: String) {
     val trimmed = reason.trim()
     if (
-        trimmed.isEmpty() || trimmed.length > MAX_REJECT_REASON_LENGTH || !uiState.value.canReject
+        trimmed.isEmpty() ||
+            trimmed.length > MAX_REJECT_REASON_LENGTH ||
+            offline.value ||
+            !uiState.value.canReject
     ) {
       return
     }

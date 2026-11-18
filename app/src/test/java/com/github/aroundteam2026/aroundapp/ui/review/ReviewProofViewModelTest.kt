@@ -345,9 +345,32 @@ class ReviewProofViewModelTest {
   }
 
   @Test
+  fun goingOfflineWhileTheScreenIsStoppedKeepsTheProofUnanswered() = test {
+    sendProof(reserve())
+    val watching = backgroundScope.launch { viewModel.uiState.collect {} }
+    assertTrue(state.canApprove)
+
+    watching.cancel()
+    advanceTimeBy(STOPPED_LONG_ENOUGH_MS)
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS + 1)
+    watch()
+
+    viewModel.approve()
+    viewModel.reject("Photo is blurry")
+    assertEquals(CompletionStatus.PENDING, stored().status)
+    assertTrue(state.offline)
+    assertFalse(state.canReject)
+  }
+
+  @Test
   fun rejectingSendsTheTrimmedReason() = test {
     sendProof(reserve())
     watch()
+    // Back online after a disconnect, rejecting works again
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS + 1)
+    connectivity.online.value = true
 
     viewModel.reject("  Photo is blurry  ")
 
