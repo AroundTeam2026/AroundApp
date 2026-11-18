@@ -16,12 +16,16 @@ class RulesRefusalTest {
 
   @Test
   fun storageForbidden_isARefusal() {
-    assertTrue(isRulesRefusal(StorageException.fromExceptionAndHttpCode(null, FORBIDDEN)))
+    assertTrue(
+        isRulesRefusal(checkNotNull(StorageException.fromExceptionAndHttpCode(null, FORBIDDEN)))
+    )
   }
 
   @Test
   fun otherStorageFailure_isNotARefusal() {
-    assertFalse(isRulesRefusal(StorageException.fromExceptionAndHttpCode(null, NOT_FOUND)))
+    assertFalse(
+        isRulesRefusal(checkNotNull(StorageException.fromExceptionAndHttpCode(null, NOT_FOUND)))
+    )
   }
 
   @Test

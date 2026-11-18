@@ -25,9 +25,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Sends a photo proof once the device is online, even if the app was closed meanwhile (#406): it
- * uploads the copy [ProofPhotos] keeps in app storage (#412) through [ProofPhotoRepository], submits
- * the proof with the photo's `gs://` location through [CompletionRepository], then deletes the
- * copy. The upload queue (#538) enqueues it with [buildRequest].
+ * uploads the copy [ProofPhotos] keeps in app storage (#412) through [ProofPhotoRepository],
+ * submits the proof with the photo's `gs://` location through [CompletionRepository], then deletes
+ * the copy. The upload queue (#538) enqueues it with [buildRequest].
  *
  * A failure that can pass, such as a lost connection or a timeout, is retried with backoff, for at
  * most [MAX_ATTEMPTS] runs. One that would fail the same way on every run stops at once: a refusal

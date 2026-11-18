@@ -122,7 +122,7 @@ class ProofUploadWorkerTest {
 
   @Test
   fun refusedUpload_stopsWithoutRetryingAndKeepsTheCopy() = runBlocking {
-    photos.forcedFailure = StorageException.fromExceptionAndHttpCode(null, FORBIDDEN)
+    photos.forcedFailure = checkNotNull(StorageException.fromExceptionAndHttpCode(null, FORBIDDEN))
     val request = request()
     workManager.enqueue(request).await()
 
@@ -191,7 +191,8 @@ class ProofUploadWorkerTest {
 
   @Test
   fun approvedCompletion_stops() = runBlocking {
-    val id = completions.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, Proof.Text("x")).getOrThrow()
+    val id =
+        completions.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, Proof.Text("x")).getOrThrow()
     completions.approve(id).getOrThrow()
 
     assertEquals(failure(ERROR_ALREADY_APPROVED), worker().doWork())
