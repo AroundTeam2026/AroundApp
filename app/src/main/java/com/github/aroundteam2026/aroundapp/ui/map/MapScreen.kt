@@ -16,6 +16,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
@@ -74,12 +76,33 @@ fun MapScreen(
   val mapStyle = remember(resources, darkTheme) { MapStyleOptions(mapStyle(resources, darkTheme)) }
   val markerColors = MarkerDefaults.colors()
   val markerStyle = remember(markerColors) { MarkerDefaults.style(markerColors) }
+  val density = LocalDensity.current
+  val direction = LocalLayoutDirection.current
+  val markerHits =
+      remember(markerStyle, density, direction) {
+        QuestMarkerHitTest(markerStyle, density, direction)
+      }
+  val mapTaps = remember { MapTapPosition() }
+
+  fun openMarker(pin: VenuePin) {
+    if (pin.key == state.selectedPinKey) onFocusQuest(pin.venueId, pin.featuredQuest.id)
+    else viewModel.onPinClick(pin.key)
+  }
+
+  fun onMapTap(sdkMarker: VenuePin? = null) {
+    val projection = cameraPositionState.projection
+    val project = projection?.let { map ->
+      { pin: VenuePin -> map.toScreenLocation(pin.location.toLatLng()) }
+    }
+    val hit = markerHits.find(mapTaps.take(), state.pins, state.selectedPinKey, sdkMarker, project)
+    if (hit == null) viewModel.onMapClick() else openMarker(hit)
+  }
 
   BoxWithConstraints(Modifier.fillMaxSize().testTag(C.Tag.MAP_SCREEN)) {
     val width = constraints.maxWidth
     val height = constraints.maxHeight
     GoogleMap(
-        modifier = Modifier.fillMaxSize().testTag(C.Tag.MAP),
+        modifier = Modifier.fillMaxSize().testTag(C.Tag.MAP).observeMapTaps(mapTaps),
         cameraPositionState = cameraPositionState,
         // Both need the permission, or the Maps SDK throws a SecurityException
         properties =
@@ -91,9 +114,8 @@ fun MapScreen(
         // Whatever the style leaves uncoloured follows the theme too, where the device's Maps
         // renderer has dark colours; it uses the light ones unless told otherwise
         mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
-        onMapClick = { viewModel.onMapClick() },
-        // A tap on a place of the base map closes the card too, like any tap beside the pins
-        onPOIClick = { viewModel.onMapClick() },
+        onMapClick = { onMapTap() },
+        onPOIClick = { onMapTap() },
     ) {
       FrameArea(state.areaToFrame, cameraPositionState, width, height, viewModel::onAreaFramed)
       ReportVisibleArea(
@@ -105,8 +127,8 @@ fun MapScreen(
           pins = state.pins,
           selectedPinKey = state.selectedPinKey,
           style = markerStyle,
-          onPinClick = viewModel::onPinClick,
-          onCardClick = { onFocusQuest(it.venueId, it.featuredQuest.id) },
+          onMarkerClick = ::onMapTap,
+          onCardSize = markerHits::recordCardSize,
       )
     }
     if (state.showsNearby) {

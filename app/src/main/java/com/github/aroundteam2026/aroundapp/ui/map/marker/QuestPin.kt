@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map.marker
 
 import androidx.compose.foundation.background
@@ -11,11 +12,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.QuestMarkerHitTest
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
 /**
  * A venue's closed marker: [icon] on a light circle in a ring, whose pointer's tip, at the bottom
  * centre, marks the venue.
+ *
+ * [QuestMarkerHitTest] mirrors the pin's measured width, height and outline. Keep it in sync when
+ * changing the pin's layout.
  */
 @Composable
 fun QuestPin(

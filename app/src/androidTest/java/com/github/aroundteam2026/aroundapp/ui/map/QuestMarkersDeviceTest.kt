@@ -38,6 +38,7 @@ import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.maps.android.compose.CameraPositionState
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.log2
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -60,9 +61,9 @@ class QuestMarkersDeviceTest {
   private val venues = mutableMapOf<String, Venue>()
   // Venues of the test's own, in Zürich: the demo data's are in Lausanne
   private val cafe = quest("cafe", "Café Zürich", here)
-  // About 3 km south: the café's open card grows upwards and covers most of a small screen's width,
+  // A few kilometres southeast: the café's open card grows upwards and covers most of the width,
   // so a pin beside the café would be under it
-  private val bar = quest("bar", "Bar Zürich", Location(47.3499, 8.5417))
+  private val bar = quest("bar", "Bar Zürich", Location(47.3499, 8.5700))
   private val geneva = quest("geneva", "Atelier Genève", Location(46.2044, 6.1432))
 
   private val viewModel =
@@ -164,6 +165,44 @@ class QuestMarkersDeviceTest {
     openCard(cafe)
 
     assertEquals("cafe", state.selectedPinKey)
+  }
+
+  @Test
+  fun tappingTheVisibleFlagInOverlappingMarkerBoundsOpensItsQuest() {
+    awaitPins(cafe.venueId, bar.venueId)
+    openCard(cafe)
+    val dimensions = MarkerDefaults.dimensions
+    val density = composeTestRule.activity.resources.displayMetrics.density
+    val separation = (dimensions.pinDiameter / 2 + dimensions.pointerHeight / 3).value * density
+    val currentSeparation = screenPoint(bar.location()).y - screenPoint(cafe.location()).y
+    composeTestRule.runOnUiThread {
+      val zoom = camera.position.zoom + log2(separation / currentSeparation)
+      camera.move(CameraUpdateFactory.newLatLngZoom(here.toLatLng(), zoom))
+    }
+    awaitPins(cafe.venueId, bar.venueId)
+
+    val flag =
+        pointAbove(bar.location(), (dimensions.pinDiameter / 2 + dimensions.pointerHeight).value)
+    val cafePoint = screenPoint(cafe.location())
+    val fromCafeX = flag.x - cafePoint.x
+    val aboveCafe = cafePoint.y - flag.y
+    // The bar's flag centre falls in the café bitmap, beside its painted pointer.
+    assertTrue(
+        fromCafeX in
+            (dimensions.pointerWidth.value * density / 2)..(dimensions.pinDiameter.value * density /
+                    2)
+    )
+    assertTrue(aboveCafe in 0f..(dimensions.pointerHeight.value * density))
+
+    assertEquals(cafe.venueId, state.selectedPinKey)
+    composeTestRule.tapMapUntil(C.Tag.MAP, { flag }) {
+      state.selectedPinKey != cafe.venueId || opened.isNotEmpty()
+    }
+    assertEquals(bar.venueId, state.selectedPinKey)
+    assertTrue(opened.isEmpty())
+    tapCard(bar)
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) { opened.isNotEmpty() }
+    assertEquals(listOf(bar.venueId to bar.id), opened)
   }
 
   @Test

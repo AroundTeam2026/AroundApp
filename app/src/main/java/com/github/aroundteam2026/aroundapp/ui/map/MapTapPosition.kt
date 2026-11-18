@@ -1,0 +1,57 @@
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
+package com.github.aroundteam2026.aroundapp.ui.map
+
+import android.os.SystemClock
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+
+// The SDK confirms single taps asynchronously, including while its renderer starts up.
+private const val MAX_MAP_TAP_AGE_MILLIS = 2_000L
+
+/** Supplies the touch coordinate missing from a Maps SDK marker click. */
+internal class MapTapPosition {
+  private var latest: Pair<Offset, Long>? = null
+
+  fun clear() {
+    latest = null
+  }
+
+  fun record(point: Offset) {
+    latest = point to SystemClock.uptimeMillis()
+  }
+
+  /** A click consumes the coordinate once. Accessibility actions can arrive without a touch. */
+  fun take(): Offset? {
+    val tap = latest ?: return null
+    clear()
+    return if (SystemClock.uptimeMillis() - tap.second <= MAX_MAP_TAP_AGE_MILLIS) tap.first
+    else null
+  }
+}
+
+/** Observes single-finger taps in map-local pixels and leaves gesture handling to the SDK. */
+internal fun Modifier.observeMapTaps(taps: MapTapPosition): Modifier =
+    pointerInput(taps) {
+      awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        taps.clear()
+        awaitTapPosition(down)?.let(taps::record)
+      }
+    }
+
+/** Returns the release position of a single-finger tap within the touch slop and press timeout. */
+private suspend fun AwaitPointerEventScope.awaitTapPosition(down: PointerInputChange): Offset? {
+  while (true) {
+    val pointer = awaitPointerEvent(PointerEventPass.Initial).changes.singleOrNull() ?: return null
+    if ((pointer.position - down.position).getDistance() > viewConfiguration.touchSlop) return null
+    if (pointer.pressed) continue
+    val duration = pointer.uptimeMillis - down.uptimeMillis
+    return if (duration < viewConfiguration.longPressTimeoutMillis) pointer.position else null
+  }
+}
