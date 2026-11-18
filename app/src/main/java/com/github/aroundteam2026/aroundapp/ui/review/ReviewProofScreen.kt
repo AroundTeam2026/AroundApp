@@ -87,9 +87,9 @@ import kotlinx.coroutines.launch
  * quest, the photo or the written answer, and Approve and Reject. Reject opens [RejectProofSheet].
  * A failed answer shows a snackbar once. Once the proof is answered while shown, here or on another
  * phone, [onBack] returns to the dashboard; while an answer is being saved, Back waits for it. A
- * proof the venue already rejected shows read-only, with the reason, and no Approve or Reject.
- * Offline, Approve, Reject and the sheet's "Reject proof" are disabled, with a hint that they need
- * a connection.
+ * proof the venue already rejected shows the reason and only Approve, as the Figma frame `M2 ·
+ * Review proof · rejected, approve` (#609), for a venue that changes its mind. Offline, Approve,
+ * Reject and the sheet's "Reject proof" are disabled, with a hint that they need a connection.
  *
  * @param viewModel Holds the proof the dashboard opened.
  * @param onBack Returns to the dashboard.
@@ -150,8 +150,8 @@ internal fun ReviewProofContent(
       containerColor = MaterialTheme.colorScheme.background,
       snackbarHost = { SnackbarHost(snackbarHostState) },
       bottomBar = {
-        // An answered proof is only there to look at
-        if (loaded && !state.reviewed) {
+        // An approved proof is only there to look at
+        if (loaded && state.answerable) {
           Actions(
               state,
               approving = state.saving && !rejecting,
@@ -515,7 +515,8 @@ private fun ColumnScope.LoadFailed(onRetry: () -> Unit) {
 }
 
 /**
- * What approving gives, then Reject and Approve, disabled unless the proof can be answered. While
+ * What approving gives, then Reject and Approve, disabled unless the proof can be answered; a
+ * rejected proof can't be rejected again, so it gets Approve alone, across the bar. While
  * [approving], Approve shows it; the reject sheet shows a rejection being saved. Offline, a hint
  * above says why both are disabled; here, next to the buttons, it stays in view while the proof
  * scrolls.
@@ -559,12 +560,14 @@ private fun Actions(
       )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap)) {
-      SecondaryButton(
-          stringResource(R.string.review_proof_reject),
-          onReject,
-          enabled = state.canReject,
-          tag = C.Tag.REVIEW_PROOF_REJECT,
-      )
+      if (!state.reviewed) {
+        SecondaryButton(
+            stringResource(R.string.review_proof_reject),
+            onReject,
+            enabled = state.canReject,
+            tag = C.Tag.REVIEW_PROOF_REJECT,
+        )
+      }
       PrimaryButton(
           stringResource(
               if (approving) R.string.review_proof_approving else R.string.review_proof_approve

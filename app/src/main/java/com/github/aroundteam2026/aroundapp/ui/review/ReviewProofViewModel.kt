@@ -70,10 +70,10 @@ import kotlinx.coroutines.withContext
  * [proofPhotoRepository], decoded by [decode]. Once the proof is no longer pending, the state is
  * [ReviewProofUiState.reviewed], with the reason of a rejection; once it is answered while shown,
  * here or on another phone, the state is also [ReviewProofUiState.answered]. A proof the venue
- * already rejected opens read-only, for the venue to look at. A proof that can't be found, or its
- * listener failing, shows [ReviewProofStatus.FAILED] until [retry]. The reservation, party or quest
- * failing only leaves out what they tell, and a photo that can't be downloaded or decoded shows
- * [ProofPhoto.Failed] until [retry].
+ * already rejected opens with only [approve] left, for a venue that changes its mind. A proof that
+ * can't be found, or its listener failing, shows [ReviewProofStatus.FAILED] until [retry]. The
+ * reservation, party or quest failing only leaves out what they tell, and a photo that can't be
+ * downloaded or decoded shows [ProofPhoto.Failed] until [retry].
  *
  * [approve] and [reject] save through an [AnswerSaver]: a double tap saves once, and a failure is
  * reported until [clearUpdateError].
@@ -150,13 +150,14 @@ class ReviewProofViewModel(
             // Reloading keeps answered, as the screen is leaving once it is
             val shown =
                 if (reloading) ReviewProofUiState(answered = listened.answered) else listened
-            val pending =
-                if (shown.status == ReviewProofStatus.LOADED && !shown.reviewed) setOf(completionId)
+            val answerable =
+                if (shown.status == ReviewProofStatus.LOADED && shown.answerable)
+                    setOf(completionId)
                 else emptySet()
             // While the answer is being written, saving even if the proof fails to load meanwhile:
             // the screen keeps Back disabled, as leaving would cancel the write
             shown.copy(
-                saving = writing || answers.savingAmong(pending).isNotEmpty(),
+                saving = writing || answers.savingAmong(answerable).isNotEmpty(),
                 updateFailed = answers.failed,
                 offline = offline,
             )
