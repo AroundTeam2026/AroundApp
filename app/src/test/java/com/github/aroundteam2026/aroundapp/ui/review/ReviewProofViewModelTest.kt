@@ -512,6 +512,33 @@ class ReviewProofViewModelTest {
   }
 
   @Test
+  fun approvingARejectedProofKeepsSavingUntilTheListenerShowsItApproved() = test {
+    sendProof(reserve())
+    completions.reject(id, "Blurry").getOrThrow()
+    // The approval returns before the listener shows it: it still shows the proof rejected
+    reviewed =
+        object : CompletionRepository by completions {
+          override suspend fun approve(id: String): Result<Unit> = Result.success(Unit)
+        }
+    watch()
+
+    viewModel.approve()
+    advanceUntilIdle()
+
+    // Saving keeps Approve, and Back on the screen, disabled until the approval shows
+    assertEquals(CompletionStatus.REJECTED, state.proofStatus)
+    assertTrue(state.saving)
+    assertFalse(state.canApprove)
+    assertFalse(state.answered)
+
+    completions.approve(id).getOrThrow()
+
+    assertEquals(CompletionStatus.APPROVED, state.proofStatus)
+    assertFalse(state.saving)
+    assertTrue(state.answered)
+  }
+
+  @Test
   fun offlineARejectedProofCantBeApprovedAndSaysWhy() = test {
     sendProof(reserve())
     completions.reject(id, "Blurry").getOrThrow()
