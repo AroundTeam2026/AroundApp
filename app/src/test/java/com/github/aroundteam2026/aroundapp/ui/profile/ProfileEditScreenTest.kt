@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
@@ -108,7 +109,9 @@ class ProfileEditScreenTest {
     compose.waitForIdle()
     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(OFFLINE_HINT_DELAY_MS))
     compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
-    compose.onNodeWithText("Saving your profile needs a connection.").assertIsDisplayed()
+    compose
+        .onNodeWithText(compose.activity.getString(R.string.offline_profile_needs_connection))
+        .assertIsDisplayed()
     save.assertIsNotEnabled()
 
     compose.runOnIdle { connectivity.online.value = true }

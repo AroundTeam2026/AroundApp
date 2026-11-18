@@ -81,7 +81,8 @@ class ProfileSetupViewModelTest {
         model.save()
         advanceUntilIdle()
         assertEquals(ProfileSetupDestination.SETUP, model.destination.value)
-        assertFalse(model.form.value.saving)
+        // Nothing was written: the saved name is still blank
+        assertEquals("", users.getUser(uid)?.displayName)
 
         connectivity.online.value = true
         advanceUntilIdle()
