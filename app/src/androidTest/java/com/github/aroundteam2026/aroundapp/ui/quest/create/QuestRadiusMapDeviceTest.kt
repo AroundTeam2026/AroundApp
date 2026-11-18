@@ -52,10 +52,13 @@ class QuestRadiusMapDeviceTest {
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   private val questLocation = Location(46.5220, 6.6330)
+  // An address picked in the form, about a kilometre away
+  private val picked = Location(46.5300, 6.6400)
   private lateinit var scroll: ScrollState
   private val moves = mutableListOf<Location>()
   // Follows the pin, as the form's view model does
   private var location by mutableStateOf(questLocation)
+  private var radiusMeters by mutableStateOf(RADIUS_METERS)
 
   /** Shows [map] below some blank space and above more, so the screen around it can scroll. */
   private fun showInScrollingScreen(map: @Composable () -> Unit) {
@@ -74,7 +77,7 @@ class QuestRadiusMapDeviceTest {
   private fun showPicker() = showInScrollingScreen {
     QuestRadiusMap(
         location,
-        RADIUS_METERS,
+        radiusMeters,
         WALK_MINUTES,
         venue = null,
         venueName = VENUE_NAME,
@@ -113,8 +116,9 @@ class QuestRadiusMapDeviceTest {
   }
 
   /**
-   * Spreads two fingers apart from near the centre of the node tagged [tag], as a user zooms in.
-   * The Maps SDK doesn't zoom on a pinch from `performTouchInput`, so it goes through the system's
+   * Spreads two fingers apart diagonally from near the centre of the node tagged [tag], as a user
+   * zooms in. The first finger moves up, which a scrolling screen would take to scroll itself. The
+   * Maps SDK doesn't zoom on a pinch from `performTouchInput`, so it goes through the system's
    * input, as a real one does.
    */
   private fun pinchOpen(tag: String) {
@@ -124,12 +128,12 @@ class QuestRadiusMapDeviceTest {
       composeTestRule.activity.window.decorView.getLocationOnScreen(root)
     }
     val center = Offset(root[0] + bounds.center.x, root[1] + bounds.center.y)
-    val near = bounds.width * PINCH_START
-    val far = bounds.width * PINCH_END
+    val near = Offset(bounds.width, bounds.height) * PINCH_START
+    val far = Offset(bounds.width, bounds.height) * PINCH_END
     val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
     val start = SystemClock.uptimeMillis()
     // Each finger at [spread] from the centre, both fingers when [both]
-    fun event(time: Long, action: Int, spread: Float, both: Boolean): MotionEvent {
+    fun event(time: Long, action: Int, spread: Offset, both: Boolean): MotionEvent {
       val fingers = if (both) 2 else 1
       val properties =
           Array(fingers) { finger ->
@@ -141,8 +145,9 @@ class QuestRadiusMapDeviceTest {
       val coords =
           Array(fingers) { finger ->
             MotionEvent.PointerCoords().apply {
-              x = if (finger == 0) center.x - spread else center.x + spread
-              y = center.y
+              val at = if (finger == 0) center - spread else center + spread
+              x = at.x
+              y = at.y
               pressure = 1f
               size = 1f
             }
@@ -170,7 +175,7 @@ class QuestRadiusMapDeviceTest {
       add(event(start, MotionEvent.ACTION_POINTER_DOWN or second, near, both = true))
       for (step in 1..PINCH_STEPS) {
         val time = start + PINCH_MILLIS * step / PINCH_STEPS
-        val spread = near + (far - near) * step / PINCH_STEPS
+        val spread = near + (far - near) * (step.toFloat() / PINCH_STEPS)
         add(event(time, MotionEvent.ACTION_MOVE, spread, both = true))
       }
       val end = start + PINCH_MILLIS
@@ -251,6 +256,32 @@ class QuestRadiusMapDeviceTest {
   }
 
   @Test
+  fun aNewRadiusOrAMoveFromElsewhereFramesThePinWhereItIs() {
+    showPicker()
+    val map = composeTestRule.awaitGoogleMap()
+    val framed = map.awaitFramed()
+    // Off the pin, which would take the tap; far enough from it to tell the two apart
+    composeTestRule.tapMapUntil(
+        C.Tag.CREATE_QUEST_RADIUS_MAP,
+        at = { Offset(width * OFF_PIN, centerY) },
+    ) {
+      moves.isNotEmpty()
+    }
+    val tapped = moves.last()
+    assertFalse("The pin didn't move away", framed.target.isNear(tapped))
+
+    composeTestRule.runOnUiThread { radiusMeters = LARGER_RADIUS_METERS }
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
+      composeTestRule.runOnUiThread { map.cameraPosition.target.isNear(tapped) }
+    }
+
+    composeTestRule.runOnUiThread { location = picked }
+    composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
+      composeTestRule.runOnUiThread { map.cameraPosition.target.isNear(picked) }
+    }
+  }
+
+  @Test
   fun theQuestDetailsMapStaysStillAndLetsTheScreenScroll() {
     showDetailsMap()
     val map = composeTestRule.awaitGoogleMap()
@@ -271,6 +302,7 @@ class QuestRadiusMapDeviceTest {
     const val VENUE_NAME = "Café du Lac"
     const val DETAILS_MAP_DESCRIPTION = "Within 200 m of Café du Lac"
     const val RADIUS_METERS = 200
+    const val LARGER_RADIUS_METERS = 400
     const val WALK_MINUTES = 3
     const val ZOOM_IN = 2f
     const val OFF_PIN = 0.2f
