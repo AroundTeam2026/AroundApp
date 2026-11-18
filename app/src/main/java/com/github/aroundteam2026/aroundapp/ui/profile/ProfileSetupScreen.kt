@@ -53,9 +53,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.ProfilePhoto
 import com.github.aroundteam2026.aroundapp.ui.completion.ProofPhotos
 import com.github.aroundteam2026.aroundapp.ui.navigation.ProfileError
@@ -81,13 +83,14 @@ fun ExplorerProfileSetupGate(
     uid: String,
     users: UserRepository,
     pictures: UserPictureRepository,
+    connectivity: ConnectivityRepository,
     onSignOut: () -> Unit,
     home: @Composable (ProfileSetupViewModel) -> Unit,
 ) {
   val model: ProfileSetupViewModel =
       viewModel(
           key = "profile-setup-$uid",
-          factory = ProfileSetupViewModel.factory(uid, users, pictures),
+          factory = ProfileSetupViewModel.factory(uid, users, pictures, connectivity),
       )
   val destination by model.destination.collectAsStateWithLifecycle()
   when (destination) {
@@ -116,6 +119,7 @@ internal fun ProfileForm(
 ) {
   val form by model.form.collectAsStateWithLifecycle()
   val profile by model.profile.collectAsStateWithLifecycle()
+  val offline by model.offline.collectAsStateWithLifecycle()
   val context = LocalContext.current.applicationContext
   // Uploaded at once, so its copies stay in the cache, which the system clears
   val photos = remember(context) { ProofPhotos(context, root = context.cacheDir) }
@@ -194,9 +198,14 @@ internal fun ProfileForm(
       )
     }
     Spacer(Modifier.weight(1f))
+    // Uploading the picture and saving the profile both need the server
+    if (offline) {
+      OfflineHint(R.string.offline_profile_needs_connection)
+      Spacer(Modifier.height(AroundSpacing.Medium))
+    }
     Button(
         onClick = model::save,
-        enabled = !form.saving && !preparingPhoto,
+        enabled = !form.saving && !preparingPhoto && !offline,
         shape = AroundShapes.medium,
         modifier =
             Modifier.fillMaxWidth().height(CONTINUE_HEIGHT).testTag(C.Tag.PROFILE_SETUP_CONTINUE),

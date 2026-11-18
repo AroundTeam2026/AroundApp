@@ -8,9 +8,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,13 +51,20 @@ enum class ProfileSetupError {
 
 /**
  * Saves the name and optional picture through repository interfaces, then observes the saved name.
+ * Saving needs a connection, for the picture's upload and the profile's server write, so it waits
+ * while [offline].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileSetupViewModel(
     private val uid: String,
     private val users: UserRepository,
     private val pictures: UserPictureRepository,
+    connectivity: ConnectivityRepository,
 ) : ViewModel() {
+  /** Whether the phone is offline, so saving is unavailable; brief disconnects are ignored. */
+  val offline: StateFlow<Boolean> =
+      connectivity.observeOffline(TAG).stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
   private val retries = MutableStateFlow(0)
   private val mutableProfile = MutableStateFlow<User?>(null)
 
@@ -135,11 +144,19 @@ class ProfileSetupViewModel(
     retries.update { it + 1 }
   }
 
-  /** A second tap cannot start another upload or profile write while the first save is pending. */
+  /**
+   * A second tap cannot start another upload or profile write while the first save is pending. Does
+   * nothing while [offline].
+   */
   fun save() {
     val current = form.value
     val isEditing = editing.value
-    if (current.saving || (destination.value != ProfileSetupDestination.SETUP && !isEditing)) return
+    if (
+        current.saving ||
+            offline.value ||
+            (destination.value != ProfileSetupDestination.SETUP && !isEditing)
+    )
+        return
     val name = current.name.trim()
     val validation =
         when {
@@ -179,13 +196,15 @@ class ProfileSetupViewModel(
 
   companion object {
     const val MAX_NAME_LENGTH = 100
+    private const val TAG = "ProfileSetup"
 
     fun factory(
         uid: String,
         users: UserRepository,
         pictures: UserPictureRepository,
+        connectivity: ConnectivityRepository,
     ): ViewModelProvider.Factory = viewModelFactory {
-      initializer { ProfileSetupViewModel(uid, users, pictures) }
+      initializer { ProfileSetupViewModel(uid, users, pictures, connectivity) }
     }
   }
 }

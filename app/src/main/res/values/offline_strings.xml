@@ -9,6 +9,7 @@
     <string name="offline_answer_needs_connection">Approve and decline need a connection.</string>
     <string name="offline_review_needs_connection">Approving and rejecting need a connection.</string>
     <string name="offline_photo_needs_connection">Sending a photo needs a connection.</string>
+    <string name="offline_profile_needs_connection">Saving your profile needs a connection.</string>
     <!-- Caption of the app-wide offline banner, OfflineBanner -->
     <string name="offline_banner_caption">Showing what\'s saved on this phone.</string>
 </resources>

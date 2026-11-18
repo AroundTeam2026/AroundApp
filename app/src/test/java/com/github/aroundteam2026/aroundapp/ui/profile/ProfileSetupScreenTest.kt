@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.user.Role
@@ -53,6 +54,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ProfileSetupScreenTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+  private val connectivity = FakeConnectivityRepository()
   private val users = FakeUserRepository()
 
   @Test
@@ -60,7 +62,13 @@ class ProfileSetupScreenTest {
     runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
     compose.setContent {
       AroundAppTheme {
-        ExplorerProfileSetupGate("explorer", users, FakeUserPictureRepository(), onSignOut = {}) {
+        ExplorerProfileSetupGate(
+            "explorer",
+            users,
+            FakeUserPictureRepository(),
+            connectivity = connectivity,
+            onSignOut = {},
+        ) {
           Text("Explorer home", modifier = Modifier.testTag(C.Tag.APP))
         }
       }
@@ -93,6 +101,7 @@ class ProfileSetupScreenTest {
             "explorer",
             refusing,
             FakeUserPictureRepository(),
+            connectivity = connectivity,
             onSignOut = {},
         ) {
           Text("Explorer home", modifier = Modifier.testTag(C.Tag.APP))
@@ -128,6 +137,7 @@ class ProfileSetupScreenTest {
             "explorer",
             flaky,
             FakeUserPictureRepository(),
+            connectivity = connectivity,
             onSignOut = { signOuts++ },
         ) {}
       }
@@ -149,7 +159,13 @@ class ProfileSetupScreenTest {
     compose.setContent {
       CompositionLocalProvider(LocalActivityResultRegistryOwner provides results) {
         AroundAppTheme {
-          ExplorerProfileSetupGate("explorer", repository, pictures, onSignOut = {}) {
+          ExplorerProfileSetupGate(
+              "explorer",
+              repository,
+              pictures,
+              connectivity = connectivity,
+              onSignOut = {},
+          ) {
             Text("Explorer home", modifier = Modifier.testTag(C.Tag.APP))
           }
         }
@@ -259,7 +275,13 @@ class ProfileSetupScreenTest {
     runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
     compose.setContent {
       AroundAppTheme(darkTheme = true) {
-        ExplorerProfileSetupGate("explorer", users, FakeUserPictureRepository(), onSignOut = {}) {}
+        ExplorerProfileSetupGate(
+            "explorer",
+            users,
+            FakeUserPictureRepository(),
+            connectivity = connectivity,
+            onSignOut = {},
+        ) {}
       }
     }
     val screen = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_SCREEN).captureToImage()

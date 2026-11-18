@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
@@ -33,13 +34,15 @@ class MainActivity : ComponentActivity() {
       val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
       val users = UserRepositoryProvider.repository
       val pictures = remember { UserPictureRepositoryProvider.repository(applicationContext) }
+      val connectivity = remember { ConnectivityRepositoryProvider.repository(applicationContext) }
       AroundAppTheme {
         RoleNavigation(
             authRepository = auth,
             userRepository = users,
             pendingRoleStore = pendingRole,
             explorerScreen = { uid ->
-              ExplorerProfileSetupGate(uid, users, pictures, profile::signOut) { setup ->
+              ExplorerProfileSetupGate(uid, users, pictures, connectivity, profile::signOut) { setup
+                ->
                 AroundApp(
                     explorerUid = uid,
                     onSignOut = profile::signOut,
