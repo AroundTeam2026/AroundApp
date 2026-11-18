@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.compose.runtime.Composable
@@ -7,7 +8,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import com.github.aroundteam2026.aroundapp.R
@@ -30,11 +33,11 @@ private const val OPEN_CARD_Z_INDEX = 1f
 
 /**
  * Marks each of [pins] on the map: a pin, or the card of the pin keyed [selectedPinKey], over its
- * area. Tapping a pin calls [onPinClick] with its [VenuePin.key]; tapping the card calls
- * [onCardClick].
+ * area. [onMarkerClick] reports the marker picked by the SDK so the screen can resolve the tap.
+ * [onCardSize] reports the open card's measured size for hit testing.
  *
  * Each marker is drawn as an image, which is redrawn only when what it shows changes: a pin's icon
- * or [style], or for a card, its whole pin. So the whole marker is one tap target.
+ * or [style], or for a card, its whole pin.
  */
 @Composable
 @GoogleMapComposable
@@ -42,10 +45,10 @@ fun QuestMarkers(
     pins: List<VenuePin>,
     selectedPinKey: String?,
     style: MarkerStyle,
-    onPinClick: (key: String) -> Unit,
-    onCardClick: (VenuePin) -> Unit,
+    onMarkerClick: (VenuePin) -> Unit,
+    onCardSize: (key: String, IntSize) -> Unit,
 ) {
-  pins.forEach { pin ->
+  pins.forEachIndexed { index, pin ->
     key(pin.key) {
       val open = pin.key == selectedPinKey
       // Real metres on the ground, so the area grows as the explorer zooms in
@@ -62,14 +65,20 @@ fun QuestMarkers(
           *keys,
           state = rememberUpdatedMarkerState(pin.location.toLatLng()),
           contentDescription = pin.description(),
-          zIndex = if (open) OPEN_CARD_Z_INDEX else 0f,
+          anchor = QuestMarkerAnchor,
+          // Closed pins draw in list order from top to bottom, like the hit test.
+          zIndex = if (open) OPEN_CARD_Z_INDEX else -index.toFloat(),
           onClick = {
-            if (open) onCardClick(pin) else onPinClick(pin.key)
+            onMarkerClick(pin)
             // Handled: no info window, and the camera stays put
             true
           },
       ) {
-        if (open) QuestCard(pin, style = style) else QuestPin(pin.icon, style = style)
+        if (open) {
+          QuestCard(pin, Modifier.onSizeChanged { onCardSize(pin.key, it) }, style)
+        } else {
+          QuestPin(pin.icon, style = style)
+        }
       }
     }
   }
