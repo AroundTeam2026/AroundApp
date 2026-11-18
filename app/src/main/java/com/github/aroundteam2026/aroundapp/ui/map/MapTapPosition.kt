@@ -6,7 +6,9 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 
 // The SDK confirms single taps asynchronously, including while its renderer starts up.
@@ -39,18 +41,17 @@ internal fun Modifier.observeMapTaps(taps: MapTapPosition): Modifier =
       awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         taps.clear()
-        while (true) {
-          val event = awaitPointerEvent(PointerEventPass.Initial)
-          val pointer = event.changes.singleOrNull() ?: break
-          if ((pointer.position - down.position).getDistance() > viewConfiguration.touchSlop) break
-          if (!pointer.pressed) {
-            if (
-                pointer.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
-            ) {
-              taps.record(pointer.position)
-            }
-            break
-          }
-        }
+        awaitTapPosition(down)?.let(taps::record)
       }
     }
+
+/** Returns the release position of a single-finger tap within the touch slop and press timeout. */
+private suspend fun AwaitPointerEventScope.awaitTapPosition(down: PointerInputChange): Offset? {
+  while (true) {
+    val pointer = awaitPointerEvent(PointerEventPass.Initial).changes.singleOrNull() ?: return null
+    if ((pointer.position - down.position).getDistance() > viewConfiguration.touchSlop) return null
+    if (pointer.pressed) continue
+    val duration = pointer.uptimeMillis - down.uptimeMillis
+    return if (duration < viewConfiguration.longPressTimeoutMillis) pointer.position else null
+  }
+}

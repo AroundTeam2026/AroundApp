@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.map.marker
 
 import androidx.compose.foundation.background
@@ -18,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.QuestMarkerHitTest
 import com.github.aroundteam2026.aroundapp.ui.map.VenuePin
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
@@ -31,6 +33,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.QuestLine
  *
  * The card is always [MarkerDimensions.cardWidth] wide: long text is cut off, and chips that don't
  * fit move to the next line, rather than widening it.
+ *
+ * [QuestMarkerHitTest] mirrors the rounded body above the centred pointer. Keep it in sync when
+ * changing how the body and pointer are laid out.
  */
 @Composable
 fun QuestCard(

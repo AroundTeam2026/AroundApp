@@ -61,7 +61,7 @@ class QuestMarkersTest {
   }
 
   private fun project(candidate: VenuePin): Point =
-      if (candidate == pin) Point(0, 0) else Point(18, 25)
+      if (candidate == pin) Point(0, 0) else Point(NEIGHBOUR_ANCHOR_X, NEIGHBOUR_ANCHOR_Y)
 
   @Test
   fun closeFlagsUseThePaintedShapeAndTheVisibleStackOrder() {
@@ -69,20 +69,20 @@ class QuestMarkersTest {
     val pins = listOf(pin, neighbour)
 
     // The neighbour's flag lies in the first bitmap's clear corner beside its pointer.
-    assertEquals(neighbour, hits.find(Offset(18f, -7f), pins, null, project = ::project))
+    assertEquals(neighbour, hits.find(NEIGHBOUR_FLAG, pins, null, project = ::project))
     // Here both pin bodies overlap, so the top pin owns the visible pixel.
-    assertEquals(pin, hits.find(Offset(10f, -20f), pins, null, project = ::project))
-    assertNull(hits.find(Offset(-20f, -5f), pins, null, project = ::project))
+    assertEquals(pin, hits.find(OVERLAPPING_FLAG_BODIES, pins, null, project = ::project))
+    assertNull(hits.find(CLEAR_CORNER, pins, null, project = ::project))
   }
 
   @Test
   fun anOpenCardCoversThePinsOnlyWhereItsShapeIsPainted() {
     val hits = hitTest()
     val pins = listOf(pin, neighbour)
-    hits.recordCardSize(pin.key, IntSize(MarkerDefaults.dimensions.cardWidth.value.toInt(), 100))
+    hits.recordCardSize(pin.key, OPEN_CARD_SIZE)
 
-    assertEquals(pin, hits.find(Offset(18f, -14f), pins, pin.key, project = ::project))
-    assertEquals(neighbour, hits.find(Offset(18f, -7f), pins, pin.key, project = ::project))
+    assertEquals(pin, hits.find(FLAG_UNDER_CARD_BODY, pins, pin.key, project = ::project))
+    assertEquals(neighbour, hits.find(NEIGHBOUR_FLAG, pins, pin.key, project = ::project))
   }
 
   @Test
@@ -98,12 +98,11 @@ class QuestMarkersTest {
   fun theSdkSelectionStillWorksBeforeTheMapOrCardCanBeHitTested() {
     val hits = hitTest()
     val pins = listOf(pin, neighbour)
-    val neighbourFlag = Offset(18f, -7f)
 
-    assertEquals(pin, hits.find(neighbourFlag, pins, null, pin, project = null))
-    assertEquals(pin, hits.find(neighbourFlag, pins, pin.key, pin, ::project))
-    hits.recordCardSize(pin.key, IntSize(MarkerDefaults.dimensions.cardWidth.value.toInt(), 100))
-    assertEquals(neighbour, hits.find(neighbourFlag, pins, pin.key, pin, ::project))
+    assertEquals(pin, hits.find(NEIGHBOUR_FLAG, pins, null, pin, project = null))
+    assertEquals(pin, hits.find(NEIGHBOUR_FLAG, pins, pin.key, pin, ::project))
+    hits.recordCardSize(pin.key, OPEN_CARD_SIZE)
+    assertEquals(neighbour, hits.find(NEIGHBOUR_FLAG, pins, pin.key, pin, ::project))
   }
 
   @Test
@@ -137,5 +136,23 @@ class QuestMarkersTest {
         context.getString(R.string.map_pin_description, "Café Lumen", "Find the hidden fox"),
         description,
     )
+  }
+
+  private companion object {
+    // Offsets in pixels at density 1, relative to the café pointer at the origin.
+    const val NEIGHBOUR_ANCHOR_X = 18
+    const val NEIGHBOUR_ANCHOR_Y = 25
+    val NEIGHBOUR_FLAG =
+        Offset(
+            NEIGHBOUR_ANCHOR_X.toFloat(),
+            NEIGHBOUR_ANCHOR_Y -
+                (MarkerDefaults.dimensions.pinDiameter / 2 +
+                        MarkerDefaults.dimensions.pointerHeight)
+                    .value,
+        )
+    val OVERLAPPING_FLAG_BODIES = Offset(10f, -20f)
+    val CLEAR_CORNER = Offset(-20f, -5f)
+    val FLAG_UNDER_CARD_BODY = Offset(18f, -14f)
+    val OPEN_CARD_SIZE = IntSize(MarkerDefaults.dimensions.cardWidth.value.toInt(), 100)
   }
 }
