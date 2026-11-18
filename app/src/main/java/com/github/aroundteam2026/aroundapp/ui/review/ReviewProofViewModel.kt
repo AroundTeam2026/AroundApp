@@ -47,17 +47,16 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -111,6 +110,12 @@ class ReviewProofViewModel(
 
   /** Whether the venue's answer is being written, until the repository returns. */
   private val writing = MutableStateFlow(false)
+
+  /**
+   * Where the proof stood when last shown, and whether it was answered while shown. Held here, not
+   * in the flow, so it outlives the listeners stopping while the screen is in the background.
+   */
+  private val shown = MutableStateFlow(Shown())
 
   /**
    * Whether the device is offline, followed for as long as the ViewModel lives rather than only
@@ -367,13 +372,12 @@ class ReviewProofViewModel(
 
   /**
    * These states, each [ReviewProofUiState.answered] once the proof was answered while shown, here
-   * or on another phone. A proof opened once rejected, to look at it, isn't answered until its
-   * status changes.
+   * or on another phone, even while the listeners were stopped. A proof opened once rejected, to
+   * look at it, isn't answered until its status changes.
    */
-  private fun Flow<ReviewProofUiState>.withAnswered() =
-      scan(Shown() to ReviewProofUiState()) { (shown, _), state -> shown.next(state) to state }
-          .drop(1)
-          .map { (shown, state) -> state.copy(answered = shown.answered) }
+  private fun Flow<ReviewProofUiState>.withAnswered() = map { state ->
+    state.copy(answered = shown.updateAndGet { it.next(state) }.answered)
+  }
 
   companion object {
     private const val TAG = "ReviewProofViewModel"

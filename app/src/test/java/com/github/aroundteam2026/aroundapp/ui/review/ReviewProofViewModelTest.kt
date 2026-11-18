@@ -509,6 +509,23 @@ class ReviewProofViewModelTest {
     assertNull(state.rejectReason)
   }
 
+  // The listeners stop 5 s after the screen goes to the background; what the proof was must outlive
+  // that, or an answer given meanwhile would look like the proof's status when opened
+  @Test
+  fun aProofAnsweredElsewhereWhileTheScreenIsStoppedIsAnswered() = test {
+    sendProof(reserve())
+    val watching = backgroundScope.launch { viewModel.uiState.collect {} }
+    assertFalse(state.reviewed)
+
+    watching.cancel()
+    advanceTimeBy(STOPPED_LONG_ENOUGH_MS)
+    completions.reject(id, "Blurry").getOrThrow()
+    watch()
+
+    assertTrue(state.reviewed)
+    assertTrue(state.answered)
+  }
+
   @Test
   fun aRejectedProofReplacedWhileShownCanBeAnsweredAgain() = test {
     val reservation = reserve()
