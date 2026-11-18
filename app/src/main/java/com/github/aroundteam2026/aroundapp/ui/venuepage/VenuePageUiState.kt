@@ -60,8 +60,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property leavesParties Whether the explorer joined the party of each reservation rather than
  *   created it, by reservation id, known as soon as the parties are read. A reservation whose party
  *   doesn't list the explorer as joined isn't in it.
- * @property offline Whether the device is offline, so cancelling, which needs a connection, is
- *   unavailable.
+ * @property offline Whether the device is offline, so cancelling and accepting, which need a
+ *   connection, are unavailable.
  */
 data class VenuePageUiState(
     val status: VenuePageStatus = VenuePageStatus.LOADING,

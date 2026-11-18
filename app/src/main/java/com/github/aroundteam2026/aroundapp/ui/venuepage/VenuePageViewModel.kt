@@ -209,10 +209,10 @@ class VenuePageViewModel(
    * Books the picked quest as a pending reservation, with the explorer as its party's first member,
    * for a slot starting now.
    *
-   * Does nothing when no quest is picked, accepting is unavailable, or that quest is already
-   * accepted or being accepted, so a double tap books once; other quests can still be accepted
-   * meanwhile. The quest shows as accepted only once the backend answered. A failure, a later
-   * server refusal or an unreadable profile keeps it picked and shows [AcceptStatus.FAILED];
+   * Does nothing when no quest is picked, accepting is unavailable, the device is offline, or that
+   * quest is already accepted or being accepted, so a double tap books once; other quests can still
+   * be accepted meanwhile. The quest shows as accepted only once the backend answered. A failure, a
+   * later server refusal or an unreadable profile keeps it picked and shows [AcceptStatus.FAILED];
    * calling this again retries. A quest accepted from its details stays picked once they close.
    */
   fun accept() {
@@ -220,7 +220,10 @@ class VenuePageViewModel(
     val quest = current.selectedQuest ?: return
     val id = quest.questId
     if (
-        !current.acceptAvailable || id in current.acceptingQuestIds || id in current.acceptedParties
+        !current.acceptAvailable ||
+            current.offline ||
+            id in current.acceptingQuestIds ||
+            id in current.acceptedParties
     ) {
       return
     }

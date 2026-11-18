@@ -91,6 +91,7 @@ internal fun QuestActionBar(
  * - Ready: the button calls [onAccept]. Failed: an error shows above it, and it says "Try again".
  * - Accepting: a pulsing skeleton that can't be tapped takes the button's place.
  * - Accepted: disabled, saying the venue is yet to approve. Unavailable: disabled, saying why.
+ * - Offline: disabled; the app-wide offline banner says why.
  * - A quest that needs more people says how many, whatever the state. Before it is accepted, that
  *   count leaves out the explorer, who isn't in the party yet, and the bar says so: "You + 3 more".
  *
@@ -134,7 +135,7 @@ fun AcceptQuestBar(
       )
     }
     if (onSubmitProof != null) SubmitProofButton(onSubmitProof)
-    else AcceptQuestButton(status, enabled = state.acceptAvailable, onAccept)
+    else AcceptQuestButton(status, enabled = state.acceptAvailable && !state.offline, onAccept)
     footer()
   }
 }

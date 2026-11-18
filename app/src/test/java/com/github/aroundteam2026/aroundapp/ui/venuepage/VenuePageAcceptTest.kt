@@ -1147,6 +1147,22 @@ class VenuePageAcceptTest {
   }
 
   @Test
+  fun offlineAcceptingIsUnavailableUntilBackOnline() = test {
+    openAndPick("a")
+    goOffline()
+
+    viewModel.accept()
+    runCurrent()
+    assertTrue(stored().isEmpty())
+
+    connectivity.online.value = true
+    runCurrent()
+    viewModel.accept()
+    runCurrent()
+    assertEquals("a", stored().single().questId)
+  }
+
+  @Test
   fun offlineSurvivesAFailedLoadAndARetry() = test {
     var loads = 0
     val venues = FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))

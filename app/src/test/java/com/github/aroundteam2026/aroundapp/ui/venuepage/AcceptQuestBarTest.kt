@@ -106,6 +106,13 @@ class AcceptQuestBarTest {
   }
 
   @Test
+  fun offlineTheButtonCannotAccept() {
+    show(LOADED.copy(selectedQuestId = "a", offline = true))
+
+    button.assertIsNotEnabled()
+  }
+
+  @Test
   fun acceptingShowsASkeletonInsteadOfASpinnerAndCannotBeTappedAgain() {
     show(LOADED.copy(selectedQuestId = "a", acceptingQuestIds = setOf("a")))
 
