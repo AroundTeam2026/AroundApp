@@ -63,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.OfflineHint
@@ -84,10 +85,11 @@ import kotlinx.coroutines.launch
 /**
  * The Review proof screen, as the Figma frames `S4 · Review proof`: who sent the proof, for which
  * quest, the photo or the written answer, and Approve and Reject. Reject opens [RejectProofSheet].
- * A failed answer shows a snackbar once. Once the proof is reviewed, here or on another phone,
- * [onBack] returns to the dashboard; while an answer is being saved, Back waits for it. Offline,
- * Approve, Reject and the sheet's "Reject proof" are disabled, with a hint that they need a
- * connection.
+ * A failed answer shows a snackbar once. Once the proof is answered while shown, here or on another
+ * phone, [onBack] returns to the dashboard; while an answer is being saved, Back waits for it. A
+ * proof the venue already rejected shows read-only, with the reason, and no Approve or Reject.
+ * Offline, Approve, Reject and the sheet's "Reject proof" are disabled, with a hint that they need
+ * a connection.
  *
  * @param viewModel Holds the proof the dashboard opened.
  * @param onBack Returns to the dashboard.
@@ -110,7 +112,7 @@ fun ReviewProofScreen(
     }
   }
   val currentOnBack by rememberUpdatedState(onBack)
-  LaunchedEffect(state.reviewed) { if (state.reviewed) currentOnBack() }
+  LaunchedEffect(state.answered) { if (state.answered) currentOnBack() }
   BackHandler(state.saving) {}
   ReviewProofContent(
       state = state,
@@ -148,7 +150,8 @@ internal fun ReviewProofContent(
       containerColor = MaterialTheme.colorScheme.background,
       snackbarHost = { SnackbarHost(snackbarHostState) },
       bottomBar = {
-        if (loaded) {
+        // An answered proof is only there to look at
+        if (loaded && !state.reviewed) {
           Actions(
               state,
               approving = state.saving && !rejecting,
@@ -175,6 +178,7 @@ internal fun ReviewProofContent(
         ReviewProofStatus.FAILED -> LoadFailed(onRetry)
         ReviewProofStatus.LOADED -> {
           Explorer(state, clock)
+          state.rejectReason?.let { RejectedReason(it) }
           Quest(state.questTitle, state.requirements)
           when (val proof = state.proof) {
             is Proof.Photo -> PhotoProof(state, explorerInSentence(state), clock, onRetry)
@@ -226,7 +230,11 @@ private fun TopBar(onBack: () -> Unit, enabled: Boolean) {
   }
 }
 
-/** Who sent the proof, their party and when, then the Pending tag. */
+/**
+ * Who sent the proof, their party and when, then where it stands: Pending on lavender, Rejected on
+ * the error colour of the reason's box, or Approved on the tertiary colour of the dashboard's
+ * Approved pill.
+ */
 @Composable
 private fun Explorer(state: ReviewProofUiState, clock: Clock) {
   val name = state.explorerName
@@ -263,13 +271,28 @@ private fun Explorer(state: ReviewProofUiState, clock: Clock) {
           style = AroundTextStyles.Caption,
       )
     }
+    val colors = MaterialTheme.colorScheme
+    val (label, color, contentColor) =
+        when (state.proofStatus) {
+          CompletionStatus.PENDING ->
+              Triple(
+                  R.string.review_proof_pending,
+                  AroundTheme.colors.lavender,
+                  AroundTheme.colors.accentText,
+              )
+          CompletionStatus.REJECTED ->
+              Triple(R.string.review_proof_rejected, colors.error, colors.onError)
+          CompletionStatus.APPROVED ->
+              Triple(R.string.review_proof_approved, colors.tertiary, colors.onTertiary)
+        }
     Surface(
+        Modifier.testTag(C.Tag.REVIEW_PROOF_STATUS),
         shape = AroundPillShape,
-        color = AroundTheme.colors.lavender,
-        contentColor = AroundTheme.colors.accentText,
+        color = color,
+        contentColor = contentColor,
     ) {
       Text(
-          stringResource(R.string.review_proof_pending),
+          stringResource(label),
           Modifier.padding(horizontal = AroundSpacing.Medium, vertical = TAG_VERTICAL_PADDING),
           style = AroundTextStyles.Badge,
       )

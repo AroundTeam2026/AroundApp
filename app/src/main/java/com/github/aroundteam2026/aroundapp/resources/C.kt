@@ -274,6 +274,10 @@ object C {
     const val DASHBOARD_PROOF_DETAILS = "dashboard_proof_details"
     const val DASHBOARD_PROOF_SENT = "dashboard_proof_sent"
     const val DASHBOARD_PROOF_ICON = "dashboard_proof_icon"
+    const val DASHBOARD_REJECTED_PROOFS = "dashboard_rejected_proofs"
+    const val DASHBOARD_SHOW_ALL_REJECTED = "dashboard_show_all_rejected"
+    /** Why the venue rejected a proof, on its dashboard row and on the Review proof screen. */
+    const val PROOF_REJECT_REASON = "proof_reject_reason"
     const val AROUND_HEADER = "around_header"
     const val OVERVIEW_TITLE = "overview_title"
     const val OVERVIEW_COUNT = "overview_count"
@@ -370,6 +374,8 @@ object C {
     const val REVIEW_PROOF_RETRY = "review_proof_retry"
     const val REVIEW_PROOF_EXPLORER = "review_proof_explorer"
     const val REVIEW_PROOF_SENT = "review_proof_sent"
+    /** Where the proof stands: the Pending, Rejected or Approved tag. */
+    const val REVIEW_PROOF_STATUS = "review_proof_status"
     const val REVIEW_PROOF_QUEST = "review_proof_quest"
     const val REVIEW_PROOF_REQUIREMENTS = "review_proof_requirements"
     const val REVIEW_PROOF_PHOTO = "review_proof_photo"

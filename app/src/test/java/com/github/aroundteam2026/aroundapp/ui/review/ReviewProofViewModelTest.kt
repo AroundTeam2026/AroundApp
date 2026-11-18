@@ -316,6 +316,8 @@ class ReviewProofViewModelTest {
 
     assertEquals(CompletionStatus.APPROVED, stored().status)
     assertTrue(state.reviewed)
+    assertTrue(state.answered)
+    assertNull(state.rejectReason)
     assertFalse(state.saving)
   }
 
@@ -377,6 +379,8 @@ class ReviewProofViewModelTest {
     assertEquals(CompletionStatus.REJECTED, stored().status)
     assertEquals("Photo is blurry", stored().rejectReason)
     assertTrue(state.reviewed)
+    assertTrue(state.answered)
+    assertEquals("Photo is blurry", state.rejectReason)
   }
 
   @Test
@@ -464,11 +468,82 @@ class ReviewProofViewModelTest {
     completions.reject(id, "Not the right drink").getOrThrow()
 
     assertTrue(state.reviewed)
+    assertTrue(state.answered)
     assertFalse(state.canReject)
 
     viewModel.approve()
 
     assertEquals(CompletionStatus.REJECTED, stored().status)
+  }
+
+  @Test
+  fun aProofOpenedOnceRejectedShowsItsReasonReadOnly() = test {
+    sendProof(reserve())
+    completions.reject(id, "Not taken at the venue").getOrThrow()
+    watch()
+
+    assertEquals(ReviewProofStatus.LOADED, state.status)
+    assertTrue(state.reviewed)
+    assertEquals("Not taken at the venue", state.rejectReason)
+    // The venue opened it to look at it, so the screen stays
+    assertFalse(state.answered)
+    assertFalse(state.canReject)
+    assertFalse(state.canApprove)
+
+    viewModel.approve()
+    viewModel.reject("Changed my mind")
+
+    assertEquals(CompletionStatus.REJECTED, stored().status)
+    assertEquals("Not taken at the venue", stored().rejectReason)
+  }
+
+  @Test
+  fun aRejectedProofApprovedElsewhereWhileShownIsAnswered() = test {
+    sendProof(reserve())
+    completions.reject(id, "Blurry").getOrThrow()
+    watch()
+
+    completions.approve(id).getOrThrow()
+
+    assertTrue(state.answered)
+    assertNull(state.rejectReason)
+  }
+
+  // The listeners stop 5 s after the screen goes to the background; what the proof was must outlive
+  // that, or an answer given meanwhile would look like the proof's status when opened
+  @Test
+  fun aProofAnsweredElsewhereWhileTheScreenIsStoppedIsAnswered() = test {
+    sendProof(reserve())
+    val watching = backgroundScope.launch { viewModel.uiState.collect {} }
+    assertFalse(state.reviewed)
+
+    watching.cancel()
+    advanceTimeBy(STOPPED_LONG_ENOUGH_MS)
+    completions.reject(id, "Blurry").getOrThrow()
+    watch()
+
+    assertTrue(state.reviewed)
+    assertTrue(state.answered)
+  }
+
+  @Test
+  fun aRejectedProofReplacedWhileShownCanBeAnsweredAgain() = test {
+    val reservation = reserve()
+    sendProof(reservation)
+    completions.reject(id, "Blurry").getOrThrow()
+    watch()
+
+    sendProof(reservation, Proof.Text("The fox is by the window"))
+
+    assertFalse(state.reviewed)
+    assertFalse(state.answered)
+    assertNull(state.rejectReason)
+    assertTrue(state.canReject)
+
+    viewModel.reject("Still not it")
+
+    assertTrue(state.answered)
+    assertEquals("Still not it", state.rejectReason)
   }
 
   @Test

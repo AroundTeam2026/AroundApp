@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.review
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 
 /**
@@ -23,8 +24,13 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
  * @property proof What the explorer sent: a written answer, or a photo shown from [photo].
  * @property photo The photo of a [Proof.Photo], downloaded for the screen; null for a written
  *   answer.
- * @property reviewed Whether the proof was approved or rejected, here or on another phone: the
- *   screen then goes back to the dashboard.
+ * @property proofStatus Where the proof stands: pending, or answered by the venue. An answered
+ *   proof is [reviewed].
+ * @property rejectReason Why the venue rejected the proof, when it did, as the explorers see it;
+ *   null otherwise.
+ * @property answered Whether the proof was approved or rejected while the screen showed it, here or
+ *   on another phone: the screen then goes back to the dashboard. A proof opened once rejected, to
+ *   look at it, doesn't count until its status changes.
  * @property saving Whether an approval or a rejection is being saved: both buttons are disabled
  *   meanwhile, so the venue can't answer twice.
  * @property updateFailed Whether saving the last answer failed: the screen shows it once, then
@@ -42,11 +48,20 @@ data class ReviewProofUiState(
     val reward: Reward? = null,
     val proof: Proof? = null,
     val photo: ProofPhoto? = null,
-    val reviewed: Boolean = false,
+    val proofStatus: CompletionStatus = CompletionStatus.PENDING,
+    val rejectReason: String? = null,
+    val answered: Boolean = false,
     val saving: Boolean = false,
     val updateFailed: Boolean = false,
     val offline: Boolean = false,
 ) {
+  /**
+   * Whether the proof was approved or rejected: it can't be answered then, so the screen shows no
+   * Approve or Reject.
+   */
+  val reviewed: Boolean
+    get() = proofStatus != CompletionStatus.PENDING
+
   /** Whether Reject can be tapped: the proof is shown, pending, not saving, and online. */
   val canReject: Boolean
     get() = status == ReviewProofStatus.LOADED && !reviewed && !saving && !offline

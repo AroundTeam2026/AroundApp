@@ -56,6 +56,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -66,8 +67,10 @@ import kotlinx.coroutines.withContext
  * It follows the venue's completions for this one, as the repository has no listener for a single
  * completion, and reads the reservation it belongs to (the explorer's name), the reservation's
  * party, the quest (title, requirements and reward) and, for a photo, the photo through
- * [proofPhotoRepository], decoded by [decode]. Once the proof is no longer pending, here or on
- * another phone, the state is [ReviewProofUiState.reviewed]. A proof that can't be found, or its
+ * [proofPhotoRepository], decoded by [decode]. Once the proof is no longer pending, the state is
+ * [ReviewProofUiState.reviewed], with the reason of a rejection; once it is answered while shown,
+ * here or on another phone, the state is also [ReviewProofUiState.answered]. A proof the venue
+ * already rejected opens read-only, for the venue to look at. A proof that can't be found, or its
  * listener failing, shows [ReviewProofStatus.FAILED] until [retry]. The reservation, party or quest
  * failing only leaves out what they tell, and a photo that can't be downloaded or decoded shows
  * [ProofPhoto.Failed] until [retry].
@@ -109,6 +112,12 @@ class ReviewProofViewModel(
   private val writing = MutableStateFlow(false)
 
   /**
+   * Where the proof stood when last shown, and whether it was answered while shown. Held here, not
+   * in the flow, so it outlives the listeners stopping while the screen is in the background.
+   */
+  private val shown = MutableStateFlow(Shown())
+
+  /**
    * Whether the device is offline, followed for as long as the ViewModel lives rather than only
    * while the screen watches [uiState], so it is current when the screen comes back.
    */
@@ -131,13 +140,16 @@ class ReviewProofViewModel(
                         flowOf(ReviewProofUiState(status = ReviewProofStatus.FAILED))
                     else listen(venueId)
                   }
-                  .onEach { reloading.value = false },
+                  .onEach { reloading.value = false }
+                  .withAnswered(),
               answers.state,
               reloading,
               writing,
               offline,
           ) { listened, answers, reloading, writing, offline ->
-            val shown = if (reloading) ReviewProofUiState() else listened
+            // Reloading keeps answered, as the screen is leaving once it is
+            val shown =
+                if (reloading) ReviewProofUiState(answered = listened.answered) else listened
             val pending =
                 if (shown.status == ReviewProofStatus.LOADED && !shown.reviewed) setOf(completionId)
                 else emptySet()
@@ -329,7 +341,8 @@ class ReviewProofViewModel(
           reward = read.quest?.reward,
           proof = completion.proof,
           photo = read.photo,
-          reviewed = completion.status != CompletionStatus.PENDING,
+          proofStatus = completion.status,
+          rejectReason = completion.rejectReason,
       )
 
   /** What was read about the proof of the reservation [reservationId], besides the proof itself. */
@@ -340,6 +353,31 @@ class ReviewProofViewModel(
       val quest: Quest?,
       val photo: ProofPhoto?,
   )
+
+  /**
+   * Where the proof stood when last shown, null until it is shown, and whether it was answered
+   * while shown, which stays so, as the screen is leaving.
+   */
+  private data class Shown(val status: CompletionStatus? = null, val answered: Boolean = false) {
+    /**
+     * This, once [state] is emitted: a shown proof whose status changes to an answer is answered.
+     */
+    fun next(state: ReviewProofUiState): Shown {
+      if (state.status != ReviewProofStatus.LOADED) return this
+      val status = state.proofStatus
+      val changed = this.status != null && status != this.status
+      return Shown(status, answered || (changed && status != CompletionStatus.PENDING))
+    }
+  }
+
+  /**
+   * These states, each [ReviewProofUiState.answered] once the proof was answered while shown, here
+   * or on another phone, even while the listeners were stopped. A proof opened once rejected, to
+   * look at it, isn't answered until its status changes.
+   */
+  private fun Flow<ReviewProofUiState>.withAnswered() = map { state ->
+    state.copy(answered = shown.updateAndGet { it.next(state) }.answered)
+  }
 
   companion object {
     private const val TAG = "ReviewProofViewModel"

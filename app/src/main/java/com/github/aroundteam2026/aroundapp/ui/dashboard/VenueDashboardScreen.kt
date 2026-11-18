@@ -70,9 +70,10 @@ import kotlinx.coroutines.launch
 /**
  * The venue's Dashboard tab, as the Figma frame `Venue dashboard`: a header with the venue and
  * today's date, the pending and active quests counts, then the proofs to review, the reservations
- * that need an answer and the approved ones. Approve and Decline answer a pending reservation: its
- * buttons are disabled while the answer is saved, and a failed answer shows a snackbar once.
- * Offline, both buttons are disabled. Tapping a proof calls [onOpenProof] with its completion's id.
+ * that need an answer, the approved ones and the proofs the venue rejected, as `M2 · Dashboard ·
+ * rejected proofs`. Approve and Decline answer a pending reservation: its buttons are disabled
+ * while the answer is saved, and a failed answer shows a snackbar once. Offline, both buttons are
+ * disabled. Tapping a proof, to review or rejected, calls [onOpenProof] with its completion's id.
  * With [showOfflineBanner], by default while the shell says the device is offline, the offline
  * banner sits under the header and stays at the top while the list scrolls. While reservations wait
  * for an answer offline, that slot says instead that Approve and Decline need a connection, so the
@@ -168,6 +169,10 @@ private fun Dashboard(
   var showAllPending by rememberSaveable { mutableStateOf(false) }
   val pending =
       if (showAllPending) state.needsAnswer else state.needsAnswer.take(PENDING_SHOWN_FIRST)
+  // Rejected proofs stay until their party sends a new one, so they could pile up the same way
+  var showAllRejected by rememberSaveable { mutableStateOf(false) }
+  val rejected =
+      if (showAllRejected) state.rejectedProofs else state.rejectedProofs.take(REJECTED_SHOWN_FIRST)
   LazyColumn(
       Modifier.fillMaxSize().testTag(C.Tag.DASHBOARD_LIST),
       contentPadding = PaddingValues(AroundSpacing.ScreenHorizontal),
@@ -198,22 +203,24 @@ private fun Dashboard(
       }
       section(R.string.dashboard_needs_answer, state.needsAnswer.size, C.Tag.DASHBOARD_NEEDS_ANSWER)
       reservations(pending, state.savingIds, state.offline, onApprove, onDecline, clock)
-      if (pending.size < state.needsAnswer.size) {
-        item {
-          TextButton(
-              onClick = { showAllPending = true },
-              modifier = Modifier.fillMaxWidth().testTag(C.Tag.DASHBOARD_SHOW_ALL),
-          ) {
-            Text(
-                stringResource(R.string.dashboard_show_all, state.needsAnswer.size),
-                color = AroundTheme.colors.accentText,
-                style = AroundTextStyles.Subtitle,
-            )
-          }
-        }
+      showAll(pending.size, state.needsAnswer.size, C.Tag.DASHBOARD_SHOW_ALL) {
+        showAllPending = true
       }
       section(R.string.dashboard_upcoming, state.upcoming.size, C.Tag.DASHBOARD_UPCOMING)
       reservations(state.upcoming, state.savingIds, state.offline, onApprove, onDecline, clock)
+      // Nothing left to do there, so its count is grey rather than purple
+      section(
+          R.string.dashboard_rejected_proofs,
+          state.rejectedProofs.size,
+          C.Tag.DASHBOARD_REJECTED_PROOFS,
+          muted = true,
+      )
+      items(rejected, key = { REJECTED_KEY_PREFIX + it.completionId }) {
+        DashboardProofRow(it, onOpen = { onOpenProof(it.completionId) }, clock = clock)
+      }
+      showAll(rejected.size, state.rejectedProofs.size, C.Tag.DASHBOARD_SHOW_ALL_REJECTED) {
+        showAllRejected = true
+      }
     }
   }
 }
@@ -296,10 +303,32 @@ private fun RowScope.Stat(value: Int, @StringRes label: Int, color: Color, tag: 
 }
 
 /**
- * A section's heading, [title], with its [count] in a badge, a little apart from what is above.
- * Left out when the section is empty.
+ * "Show all [total]" under a section that shows only [shown] of its rows, which calls [onClick];
+ * left out once every row shows.
  */
-private fun LazyListScope.section(@StringRes title: Int, count: Int, tag: String) {
+private fun LazyListScope.showAll(shown: Int, total: Int, tag: String, onClick: () -> Unit) {
+  if (shown >= total) return
+  item(key = tag) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag(tag)) {
+      Text(
+          stringResource(R.string.dashboard_show_all, total),
+          color = AroundTheme.colors.accentText,
+          style = AroundTextStyles.Subtitle,
+      )
+    }
+  }
+}
+
+/**
+ * A section's heading, [title], with its [count] in a badge, purple unless [muted], a little apart
+ * from what is above. Left out when the section is empty.
+ */
+private fun LazyListScope.section(
+    @StringRes title: Int,
+    count: Int,
+    tag: String,
+    muted: Boolean = false,
+) {
   if (count == 0) return
   item(key = tag) {
     Row(
@@ -311,9 +340,12 @@ private fun LazyListScope.section(@StringRes title: Int, count: Int, tag: String
       Text(stringResource(title), color = colors.onBackground, style = AroundTextStyles.CardHeading)
       Text(
           count.toString(),
-          Modifier.background(colors.primary, AroundPillShape)
+          Modifier.background(
+                  if (muted) colors.onSurfaceVariant else colors.primary,
+                  AroundPillShape,
+              )
               .padding(horizontal = AroundSpacing.Small, vertical = BADGE_VERTICAL),
-          color = colors.onPrimary,
+          color = if (muted) colors.surface else colors.onPrimary,
           style = AroundTextStyles.Badge,
       )
     }
@@ -391,14 +423,18 @@ private fun LoadFailed(onRetry: () -> Unit) {
 
 /** How many pending reservations show before "Show all", as the Figma note on long lists asks. */
 internal const val PENDING_SHOWN_FIRST = 3
+
+/** How many rejected proofs show before "Show all", as for the pending reservations. */
+internal const val REJECTED_SHOWN_FIRST = 3
 /** The weekday, day and month, in the order of the device's language. */
 private const val DAY_SKELETON = "EEEdMMM"
 
 /**
- * Starts the list key of a proof row. A proof's completion id is its reservation's id, which also
- * keys the reservation's row, and keys must be unique in the list.
+ * Start the list keys of the proof rows, to review and rejected. A proof's completion id is its
+ * reservation's id, which also keys the reservation's row, and keys must be unique in the list.
  */
 private const val PROOF_KEY_PREFIX = "proof:"
+private const val REJECTED_KEY_PREFIX = "rejected:"
 private val TEXT_GAP = 2.dp
 // Figma's counts are 26 sp, between the app's page and sheet titles
 private val STAT_STYLE = AroundTextStyles.PageTitle.copy(fontSize = 26.sp)

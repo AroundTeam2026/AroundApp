@@ -507,6 +507,70 @@ class VenueDashboardViewModelTest {
   }
 
   @Test
+  fun rejectedProofsAreListedNewestFirstWithTheirReason() = test {
+    val older = sendProof(reserve(status = ReservationStatus.APPROVED), sentAt = NOW - 2 * HOUR)
+    val newer =
+        sendProof(
+            reserve(
+                questId = "menu",
+                name = "Grace",
+                partySize = 3,
+                status = ReservationStatus.APPROVED,
+            ),
+            explorerUid = "grace",
+            proof = Proof.Photo("gs://proofs/grace.jpg"),
+            sentAt = NOW - HOUR,
+        )
+    completions.reject(older, "Blurry").getOrThrow()
+    completions.reject(newer, "Not taken at the venue: the fox is by the window").getOrThrow()
+    completions.approve(sendProof(reserve(status = ReservationStatus.APPROVED))).getOrThrow()
+    watch()
+
+    assertEquals(listOf(newer, older), proofIds(state.rejectedProofs))
+    assertEquals(
+        DashboardProof(
+            completionId = newer,
+            explorerName = "Grace",
+            questTitle = "Order the secret menu",
+            partySize = 3,
+            proofType = ProofType.PHOTO,
+            sentAt = NOW - HOUR,
+            rejectReason = "Not taken at the venue: the fox is by the window",
+        ),
+        state.rejectedProofs.first(),
+    )
+    assertEquals("Blurry", state.rejectedProofs.last().rejectReason)
+    assertTrue(state.proofsToReview.isEmpty())
+  }
+
+  @Test
+  fun aRejectedProofGoesBackToReviewOnceTheExplorersReplaceIt() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED)
+    val id = sendProof(reservation)
+    watch()
+
+    completions.reject(id, "Blurry").getOrThrow()
+    assertEquals(listOf(id), proofIds(state.rejectedProofs))
+    assertTrue(state.proofsToReview.isEmpty())
+
+    sendProof(reservation, proof = Proof.Photo("gs://proofs/again.jpg"))
+    assertTrue(state.rejectedProofs.isEmpty())
+    assertNull(state.proofsToReview.single().rejectReason)
+  }
+
+  @Test
+  fun aRejectedProofOfACancelledReservationKeepsItsPartyAndFillsTheDashboard() = test {
+    val reservation = reserve(status = ReservationStatus.APPROVED, partySize = 3)
+    completions.reject(sendProof(reservation), "Blurry").getOrThrow()
+    fake.updateStatus(reservation, ReservationStatus.CANCELLED).getOrThrow()
+    watch()
+
+    assertEquals(3, state.rejectedProofs.single().partySize)
+    // Only the rejected proof is listed, and it's enough for the dashboard not to be empty
+    assertFalse(state.isEmpty)
+  }
+
+  @Test
   fun aFailingProofListenerShowsFailed() = test {
     val failing =
         object : CompletionRepository by completions {

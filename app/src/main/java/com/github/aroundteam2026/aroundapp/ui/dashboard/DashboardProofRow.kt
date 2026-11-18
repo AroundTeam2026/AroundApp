@@ -32,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
+import com.github.aroundteam2026.aroundapp.ui.review.RejectedReason
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -41,12 +42,13 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import java.time.Clock
 
 /**
- * One proof waiting for the venue on the dashboard, as the Figma component `S4 · Proof row`: the
- * explorer's initials, their name, the quest and party, what kind of proof it is and when it was
- * sent, then the kind of proof as an icon and a chevron. The whole row opens the proof.
+ * One proof on the dashboard, as the Figma component `S4 · Proof row`: the explorer's initials,
+ * their name, the quest and party, what kind of proof it is and when it was sent, then the kind of
+ * proof as an icon and a chevron. A rejected proof adds the reason under them, as `M2 · Rejected
+ * proof row`. The whole row opens the proof.
  *
  * @param proof The proof to draw.
- * @param onOpen Opens the proof, to approve or reject it.
+ * @param onOpen Opens the proof: to approve or reject it, or to look at it once rejected.
  * @param clock Tells how long ago it was sent; read again each time the minute shown changes, so a
  *   dashboard left open keeps up.
  */
@@ -59,14 +61,37 @@ internal fun DashboardProofRow(
 ) {
   val colors = MaterialTheme.colorScheme
   val now = rememberNow(proof.sentAt, clock)
-  Row(
+  val reason = proof.rejectReason
+  Column(
       modifier
           .fillMaxWidth()
           .clip(MaterialTheme.shapes.large)
           .background(colors.surface)
-          .clickable(onClickLabel = stringResource(R.string.dashboard_proof_open), onClick = onOpen)
+          .clickable(
+              onClickLabel =
+                  stringResource(
+                      if (reason == null) R.string.dashboard_proof_open
+                      else R.string.dashboard_proof_see
+                  ),
+              onClick = onOpen,
+          )
           .padding(horizontal = AroundSpacing.Large, vertical = AroundSpacing.InsetPadding)
           .testTag("${C.Tag.DASHBOARD_PROOF_ROW}_${proof.completionId}"),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+  ) {
+    ProofSummary(proof, now)
+    if (reason != null) RejectedReason(reason)
+  }
+}
+
+/**
+ * Who sent [proof], for which quest and party, what kind of proof it is and when it was sent, read
+ * against [now], then its icon and a chevron.
+ */
+@Composable
+private fun ProofSummary(proof: DashboardProof, now: Long) {
+  val colors = MaterialTheme.colorScheme
+  Row(
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
       verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -221,6 +246,18 @@ internal fun DashboardProofRowPreview() {
               partySize = 1,
               proofType = ProofType.TEXT,
               sentAt = now - 10 * DateUtils.MINUTE_IN_MILLIS,
+          ),
+          onOpen = {},
+      )
+      DashboardProofRow(
+          DashboardProof(
+              completionId = "rejected",
+              explorerName = "Yusuf S.",
+              questTitle = "Find the hidden fox",
+              partySize = 4,
+              proofType = ProofType.PHOTO,
+              sentAt = now - 2 * DateUtils.HOUR_IN_MILLIS,
+              rejectReason = "Not taken at the venue",
           ),
           onOpen = {},
       )

@@ -7,7 +7,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 
 /**
  * What the venue's dashboard shows: the venue, the proofs it has to review, the reservations it has
- * to answer, the approved ones, and the summary tiles.
+ * to answer, the approved ones, the proofs it rejected, and the summary tiles.
  *
  * Reservations have no visit time yet: accepting a quest doesn't pick a slot, so a reservation's
  * stored slot only dates the request. The dashboard therefore shows no slot, and nothing that
@@ -24,6 +24,9 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   them.
  * @property proofsToReview The proofs explorers sent and the venue hasn't reviewed, oldest first.
  *   Empty until [status] is [VenueDashboardStatus.LOADED].
+ * @property rejectedProofs The proofs the venue rejected and no party has replaced yet, most
+ *   recently sent first, each with its [DashboardProof.rejectReason]. Empty until [status] is
+ *   [VenueDashboardStatus.LOADED].
  * @property savingIds Ids of the pending reservations whose answer is being saved, or saved but not
  *   shown by the listener yet; their buttons are disabled meanwhile.
  * @property updateFailed Whether the last approve or decline failed. The screen shows it once, then
@@ -39,6 +42,7 @@ data class VenueDashboardUiState(
     val upcoming: List<DashboardReservation> = emptyList(),
     val activeQuestsCount: Int = 0,
     val proofsToReview: List<DashboardProof> = emptyList(),
+    val rejectedProofs: List<DashboardProof> = emptyList(),
     val savingIds: Set<String> = emptySet(),
     val updateFailed: Boolean = false,
     val offline: Boolean = false,
@@ -55,7 +59,8 @@ data class VenueDashboardUiState(
         status == VenueDashboardStatus.LOADED &&
             needsAnswer.isEmpty() &&
             upcoming.isEmpty() &&
-            proofsToReview.isEmpty()
+            proofsToReview.isEmpty() &&
+            rejectedProofs.isEmpty()
 
   /** Whether to show the offline hint: offline, with reservations waiting for an answer. */
   val showsOfflineHint: Boolean
@@ -123,8 +128,8 @@ sealed interface ApproveBlock {
 }
 
 /**
- * One proof to review on the dashboard, as the Figma row `S4 · Proof row`: opening it shows the
- * proof itself.
+ * One proof on the dashboard, to review as the Figma row `S4 · Proof row`, or that the venue
+ * rejected, as `M2 · Rejected proof row`: opening it shows the proof itself.
  *
  * @property completionId Id of the completion the proof was sent with.
  * @property explorerName Display name of the explorer who made the reservation the proof belongs
@@ -135,6 +140,8 @@ sealed interface ApproveBlock {
  * @property partySize How many explorers the reservation's party has.
  * @property proofType Whether the proof is a photo or a written answer.
  * @property sentAt When the explorer sent it, in epoch milliseconds.
+ * @property rejectReason Why the venue rejected it, as the explorers see it; null for a proof to
+ *   review.
  */
 data class DashboardProof(
     val completionId: String,
@@ -143,6 +150,7 @@ data class DashboardProof(
     val partySize: Int,
     val proofType: ProofType,
     val sentAt: Long,
+    val rejectReason: String? = null,
 )
 
 /** Where the dashboard stands. */
