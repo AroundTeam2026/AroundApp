@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.view.MotionEvent
 import androidx.compose.foundation.Image
@@ -217,6 +218,8 @@ internal class RadiusMapFraming(initial: Location) {
  * A map view that, while [movable], keeps the touches that start on it: a scrolling screen around
  * it would otherwise take its vertical drags and pinches to scroll itself.
  */
+// Only built in code, through the map's mapViewFactory, so it needs no constructor for layouts
+@SuppressLint("ViewConstructor")
 private class KeepTouchesMapView(
     context: Context,
     options: GoogleMapOptions,
