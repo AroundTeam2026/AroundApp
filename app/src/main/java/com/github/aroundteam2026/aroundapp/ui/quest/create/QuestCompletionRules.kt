@@ -225,7 +225,7 @@ private fun UnlockRadius(state: CreateQuestUiState, actions: QuestCompletionActi
     Text(
         value,
         style = AroundTextStyles.Subtitle,
-        color = MaterialTheme.colorScheme.primary,
+        color = AroundTheme.colors.accentText,
         modifier = Modifier.testTag(C.Tag.CREATE_QUEST_RADIUS),
     )
   }
@@ -361,7 +361,7 @@ private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions
         Text(
             size.toString(),
             style = AroundTextStyles.Subtitle.copy(fontSize = PARTY_COUNT_FONT_SIZE),
-            color = MaterialTheme.colorScheme.primary,
+            color = AroundTheme.colors.accentText,
             modifier = Modifier.testTag(C.Tag.CREATE_QUEST_PARTY_SIZE),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(AroundSpacing.CompactGap)) {
