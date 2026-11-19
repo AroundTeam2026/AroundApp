@@ -52,7 +52,10 @@ data class CompletionUiState(
   val answerTooLong: Boolean
     get() = answer.trim().length > MAX_TEXT_ANSWER_LENGTH
 
-  /** Whether the current proof is a photo queued to be sent once the device is online. */
+  /**
+   * Whether the current proof is a photo that would be queued, and sent once online, because the
+   * device is offline.
+   */
   val photoSentLater: Boolean
     get() = proofType == ProofType.PHOTO && offline
 

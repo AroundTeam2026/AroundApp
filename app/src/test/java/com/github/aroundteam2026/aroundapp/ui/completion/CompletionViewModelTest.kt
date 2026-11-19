@@ -606,6 +606,21 @@ class CompletionViewModelTest {
     assertEquals(PHOTO, state.photo)
   }
 
+  // Only a file can be queued: another Uri shows the save error instead of crashing
+  @Test
+  fun queuingAPhotoThatIsNotAFileShowsAnError() = test {
+    connectivity.online.value = false
+    open("photo")
+    viewModel.pickPhoto(Uri.parse("content://proof/photo"))
+    waitForOfflineState()
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(SaveState.Failed, state.saveState)
+    assertTrue(queue.queued.isEmpty())
+  }
+
   @Test
   fun writtenProofCanBeSubmittedOfflineAndRemainsEnabledAfterReconnect() = test {
     connectivity.online.value = false

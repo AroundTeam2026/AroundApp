@@ -145,16 +145,22 @@ class CompletionViewModel(
    * Queues the photo of [form] to be sent once online; its copy is deleted once it is. The form
    * then shows as saved, so the screen closes; sending a new photo later replaces the queued one.
    */
-  private suspend fun enqueueProof(form: CompletionUiState, venueId: String): SaveState =
-      proofUploadQueue
-          .enqueue(reservationId, venueId, explorerUid, checkNotNull(form.photo).toFile())
-          .fold(
-              { SaveState.Saved(completionId(reservationId)) },
-              {
-                Log.w(TAG, "Queuing the proof photo of $reservationId failed", it)
-                SaveState.Failed
-              },
-          )
+  private suspend fun enqueueProof(form: CompletionUiState, venueId: String): SaveState {
+    // toFile() throws on a Uri that isn't a file: the form shows the save error instead of crashing
+    val photo = runCatching { checkNotNull(form.photo).toFile() }
+    val queued =
+        photo.fold(
+            { proofUploadQueue.enqueue(reservationId, venueId, explorerUid, it) },
+            { Result.failure(it) },
+        )
+    return queued.fold(
+        { SaveState.Saved(completionId(reservationId)) },
+        {
+          Log.w(TAG, "Queuing the proof photo of $reservationId failed", it)
+          SaveState.Failed
+        },
+    )
+  }
 
   /** Uploads the proof of [form] if needed and submits it; says where that left the form. */
   private suspend fun submitProof(form: CompletionUiState, venueId: String): SaveState =
