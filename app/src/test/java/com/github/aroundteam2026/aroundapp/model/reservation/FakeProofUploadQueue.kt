@@ -19,7 +19,7 @@ class FakeProofUploadQueue : ProofUploadQueue {
    */
   var forcedFailure: Throwable? = null
 
-  /** Every proof queued, in order; a proof kept in place of a later one is listed once. */
+  /** Every proof queued, in order, including the ones a later proof replaced. */
   val queued: List<QueuedProof>
     get() = recorded.toList()
 
@@ -31,7 +31,7 @@ class FakeProofUploadQueue : ProofUploadQueue {
 
   /**
    * Records the proof and lists [reservationId] in [waiting]. Fails with [forcedFailure] if it is
-   * set, and keeps the waiting proof if [reservationId] already has one, as [ProofUploadQueue]
+   * set. A proof queued again for [reservationId] replaces the waiting one, as [ProofUploadQueue]
    * describes.
    */
   override suspend fun enqueue(
@@ -43,10 +43,8 @@ class FakeProofUploadQueue : ProofUploadQueue {
     forcedFailure?.let {
       return Result.failure(it)
     }
-    if (reservationId !in waitingIds.value) {
-      recorded += QueuedProof(reservationId, venueId, explorerUid, photo)
-      waitingIds.update { it + reservationId }
-    }
+    recorded += QueuedProof(reservationId, venueId, explorerUid, photo)
+    waitingIds.update { it + reservationId }
     return Result.success(Unit)
   }
 

@@ -28,6 +28,7 @@ import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -266,6 +267,7 @@ class CompletionDestinationTest {
             completions,
             FakeProofPhotoRepository(),
             FakeConnectivityRepository(),
+            FakeProofUploadQueue(),
             discardPhoto = { true },
         )
       }

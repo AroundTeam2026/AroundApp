@@ -38,13 +38,13 @@ class FakeProofUploadQueueTest {
   }
 
   @Test
-  fun enqueue_whileTheReservationIsWaiting_keepsTheFirstProof() = runTest {
+  fun enqueue_whileTheReservationIsWaiting_replacesTheProof() = runTest {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     val result = queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
 
     assertTrue(result.isSuccess)
-    assertEquals(listOf(PHOTO), queue.queued.map { it.photo })
+    assertEquals(listOf(PHOTO, RETAKE), queue.queued.map { it.photo })
     assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
   }
 

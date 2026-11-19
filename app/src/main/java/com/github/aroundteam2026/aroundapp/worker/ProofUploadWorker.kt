@@ -146,6 +146,9 @@ class ProofUploadWorker(
     /** Starts each [uniqueWorkName], which [reservationIdOf] reads back. */
     private const val UNIQUE_NAME_PREFIX = "$TAG:"
 
+    /** Starts the tag naming an upload's photo, which [photoOf] reads back. */
+    private const val PHOTO_TAG_PREFIX = "$TAG-photo:"
+
     /** How many runs a failure that can pass gets before the work fails. */
     const val MAX_ATTEMPTS = 5
 
@@ -163,9 +166,16 @@ class ProofUploadWorker(
         tag.removePrefix(UNIQUE_NAME_PREFIX).takeIf { it != tag && it.isNotEmpty() }
 
     /**
+     * The photo whose upload [tag] names, or null if it names none, so a replaced upload's copy can
+     * be deleted.
+     */
+    fun photoOf(tag: String): Uri? =
+        tag.removePrefix(PHOTO_TAG_PREFIX).takeIf { it != tag && it.isNotEmpty() }?.toUri()
+
+    /**
      * The work that sends [photo], a copy [ProofPhotos] keeps, as the proof of the reservation
      * [reservationId]. It waits for a network connection and retries with exponential backoff, and
-     * is tagged with [TAG] and its [uniqueWorkName].
+     * is tagged with [TAG], its [uniqueWorkName] and its photo.
      */
     fun buildRequest(
         reservationId: String,
@@ -192,6 +202,7 @@ class ProofUploadWorker(
             )
             .addTag(TAG)
             .addTag(uniqueWorkName(reservationId))
+            .addTag("$PHOTO_TAG_PREFIX$photo")
             .build()
   }
 }

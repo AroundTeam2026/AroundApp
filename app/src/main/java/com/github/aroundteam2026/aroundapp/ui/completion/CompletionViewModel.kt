@@ -5,6 +5,7 @@ package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
 import android.util.Log
+import androidx.core.net.toFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -27,6 +28,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueue
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -61,6 +64,7 @@ import kotlinx.coroutines.launch
  * usable, as the repository refuses to replace an approved one. A photo is uploaded through
  * [proofPhotoRepository] first, and not again when only the submit failed. Once its proof is saved,
  * the app's copy of the photo is deleted with [discardPhoto], `ProofPhotos.discard` in the app.
+ * Offline, a photo proof is queued in [proofUploadQueue] instead, which sends it once online.
  */
 class CompletionViewModel(
     private val reservationId: String,
@@ -72,6 +76,7 @@ class CompletionViewModel(
     private val completionRepository: CompletionRepository,
     private val proofPhotoRepository: ProofPhotoRepository,
     connectivityRepository: ConnectivityRepository,
+    private val proofUploadQueue: ProofUploadQueue,
     private val discardPhoto: suspend (Uri) -> Boolean,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(CompletionUiState())
@@ -95,6 +100,11 @@ class CompletionViewModel(
         mutableUiState.update { it.copy(offline = offline) }
       }
     }
+    viewModelScope.launch {
+      proofUploadQueue.waiting.collect { waiting ->
+        mutableUiState.update { it.copy(photoWaiting = reservationId in waiting) }
+      }
+    }
     listen()
   }
 
@@ -112,8 +122,8 @@ class CompletionViewModel(
    * Called when the explorer submits the proof. Does nothing unless the proof is filled in and the
    * form is not already saving or saved, so a double tap submits once. A failure, at the upload or
    * at the submit, keeps what the explorer filled in and shows [SaveState.Failed]; calling this
-   * again retries. A precise location is checked before any photo upload or completion write. Photo
-   * proofs also require a connection before and after the location check.
+   * again retries. A precise location is checked before any photo upload or completion write.
+   * Offline once it is checked, a photo proof is queued instead of uploaded.
    */
   fun submit() {
     val form = mutableUiState.value
@@ -129,11 +139,32 @@ class CompletionViewModel(
         current.saveState is SaveState.Saved -> Unit
         current.sentByTeammate -> finishSubmit(SaveState.Idle)
         // Approval may be withdrawn while the device is finding its position.
-        current.status != CompletionFormStatus.READY || current.photoBlockedOffline ->
-            finishSubmit(SaveState.Idle)
+        current.status != CompletionFormStatus.READY -> finishSubmit(SaveState.Idle)
+        current.photoSentLater || current.photoWaiting -> finishSubmit(enqueueProof(form, venueId))
         else -> finishSubmit(submitProof(form, venueId))
       }
     }
+  }
+
+  /**
+   * Queues the photo of [form] to be sent once online; its copy is deleted once it is. The form
+   * then shows as saved, so the screen closes; sending a new photo later replaces the queued one.
+   */
+  private suspend fun enqueueProof(form: CompletionUiState, venueId: String): SaveState {
+    // toFile() throws on a Uri that isn't a file: the form shows the save error instead of crashing
+    val photo = runCatching { checkNotNull(form.photo).toFile() }
+    val queued =
+        photo.fold(
+            { proofUploadQueue.enqueue(reservationId, venueId, explorerUid, it) },
+            { Result.failure(it) },
+        )
+    return queued.fold(
+        { SaveState.Saved(completionId(reservationId)) },
+        {
+          Log.w(TAG, "Queuing the proof photo of $reservationId failed", it)
+          SaveState.Failed
+        },
+    )
   }
 
   /** Uploads the proof of [form] if needed and submits it; says where that left the form. */
@@ -303,7 +334,7 @@ class CompletionViewModel(
     /**
      * Builds the [CompletionViewModel] of the reservation [reservationId] for the explorer
      * [explorerUid], with the app's repositories. The location, photo and connectivity repositories
-     * are built from the application, so they never keep a screen in memory.
+     * and the upload queue are built from the application, so they never keep a screen in memory.
      */
     fun factory(reservationId: String, explorerUid: String): ViewModelProvider.Factory =
         viewModelFactory {
@@ -319,6 +350,7 @@ class CompletionViewModel(
                 CompletionRepositoryProvider.repository,
                 ProofPhotoRepositoryProvider.repository(app),
                 ConnectivityRepositoryProvider.repository(app),
+                ProofUploadQueueProvider.queue(app),
                 ProofPhotos(app)::discard,
             )
           }

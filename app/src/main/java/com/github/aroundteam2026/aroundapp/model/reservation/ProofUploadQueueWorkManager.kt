@@ -10,6 +10,7 @@ import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
@@ -17,8 +18,14 @@ import kotlinx.coroutines.flow.map
  * unique work per reservation, which WorkManager keeps across app restarts. A reservation is
  * [waiting] while its work hasn't finished, so it leaves once the proof is submitted, or once the
  * worker stops or is cancelled.
+ *
+ * @param discard Deletes the copy of a proof that a newer one replaced, since its cancelled work
+ *   never runs to delete it.
  */
-class ProofUploadQueueWorkManager(private val workManager: WorkManager) : ProofUploadQueue {
+class ProofUploadQueueWorkManager(
+    private val workManager: WorkManager,
+    private val discard: suspend (Uri) -> Boolean,
+) : ProofUploadQueue {
 
   override suspend fun enqueue(
       reservationId: String,
@@ -27,11 +34,18 @@ class ProofUploadQueueWorkManager(private val workManager: WorkManager) : ProofU
       photo: File,
   ): Result<Unit> =
       try {
+        val name = ProofUploadWorker.uniqueWorkName(reservationId)
+        val replaced =
+            workManager
+                .getWorkInfosForUniqueWorkFlow(name)
+                .first()
+                .filterNot { it.state.isFinished }
+                .flatMap { work -> work.tags.mapNotNull(ProofUploadWorker::photoOf) }
         workManager
             .enqueueUniqueWork(
-                ProofUploadWorker.uniqueWorkName(reservationId),
+                name,
                 // A reservation has one proof waiting at a time, as ProofUploadQueue describes
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 ProofUploadWorker.buildRequest(
                     reservationId,
                     venueId,
@@ -40,6 +54,7 @@ class ProofUploadQueueWorkManager(private val workManager: WorkManager) : ProofU
                 ),
             )
             .await()
+        replaced.filter { it != Uri.fromFile(photo) }.forEach { discard(it) }
         Result.success(Unit)
       } catch (e: CancellationException) {
         throw e

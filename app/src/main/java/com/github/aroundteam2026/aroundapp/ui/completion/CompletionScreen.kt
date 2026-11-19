@@ -60,6 +60,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LEN
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
@@ -125,7 +126,7 @@ fun CompletionContent(
 ) {
   val saving = state.saveState == SaveState.Saving
   val saved = state.saveState is SaveState.Saved
-  val showOfflineHint = state.isEditable && state.photoBlockedOffline
+  val showOfflineHint = state.isEditable && state.photoSentLater
   Scaffold(
       modifier = modifier.testTag(C.Tag.COMPLETION_SCREEN).imePadding(),
       containerColor = MaterialTheme.colorScheme.background,
@@ -136,8 +137,11 @@ fun CompletionContent(
               verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
           ) {
             Text(
-                if (state.sentByTeammate) stringResource(R.string.completion_sent_by_teammate)
-                else stringResource(R.string.completion_review_hint, venueName),
+                when {
+                  state.sentByTeammate -> stringResource(R.string.completion_sent_by_teammate)
+                  state.photoWaiting -> stringResource(R.string.completion_photo_waiting)
+                  else -> stringResource(R.string.completion_review_hint, venueName)
+                },
                 Modifier.fillMaxWidth().testTag(C.Tag.COMPLETION_HINT),
                 style = AroundTextStyles.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -203,6 +207,8 @@ fun CompletionContent(
         }
         Text(stringResource(R.string.completion_heading), style = AroundTextStyles.CardTitle)
       }
+      // The app-wide banner, unless the hint already says the device is offline
+      if (state.offline && !showOfflineHint) OfflineBanner()
       when (state.status) {
         CompletionFormStatus.LOADING ->
             CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
@@ -213,7 +219,7 @@ fun CompletionContent(
         CompletionFormStatus.UNAVAILABLE ->
             CompletionMessage(stringResource(R.string.completion_unavailable))
         CompletionFormStatus.READY -> {
-          if (showOfflineHint) OfflineHint(message = R.string.offline_photo_needs_connection)
+          if (showOfflineHint) OfflineHint(message = R.string.offline_photo_sent_later)
           Row(
               horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
               verticalAlignment = Alignment.CenterVertically,
@@ -335,7 +341,6 @@ fun CompletionContent(
           }
           if (
               state.saveState == SaveState.Failed &&
-                  !showOfflineHint &&
                   state.locationError == null &&
                   !preciseLocationRefused
           ) {

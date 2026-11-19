@@ -32,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -116,6 +117,7 @@ class CompletionScreenFlowTest {
               completions,
               photos,
               connectivity,
+              FakeProofUploadQueue(),
               discardPhoto = { true },
           )
       store.put("completion", viewModel)
@@ -212,7 +214,7 @@ class CompletionScreenFlowTest {
 
   @Test
   @GraphicsMode(GraphicsMode.Mode.NATIVE)
-  fun photoFormShowsTheConnectionHintUntilOnlineAgain() {
+  fun photoFormSaysThePhotoIsSentOnceOnline() {
     show(proofType = ProofType.PHOTO)
     compose.runOnIdle { viewModel.pickPhoto(testImage(app, 80, 60)) }
     val submit = compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT)
@@ -224,7 +226,8 @@ class CompletionScreenFlowTest {
     compose.waitForIdle()
     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(OFFLINE_HINT_DELAY_MS))
     hint.assertIsDisplayed()
-    submit.assertIsNotEnabled()
+    compose.onNodeWithText(app.getString(R.string.offline_photo_sent_later)).assertIsDisplayed()
+    submit.assertIsEnabled()
 
     compose.runOnIdle { connectivity.online.value = true }
     hint.assertDoesNotExist()

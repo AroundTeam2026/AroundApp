@@ -13,7 +13,7 @@ interface ProofUploadQueue {
   /**
    * Queues the photo proof in [photo] for [reservationId], to be uploaded and submitted once
    * online. A reservation has one proof waiting at a time: while [reservationId]'s is waiting, this
-   * keeps it and doesn't queue [photo].
+   * replaces it with [photo], cancelling its upload, so the latest photo is the one sent.
    *
    * @param reservationId id of the approved reservation the photo proves.
    * @param venueId id of the venue that owns the reservation's quest.
