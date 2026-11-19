@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.isJoined
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -68,6 +69,7 @@ class OverviewLeaveTest {
           FakeCompletionRepository(),
           FakeUserRepository(),
           FakeConnectivityRepository(),
+          FakeProofUploadQueue(),
       )
 
   @Before fun setUp() = Dispatchers.setMain(dispatcher)

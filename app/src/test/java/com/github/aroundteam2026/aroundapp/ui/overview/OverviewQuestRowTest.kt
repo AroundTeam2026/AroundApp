@@ -116,6 +116,15 @@ class OverviewQuestRowTest {
         }
   }
 
+  // #414, the Figma frame "Quests tab · offline, proof waiting to upload"
+  @Test
+  fun aQueuedProofSaysItIsWaitingToUpload() {
+    show(row(status = OverviewRowStatus.UPLOAD_WAITING))
+
+    status(app.getString(R.string.overview_status_upload_waiting).uppercase()).assertIsDisplayed()
+    status("APPROVED").assertDoesNotExist()
+  }
+
   // The Figma frame "Quests tab · Send new proof": "Proof sent by Lea"; unnamed, it stays "Proof
   // sent"
   @Test

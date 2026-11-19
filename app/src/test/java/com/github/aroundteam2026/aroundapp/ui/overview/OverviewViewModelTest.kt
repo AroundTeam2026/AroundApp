@@ -15,6 +15,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -33,6 +34,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,6 +69,7 @@ class OverviewViewModelTest {
   private val completions = FakeCompletionRepository { now }
   private val users = FakeUserRepository()
   private val connectivity = FakeConnectivityRepository()
+  private val uploads = FakeProofUploadQueue()
 
   private val venues =
       FakeVenueRepository(
@@ -100,6 +103,7 @@ class OverviewViewModelTest {
         completions,
         users,
         connectivity,
+        uploads,
     )
   }
 
@@ -148,6 +152,10 @@ class OverviewViewModelTest {
    */
   private suspend fun sendProof(reservationId: String, sender: String = EXPLORER): String =
       completions.submit(reservationId, CAFE, sender, Proof.Text("By the window")).getOrThrow()
+
+  /** Queues a photo proof of the reservation [reservationId], as one taken offline. */
+  private suspend fun queue(reservationId: String) =
+      uploads.enqueue(reservationId, CAFE, EXPLORER, File("proof.jpg")).getOrThrow()
 
   private fun titles() = state.rows.map { it.questTitle }
 
@@ -421,6 +429,7 @@ class OverviewViewModelTest {
             completions,
             users,
             connectivity,
+            uploads,
         )
     runCurrent()
 
@@ -446,6 +455,7 @@ class OverviewViewModelTest {
             completions,
             users,
             connectivity,
+            uploads,
         )
     runCurrent()
 
@@ -471,6 +481,7 @@ class OverviewViewModelTest {
             broken,
             users,
             connectivity,
+            uploads,
         )
     runCurrent()
 
@@ -504,6 +515,7 @@ class OverviewViewModelTest {
             recording,
             users,
             connectivity,
+            uploads,
         )
     runCurrent()
 
@@ -641,6 +653,7 @@ class OverviewViewModelTest {
         completions,
         slow,
         connectivity,
+        uploads,
     )
   }
 
@@ -666,6 +679,61 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(OverviewRowStatus.PROOF_REJECTED, state.rows.single().status)
+  }
+
+  // #414: a photo proof taken offline waits in the queue until it uploads and is sent
+  @Test
+  fun aQueuedProofWaitsToUploadUntilTheQueueNoLongerListsIt() = test {
+    val id = approvedReservation()
+    viewModel
+    queue(id)
+    runCurrent()
+    assertEquals(OverviewRowStatus.UPLOAD_WAITING, state.rows.single().status)
+
+    uploads.finish(id)
+    sendProof(id)
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.PROOF_SENT, state.rows.single().status)
+  }
+
+  // E.g. the upload failed for good: the queue drops it, and nothing was sent
+  @Test
+  fun aProofThatLeavesTheQueueUnsentLeavesTheRowApproved() = test {
+    val id = approvedReservation()
+    queue(id)
+    viewModel
+    runCurrent()
+    assertEquals(OverviewRowStatus.UPLOAD_WAITING, state.rows.single().status)
+
+    uploads.finish(id)
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.APPROVED, state.rows.single().status)
+  }
+
+  // A new proof queued after a rejection is newer than the rejected one
+  @Test
+  fun aNewProofQueuedAfterARejectionWaitsToUpload() = test {
+    val id = approvedReservation()
+    completions.reject(sendProof(id), "The fox isn't in the photo").getOrThrow()
+    queue(id)
+    viewModel
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.UPLOAD_WAITING, state.rows.single().status)
+  }
+
+  // An approved proof ends the quest: a proof still queued can't change that
+  @Test
+  fun anApprovedProofStaysCompletedWhileAnotherIsQueued() = test {
+    val id = approvedReservation()
+    completions.approve(sendProof(id)).getOrThrow()
+    queue(id)
+    viewModel
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.COMPLETED, state.rows.single().status)
   }
 
   // A proof only changes the row of its own reservation

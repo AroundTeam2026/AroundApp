@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRe
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -19,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +55,7 @@ class OverviewCancelTest {
   private val reservations = GatedStatusUpdates(fake)
   private val completions = FakeCompletionRepository()
   private val connectivity = FakeConnectivityRepository()
+  private val uploads = FakeProofUploadQueue()
   /** What the ViewModel watches; [connectivity] unless a test replaces it before opening. */
   private var watched: ConnectivityRepository = connectivity
 
@@ -66,6 +69,7 @@ class OverviewCancelTest {
         completions,
         FakeUserRepository(),
         watched,
+        uploads,
     )
   }
 
@@ -208,6 +212,22 @@ class OverviewCancelTest {
     fake.updateStatus(id, ReservationStatus.APPROVED)
     viewModel
     runCurrent()
+
+    viewModel.cancel(id)
+    runCurrent()
+
+    assertEquals(ReservationStatus.CANCELLED, stored(id))
+  }
+
+  // A queued proof isn't sent yet, so the party has no proof, as on the venue's page (#414)
+  @Test
+  fun aReservationWhoseProofIsQueuedCanBeCancelled() = test {
+    val id = book("fox")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    uploads.enqueue(id, CAFE, EXPLORER, File("proof.jpg")).getOrThrow()
+    viewModel
+    runCurrent()
+    assertEquals(OverviewRowStatus.UPLOAD_WAITING, state.rows.single().status)
 
     viewModel.cancel(id)
     runCurrent()

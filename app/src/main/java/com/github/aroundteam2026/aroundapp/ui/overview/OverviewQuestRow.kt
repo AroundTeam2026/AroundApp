@@ -205,8 +205,9 @@ private fun NewProofButton(onClick: () -> Unit) {
 /**
  * Where the reservation stands, in small capitals, as in the Figma frames of the Quests tab: a
  * muted dot and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then,
- * for the proof, an accent dot and "Proof sent", or "Proof sent by Lea" when [sender] Lea sent the
- * party's proof, a check and "Completed", or a red dot and "Proof rejected".
+ * for the proof, an accent dot and "Waiting to upload" while a photo taken offline is queued, or
+ * "Proof sent", or "Proof sent by Lea" when [sender] Lea sent the party's proof, a check and
+ * "Completed", or a red dot and "Proof rejected".
  */
 @Composable
 private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Modifier) {
@@ -225,6 +226,10 @@ private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Mo
           OverviewRowStatus.APPROVED -> {
             Check()
             stringResource(R.string.overview_status_approved) to colors.onSurface
+          }
+          OverviewRowStatus.UPLOAD_WAITING -> {
+            Dot(AroundTheme.colors.accentText)
+            stringResource(R.string.overview_status_upload_waiting) to colors.onSurfaceVariant
           }
           OverviewRowStatus.PROOF_SENT -> {
             Dot(AroundTheme.colors.accentText)
