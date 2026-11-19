@@ -29,6 +29,8 @@
     <string name="completion_review_hint">%1$s checks your proof, usually within a few minutes.</string>
     <!-- Instead of the review hint, once another member of the party sent its proof -->
     <string name="completion_sent_by_teammate">The venue approved the proof a teammate sent.</string>
+    <!-- Instead of the review hint, while a photo queued earlier is still waiting to upload -->
+    <string name="completion_photo_waiting">Your photo is waiting to upload. Sending a new one replaces it.</string>
     <string name="completion_requirements">WHAT TO DO</string>
     <string name="completion_answer">Your answer</string>
     <string name="completion_answer_hint">Write your answer here</string>

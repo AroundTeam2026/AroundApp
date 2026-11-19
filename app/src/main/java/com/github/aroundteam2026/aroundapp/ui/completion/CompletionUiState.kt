@@ -22,6 +22,8 @@ import com.github.aroundteam2026.aroundapp.ui.SaveState
  *   when it was submitted earlier.
  * @property locationError Why the last location check blocked submission, or null otherwise.
  * @property offline Whether the device has no validated internet connection.
+ * @property photoWaiting Whether a photo this party queued for the reservation is still waiting to
+ *   upload: a new proof then replaces it through the queue, so the older one can't overwrite it.
  * @property sentByTeammate Whether the venue approved the proof another member of the party sent:
  *   the form is locked, and [saveState] doesn't become [SaveState.Saved], which is kept for a proof
  *   this explorer sent.
@@ -37,6 +39,7 @@ data class CompletionUiState(
     val locationError: CompletionLocationError? = null,
     val sentByTeammate: Boolean = false,
     val offline: Boolean = false,
+    val photoWaiting: Boolean = false,
 ) {
   /**
    * Whether the form can still be changed: the quest is ready, nothing is saving or saved, and no

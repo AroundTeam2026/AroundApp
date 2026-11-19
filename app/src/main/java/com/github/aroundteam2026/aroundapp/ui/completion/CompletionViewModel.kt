@@ -100,6 +100,11 @@ class CompletionViewModel(
         mutableUiState.update { it.copy(offline = offline) }
       }
     }
+    viewModelScope.launch {
+      proofUploadQueue.waiting.collect { waiting ->
+        mutableUiState.update { it.copy(photoWaiting = reservationId in waiting) }
+      }
+    }
     listen()
   }
 
@@ -135,7 +140,7 @@ class CompletionViewModel(
         current.sentByTeammate -> finishSubmit(SaveState.Idle)
         // Approval may be withdrawn while the device is finding its position.
         current.status != CompletionFormStatus.READY -> finishSubmit(SaveState.Idle)
-        current.photoSentLater -> finishSubmit(enqueueProof(form, venueId))
+        current.photoSentLater || current.photoWaiting -> finishSubmit(enqueueProof(form, venueId))
         else -> finishSubmit(submitProof(form, venueId))
       }
     }

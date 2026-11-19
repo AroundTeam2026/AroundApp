@@ -122,6 +122,15 @@ class CompletionScreenTest {
   }
 
   @Test
+  fun aWaitingPhotoReplacesTheReviewHint() {
+    state = state.copy(photoWaiting = true)
+    show()
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_HINT)
+        .assertTextContains("Your photo is waiting to upload", substring = true)
+  }
+
+  @Test
   fun photoProofUsesPickerAndRequiresPhoto() {
     state = state.copy(proofType = ProofType.PHOTO)
     show()

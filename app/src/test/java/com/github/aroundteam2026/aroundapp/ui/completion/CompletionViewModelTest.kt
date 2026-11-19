@@ -606,6 +606,22 @@ class CompletionViewModelTest {
     assertEquals(PHOTO, state.photo)
   }
 
+  // A photo still waiting to upload is replaced through the queue, so it can't overwrite this one
+  @Test
+  fun aWaitingPhotoIsReplacedThroughTheQueueEvenOnline() = test {
+    open("photo")
+    queue.enqueue(reservationId, CAFE, EXPLORER, File(checkNotNull(PHOTO.path)))
+    runCurrent()
+    assertTrue(state.photoWaiting)
+    viewModel.pickPhoto(PHOTO)
+
+    viewModel.submit()
+    runCurrent()
+
+    assertEquals(2, queue.queued.size)
+    assertTrue(photos.uploads.isEmpty())
+  }
+
   // Only a file can be queued: another Uri shows the save error instead of crashing
   @Test
   fun queuingAPhotoThatIsNotAFileShowsAnError() = test {

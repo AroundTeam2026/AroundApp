@@ -137,8 +137,11 @@ fun CompletionContent(
               verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
           ) {
             Text(
-                if (state.sentByTeammate) stringResource(R.string.completion_sent_by_teammate)
-                else stringResource(R.string.completion_review_hint, venueName),
+                when {
+                  state.sentByTeammate -> stringResource(R.string.completion_sent_by_teammate)
+                  state.photoWaiting -> stringResource(R.string.completion_photo_waiting)
+                  else -> stringResource(R.string.completion_review_hint, venueName)
+                },
                 Modifier.fillMaxWidth().testTag(C.Tag.COMPLETION_HINT),
                 style = AroundTextStyles.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
