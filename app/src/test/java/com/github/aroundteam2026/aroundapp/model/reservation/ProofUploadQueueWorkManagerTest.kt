@@ -20,6 +20,7 @@ import io.mockk.mockk
 import java.io.File
 import java.io.FileNotFoundException
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -70,18 +71,19 @@ class ProofUploadQueueWorkManagerTest {
     queue = ProofUploadQueueWorkManager(workManager)
   }
 
-  @Test fun startsWithNothingWaiting() = runBlocking { assertTrue(queue.waiting.first().isEmpty()) }
+  @Test
+  fun startsWithNothingWaiting() = runWithTimeout { assertTrue(queue.waiting.first().isEmpty()) }
 
   @Test
-  fun enqueue_listsTheReservationAsWaitingWhileOffline() = runBlocking {
+  fun enqueue_listsTheReservationAsWaitingWhileOffline() = runWithTimeout {
     assertTrue(queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO).isSuccess)
 
     assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
-    assertTrue("Uploaded while offline", photos.uploads.isEmpty())
+    assertTrue(photos.uploads.isEmpty())
   }
 
   @Test
-  fun enqueue_twoReservations_listsBoth() = runBlocking {
+  fun enqueue_twoReservations_listsBoth() = runWithTimeout {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
     queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
 
@@ -89,7 +91,7 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun succeededUpload_leavesWaitingAndSendsTheQueuedPhoto() = runBlocking {
+  fun succeededUpload_leavesWaitingAndSendsTheQueuedPhoto() = runWithTimeout {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     runOnline(RESERVATION_ID)
@@ -100,7 +102,7 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun stoppedUpload_leavesWaiting() = runBlocking {
+  fun stoppedUpload_leavesWaiting() = runWithTimeout {
     photos.forcedFailure = FileNotFoundException(GONE)
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
@@ -111,7 +113,7 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun cancelledUpload_leavesWaiting() = runBlocking {
+  fun cancelledUpload_leavesWaiting() = runWithTimeout {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     workManager.cancelUniqueWork(ProofUploadWorker.uniqueWorkName(RESERVATION_ID)).await()
@@ -120,7 +122,7 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun enqueue_whileTheReservationIsWaiting_keepsTheFirstProof() = runBlocking {
+  fun enqueue_whileTheReservationIsWaiting_keepsTheFirstProof() = runWithTimeout {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     assertTrue(queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE).isSuccess)
@@ -130,7 +132,7 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun enqueue_afterTheUploadEnded_queuesTheNewProof() = runBlocking {
+  fun enqueue_afterTheUploadEnded_queuesTheNewProof() = runWithTimeout {
     photos.forcedFailure = FileNotFoundException(GONE)
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
     runOnline(RESERVATION_ID)
@@ -142,29 +144,22 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun enqueue_whenWorkManagerFails_returnsTheFailure() = runBlocking {
+  fun enqueue_whenWorkManagerFails_returnsTheFailure() = runWithTimeout {
     val failure = IllegalStateException(UNAVAILABLE)
-    val broken = mockk<WorkManager>(relaxed = true)
-    every { broken.enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws
-        failure
 
     val result =
-        ProofUploadQueueWorkManager(broken).enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+        ProofUploadQueueWorkManager(brokenWorkManager(failure))
+            .enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     assertEquals(failure, result.exceptionOrNull())
   }
 
   @Test
-  fun enqueue_whenCancelled_rethrowsTheCancellation() = runBlocking {
-    val cancellation = CancellationException(CANCELLED)
-    val broken = mockk<WorkManager>(relaxed = true)
-    every { broken.enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws
-        cancellation
-
+  fun enqueue_whenCancelled_rethrowsTheCancellation() = runWithTimeout {
     val thrown =
         assertThrows(CancellationException::class.java) {
           runBlocking {
-            ProofUploadQueueWorkManager(broken)
+            ProofUploadQueueWorkManager(brokenWorkManager(CancellationException(CANCELLED)))
                 .enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
           }
         }
@@ -182,12 +177,21 @@ class ProofUploadQueueWorkManagerTest {
     workManager.getWorkInfosForUniqueWorkFlow(name).first().forEach {
       driver.setAllConstraintsMet(it.id)
     }
-    withTimeout(TIMEOUT_MS) {
-      workManager.getWorkInfosForUniqueWorkFlow(name).first { works ->
-        works.all { it.state.isFinished }
-      }
+    workManager.getWorkInfosForUniqueWorkFlow(name).first { works ->
+      works.all { it.state.isFinished }
     }
   }
+
+  /** Runs [body] as a test that fails, instead of hanging, if a flow stops emitting. */
+  private fun runWithTimeout(body: suspend CoroutineScope.() -> Unit) = runBlocking {
+    withTimeout(TIMEOUT_MS, body)
+  }
+
+  /** A WorkManager whose every [WorkManager.enqueueUniqueWork] throws [error]. */
+  private fun brokenWorkManager(error: Throwable): WorkManager =
+      mockk<WorkManager>(relaxed = true) {
+        every { enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws error
+      }
 
   private companion object {
     const val RESERVATION_ID = "reservation-1"
