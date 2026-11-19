@@ -191,10 +191,9 @@ class OverviewScreenTest {
         )
     )
 
-    cancelButtonOf("approved").assertExists()
-    listOf("queued", "sent", "completed", "rejected").forEach {
-      cancelButtonOf(it).assertDoesNotExist()
-    }
+    // A queued proof isn't sent yet, so its card can still be cancelled
+    listOf("approved", "queued").forEach { cancelButtonOf(it).assertExists() }
+    listOf("sent", "completed", "rejected").forEach { cancelButtonOf(it).assertDoesNotExist() }
   }
 
   // Without the explorer's membership, neither cancelling nor leaving is known to be safe
