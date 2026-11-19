@@ -24,13 +24,16 @@ When the phone loses its internet connection, a banner under the header says "Yo
 
 These actions need a connection and are disabled after two seconds offline, with a hint or the banner saying why:
 
-- Explorers can't accept a quest from a venue's page or a quest's details, cancel a reservation, leave a party, send a photo proof or save their profile. Joining a party with a code says the phone is offline.
+- Explorers can't accept a quest from a venue's page or a quest's details, cancel a reservation, leave a party or save their profile. Joining a party with a code says the phone is offline.
 - Venues can't approve or decline a reservation, or approve or reject a proof.
 
-Two things still work offline, as Firestore keeps the write and sends it once the phone is back online:
+These still work offline, and are sent once the phone is back online:
 
-- Venues can create and edit quests.
-- Explorers can send a text proof. If the venue approved the party's proof in the meantime, the late write is refused and dropped; after a rejection, it becomes the party's new proof.
+- Venues can create and edit quests: Firestore keeps the change.
+- Explorers can send a text proof: Firestore keeps the write.
+- Explorers can send a photo proof: it's queued, and a background upload sends it once online, even if the app was closed in the meantime. The proof screen says "Your photo will be sent once you're back online." Sending another photo replaces the queued one.
+
+If the venue approved the party's proof in the meantime, a late proof is dropped; after a rejection, it becomes the party's new proof.
 
 ## Architecture
 
