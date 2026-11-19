@@ -143,6 +143,9 @@ class ProofUploadWorker(
     /** Tag of every proof upload, to observe them all. */
     const val TAG = "proof-upload"
 
+    /** Starts each [uniqueWorkName], which [reservationIdOf] reads back. */
+    private const val UNIQUE_NAME_PREFIX = "$TAG:"
+
     /** How many runs a failure that can pass gets before the work fails. */
     const val MAX_ATTEMPTS = 5
 
@@ -150,11 +153,19 @@ class ProofUploadWorker(
      * Name to enqueue the upload of [reservationId]'s proof under as unique work: a party has one
      * completion per reservation, so one upload per reservation is pending at a time.
      */
-    fun uniqueWorkName(reservationId: String): String = "$TAG:$reservationId"
+    fun uniqueWorkName(reservationId: String): String = "$UNIQUE_NAME_PREFIX$reservationId"
+
+    /**
+     * The id of the reservation whose upload [tag] names, or null if it names none. [buildRequest]
+     * tags each upload with its [uniqueWorkName], since WorkManager doesn't report a work's input.
+     */
+    fun reservationIdOf(tag: String): String? =
+        tag.removePrefix(UNIQUE_NAME_PREFIX).takeIf { it != tag && it.isNotEmpty() }
 
     /**
      * The work that sends [photo], a copy [ProofPhotos] keeps, as the proof of the reservation
-     * [reservationId]. It waits for a network connection and retries with exponential backoff.
+     * [reservationId]. It waits for a network connection and retries with exponential backoff, and
+     * is tagged with [TAG] and its [uniqueWorkName].
      */
     fun buildRequest(
         reservationId: String,
@@ -180,6 +191,7 @@ class ProofUploadWorker(
                 TimeUnit.MILLISECONDS,
             )
             .addTag(TAG)
+            .addTag(uniqueWorkName(reservationId))
             .build()
   }
 }

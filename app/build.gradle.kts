@@ -158,7 +158,7 @@ configurations
 
 dependencies {
   implementation(libs.androidx.work.runtime.ktx)
-  androidTestImplementation(libs.androidx.work.testing)
+  globalTestImplementation(libs.androidx.work.testing)
   val composeBom = platform(libs.compose.bom)
   val firebaseBom = platform(libs.firebase.bom)
 
