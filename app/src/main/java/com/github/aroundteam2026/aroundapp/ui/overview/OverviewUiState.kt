@@ -94,6 +94,11 @@ enum class OverviewRowStatus(val cancellable: Boolean, val proofReplaceable: Boo
   WAITING(cancellable = true),
   /** The venue approved it, and the party hasn't sent a proof yet. */
   APPROVED(cancellable = true),
+  /**
+   * The explorer took a photo proof offline: it is queued, and uploads and is sent once online.
+   * Like a sent proof, it can't be cancelled meanwhile.
+   */
+  UPLOAD_WAITING(cancellable = false),
   /** A member of the party sent the proof; the venue hasn't answered it yet. */
   PROOF_SENT(cancellable = false, proofReplaceable = true),
   /** The venue approved the proof: the quest is done. */

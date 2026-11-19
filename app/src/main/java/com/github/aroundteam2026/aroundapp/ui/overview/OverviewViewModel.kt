@@ -23,6 +23,8 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueue
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -58,12 +60,13 @@ import kotlinx.coroutines.launch
  * It listens to the explorer's reservations and keeps the pending and approved ones, each with its
  * quest, read once, and its venue and party, which it listens to, as well as their completions,
  * which say where the party's proof stands, whichever member sent it, and the profile of a member
- * other than the explorer who sent one, to name them. Rows follow the reservations, the venues, the
- * parties, the completions and those profiles as they change. If anything fails, including the
- * reservations' listener after sign-out, the overview shows [OverviewStatus.FAILED] until [retry].
- * The explorer can [cancel] a reservation, or leave the party of one they joined rather than
- * created, but not while [OverviewUiState.offline] says the device is offline, which it follows
- * from [connectivityRepository].
+ * other than the explorer who sent one, to name them. A photo proof queued in [proofUploadQueue]
+ * shows as waiting to upload until it leaves the queue. Rows follow the reservations, the venues,
+ * the parties, the completions, the queue and those profiles as they change. If anything fails,
+ * including the reservations' listener after sign-out, the overview shows [OverviewStatus.FAILED]
+ * until [retry]. The explorer can [cancel] a reservation, or leave the party of one they joined
+ * rather than created, but not while [OverviewUiState.offline] says the device is offline, which it
+ * follows from [connectivityRepository].
  */
 class OverviewViewModel(
     private val explorerUid: String,
@@ -74,6 +77,7 @@ class OverviewViewModel(
     private val completionRepository: CompletionRepository,
     private val userRepository: UserRepository,
     private val connectivityRepository: ConnectivityRepository,
+    private val proofUploadQueue: ProofUploadQueue,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow(OverviewUiState())
   /** What the overview shows now; the screen observes it. */
@@ -180,10 +184,19 @@ class OverviewViewModel(
                     completions ->
                   proofSenders.observe(completions).map { completions to it }
                 },
-            ) { venues, parties, (completions, senders) ->
+                proofUploadQueue.waiting,
+            ) { venues, parties, (completions, senders), waiting ->
               val partySizes = parties.mapValues { (_, members) -> members.count { it.isJoined } }
               val leaves = leavesPartiesOf(reservations, parties, explorerUid)
-              overviewRows(booked, venues, partySizes, proofsOf(completions), senders, leaves)
+              overviewRows(
+                  booked,
+                  venues,
+                  partySizes,
+                  proofsOf(completions),
+                  senders,
+                  leaves,
+                  waiting,
+              )
             }
           }
           .catch {
@@ -229,6 +242,7 @@ class OverviewViewModel(
             CompletionRepositoryProvider.repository,
             UserRepositoryProvider.repository,
             ConnectivityRepositoryProvider.repository(this[APPLICATION_KEY]!!),
+            ProofUploadQueueProvider.queue(this[APPLICATION_KEY]!!),
         )
       }
     }
@@ -264,7 +278,7 @@ internal fun proofsOf(completions: List<Completion>): Map<String, CompletionStat
  * whose venue isn't among [venues], because it no longer exists, has no row. A party missing from
  * [partySizes] counts as just the explorer, who is in every party they see here. Each row's
  * [OverviewRow.leave] comes from [leaves] ([leavesPartiesOf]); a reservation missing from it has a
- * null one.
+ * null one. A reservation among [waiting] has its photo proof waiting to upload.
  */
 internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,
@@ -273,30 +287,43 @@ internal fun overviewRows(
     proofs: Map<String, CompletionStatus>,
     senders: Map<String, ProofSender> = emptyMap(),
     leaves: Map<String, Boolean> = emptyMap(),
+    waiting: Set<String> = emptySet(),
 ): List<OverviewRow> {
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
     venuesById[reservation.venueId]?.let { venue ->
       // A safety net only: observeParties gives every party it is asked for
       val partySize = partySizes[reservation.id] ?: 1
-      overviewRow(reservation, quest, venue, partySize, rowStatus(reservation, proofs))
+      overviewRow(reservation, quest, venue, partySize, rowStatus(reservation, proofs, waiting))
           .copy(proofSender = senders[reservation.id], leave = leaves[reservation.id])
     }
   }
 }
 
-/** Where [reservation] stands: with its venue until approved, then with the proof in [proofs]. */
-private fun rowStatus(reservation: Reservation, proofs: Map<String, CompletionStatus>) =
-    if (reservation.status != ReservationStatus.APPROVED) {
-      OverviewRowStatus.WAITING
-    } else {
-      when (proofs[reservation.id]) {
-        null -> OverviewRowStatus.APPROVED
-        CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
-        CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED
-        CompletionStatus.REJECTED -> OverviewRowStatus.PROOF_REJECTED
-      }
+/**
+ * Where [reservation] stands: with its venue until approved, then with the proof in [proofs]. A
+ * proof among [waiting] is newer than the one the venue has, unless the venue approved that one,
+ * which ends the quest.
+ */
+private fun rowStatus(
+    reservation: Reservation,
+    proofs: Map<String, CompletionStatus>,
+    waiting: Set<String>,
+): OverviewRowStatus {
+  val proof = proofs[reservation.id]
+  return if (reservation.status != ReservationStatus.APPROVED) {
+    OverviewRowStatus.WAITING
+  } else if (reservation.id in waiting && proof != CompletionStatus.APPROVED) {
+    OverviewRowStatus.UPLOAD_WAITING
+  } else {
+    when (proof) {
+      null -> OverviewRowStatus.APPROVED
+      CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
+      CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED
+      CompletionStatus.REJECTED -> OverviewRowStatus.PROOF_REJECTED
     }
+  }
+}
 
 private fun overviewRow(
     reservation: Reservation,

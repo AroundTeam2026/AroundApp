@@ -19,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
@@ -58,6 +59,7 @@ class JoinPartyNavigationTest {
             FakeCompletionRepository(),
             FakeUserRepository(),
             FakeConnectivityRepository(),
+            FakeProofUploadQueue(),
         )
     composeTestRule.setContent {
       navController = rememberNavController()

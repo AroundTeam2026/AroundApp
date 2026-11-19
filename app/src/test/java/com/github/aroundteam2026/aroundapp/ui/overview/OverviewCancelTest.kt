@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRe
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -66,6 +67,7 @@ class OverviewCancelTest {
         completions,
         FakeUserRepository(),
         watched,
+        FakeProofUploadQueue(),
     )
   }
 

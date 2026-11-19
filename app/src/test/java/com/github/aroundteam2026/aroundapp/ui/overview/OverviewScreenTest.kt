@@ -28,6 +28,7 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -183,6 +184,7 @@ class OverviewScreenTest {
     show(
         loaded(
             row(id = "approved", status = OverviewRowStatus.APPROVED),
+            row(id = "queued", status = OverviewRowStatus.UPLOAD_WAITING),
             row(id = "sent", status = OverviewRowStatus.PROOF_SENT),
             row(id = "completed", status = OverviewRowStatus.COMPLETED),
             row(id = "rejected", status = OverviewRowStatus.PROOF_REJECTED),
@@ -190,7 +192,9 @@ class OverviewScreenTest {
     )
 
     cancelButtonOf("approved").assertExists()
-    listOf("sent", "completed", "rejected").forEach { cancelButtonOf(it).assertDoesNotExist() }
+    listOf("queued", "sent", "completed", "rejected").forEach {
+      cancelButtonOf(it).assertDoesNotExist()
+    }
   }
 
   // Without the explorer's membership, neither cancelling nor leaving is known to be safe
@@ -223,10 +227,11 @@ class OverviewScreenTest {
         loaded(
             row(id = "waiting", status = OverviewRowStatus.WAITING),
             row(id = "approved", status = OverviewRowStatus.APPROVED),
+            row(id = "queued", status = OverviewRowStatus.UPLOAD_WAITING),
         )
     )
 
-    listOf("waiting", "approved").forEach { newProofButtonOf(it).assertDoesNotExist() }
+    listOf("waiting", "approved", "queued").forEach { newProofButtonOf(it).assertDoesNotExist() }
   }
 
   @Test
@@ -298,6 +303,7 @@ class OverviewScreenTest {
             FakeCompletionRepository(),
             FakeUserRepository(),
             FakeConnectivityRepository(),
+            FakeProofUploadQueue(),
         )
     compose.setContent {
       AroundAppTheme {
@@ -336,6 +342,7 @@ class OverviewScreenTest {
             FakeCompletionRepository(),
             FakeUserRepository(),
             FakeConnectivityRepository(),
+            FakeProofUploadQueue(),
         )
     compose.setContent {
       AroundAppTheme {
