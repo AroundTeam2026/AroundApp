@@ -19,6 +19,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositor
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LENGTH
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
@@ -33,6 +34,7 @@ import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +99,7 @@ class CompletionViewModelTest {
   private val connectivity = FakeConnectivityRepository()
   private var connectivityRepository: ConnectivityRepository = connectivity
   private val discarded = mutableListOf<Uri>()
+  private val queue = FakeProofUploadQueue()
 
   private val viewModel by lazy {
     CompletionViewModel(
@@ -109,6 +112,7 @@ class CompletionViewModelTest {
         completions,
         photoRepository,
         connectivityRepository,
+        queue,
         discardPhoto = { discarded.add(it) },
     )
   }
@@ -571,24 +575,35 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun offlinePhotoCanBeSubmittedAfterReconnect() = test {
+  fun anOfflinePhotoIsQueuedInsteadOfUploaded() = test {
     connectivity.online.value = false
     open("photo")
     viewModel.pickPhoto(PHOTO)
     waitForOfflineState()
 
-    assertFalse(state.canSubmit)
     viewModel.submit()
     runCurrent()
+
+    assertEquals(listOf(PHOTO.path), queue.queued.map { it.photo.path })
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
+    assertTrue(discarded.isEmpty())
+  }
 
-    connectivity.online.value = true
-    runCurrent()
-    assertTrue(state.canSubmit)
+  @Test
+  fun aFailedEnqueueShowsAnErrorAndKeepsThePhoto() = test {
+    queue.forcedFailure = IOException("no space left")
+    connectivity.online.value = false
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    waitForOfflineState()
+
     viewModel.submit()
     runCurrent()
-    assertEquals(Proof.Photo(location(1)), stored().single().proof)
+
+    assertEquals(SaveState.Failed, state.saveState)
+    assertEquals(PHOTO, state.photo)
   }
 
   @Test
@@ -612,7 +627,7 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun losingConnectivityWhileCheckingLocationStopsThePhotoUpload() = test {
+  fun losingConnectivityWhileCheckingLocationQueuesThePhoto() = test {
     open("photo")
     viewModel.pickPhoto(PHOTO)
     val gate = CompletableDeferred<Unit>().also { locations.preciseGate = it }
@@ -625,8 +640,7 @@ class CompletionViewModelTest {
     gate.complete(Unit)
     runCurrent()
 
-    assertEquals(SaveState.Idle, state.saveState)
-    assertEquals(PHOTO, state.photo)
+    assertEquals(listOf(PHOTO.path), queue.queued.map { it.photo.path })
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
   }
@@ -652,7 +666,7 @@ class CompletionViewModelTest {
   }
 
   @Test
-  fun aFailedConnectivityObserverDoesNotLeaveThePhotoBlocked() = test {
+  fun aFailedConnectivityObserverSendsThePhotoAtOnce() = test {
     val fail = CompletableDeferred<Unit>()
     connectivityRepository =
         object : ConnectivityRepository {
@@ -665,7 +679,6 @@ class CompletionViewModelTest {
     open("photo")
     viewModel.pickPhoto(PHOTO)
     waitForOfflineState()
-    assertFalse(state.canSubmit)
 
     fail.complete(Unit)
     runCurrent()
@@ -1090,7 +1103,8 @@ class CompletionViewModelTest {
     val VENUE_LOCATION = Location(46.5220, 6.6330)
     /** Where the quest "away" takes place, kilometres from its venue. */
     val AWAY = Location(46.5191, 6.5668)
-    val PHOTO: Uri = Uri.parse("content://media/photos/1")
+    /** A copy ProofPhotos keeps, as the picker gives. */
+    val PHOTO: Uri = Uri.fromFile(File("/proofs/proof-1.jpg"))
     val OTHER_PHOTO: Uri = Uri.parse("content://media/photos/2")
   }
 }

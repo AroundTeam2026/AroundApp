@@ -125,7 +125,7 @@ fun CompletionContent(
 ) {
   val saving = state.saveState == SaveState.Saving
   val saved = state.saveState is SaveState.Saved
-  val showOfflineHint = state.isEditable && state.photoBlockedOffline
+  val showOfflineHint = state.isEditable && state.photoSentLater
   Scaffold(
       modifier = modifier.testTag(C.Tag.COMPLETION_SCREEN).imePadding(),
       containerColor = MaterialTheme.colorScheme.background,
@@ -213,7 +213,7 @@ fun CompletionContent(
         CompletionFormStatus.UNAVAILABLE ->
             CompletionMessage(stringResource(R.string.completion_unavailable))
         CompletionFormStatus.READY -> {
-          if (showOfflineHint) OfflineHint(message = R.string.offline_photo_needs_connection)
+          if (showOfflineHint) OfflineHint(message = R.string.offline_photo_sent_later)
           Row(
               horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
               verticalAlignment = Alignment.CenterVertically,
@@ -335,7 +335,6 @@ fun CompletionContent(
           }
           if (
               state.saveState == SaveState.Failed &&
-                  !showOfflineHint &&
                   state.locationError == null &&
                   !preciseLocationRefused
           ) {

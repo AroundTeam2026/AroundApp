@@ -52,8 +52,8 @@ data class CompletionUiState(
   val answerTooLong: Boolean
     get() = answer.trim().length > MAX_TEXT_ANSWER_LENGTH
 
-  /** Whether sending the current proof is blocked by the connection. */
-  val photoBlockedOffline: Boolean
+  /** Whether the current proof is a photo queued to be sent once the device is online. */
+  val photoSentLater: Boolean
     get() = proofType == ProofType.PHOTO && offline
 
   /** Whether the proof the quest asks for is filled in and the form can be submitted. */
@@ -62,7 +62,7 @@ data class CompletionUiState(
         isEditable &&
             when (proofType) {
               ProofType.TEXT -> answer.isNotBlank() && !answerTooLong
-              ProofType.PHOTO -> photo != null && !photoBlockedOffline
+              ProofType.PHOTO -> photo != null
               null -> false
             }
 }

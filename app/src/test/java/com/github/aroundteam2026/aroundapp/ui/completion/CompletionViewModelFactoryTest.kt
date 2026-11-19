@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.testing.WorkManagerTestInitHelper
 import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,6 +35,8 @@ class CompletionViewModelFactoryTest {
     Dispatchers.setMain(StandardTestDispatcher())
     // Another test in this process may have initialized the default app already
     if (FirebaseApp.getApps(app).isEmpty()) FirebaseApp.initializeApp(app)
+    // Robolectric doesn't run the app's startup initializer, which sets WorkManager up
+    WorkManagerTestInitHelper.initializeTestWorkManager(app)
   }
 
   @After fun tearDown() = Dispatchers.resetMain()
