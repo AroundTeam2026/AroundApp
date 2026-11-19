@@ -122,13 +122,13 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun enqueue_whileTheReservationIsWaiting_keepsTheFirstProof() = runWithTimeout {
+  fun enqueue_whileTheReservationIsWaiting_sendsTheNewProof() = runWithTimeout {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     assertTrue(queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE).isSuccess)
     runOnline(RESERVATION_ID)
 
-    assertEquals(listOf(Uri.fromFile(PHOTO)), photos.uploads.values.toList())
+    assertEquals(listOf(Uri.fromFile(RETAKE)), photos.uploads.values.toList())
   }
 
   @Test

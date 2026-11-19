@@ -31,7 +31,7 @@ class ProofUploadQueueWorkManager(private val workManager: WorkManager) : ProofU
             .enqueueUniqueWork(
                 ProofUploadWorker.uniqueWorkName(reservationId),
                 // A reservation has one proof waiting at a time, as ProofUploadQueue describes
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 ProofUploadWorker.buildRequest(
                     reservationId,
                     venueId,
