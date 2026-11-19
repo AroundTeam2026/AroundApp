@@ -60,6 +60,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.MAX_TEXT_ANSWER_LEN
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.SaveState
+import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.quest.initialsOf
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
@@ -203,6 +204,8 @@ fun CompletionContent(
         }
         Text(stringResource(R.string.completion_heading), style = AroundTextStyles.CardTitle)
       }
+      // The app-wide banner, unless the hint already says the device is offline
+      if (state.offline && !showOfflineHint) OfflineBanner()
       when (state.status) {
         CompletionFormStatus.LOADING ->
             CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
