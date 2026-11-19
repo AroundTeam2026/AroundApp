@@ -22,6 +22,7 @@ import java.io.FileNotFoundException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -41,6 +42,7 @@ class ProofUploadQueueWorkManagerTest {
   private lateinit var photos: FakeProofPhotoRepository
   private lateinit var completions: FakeCompletionRepository
   private lateinit var queue: ProofUploadQueueWorkManager
+  private val discarded = mutableListOf<Uri>()
 
   /** Builds every worker on the fakes, as the app's factory would on the real repositories. */
   private val factory =
@@ -68,7 +70,11 @@ class ProofUploadQueueWorkManagerTest {
             .setWorkerFactory(factory)
             .build(),
     )
-    queue = ProofUploadQueueWorkManager(workManager)
+    queue =
+        ProofUploadQueueWorkManager(workManager) {
+          discarded += it
+          true
+        }
   }
 
   @Test
@@ -129,6 +135,7 @@ class ProofUploadQueueWorkManagerTest {
     runOnline(RESERVATION_ID)
 
     assertEquals(listOf(Uri.fromFile(RETAKE)), photos.uploads.values.toList())
+    assertEquals(listOf(Uri.fromFile(PHOTO)), discarded)
   }
 
   @Test
@@ -148,7 +155,7 @@ class ProofUploadQueueWorkManagerTest {
     val failure = IllegalStateException(UNAVAILABLE)
 
     val result =
-        ProofUploadQueueWorkManager(brokenWorkManager(failure))
+        ProofUploadQueueWorkManager(brokenWorkManager(failure)) { true }
             .enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     assertEquals(failure, result.exceptionOrNull())
@@ -159,7 +166,9 @@ class ProofUploadQueueWorkManagerTest {
     val thrown =
         assertThrows(CancellationException::class.java) {
           runBlocking {
-            ProofUploadQueueWorkManager(brokenWorkManager(CancellationException(CANCELLED)))
+            ProofUploadQueueWorkManager(brokenWorkManager(CancellationException(CANCELLED))) {
+                  true
+                }
                 .enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
           }
         }
@@ -190,6 +199,7 @@ class ProofUploadQueueWorkManagerTest {
   /** A WorkManager whose every [WorkManager.enqueueUniqueWork] throws [error]. */
   private fun brokenWorkManager(error: Throwable): WorkManager =
       mockk<WorkManager>(relaxed = true) {
+        every { getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList())
         every { enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws error
       }
 
