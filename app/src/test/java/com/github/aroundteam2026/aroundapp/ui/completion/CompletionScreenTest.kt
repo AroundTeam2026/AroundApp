@@ -109,6 +109,18 @@ class CompletionScreenTest {
     assertEquals(1, submits)
   }
 
+  // Offline, the form says so once: the banner, or the hint when the photo will be sent later
+  @Test
+  fun offlineShowsTheBannerUnlessThePhotoHintSaysSo() {
+    state = state.copy(offline = true)
+    show()
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertDoesNotExist()
+    compose.runOnIdle { state = state.copy(proofType = ProofType.PHOTO) }
+    compose.onNodeWithTag(C.Tag.OFFLINE_HINT).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.OFFLINE_BANNER).assertDoesNotExist()
+  }
+
   @Test
   fun photoProofUsesPickerAndRequiresPhoto() {
     state = state.copy(proofType = ProofType.PHOTO)
