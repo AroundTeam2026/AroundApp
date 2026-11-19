@@ -157,6 +157,8 @@ configurations
     .configureEach { exclude(group = "com.google.protobuf", module = "protobuf-lite") }
 
 dependencies {
+  implementation(libs.androidx.work.runtime.ktx)
+  androidTestImplementation(libs.androidx.work.testing)
   val composeBom = platform(libs.compose.bom)
   val firebaseBom = platform(libs.firebase.bom)
 
