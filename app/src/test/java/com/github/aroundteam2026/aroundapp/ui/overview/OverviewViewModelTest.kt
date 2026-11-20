@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
@@ -603,7 +604,6 @@ class OverviewViewModelTest {
     assertEquals(ProofSender(null), state.rows.single().proofSender)
   }
 
-  // A profile can take a while offline: the rows show at once, and name the sender once it arrives
   // The Figma frame "Explorer quests · waiting to send": accepted offline, not on the server yet
   @Test
   fun aReservationTheServerHasntConfirmedIsWaitingToSend() = test {
@@ -647,6 +647,7 @@ class OverviewViewModelTest {
     )
   }
 
+  // A profile can take a while offline: the rows show at once, and name the sender once it arrives
   @Test
   fun theRowsDontWaitForTheSendersProfile() = test {
     val lea = MutableSharedFlow<User?>(extraBufferCapacity = 1)

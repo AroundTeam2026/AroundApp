@@ -213,6 +213,22 @@ class AcceptQuestBarTest {
   }
 
   @Test
+  fun aQuestWaitingToSendDoesNotAlsoSayAcceptingIsUnavailable() {
+    show(
+        LOADED.copy(
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1),
+            reservationIds = mapOf("a" to "r1"),
+            unsentIds = setOf("r1"),
+            acceptAvailable = false,
+        )
+    )
+
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_UNAVAILABLE).assertDoesNotExist()
+    button.assertIsNotEnabled().assertTextContains(text(R.string.waiting_to_send))
+  }
+
+  @Test
   fun anAcceptedQuestDoesNotAlsoSayAcceptingIsUnavailable() {
     show(
         LOADED.copy(

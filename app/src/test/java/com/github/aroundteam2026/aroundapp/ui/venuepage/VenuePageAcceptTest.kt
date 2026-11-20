@@ -55,6 +55,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -188,16 +189,23 @@ class VenuePageAcceptTest {
     viewModel.accept()
     runCurrent()
     assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    val id = stored().single().id
+    assertEquals(id, state.cancellableReservationId)
+    assertNotNull(state.partyCode)
 
-    unsent.value = setOf(stored().single().id)
+    unsent.value = setOf(id)
     runCurrent()
     assertEquals(AcceptStatus.SENDING, state.acceptStatus)
     // It still counts as accepted: its party, and no second accept
     assertEquals(setOf("a"), state.acceptedParties.keys)
+    // The server has neither the reservation to cancel nor the party code a friend would look up
+    assertNull(state.cancellableReservationId)
+    assertNull(state.partyCode)
 
     unsent.value = emptySet()
     runCurrent()
     assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    assertEquals(id, state.cancellableReservationId)
   }
 
   @Test

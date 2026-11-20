@@ -119,15 +119,16 @@ data class VenuePageUiState(
   /**
    * The reservation the explorer can cancel for the picked quest, or null when there is none. Once
    * any member of its party sent its proof, whatever the proof's status, it can't be cancelled, as
-   * on the Quests tab and as the rules enforce. While the reservations can't be read it is null
-   * too, since the page can't tell if it still stands.
+   * on the Quests tab and as the rules enforce. Nor can it while the server doesn't have it yet
+   * ([unsentIds]): there is nothing to cancel. While the reservations can't be read it is null too,
+   * since the page can't tell if it still stands.
    */
   val cancellableReservationId: String?
     get() =
         selectedQuestId
             ?.takeIf { acceptAvailable }
             ?.let(reservationIds::get)
-            ?.takeIf { it !in completions }
+            ?.takeIf { it !in completions && it !in unsentIds }
 
   /**
    * Whether the explorer leaves the party of [cancellableReservationId] rather than cancelling it,
@@ -159,15 +160,17 @@ data class VenuePageUiState(
   /**
    * The code the explorer shares so friends can join their party for the picked quest: only for a
    * reservation they created, while friends can join it, so while it is pending and its party isn't
-   * full. Null otherwise, and while the reservations can't be read.
+   * full. Null otherwise, while the reservations can't be read, and while the server doesn't have
+   * the reservation yet ([unsentIds]), since friends can't find its code before then.
    */
   val partyCode: String?
     get() {
       val quest = selectedQuest?.takeIf { acceptAvailable } ?: return null
       val party = acceptedParties[quest.questId] ?: SOLO_PARTY
-      return reservationIds[quest.questId]?.let(partyCodes::get)?.takeIf {
-        party < quest.partyCapacity
-      }
+      return reservationIds[quest.questId]
+          ?.takeIf { it !in unsentIds }
+          ?.let(partyCodes::get)
+          ?.takeIf { party < quest.partyCapacity }
     }
 
   /** How cancelling the picked quest's reservation stands; [CancelStatus.NONE] when none is. */

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: OpenAI Codex <noreply@openai.com> -->
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
 <resources>
     <string name="offline_hint_title">You\'re offline</string>
     <string name="offline_needs_connection">This action needs a connection.</string>
