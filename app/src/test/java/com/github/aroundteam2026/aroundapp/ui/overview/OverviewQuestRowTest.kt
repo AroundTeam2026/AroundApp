@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.app.Application
@@ -92,7 +93,7 @@ class OverviewQuestRowTest {
     show(row(status = OverviewRowStatus.APPROVED, partySize = 3))
 
     status("APPROVED").assertIsDisplayed()
-    status("WAITING FOR THE VENUE").assertDoesNotExist()
+    status(app.getString(R.string.overview_status_waiting).uppercase()).assertDoesNotExist()
     part(C.Tag.OVERVIEW_ROW_PARTY).assertTextEquals("3 people")
   }
 
@@ -116,7 +117,6 @@ class OverviewQuestRowTest {
         }
   }
 
-  // #414, the Figma frame "Quests tab · offline, proof waiting to upload"
   // The Figma frame "Explorer quests · waiting to send"
   @Test
   fun aReservationNotSentYetSaysItIsWaitingToSend() {
@@ -126,6 +126,7 @@ class OverviewQuestRowTest {
     status("WAITING FOR THE VENUE").assertDoesNotExist()
   }
 
+  // #414, the Figma frame "Quests tab · offline, proof waiting to upload"
   @Test
   fun aQueuedProofSaysItIsWaitingToUpload() {
     show(row(status = OverviewRowStatus.UPLOAD_WAITING))

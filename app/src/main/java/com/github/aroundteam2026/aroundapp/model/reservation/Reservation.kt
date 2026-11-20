@@ -19,7 +19,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
  *   repository on creation and never changed. Null for reservations made before party codes.
  * @property pendingWrite Whether this device wrote the reservation and the server hasn't confirmed
  *   it yet, as when it was accepted offline: Firestore sends it once the device is back online.
- *   Only the explorer's listeners set it.
+ *   Only the explorer's per-reservation listeners keep it up to date; it is false elsewhere.
  */
 data class Reservation(
     val id: String,

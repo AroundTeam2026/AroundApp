@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.util.Log
@@ -311,19 +312,18 @@ private fun rowStatus(
     waiting: Set<String>,
 ): OverviewRowStatus {
   val proof = proofs[reservation.id]
-  return if (reservation.pendingWrite) {
-    OverviewRowStatus.SENDING
-  } else if (reservation.status != ReservationStatus.APPROVED) {
-    OverviewRowStatus.WAITING
-  } else if (reservation.id in waiting && proof != CompletionStatus.APPROVED) {
-    OverviewRowStatus.UPLOAD_WAITING
-  } else {
-    when (proof) {
-      null -> OverviewRowStatus.APPROVED
-      CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
-      CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED
-      CompletionStatus.REJECTED -> OverviewRowStatus.PROOF_REJECTED
-    }
+  return when {
+    reservation.pendingWrite -> OverviewRowStatus.SENDING
+    reservation.status != ReservationStatus.APPROVED -> OverviewRowStatus.WAITING
+    reservation.id in waiting && proof != CompletionStatus.APPROVED ->
+        OverviewRowStatus.UPLOAD_WAITING
+    else ->
+        when (proof) {
+          null -> OverviewRowStatus.APPROVED
+          CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
+          CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED
+          CompletionStatus.REJECTED -> OverviewRowStatus.PROOF_REJECTED
+        }
   }
 }
 

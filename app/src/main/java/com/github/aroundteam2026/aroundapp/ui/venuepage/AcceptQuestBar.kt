@@ -113,16 +113,16 @@ fun AcceptQuestBar(
   QuestBar(modifier) {
     // One explanation of the button: an accepted quest is done whatever the listener does, and a
     // failure can't be retried while accepting is unavailable
-    if (!state.acceptAvailable && status != AcceptStatus.ACCEPTED) {
-      Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
-    } else if (status == AcceptStatus.SENDING) {
-      Note(stringResource(R.string.waiting_to_send_note))
-    } else if (status == AcceptStatus.FAILED) {
-      Note(
-          stringResource(R.string.accept_quest_failed),
-          C.Tag.ACCEPT_QUEST_FAILED,
-          MaterialTheme.colorScheme.error,
-      )
+    when {
+      !state.acceptAvailable && status != AcceptStatus.ACCEPTED && status != AcceptStatus.SENDING ->
+          Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
+      status == AcceptStatus.SENDING -> Note(stringResource(R.string.waiting_to_send_note))
+      status == AcceptStatus.FAILED ->
+          Note(
+              stringResource(R.string.accept_quest_failed),
+              C.Tag.ACCEPT_QUEST_FAILED,
+              MaterialTheme.colorScheme.error,
+          )
     }
     val more = state.morePeopleNeeded
     if (more > 0) {
