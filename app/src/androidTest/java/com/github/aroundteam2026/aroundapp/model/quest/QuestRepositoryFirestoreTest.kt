@@ -16,6 +16,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.Source
 import java.util.Date
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -467,6 +468,61 @@ class QuestRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: observeQuestsByVenue leaves out metadata changes, or pendingWrite isn't read from them, so
+   * a quest created offline never shows as waiting to send, or still shows so once the server has
+   * it.
+   */
+  @Test
+  fun observeQuestsByVenue_ofAQuestCreatedOffline_isPendingUntilTheServerHasIt() =
+      withTimeoutBlocking {
+        observeQuestPendingUntilTheServerHasIt {
+          repository.createQuest(quest(title = "Offline")).getOrThrow()
+        }
+      }
+
+  /** Bug: as above, for a quest edited (or archived) offline. */
+  @Test
+  fun observeQuestsByVenue_ofAQuestUpdatedOffline_isPendingUntilTheServerHasIt() =
+      withTimeoutBlocking {
+        val id = repository.createQuest(quest()).getOrThrow()
+        db.waitForPendingWrites().await()
+        observeQuestPendingUntilTheServerHasIt {
+          repository.updateQuest(quest(id = id, status = QuestStatus.ARCHIVED)).getOrThrow()
+          id
+        }
+      }
+
+  /**
+   * Bug: observeQuestsByVenue passes on metadata changes that leave the quests equal, so a
+   * disconnection or a reconnection emits the same quests again and whatever collects them starts
+   * over.
+   */
+  @Test
+  fun observeQuestsByVenue_afterAReconnection_emitsOnlyWhenTheQuestsChange() = withTimeoutBlocking {
+    val id = repository.createQuest(quest(title = "Before")).getOrThrow()
+    db.waitForPendingWrites().await()
+    val emissions = Channel<List<Quest>>(Channel.UNLIMITED)
+    val collector =
+        launch(start = CoroutineStart.UNDISPATCHED) {
+          repository.observeQuestsByVenue(venueId).collect(emissions::send)
+        }
+    try {
+      do {
+        val latest = emissions.receive()
+      } while (latest.none { it.id == id && !it.pendingWrite })
+
+      db.disableNetwork().await()
+      db.enableNetwork().await()
+      repository.updateQuest(quest(id = id, title = "After")).getOrThrow()
+
+      // A copy emitted for the disconnection or the reconnection comes before the edit
+      assertEquals("After", emissions.receive().single { it.id == id }.title)
+    } finally {
+      collector.cancel()
+    }
+  }
+
+  /**
    * Bug: observeActiveQuestsByVenue does not filter on venueId or on status, or filters on a string
    * that differs from the stored enum name.
    */
@@ -599,6 +655,40 @@ class QuestRepositoryFirestoreTest {
       return QuestRepositoryFirestore(reader).observeActiveQuestsByVenue(venueId).first()
     } finally {
       reader.terminate().await()
+    }
+  }
+
+  /**
+   * Runs [write] offline and waits until observeQuestsByVenue lists the quest whose id it returns
+   * as pending, then, back online, as confirmed. Without that, it fails on the test's timeout.
+   */
+  private suspend fun CoroutineScope.observeQuestPendingUntilTheServerHasIt(
+      write: suspend () -> String
+  ) {
+    val emissions = Channel<List<Quest>>(Channel.UNLIMITED)
+    val collector =
+        launch(start = CoroutineStart.UNDISPATCHED) {
+          repository.observeQuestsByVenue(venueId).collect(emissions::send)
+        }
+    try {
+      db.disableNetwork().await()
+      val id: String
+      // The client is shared across tests, so it must come back online even if this test fails
+      try {
+        id = write()
+        do {
+          val latest = emissions.receive()
+        } while (latest.none { it.id == id && it.pendingWrite })
+      } finally {
+        db.enableNetwork().await()
+      }
+
+      // The confirmation only changes the metadata, so without it this never ends
+      do {
+        val latest = emissions.receive()
+      } while (latest.none { it.id == id && !it.pendingWrite })
+    } finally {
+      collector.cancel()
     }
   }
 

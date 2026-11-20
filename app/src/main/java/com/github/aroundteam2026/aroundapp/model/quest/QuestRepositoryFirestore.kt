@@ -11,11 +11,13 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import java.util.Date
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -26,7 +28,9 @@ import kotlinx.coroutines.tasks.await
  * names its subtype. Null fields are omitted, and the quest id is the document id rather than a
  * stored field. Documents that cannot be mapped back to a [Quest], including those whose reward
  * cannot be read, are logged and skipped: the `observe*` flows leave them out and [getQuest]
- * returns null.
+ * returns null. Only [observeQuestsByVenue] listens to metadata changes, to set
+ * [Quest.pendingWrite] from the document's pending writes; the explorers' listeners don't, so a
+ * confirmation or a change of connectivity doesn't make them emit again.
  *
  * @param db Firestore client to read from and write to.
  * @param now Clock used for `createdAt` and `updatedAt`, in epoch milliseconds.
@@ -42,7 +46,7 @@ class QuestRepositoryFirestore(
       quests.whereEqualTo(STATUS, QuestStatus.ACTIVE.name).observe()
 
   override fun observeQuestsByVenue(venueId: String): Flow<List<Quest>> =
-      quests.whereEqualTo(VENUE_ID, venueId).observe()
+      quests.whereEqualTo(VENUE_ID, venueId).observeWithPendingWrites()
 
   // Equality filters only, so Firestore needs no composite index
   override fun observeActiveQuestsByVenue(venueId: String): Flow<List<Quest>> =
@@ -94,7 +98,8 @@ class QuestRepositoryFirestore(
 
   /**
    * Turns Firestore's callback-style listener into a Kotlin Flow<List<Quest>>, which ViewModels can
-   * collect. Every observe* method uses it.
+   * collect. The explorers' observe* methods use it: it leaves out metadata changes, so the quests'
+   * [Quest.pendingWrite] stays false and a change of connectivity doesn't emit again.
    */
   private fun Query.observe(): Flow<List<Quest>> = callbackFlow {
     val registration = addSnapshotListener { snapshot, error ->
@@ -106,6 +111,29 @@ class QuestRepositoryFirestore(
     }
     awaitClose { registration.remove() }
   }
+
+  /**
+   * Like [observe], but each quest's [Quest.pendingWrite] says whether the server has it yet, for
+   * the venue's own list. It emits again when the server confirms a write, which only changes
+   * [Quest.pendingWrite]. Metadata-only events that leave the quests equal, such as a change of
+   * connectivity, are dropped, so nothing built on this flow starts over for them.
+   */
+  private fun Query.observeWithPendingWrites(): Flow<List<Quest>> = callbackFlow {
+    val registration =
+        addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+          if (error != null) {
+            close(error)
+          } else if (snapshot != null) {
+            trySend(
+                snapshot.documents.mapNotNull { document ->
+                  document.toQuest()?.copy(pendingWrite = document.metadata.hasPendingWrites())
+                }
+            )
+          }
+        }
+    awaitClose { registration.remove() }
+  }
+      .distinctUntilChanged()
 
   /** The document fields for this quest, with [time] as both creation and update time. */
   private fun Quest.toFirestore(time: Timestamp): Map<String, Any> = buildMap {

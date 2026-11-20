@@ -17,11 +17,14 @@ interface QuestRepository {
   fun observeActiveQuests(): Flow<List<Quest>>
 
   /**
-   * Observes one venue's quests, for its "My quests" list. Emits on collection and on every change.
+   * Observes one venue's quests, for its "My quests" list. Emits on collection and on every change,
+   * including when the backend confirms a quest written while it was unreachable, which only
+   * changes [Quest.pendingWrite].
    *
    * @param venueId id of the venue whose quests to return.
    * @return all of that venue's quests, whatever their status (including drafts), in unspecified
-   *   order. Callers that need an order must sort the list themselves.
+   *   order, each with [Quest.pendingWrite] true while the backend hasn't confirmed its last write.
+   *   Callers that need an order must sort the list themselves.
    * @throws Exception from the flow if the backend stops the listener (e.g. permission denied after
    *   sign-out). Collectors must catch it, e.g. with `.catch`, or it crashes their scope.
    */
