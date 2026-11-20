@@ -146,6 +146,7 @@ object C {
     const val SEND_NEW_PROOF_BUTTON = "send_new_proof_button"
     const val ACCEPT_QUEST_NEEDS_MORE = "accept_quest_needs_more"
     const val ACCEPT_QUEST_FAILED = "accept_quest_failed"
+    const val ACCEPT_QUEST_SENDING = "accept_quest_sending"
     const val ACCEPT_QUEST_UNAVAILABLE = "accept_quest_unavailable"
     const val VENUE_QUEST_ROW = "venue_quest_row"
     const val VENUE_QUEST_ROW_TITLE = "venue_quest_row_title"

@@ -27,6 +27,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
@@ -276,8 +277,10 @@ class ReservationRepositoryFirestore(
 
   /**
    * Listens to this reservation's document: emits it, or null while it is missing or malformed. It
-   * emits again when the server confirms a write, which only changes [Reservation.pendingWrite]. If
-   * the backend stops the listener, e.g. when the rules refuse the read, it emits null and ends.
+   * emits again when the server confirms a write, which only changes [Reservation.pendingWrite].
+   * Metadata-only events that leave the reservation equal, such as a change of connectivity, are
+   * dropped, so nothing built on this flow starts over for them. If the backend stops the listener,
+   * e.g. when the rules refuse the read, it emits null and ends.
    */
   private fun DocumentReference.observe(): Flow<Reservation?> = callbackFlow {
     val registration =
@@ -292,6 +295,7 @@ class ReservationRepositoryFirestore(
         }
     awaitClose { registration.remove() }
   }
+      .distinctUntilChanged()
 
   /**
    * The document fields for a new reservation with the party code [partyCode]. The status is always
