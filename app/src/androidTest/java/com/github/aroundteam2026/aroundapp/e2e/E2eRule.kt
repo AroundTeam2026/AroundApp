@@ -4,6 +4,8 @@ package com.github.aroundteam2026.aroundapp.e2e
 
 import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.Manifest.permission.POST_NOTIFICATIONS
+import android.os.Build
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.rule.GrantPermissionRule
 import com.github.aroundteam2026.aroundapp.MainActivity
@@ -25,8 +27,9 @@ import org.junit.runners.model.Statement
  * `createAndroidComposeRule<MainActivity>()` launches the activity before `@Before` runs, so
  * connecting to the emulators there would be too late: the app would already use the real Firebase
  * project. This rule connects, clears the app's project on the Firestore emulator and signs out
- * first, grants the location permission (otherwise the map's permission dialog covers the app), and
- * only then launches [MainActivity].
+ * first, grants the location permission (otherwise the map's permission dialog covers the app) and,
+ * on Android 13 and later, the notification one (otherwise the explanation before its dialog covers
+ * home after sign-in), and only then launches [MainActivity].
  */
 class E2eRule : TestRule {
   val composeTestRule = createAndroidComposeRule<MainActivity>()
@@ -43,7 +46,16 @@ class E2eRule : TestRule {
                 }
               }
           )
-          .around(GrantPermissionRule.grant(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION))
+          .around(GrantPermissionRule.grant(*PERMISSIONS))
           .around(composeTestRule)
           .apply(base, description)
 }
+
+/** What [E2eRule] grants: POST_NOTIFICATIONS only exists from Android 13. */
+private val PERMISSIONS =
+    listOfNotNull(
+            ACCESS_FINE_LOCATION,
+            ACCESS_COARSE_LOCATION,
+            POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU },
+        )
+        .toTypedArray()
