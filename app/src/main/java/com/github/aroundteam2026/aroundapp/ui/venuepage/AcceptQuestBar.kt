@@ -111,12 +111,12 @@ fun AcceptQuestBar(
   val quest = state.selectedQuest ?: return
   val status = state.acceptStatus
   QuestBar(modifier) {
-    // One explanation of the button: an accepted quest is done whatever the listener does, and a
-    // failure can't be retried while accepting is unavailable
+    // One explanation of the button: an accepted quest, waiting to send or not, is done whatever
+    // the listener does, and a failure can't be retried while accepting is unavailable
     when {
-      !state.acceptAvailable && status != AcceptStatus.ACCEPTED && status != AcceptStatus.SENDING ->
-          Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
       status == AcceptStatus.SENDING -> Note(stringResource(R.string.waiting_to_send_note))
+      !state.acceptAvailable && status != AcceptStatus.ACCEPTED ->
+          Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
       status == AcceptStatus.FAILED ->
           Note(
               stringResource(R.string.accept_quest_failed),

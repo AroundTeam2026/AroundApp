@@ -93,7 +93,7 @@ class OverviewQuestRowTest {
     show(row(status = OverviewRowStatus.APPROVED, partySize = 3))
 
     status("APPROVED").assertIsDisplayed()
-    status(app.getString(R.string.overview_status_waiting).uppercase()).assertDoesNotExist()
+    status("WAITING FOR THE VENUE").assertDoesNotExist()
     part(C.Tag.OVERVIEW_ROW_PARTY).assertTextEquals("3 people")
   }
 
@@ -123,7 +123,7 @@ class OverviewQuestRowTest {
     show(row(status = OverviewRowStatus.SENDING))
 
     status(app.getString(R.string.waiting_to_send).uppercase()).assertIsDisplayed()
-    status("WAITING FOR THE VENUE").assertDoesNotExist()
+    status(app.getString(R.string.overview_status_waiting).uppercase()).assertDoesNotExist()
   }
 
   // #414, the Figma frame "Quests tab · offline, proof waiting to upload"
