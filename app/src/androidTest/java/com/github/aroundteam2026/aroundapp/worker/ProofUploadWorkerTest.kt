@@ -20,10 +20,13 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.worker.ProofUploadWorker.Companion.ERROR_ALREADY_APPROVED
 import com.github.aroundteam2026.aroundapp.worker.ProofUploadWorker.Companion.ERROR_BAD_INPUT
 import com.github.aroundteam2026.aroundapp.worker.ProofUploadWorker.Companion.ERROR_INVALID
@@ -64,6 +67,9 @@ class ProofUploadWorkerTest {
   private lateinit var photos: FakeProofPhotoRepository
   private lateinit var completions: FakeCompletionRepository
 
+  /** Whether a submit is written but not confirmed by the server, as on a weak connection. */
+  @Volatile private var queued = false
+
   /** The copies the worker deleted; written on the worker's thread. */
   private val discarded = CopyOnWriteArrayList<Uri>()
 
@@ -75,7 +81,7 @@ class ProofUploadWorkerTest {
             workerClassName: String,
             workerParameters: WorkerParameters,
         ): ListenableWorker =
-            ProofUploadWorker(appContext, workerParameters, photos, completions) {
+            ProofUploadWorker(appContext, workerParameters, photos, submitting()) {
               discarded += it
               true
             }
@@ -187,6 +193,27 @@ class ProofUploadWorkerTest {
     assertEquals(failure(ERROR_SUBMIT), worker(attempt = MAX_ATTEMPTS - 1).doWork())
   }
 
+  // The write may still be refused, so the copy stays and the next run submits it again
+  @Test
+  fun unconfirmedSubmission_isRetriedAndKeepsTheCopy() = runBlocking {
+    queued = true
+
+    assertEquals(ListenableWorker.Result.retry(), worker().doWork())
+    assertTrue(discarded.isEmpty())
+  }
+
+  // Firestore keeps the write and sends it later; the copy is left for discardStale
+  @Test
+  fun unconfirmedSubmission_onTheLastAttempt_succeedsAndKeepsTheCopy() = runBlocking {
+    queued = true
+
+    val result = worker(attempt = MAX_ATTEMPTS - 1).doWork()
+
+    assertTrue(result is ListenableWorker.Result.Success)
+    assertTrue(discarded.isEmpty())
+    assertEquals(1, submitted().size)
+  }
+
   @Test
   fun refusedSubmission_stops() = runBlocking {
     completions.forcedFailure =
@@ -199,7 +226,10 @@ class ProofUploadWorkerTest {
   @Test
   fun approvedCompletion_stops() = runBlocking {
     val id =
-        completions.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, Proof.Text("x")).getOrThrow()
+        completions
+            .submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, Proof.Text("x"))
+            .getOrThrow()
+            .let { completionId(RESERVATION_ID) }
     completions.approve(id).getOrThrow()
 
     assertEquals(failure(ERROR_ALREADY_APPROVED), worker().doWork())
@@ -259,6 +289,20 @@ class ProofUploadWorkerTest {
           .build()
 
   private fun failure(code: String) = ListenableWorker.Result.failure(workDataOf(KEY_ERROR to code))
+
+  /** [completions], whose submit reports [WriteConfirmation.QUEUED] while [queued] is set. */
+  private fun submitting(): CompletionRepository =
+      object : CompletionRepository by completions {
+        override suspend fun submit(
+            reservationId: String,
+            venueId: String,
+            explorerUid: String,
+            proof: Proof,
+        ) =
+            completions.submit(reservationId, venueId, explorerUid, proof).map {
+              if (queued) WriteConfirmation.QUEUED else it
+            }
+      }
 
   private suspend fun submitted(): List<Completion> =
       completions.observeForReservation(RESERVATION_ID).first()

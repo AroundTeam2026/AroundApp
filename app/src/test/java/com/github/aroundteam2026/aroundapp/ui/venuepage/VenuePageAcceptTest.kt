@@ -17,6 +17,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -394,7 +395,10 @@ class VenuePageAcceptTest {
   private suspend fun storeWithProof(questId: String): String {
     val id = storeFor(questId)
     fake.updateStatus(id, ReservationStatus.APPROVED)
-    return completions.submit(id, VENUE_ID, EXPLORER, Proof.Photo("gs://proofs/fox")).getOrThrow()
+    return completions
+        .submit(id, VENUE_ID, EXPLORER, Proof.Photo("gs://proofs/fox"))
+        .getOrThrow()
+        .let { completionId(id) }
   }
 
   // The bug of #394: the details offered "Submit proof" again once the proof was sent
@@ -463,7 +467,10 @@ class VenuePageAcceptTest {
   private suspend fun proofOfAnApprovedQuestBy(sender: String): String {
     val id = storeFor("a")
     fake.updateStatus(id, ReservationStatus.APPROVED)
-    return completions.submit(id, VENUE_ID, sender, Proof.Photo("gs://proofs/fox")).getOrThrow()
+    return completions
+        .submit(id, VENUE_ID, sender, Proof.Photo("gs://proofs/fox"))
+        .getOrThrow()
+        .let { completionId(id) }
   }
 
   // As the Figma frame "Quest details · proof sent by a member": "Lea sent your party's proof"

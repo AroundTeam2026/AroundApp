@@ -23,7 +23,9 @@ class ObserveForReservationsTest {
 
   /** Sends the proof of the reservation [reservationId] as [sender]; returns its id. */
   private suspend fun sendProof(reservationId: String, sender: String = SENDER): String =
-      completions.submit(reservationId, VENUE_ID, sender, PROOF).getOrThrow()
+      completions.submit(reservationId, VENUE_ID, sender, PROOF).getOrThrow().let {
+        completionId(reservationId)
+      }
 
   /** Each party's proof is there whichever member sent it, and other parties' are left out. */
   @Test

@@ -14,6 +14,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepos
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -56,7 +57,9 @@ class ReviewProofOnFakes {
         )
     val reservationId = reservations.createReservation(reservation, EXPLORER_UID).getOrThrow()
     reservations.updateStatus(reservationId, ReservationStatus.APPROVED).getOrThrow()
-    return completions.submit(reservationId, VENUE_ID, EXPLORER_UID, proof).getOrThrow()
+    return completions.submit(reservationId, VENUE_ID, EXPLORER_UID, proof).getOrThrow().let {
+      completionId(reservationId)
+    }
   }
 
   /** The Review proof screen's ViewModel of the proof [completionId]. */

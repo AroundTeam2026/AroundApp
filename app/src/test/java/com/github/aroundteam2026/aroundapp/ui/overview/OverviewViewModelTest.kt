@@ -22,6 +22,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -154,7 +155,10 @@ class OverviewViewModelTest {
    * given; returns the completion's id.
    */
   private suspend fun sendProof(reservationId: String, sender: String = EXPLORER): String =
-      completions.submit(reservationId, CAFE, sender, Proof.Text("By the window")).getOrThrow()
+      completions
+          .submit(reservationId, CAFE, sender, Proof.Text("By the window"))
+          .getOrThrow()
+          .let { completionId(reservationId) }
 
   /** Queues a photo proof of the reservation [reservationId], as one taken offline. */
   private suspend fun queue(reservationId: String) =

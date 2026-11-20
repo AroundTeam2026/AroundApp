@@ -13,6 +13,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkRequest
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
@@ -39,9 +40,16 @@ import java.util.concurrent.TimeUnit
  * whose upload worked but whose submission didn't leaves that upload unused, as
  * [ProofPhotoRepository.upload] describes; the next run uploads the photo again.
  *
+ * Only a submission the server confirmed ([WriteConfirmation.CONFIRMED]) deletes the copy and
+ * succeeds. One it hasn't confirmed in time ([WriteConfirmation.QUEUED]), e.g. on a weak
+ * connection, may still be refused, so the copy stays: the run is retried while attempts are left,
+ * and the next one submits again. On the last attempt the run succeeds anyway, without deleting the
+ * copy: Firestore keeps the write and sends it later, and [ProofPhotos.discardStale] deletes the
+ * copy.
+ *
  * @param photos Uploads the photo.
  * @param completions Submits the proof.
- * @param discard Deletes the kept copy once its proof is submitted.
+ * @param discard Deletes the kept copy once the server confirmed its proof.
  */
 class ProofUploadWorker(
     context: Context,
@@ -76,13 +84,21 @@ class ProofUploadWorker(
         photos.upload(reservationId, photo).getOrElse {
           return retryOrStop(it, ERROR_UPLOAD)
         }
-    completions.submit(reservationId, venueId, explorerUid, Proof.Photo(location)).onFailure {
-      // CompletionRepository.submit's way of saying the venue already approved the completion
-      if (it is IllegalStateException) return failure(ERROR_ALREADY_APPROVED)
-      return retryOrStop(it, ERROR_SUBMIT)
+    val confirmation =
+        completions.submit(reservationId, venueId, explorerUid, Proof.Photo(location)).getOrElse {
+          // CompletionRepository.submit's way of saying the venue already approved the completion
+          if (it is IllegalStateException) return failure(ERROR_ALREADY_APPROVED)
+          return retryOrStop(it, ERROR_SUBMIT)
+        }
+    val sent = Result.success(workDataOf(KEY_LOCATION to location))
+    return when (confirmation) {
+      WriteConfirmation.CONFIRMED -> {
+        discard(photo)
+        sent
+      }
+      // The server may still refuse it, so the copy stays for the next run or discardStale
+      WriteConfirmation.QUEUED -> if (runAttemptCount + 1 >= MAX_ATTEMPTS) sent else Result.retry()
     }
-    discard(photo)
-    return Result.success(workDataOf(KEY_LOCATION to location))
   }
 
   /**

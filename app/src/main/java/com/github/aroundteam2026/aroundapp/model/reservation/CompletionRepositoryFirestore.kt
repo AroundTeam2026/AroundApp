@@ -4,6 +4,7 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.util.Log
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
@@ -38,7 +39,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * @param db Firestore client to read from and write to.
  * @param confirmTimeoutMs How long [submit] waits for the server, in milliseconds, before it
- *   returns success with the write still queued.
+ *   returns [WriteConfirmation.QUEUED] with the write still queued.
  * @param now Clock used for `submittedAt`, in epoch milliseconds.
  */
 class CompletionRepositoryFirestore(
@@ -55,15 +56,16 @@ class CompletionRepositoryFirestore(
    *
    * A refusal in that time is returned as the Firestore exception, or as an [IllegalStateException]
    * if the completion is approved, which the rules never let a member replace. Without an answer in
-   * time, e.g. while offline, it returns success and a later refusal is only logged. Errors while
-   * issuing the write are returned as a failure too.
+   * time, e.g. while offline, it returns [WriteConfirmation.QUEUED] and a later refusal is only
+   * logged; with one, [WriteConfirmation.CONFIRMED]. Errors while issuing the write are returned as
+   * a failure too.
    */
   override suspend fun submit(
       reservationId: String,
       venueId: String,
       explorerUid: String,
       proof: Proof,
-  ): Result<String> =
+  ): Result<WriteConfirmation> =
       try {
         val document = completions.document(completionId(reservationId))
         // A plain write, unlike a transaction, works offline, so it doesn't read first: the rules
@@ -81,16 +83,26 @@ class CompletionRepositoryFirestore(
                 )
             )
         write.addOnFailureListener { Log.w(TAG, "Write of completion ${document.id} failed", it) }
-        try {
-          // Null when the server hasn't answered in time; a refusal throws
-          withTimeoutOrNull(confirmTimeoutMs) { write.await() }
-        } catch (e: FirebaseFirestoreException) {
-          if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED && isApproved(document)) {
-            throw IllegalStateException("Completion ${document.id} can no longer be replaced", e)
-          }
-          throw e
-        }
-        Result.success(document.id)
+        val confirmation =
+            try {
+              // Null when the server hasn't answered in time; a refusal throws
+              withTimeoutOrNull(confirmTimeoutMs) {
+                write.await()
+                WriteConfirmation.CONFIRMED
+              } ?: WriteConfirmation.QUEUED
+            } catch (e: FirebaseFirestoreException) {
+              if (
+                  e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED &&
+                      isApproved(document)
+              ) {
+                throw IllegalStateException(
+                    "Completion ${document.id} can no longer be replaced",
+                    e,
+                )
+              }
+              throw e
+            }
+        Result.success(confirmation)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
