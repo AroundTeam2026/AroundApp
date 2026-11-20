@@ -1,6 +1,8 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.party
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +52,7 @@ class FakePartyRepository(
   /** The uid of the creator of each reservation, keyed by reservation id. */
   private val creators = mutableMapOf<String, String>()
 
-  override suspend fun join(reservationId: String, uid: String): Result<Unit> {
+  override suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation> {
     forcedFailure?.let {
       return Result.failure(it)
     }
@@ -72,7 +74,7 @@ class FakePartyRepository(
     members.update {
       it + (id to PartyMember(reservationId, uid, PartyMemberStatus.JOINED, time, time))
     }
-    return Result.success(Unit)
+    return Result.success(WriteConfirmation.CONFIRMED)
   }
 
   override suspend fun withdraw(reservationId: String, uid: String): Result<Unit> {

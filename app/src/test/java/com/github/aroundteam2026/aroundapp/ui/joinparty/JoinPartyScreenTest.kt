@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
@@ -34,6 +35,9 @@ import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRowStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -183,9 +187,10 @@ class JoinPartyScreenTest {
   private fun showScreenOn(
       fakes: JoinPartyOnFakes,
       party: PartyRepository = fakes.party,
+      unsent: Flow<Set<String>> = flowOf(emptySet()),
       onJoined: () -> Unit,
   ) {
-    val viewModel = fakes.viewModel(partyRepository = party)
+    val viewModel = fakes.viewModel(partyRepository = party, unsent = unsent)
     compose.setContent {
       AroundAppTheme { JoinPartyScreen(viewModel, onBack = {}, onJoined = onJoined) }
     }
@@ -193,6 +198,42 @@ class JoinPartyScreenTest {
     compose.waitUntil {
       compose.onAllNodes(hasTestTag(C.Tag.JOIN_PARTY_FOUND)).fetchSemanticsNodes().size == 1
     }
+  }
+
+  // The Figma frame "Join a party · waiting to send": saved here, sent later
+  @Test
+  fun aQueuedJoinSaysWaitingToSendWithItsNoteAndLeavesBackOn() {
+    state = found(JoinPartyUiState.Join.SENDING)
+    show()
+
+    compose
+        .onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT)
+        .assertTextContains(text(R.string.waiting_to_send))
+        .assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SENDING).assertIsDisplayed()
+    compose.onNodeWithContentDescription(text(R.string.join_party_back)).assertIsEnabled()
+  }
+
+  // The explorer decides when to leave, until the server has the join: then the screen closes
+  @Test
+  fun aQueuedJoinKeepsTheScreenOpenUntilTheServerHasIt() {
+    val fakes = JoinPartyOnFakes()
+    val unsent = MutableStateFlow(setOf(fakes.reservationId))
+    var joined = 0
+    showScreenOn(fakes, QueuedParty(fakes.party), unsent) { joined++ }
+
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()
+    compose.waitUntil {
+      compose.onAllNodes(hasTestTag(C.Tag.JOIN_PARTY_SENDING)).fetchSemanticsNodes().isNotEmpty()
+    }
+    compose.waitForIdle()
+    assertEquals(0, joined)
+
+    unsent.value = emptySet()
+    compose.waitForIdle()
+    compose.waitUntil { joined == 1 }
+
+    assertEquals(1, joined)
   }
 
   // The screen below it (here a stand-in) is the one system back would otherwise reach
@@ -275,7 +316,7 @@ class JoinPartyScreenTest {
       private val inner: PartyRepository,
       private val gate: CompletableDeferred<Unit>,
   ) : PartyRepository by inner {
-    override suspend fun join(reservationId: String, uid: String): Result<Unit> {
+    override suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation> {
       gate.await()
       return inner.join(reservationId, uid)
     }

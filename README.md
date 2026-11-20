@@ -28,6 +28,7 @@ These actions need a connection. They stop working the moment the phone disconne
 - Venues can't approve or decline a reservation, or approve or reject a proof.
 
 A reservation the server hasn't confirmed yet, because the connection dropped right after the explorer accepted the quest, isn't shown as waiting for the venue. The Quests tab says "Waiting to send" with a cloud icon, and the venue page's accept button says the same, with "Saved on this device. We'll send it when you're back online." It can't be cancelled, and its party code isn't shown, until the server has it. Firestore keeps the write across restarts and sends it once the device is back online: it then becomes "Waiting for the venue", or is dropped if the server refuses it.
+Joining a party works the same way: if the connection drops right after the code was found, the Join a party screen stays open and says "Waiting to send", instead of closing as joined, and closes once the server has the join.
 
 These still work offline, and are sent once the phone is back online:
 

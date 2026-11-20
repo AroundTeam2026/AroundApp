@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PARTY_CODE_LENGTH
@@ -40,7 +41,8 @@ import kotlinx.coroutines.launch
  * It looks a party code up once it is long enough and shows the party it leads to, or why it can't
  * be joined. [join], the screen's button, joins the party found; with none found, it looks the
  * typed code up, which also retries a failed lookup. When a join is refused, it looks the party up
- * again to say why, e.g. that it filled up meanwhile.
+ * again to say why, e.g. that it filled up meanwhile. A join the server hasn't confirmed yet, e.g.
+ * the device went offline, shows as [JoinPartyUiState.Join.SENDING] until it does.
  */
 class JoinPartyViewModel(
     private val explorerUid: String,
@@ -99,7 +101,15 @@ class JoinPartyViewModel(
   private suspend fun joinParty(party: OverviewRow) {
     partyRepository
         .join(party.reservationId, explorerUid)
-        .onSuccess { mutableUiState.update { it.copy(join = JoinPartyUiState.Join.JOINED) } }
+        .onSuccess { confirmation ->
+          val join =
+              when (confirmation) {
+                WriteConfirmation.CONFIRMED -> JoinPartyUiState.Join.JOINED
+                WriteConfirmation.QUEUED -> JoinPartyUiState.Join.SENDING
+              }
+          mutableUiState.update { it.copy(join = join) }
+          if (join == JoinPartyUiState.Join.SENDING) awaitConfirmation(party.reservationId)
+        }
         .onFailure { failure ->
           Log.w(TAG, "Joining the party of ${party.reservationId} failed", failure)
           // The rules refuse a full, ended or already joined party alike: look it up to tell which
@@ -107,6 +117,24 @@ class JoinPartyViewModel(
           if (lookup is JoinPartyUiState.Lookup.Found) lookup = refusalFor(failure)
           mutableUiState.update { it.copy(lookup = lookup, join = JoinPartyUiState.Join.IDLE) }
         }
+  }
+
+  /**
+   * Waits until the server has the join of [reservationId], which the reservation's pending write
+   * says, then shows it as joined. If the explorer's reservations can't be listened to, the join
+   * stays "waiting to send": Firestore still sends it.
+   */
+  private suspend fun awaitConfirmation(reservationId: String) {
+    try {
+      reservationRepository.observeForExplorer(explorerUid).first { reservations ->
+        reservations.any { it.id == reservationId && !it.pendingWrite }
+      }
+      mutableUiState.update { it.copy(join = JoinPartyUiState.Join.JOINED) }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      Log.w(TAG, "Waiting for the server to confirm the join of $reservationId failed", e)
+    }
   }
 
   /**

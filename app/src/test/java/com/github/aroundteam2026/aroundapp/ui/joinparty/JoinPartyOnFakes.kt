@@ -1,15 +1,19 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -24,19 +28,21 @@ class JoinPartyOnFakes {
   val party = reservations.party as FakePartyRepository
   val venues = FakeVenueRepository(listOf(testVenue(id = "venue-1", name = "Café Lumen")))
 
-  init {
-    runBlocking {
-      reservations.createReservation(newPendingReservation("fox", "venue-1", "Ada", 0L), "friend")
-    }
+  /** The id of the friend's reservation. */
+  val reservationId: String = runBlocking {
+    reservations
+        .createReservation(newPendingReservation("fox", "venue-1", "Ada", 0L), "friend")
+        .getOrThrow()
   }
 
   fun viewModel(
       explorerUid: String = EXPLORER,
       partyRepository: PartyRepository = reservations.party,
+      unsent: Flow<Set<String>> = flowOf(emptySet()),
   ) =
       JoinPartyViewModel(
           explorerUid,
-          reservations,
+          reservations.withUnsent(unsent),
           questRepository,
           venues,
           partyRepository,
@@ -50,4 +56,13 @@ class JoinPartyOnFakes {
     /** The code as an explorer might type it: lowercase, with a space in the middle. */
     val TYPED = CODE.lowercase().let { "${it.take(3)} ${it.drop(3)}" }
   }
+}
+
+/**
+ * A party whose join is written, but not confirmed by the server yet, as when the device went
+ * offline.
+ */
+class QueuedParty(private val inner: PartyRepository) : PartyRepository by inner {
+  override suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation> =
+      inner.join(reservationId, uid).map { WriteConfirmation.QUEUED }
 }

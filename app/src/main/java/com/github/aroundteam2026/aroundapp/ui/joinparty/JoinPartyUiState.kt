@@ -68,6 +68,8 @@ data class JoinPartyUiState(
   enum class Join {
     IDLE,
     JOINING,
+    /** The server hasn't confirmed the join yet: it is sent once the device is online. */
+    SENDING,
     JOINED,
   }
 }
