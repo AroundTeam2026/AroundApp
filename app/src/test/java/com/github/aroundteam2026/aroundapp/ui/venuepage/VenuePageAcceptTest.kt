@@ -1117,6 +1117,36 @@ class VenuePageAcceptTest {
     runCurrent()
   }
 
+  // The page waits OFFLINE_HINT_DELAY_MS to say so, but a request can't succeed from the first
+  // moment
+  @Test
+  fun cancellingIsUnavailableAtOnceWhenTheDeviceDisconnects() = test {
+    val id = storeFor("a")
+    openAndPick("a")
+
+    connectivity.online.value = false
+    runCurrent()
+    assertFalse(state.offline)
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
+    assertEquals(ReservationStatus.PENDING, stored().single { it.id == id }.status)
+  }
+
+  @Test
+  fun acceptingIsUnavailableAtOnceWhenTheDeviceDisconnects() = test {
+    openAndPick("a")
+
+    connectivity.online.value = false
+    runCurrent()
+    assertFalse(state.offline)
+    viewModel.accept()
+    runCurrent()
+
+    assertTrue(stored().isEmpty())
+  }
+
   @Test
   fun offlineCancellingIsUnavailable() = test {
     val id = storeFor("a")
