@@ -22,8 +22,9 @@ internal const val OFFLINE_HINT_DELAY_MS = 2_000L
  */
 @OptIn(FlowPreview::class)
 internal fun ConnectivityRepository.observeOffline(logTag: String): Flow<Boolean> =
+    // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
     isOnline
-        .catch {
+        .catch { // NOSONAR
           Log.w(logTag, "Watching connectivity failed", it)
           emit(true)
         }
@@ -39,8 +40,9 @@ internal fun ConnectivityRepository.observeOnlineNow(
     scope: CoroutineScope,
     logTag: String,
 ): StateFlow<Boolean> =
+    // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
     isOnline
-        .catch {
+        .catch { // NOSONAR
           Log.w(logTag, "Watching connectivity failed", it)
           emit(true)
         }
