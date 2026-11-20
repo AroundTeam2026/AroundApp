@@ -966,6 +966,7 @@ class CompletionViewModelTest {
     assertFalse(state.sendingLater)
     assertEquals(SaveState.Idle, state.saveState)
     assertTrue(state.isEditable)
+    assertEquals("By the till", state.answer)
   }
 
   @Test
@@ -984,24 +985,6 @@ class CompletionViewModelTest {
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
-  // Only the server rejects a proof, so the one waiting reached it: a new proof can replace it
-  @Test
-  fun aProofRejectedWhileWaitingToSendCanBeAnsweredWithANewProof() = test {
-    open("fox")
-    viewModel.updateAnswer("By the till")
-    completions.queued = true
-    viewModel.submit()
-    runCurrent()
-    assertTrue(state.sendingLater)
-
-    fakeCompletions.reject(completionId(reservationId), "Not the right fox").getOrThrow()
-    runCurrent()
-
-    assertFalse(state.sendingLater)
-    assertTrue(state.canSubmit)
-    assertEquals("By the till", state.answer)
-  }
-
   @Test
   fun aTeammatesProofApprovedWhileWaitingToSendLocksTheForm() = test {
     open("fox")
@@ -1017,6 +1000,25 @@ class CompletionViewModelTest {
 
     assertTrue(state.sentByTeammate)
     assertFalse(state.canSubmit)
+  }
+
+  // The server has the proof before the submit's answer comes: nothing else would settle the form
+  @Test
+  fun aSubmitTheServerConfirmedBeforeItEndedIsSaved() = test {
+    open("fox")
+    val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
+    completions.queued = true
+    viewModel.updateAnswer("By the till")
+    viewModel.submit()
+    runCurrent()
+
+    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    runCurrent()
+    submitGate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+    assertFalse(state.sendingLater)
   }
 
   // The listener showed the approved proof first: the late answer to the submit doesn't undo it

@@ -93,6 +93,9 @@ class CompletionViewModel(
   /** The quest's own location, or null when it takes place at its venue. */
   private var questLocation: Location? = null
 
+  /** The party's completion as the listener last showed it. */
+  private var seen: Completion? = null
+
   /** The photo that was uploaded last, with the Storage location it was stored at. */
   private var uploaded: Pair<Uri, String>? = null
 
@@ -209,7 +212,9 @@ class CompletionViewModel(
    * Ends a submit with [saveState], [locationError] and [sendingLater]. The listener may have shown
    * the completion as saved meanwhile, e.g. when the answer to an earlier submit was lost, or as
    * the proof a teammate sent that the venue approved: this submit then fails as approved, and a
-   * retry could only fail again, so what the listener showed stays.
+   * retry could only fail again, so what the listener showed stays. A submit the server hasn't
+   * confirmed in time may have been confirmed since: the listener showed that already, so the proof
+   * is saved at once instead of waiting for a change that never comes.
    */
   private fun finishSubmit(
       saveState: SaveState,
@@ -220,15 +225,22 @@ class CompletionViewModel(
       when {
         it.saveState is SaveState.Saved -> it
         it.sentByTeammate -> it.copy(saveState = SaveState.Idle, locationError = null)
-        else ->
-            it.copy(
-                saveState = saveState,
-                locationError = locationError,
-                sendingLater = sendingLater,
-            )
+        else -> {
+          val confirmed = sendingLater && seen.isConfirmedProofOf(explorerUid)
+          it.copy(
+              saveState =
+                  if (confirmed) SaveState.Saved(completionId(reservationId)) else saveState,
+              locationError = locationError,
+              sendingLater = sendingLater && !confirmed,
+          )
+        }
       }
     }
   }
+
+  /** Whether this is the proof of [explorer] that the server has and the venue hasn't answered. */
+  private fun Completion?.isConfirmedProofOf(explorer: String) =
+      this != null && explorerUid == explorer && status == CompletionStatus.PENDING && !pendingWrite
 
   /**
    * Checks a fresh precise device fix against the quest's location, or else the venue's current
@@ -355,6 +367,7 @@ class CompletionViewModel(
     try {
       completionRepository.observeForReservation(reservationId).collect { completions ->
         val stored = completions.find { it.id == id } ?: return@collect
+        seen = stored
         when (stored.status) {
           CompletionStatus.APPROVED -> showApproved(stored.explorerUid, id)
           // A form waiting to send ends once the server has the proof, or the venue rejected it
