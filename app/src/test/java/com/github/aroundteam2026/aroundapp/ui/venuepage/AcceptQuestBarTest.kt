@@ -129,6 +129,22 @@ class AcceptQuestBarTest {
   }
 
   @Test
+  fun waitingToSendDisablesTheButtonAndSaysItWillBeSentWhenOnline() {
+    show(
+        LOADED.copy(
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1),
+            reservationIds = mapOf("a" to "r1"),
+            unsentIds = setOf("r1"),
+        )
+    )
+
+    button.assertIsNotEnabled().assertTextContains(text(R.string.waiting_to_send))
+    compose.onNodeWithText(text(R.string.waiting_to_send_note)).assertIsDisplayed()
+    compose.onNodeWithText(text(R.string.accept_quest_accepted)).assertDoesNotExist()
+  }
+
+  @Test
   fun acceptedDisablesTheButtonAndSaysTheVenueIsToApprove() {
     show(LOADED.copy(selectedQuestId = "a", acceptedParties = mapOf("a" to 1)))
 

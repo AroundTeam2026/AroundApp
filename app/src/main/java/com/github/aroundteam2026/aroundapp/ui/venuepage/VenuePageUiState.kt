@@ -39,6 +39,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  * @property acceptedParties For each quest of this venue the explorer has accepted, how many people
  *   its party has. A pending or approved reservation counts; a rejected or cancelled one does not.
  * @property reservationIds For each quest in [acceptedParties], the id of its reservation.
+ * @property unsentIds Ids of the explorer's reservations the server hasn't confirmed yet, as when
+ *   they were accepted offline: their quests are accepted, but [AcceptStatus.SENDING].
  * @property acceptingQuestIds Ids of the quests being accepted right now.
  * @property failedQuestIds Ids of the quests whose last accept failed: the write could not be
  *   issued, or the server refused it afterwards.
@@ -78,6 +80,7 @@ data class VenuePageUiState(
     val pickBeforeDetails: String? = null,
     val acceptedParties: Map<String, Int> = emptyMap(),
     val reservationIds: Map<String, String> = emptyMap(),
+    val unsentIds: Set<String> = emptySet(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
     val cancellingIds: Set<String> = emptySet(),
@@ -105,7 +108,8 @@ data class VenuePageUiState(
     get() {
       val id = selectedQuestId ?: return AcceptStatus.NONE
       return when {
-        id in acceptedParties -> AcceptStatus.ACCEPTED
+        id in acceptedParties ->
+            if (reservationIds[id] in unsentIds) AcceptStatus.SENDING else AcceptStatus.ACCEPTED
         id in acceptingQuestIds -> AcceptStatus.ACCEPTING
         id in failedQuestIds -> AcceptStatus.FAILED
         else -> AcceptStatus.NONE
@@ -286,6 +290,8 @@ enum class AcceptStatus {
   ACCEPTING,
   /** The explorer has a pending or approved reservation for the quest. */
   ACCEPTED,
+  /** Accepted, but the server hasn't confirmed it yet: it is sent once the device is online. */
+  SENDING,
   /** The last try failed; accepting again retries. */
   FAILED,
 }

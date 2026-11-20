@@ -27,6 +27,8 @@ These actions need a connection and are disabled after two seconds offline, with
 - Explorers can't accept a quest from a venue's page or a quest's details, cancel a reservation, leave a party or save their profile. Joining a party with a code says the phone is offline.
 - Venues can't approve or decline a reservation, or approve or reject a proof.
 
+A reservation the server hasn't confirmed yet, because the connection dropped right after the explorer accepted the quest, isn't shown as waiting for the venue. The Quests tab says "Waiting to send" with a cloud icon, and the venue page's accept button says the same, with "Saved on this device. We'll send it when you're back online." It can't be cancelled until the server has it. Firestore keeps the write across restarts and sends it once the device is back online: it then becomes "Waiting for the venue", or is dropped if the server refuses it.
+
 These still work offline, and are sent once the phone is back online:
 
 - Venues can create and edit quests: Firestore keeps the change.

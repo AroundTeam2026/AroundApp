@@ -40,6 +40,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -170,6 +171,33 @@ class VenuePageAcceptTest {
     runCurrent()
 
     assertEquals(TEST_EXPLORER_NAME, stored().single().explorerName)
+  }
+
+  // The Figma frame "Venue page · accept waiting to send": the same accept, until the server has it
+  @Test
+  fun aQuestAcceptedButNotSentYetIsWaitingToSend() = test {
+    val unsent = MutableStateFlow(emptySet<String>())
+    reservationRepository =
+        object : ReservationRepository by reservations {
+          override fun observeForExplorer(uid: String): Flow<List<Reservation>> =
+              reservations.observeForExplorer(uid).combine(unsent) { list, ids ->
+                list.map { it.copy(pendingWrite = it.id in ids) }
+              }
+        }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+
+    unsent.value = setOf(stored().single().id)
+    runCurrent()
+    assertEquals(AcceptStatus.SENDING, state.acceptStatus)
+    // It still counts as accepted: its party, and no second accept
+    assertEquals(setOf("a"), state.acceptedParties.keys)
+
+    unsent.value = emptySet()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
   }
 
   @Test

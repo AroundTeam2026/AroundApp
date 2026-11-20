@@ -301,9 +301,9 @@ internal fun overviewRows(
 }
 
 /**
- * Where [reservation] stands: with its venue until approved, then with the proof in [proofs]. A
- * proof among [waiting] is newer than the one the venue has, unless the venue approved that one,
- * which ends the quest.
+ * Where [reservation] stands: on its way to the server while it has a pending write, then with its
+ * venue until approved, then with the proof in [proofs]. A proof among [waiting] is newer than the
+ * one the venue has, unless the venue approved that one, which ends the quest.
  */
 private fun rowStatus(
     reservation: Reservation,
@@ -311,7 +311,9 @@ private fun rowStatus(
     waiting: Set<String>,
 ): OverviewRowStatus {
   val proof = proofs[reservation.id]
-  return if (reservation.status != ReservationStatus.APPROVED) {
+  return if (reservation.pendingWrite) {
+    OverviewRowStatus.SENDING
+  } else if (reservation.status != ReservationStatus.APPROVED) {
     OverviewRowStatus.WAITING
   } else if (reservation.id in waiting && proof != CompletionStatus.APPROVED) {
     OverviewRowStatus.UPLOAD_WAITING

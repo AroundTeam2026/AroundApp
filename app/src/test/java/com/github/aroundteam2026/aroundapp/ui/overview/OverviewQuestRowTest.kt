@@ -117,6 +117,15 @@ class OverviewQuestRowTest {
   }
 
   // #414, the Figma frame "Quests tab · offline, proof waiting to upload"
+  // The Figma frame "Explorer quests · waiting to send"
+  @Test
+  fun aReservationNotSentYetSaysItIsWaitingToSend() {
+    show(row(status = OverviewRowStatus.SENDING))
+
+    status(app.getString(R.string.waiting_to_send).uppercase()).assertIsDisplayed()
+    status("WAITING FOR THE VENUE").assertDoesNotExist()
+  }
+
   @Test
   fun aQueuedProofSaysItIsWaitingToUpload() {
     show(row(status = OverviewRowStatus.UPLOAD_WAITING))

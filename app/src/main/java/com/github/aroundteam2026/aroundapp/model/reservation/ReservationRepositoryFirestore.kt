@@ -17,6 +17,7 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
 import java.util.Date
@@ -274,19 +275,21 @@ class ReservationRepositoryFirestore(
       }
 
   /**
-   * Listens to this reservation's document: emits it, or null while it is missing or malformed. If
+   * Listens to this reservation's document: emits it, or null while it is missing or malformed. It
+   * emits again when the server confirms a write, which only changes [Reservation.pendingWrite]. If
    * the backend stops the listener, e.g. when the rules refuse the read, it emits null and ends.
    */
   private fun DocumentReference.observe(): Flow<Reservation?> = callbackFlow {
-    val registration = addSnapshotListener { snapshot, error ->
-      if (error != null) {
-        Log.w(TAG, "Listening to reservation $id failed", error)
-        trySend(null)
-        close()
-      } else {
-        trySend(snapshot?.toReservation())
-      }
-    }
+    val registration =
+        addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+          if (error != null) {
+            Log.w(TAG, "Listening to reservation $id failed", error)
+            trySend(null)
+            close()
+          } else {
+            trySend(snapshot?.toReservation())
+          }
+        }
     awaitClose { registration.remove() }
   }
 
@@ -323,6 +326,7 @@ class ReservationRepositoryFirestore(
           explorerName = getString(EXPLORER_NAME) ?: "",
           // Reservations made before party codes have none
           partyCode = getString(PARTY_CODE),
+          pendingWrite = metadata.hasPendingWrites(),
       )
     } catch (e: Exception) {
       Log.w(TAG, "Skipping malformed reservation document $id", e)

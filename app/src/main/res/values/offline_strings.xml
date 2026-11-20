@@ -8,6 +8,9 @@
     <string name="offline_leave_needs_connection">Leaving the party needs a connection.</string>
     <string name="offline_answer_needs_connection">Approve and decline need a connection.</string>
     <string name="offline_review_needs_connection">Approving and rejecting need a connection.</string>
+    <!-- A reservation the server doesn't have yet: the status on the Quests tab and the accept button -->
+    <string name="waiting_to_send">Waiting to send</string>
+    <string name="waiting_to_send_note">Saved on this device. We\'ll send it when you\'re back online.</string>
     <string name="offline_photo_sent_later">Your photo will be sent once you\'re back online.</string>
     <string name="offline_profile_needs_connection">Saving your profile needs a connection.</string>
     <!-- Caption of the app-wide offline banner, OfflineBanner -->
