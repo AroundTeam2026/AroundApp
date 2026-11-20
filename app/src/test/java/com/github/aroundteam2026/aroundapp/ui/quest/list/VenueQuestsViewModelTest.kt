@@ -5,9 +5,11 @@ import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.quest.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -111,6 +113,22 @@ class VenueQuestsViewModelTest {
 
     viewModel.setArchived(quest, archived = false)
     assertEquals(QuestStatus.ACTIVE, status())
+  }
+
+  @Test
+  fun aQuestTheServerHasNotConfirmedIsListedAsPendingUntilItIs() = runTest {
+    val older = testQuest(id = "older", venueId = VENUE_ID, createdAt = OLDER)
+    val newer = testQuest(id = "newer", venueId = VENUE_ID, createdAt = NEWER)
+    val unsent = MutableStateFlow(setOf(newer.id))
+    val quests = FakeQuestRepository(initialQuests = listOf(older, newer)).withUnsent(unsent)
+    val viewModel = watch(viewModel(quests))
+    fun listed() = (viewModel.uiState.value as VenueQuestsUiState.Loaded).quests
+
+    assertEquals(listOf(newer.copy(pendingWrite = true), older), listed())
+
+    unsent.value = emptySet()
+
+    assertEquals(listOf(newer, older), listed())
   }
 
   private companion object {

@@ -29,6 +29,10 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  * @property createdAt Creation time, in epoch milliseconds. Set by [QuestRepository.createQuest].
  * @property updatedAt Last modification time, in epoch milliseconds. Set by
  *   [QuestRepository.createQuest] and [QuestRepository.updateQuest].
+ * @property pendingWrite Whether the venue wrote this quest and the server hasn't confirmed it yet,
+ *   as when it was saved offline: Firestore sends it once the device is back online. Only
+ *   [QuestRepository.observeQuestsByVenue] keeps it up to date; it is false elsewhere. Writes
+ *   ignore it.
  */
 data class Quest(
     val id: String,
@@ -45,6 +49,7 @@ data class Quest(
     val status: QuestStatus,
     val createdAt: Long,
     val updatedAt: Long,
+    val pendingWrite: Boolean = false,
 )
 
 /**
