@@ -308,6 +308,74 @@ class CompletionRepositoryFirestoreTest {
   }
 
   /** Bug: an exception escapes submit instead of becoming a failure. */
+  /**
+   * Bug: the completion's listener leaves out metadata changes, or pendingWrite isn't read from
+   * them, so a proof queued offline never shows as waiting to send, or still does once the server
+   * has it.
+   */
+  @Test
+  fun observeForReservation_ofAProofSubmittedOffline_isPendingUntilTheServerHasIt() =
+      withTimeoutBlocking {
+        val reservationId = approvedReservation()
+        val repository =
+            CompletionRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) {
+              FIXED_NOW
+            }
+        val emissions = Channel<List<Completion>>(Channel.UNLIMITED)
+        val collector =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+              repository.observeForReservation(reservationId).collect(emissions::send)
+            }
+        try {
+          explorerDb.disableNetwork().await()
+          try {
+            repository.submit(reservationId, venueId, explorerUid, TEXT_PROOF).getOrThrow()
+            do {
+              val latest = emissions.receive()
+            } while (latest.none { it.pendingWrite })
+          } finally {
+            explorerDb.enableNetwork().await()
+          }
+
+          // The confirmation only changes the metadata, so without it this fails on the timeout
+          do {
+            val latest = emissions.receive()
+          } while (latest.none { !it.pendingWrite })
+        } finally {
+          collector.cancel()
+        }
+      }
+
+  /**
+   * Bug: the completion's listener passes on metadata changes that leave it equal, so a
+   * disconnection emits the same proof again and whatever collects it starts over.
+   */
+  @Test
+  fun observeForReservation_afterAReconnection_emitsOnlyWhenTheProofChanges() =
+      withTimeoutBlocking {
+        val reservationId = approvedReservation()
+        val id = submit(reservationId)
+        val emissions = Channel<List<Completion>>(Channel.UNLIMITED)
+        val collector =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+              explorerRepository.observeForReservation(reservationId).collect(emissions::send)
+            }
+        try {
+          do {
+            val latest = emissions.receive()
+          } while (latest.none { !it.pendingWrite })
+
+          explorerDb.disableNetwork().await()
+          explorerDb.enableNetwork().await()
+          venueRepository.approve(id).getOrThrow()
+
+          // A copy emitted for the network change would come before the answer
+          assertEquals(CompletionStatus.APPROVED, emissions.receive().single().status)
+        } finally {
+          collector.cancel()
+        }
+      }
+
   @Test
   fun submit_returnsFailureWhenTheClientIsTerminated() = withTimeoutBlocking {
     val terminated = emulatorClient(TERMINATED_APP)

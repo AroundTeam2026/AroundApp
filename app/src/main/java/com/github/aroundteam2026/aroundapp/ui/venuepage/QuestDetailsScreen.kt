@@ -243,7 +243,8 @@ private fun Header(state: VenuePageUiState, quest: VenuePageQuest) {
  * Where [proof] stands, as the Figma frames "Quest details · state": waiting for [venueName], or
  * its answer, with the reason of a rejection. A waiting proof another member sent names its
  * [sender], as the frame "Quest details · proof sent by a member" does, and says anyone in the
- * party can still send a new one.
+ * party can still send a new one. A proof the server hasn't confirmed yet says it is waiting to
+ * send.
  */
 @Composable
 private fun ProofStatusCard(proof: Completion, venueName: String, sender: ProofSender?) {
@@ -253,14 +254,20 @@ private fun ProofStatusCard(proof: Completion, venueName: String, sender: ProofS
       when (proof.status) {
         CompletionStatus.PENDING ->
             ProofStatusLook(
-                R.drawable.ic_clock,
+                if (proof.pendingWrite) R.drawable.ic_cloud_upload else R.drawable.ic_clock,
                 R.string.quest_detail_proof_pending_label,
-                sender?.name?.let {
-                  stringResource(R.string.quest_detail_proof_pending_title_by, it)
-                } ?: stringResource(R.string.quest_detail_proof_pending_title),
-                if (sender == null)
-                    stringResource(R.string.quest_detail_proof_pending_text, venueName)
-                else stringResource(R.string.quest_detail_proof_pending_text_by, venueName),
+                when {
+                  proof.pendingWrite -> stringResource(R.string.waiting_to_send)
+                  sender?.name != null ->
+                      stringResource(R.string.quest_detail_proof_pending_title_by, sender.name)
+                  else -> stringResource(R.string.quest_detail_proof_pending_title)
+                },
+                when {
+                  proof.pendingWrite -> stringResource(R.string.waiting_to_send_note)
+                  sender == null ->
+                      stringResource(R.string.quest_detail_proof_pending_text, venueName)
+                  else -> stringResource(R.string.quest_detail_proof_pending_text_by, venueName)
+                },
                 tile = theme.lavender,
                 icon = theme.accentText,
                 dot = theme.accentText,

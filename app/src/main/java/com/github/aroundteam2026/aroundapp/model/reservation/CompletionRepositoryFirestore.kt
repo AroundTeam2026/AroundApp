@@ -12,6 +12,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
 import java.util.Date
@@ -19,6 +20,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -112,8 +114,13 @@ class CompletionRepositoryFirestore(
   override fun observeForVenue(venueId: String): Flow<List<Completion>> =
       completions.whereEqualTo(VENUE_ID, venueId).observe()
 
+  // Metadata-only events that leave the completion equal, such as a change of connectivity, are
+  // dropped, so nothing built on this flow starts over for them
   override fun observeForReservation(reservationId: String): Flow<List<Completion>> =
-      completions.whereEqualTo(RESERVATION_ID, reservationId).observe()
+      completions
+          .whereEqualTo(RESERVATION_ID, reservationId)
+          .observe(MetadataChanges.INCLUDE)
+          .distinctUntilChanged()
 
   /** Answers the completion with [id]; see [answer]. */
   override suspend fun approve(id: String): Result<Unit> =
@@ -198,16 +205,20 @@ class CompletionRepositoryFirestore(
   /**
    * Turns Firestore's callback-style listener into a Kotlin Flow of the completions, leaving out
    * those it can't map, which ViewModels can collect. The flow ends with the Firestore exception if
-   * the backend stops the listener, e.g. when the rules refuse the query.
+   * the backend stops the listener, e.g. when the rules refuse the query. With
+   * [MetadataChanges.INCLUDE] it also emits when only a write's confirmation changes.
    */
-  private fun Query.observe(): Flow<List<Completion>> = callbackFlow {
-    val registration = addSnapshotListener { snapshot, error ->
-      if (error != null) {
-        close(error)
-      } else if (snapshot != null) {
-        trySend(snapshot.documents.mapNotNull { it.toCompletion() })
-      }
-    }
+  private fun Query.observe(
+      metadata: MetadataChanges = MetadataChanges.EXCLUDE
+  ): Flow<List<Completion>> = callbackFlow {
+    val registration =
+        addSnapshotListener(metadata) { snapshot, error ->
+          if (error != null) {
+            close(error)
+          } else if (snapshot != null) {
+            trySend(snapshot.documents.mapNotNull { it.toCompletion() })
+          }
+        }
     awaitClose { registration.remove() }
   }
 
@@ -231,6 +242,7 @@ class CompletionRepositoryFirestore(
           status = CompletionStatus.valueOf(required(STATUS) { getString(it) }),
           rejectReason = getString(REJECT_REASON),
           submittedAt = required(SUBMITTED_AT) { getTimestamp(it) }.toDate().time,
+          pendingWrite = metadata.hasPendingWrites(),
       )
     } catch (e: Exception) {
       Log.w(TAG, "Skipping malformed completion document $id", e)

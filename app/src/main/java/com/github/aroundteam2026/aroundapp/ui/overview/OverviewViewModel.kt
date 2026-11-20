@@ -268,12 +268,12 @@ internal fun activeReservations(reservations: List<Reservation>): List<Reservati
         )
 
 /**
- * Where the party's proof of each reservation stands, keyed by reservation id, from the
- * [completions] of the explorer's parties: one per reservation, whichever member sent it.
+ * The party's proof of each reservation, keyed by reservation id, from the [completions] of the
+ * explorer's parties: one per reservation, whichever member sent it.
  */
-internal fun proofsOf(completions: List<Completion>): Map<String, CompletionStatus> =
-    completions.associate {
-      it.reservationId to it.status
+internal fun proofsOf(completions: List<Completion>): Map<String, Completion> =
+    completions.associateBy {
+      it.reservationId
     }
 
 /**
@@ -289,7 +289,7 @@ internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,
     venues: List<Venue>,
     partySizes: Map<String, Int>,
-    proofs: Map<String, CompletionStatus>,
+    proofs: Map<String, Completion>,
     senders: Map<String, ProofSender> = emptyMap(),
     leaves: Map<String, Boolean> = emptyMap(),
     waiting: Set<String> = emptySet(),
@@ -307,22 +307,24 @@ internal fun overviewRows(
 
 /**
  * Where [reservation] stands: on its way to the server while it has a pending write, then with its
- * venue until approved, then with the proof in [proofs]. A proof among [waiting] is newer than the
- * one the venue has, unless the venue approved that one, which ends the quest.
+ * venue until approved, then with the proof in [proofs], which is on its way to the server while it
+ * has a pending write. A proof among [waiting] is newer than the one the venue has, unless the
+ * venue approved that one, which ends the quest.
  */
 private fun rowStatus(
     reservation: Reservation,
-    proofs: Map<String, CompletionStatus>,
+    proofs: Map<String, Completion>,
     waiting: Set<String>,
 ): OverviewRowStatus {
   val proof = proofs[reservation.id]
   return when {
     reservation.pendingWrite -> OverviewRowStatus.SENDING
     reservation.status != ReservationStatus.APPROVED -> OverviewRowStatus.WAITING
-    reservation.id in waiting && proof != CompletionStatus.APPROVED ->
+    reservation.id in waiting && proof?.status != CompletionStatus.APPROVED ->
         OverviewRowStatus.UPLOAD_WAITING
+    proof?.pendingWrite == true -> OverviewRowStatus.SENDING
     else ->
-        when (proof) {
+        when (proof?.status) {
           null -> OverviewRowStatus.APPROVED
           CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
           CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED

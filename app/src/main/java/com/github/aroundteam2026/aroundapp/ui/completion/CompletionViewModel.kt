@@ -23,6 +23,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
@@ -327,17 +328,37 @@ class CompletionViewModel(
   }
 
   /**
+   * Ends a form waiting to send once [proof], the party's completion, is on the server: the
+   * explorer's own proof is then saved, or the form unlocks if the venue rejected it. A proof the
+   * server doesn't have yet, or another member's, changes nothing.
+   */
+  private fun settleSendingLater(proof: Completion) {
+    if (proof.pendingWrite || proof.explorerUid != explorerUid) return
+    mutableUiState.update {
+      when {
+        !it.sendingLater -> it
+        proof.status == CompletionStatus.REJECTED -> it.copy(sendingLater = false)
+        else -> it.copy(sendingLater = false, saveState = SaveState.Saved(proof.id))
+      }
+    }
+  }
+
+  /**
    * Shows the reservation as completed once the venue approved its party's completion: as saved if
    * [explorerUid] sent it, or as [CompletionUiState.sentByTeammate] if another member did. A
-   * completion still waiting or rejected doesn't lock the form: a new proof replaces it.
+   * completion still waiting or rejected doesn't lock the form: a new proof replaces it. A form
+   * waiting to send ([CompletionUiState.sendingLater]) ends once the server has the explorer's
+   * proof: as saved, or unlocked if the venue already rejected it.
    */
   private suspend fun listenToCompletions() {
     val id = completionId(reservationId)
     try {
       completionRepository.observeForReservation(reservationId).collect { completions ->
-        val stored =
-            completions.find { it.id == id && it.status == CompletionStatus.APPROVED }
-                ?: return@collect
+        val stored = completions.find { it.id == id } ?: return@collect
+        if (stored.status != CompletionStatus.APPROVED) {
+          settleSendingLater(stored)
+          return@collect
+        }
         mutableUiState.update {
           if (stored.explorerUid == explorerUid) it.copy(saveState = SaveState.Saved(id))
           // A send in progress ends in finishSubmit; an earlier one's error no longer applies
