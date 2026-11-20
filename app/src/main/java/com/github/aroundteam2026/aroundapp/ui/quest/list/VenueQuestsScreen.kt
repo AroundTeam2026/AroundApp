@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,6 +54,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
+import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
@@ -147,7 +149,8 @@ private fun QuestList(
 /**
  * A quest's title, status, a pencil that calls [onEdit] and a box that calls [onSetArchived]: true
  * after the venue confirms archiving, false at once for an archived quest. A quest that isn't
- * active is muted.
+ * active is muted, and one the server hasn't confirmed yet says it is waiting to send; it can still
+ * be edited and archived.
  */
 @Composable
 private fun QuestCard(quest: Quest, onEdit: () -> Unit, onSetArchived: (Boolean) -> Unit) {
@@ -164,14 +167,20 @@ private fun QuestCard(quest: Quest, onEdit: () -> Unit, onSetArchived: (Boolean)
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Small),
   ) {
-    Text(
-        quest.title,
-        style = AroundTextStyles.CardTitle,
-        color = if (active) colors.onSurface else colors.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f).testTag(C.Tag.VENUE_QUEST_TITLE),
-    )
+    Column(
+        Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall),
+    ) {
+      Text(
+          quest.title,
+          style = AroundTextStyles.CardTitle,
+          color = if (active) colors.onSurface else colors.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier.testTag(C.Tag.VENUE_QUEST_TITLE),
+      )
+      if (quest.pendingWrite) WaitingToSend()
+    }
     StatusPill(
         statusLabel(quest.status),
         background = if (active) colors.tertiary else colors.outline,
@@ -268,6 +277,28 @@ private fun StatusPill(@StringRes label: Int, background: Color, content: Color)
   )
 }
 
+/**
+ * Under the title of a quest the server hasn't confirmed yet: an accent cloud and "Waiting to
+ * send", as on the explorer's Quests tab. TalkBack reads it as one item.
+ */
+@Composable
+private fun WaitingToSend() {
+  val accent = AroundTheme.colors.accentText
+  Row(
+      Modifier.semantics(mergeDescendants = true) {}.testTag(C.Tag.VENUE_QUEST_SENDING),
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraSmall),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Icon(
+        painterResource(R.drawable.ic_cloud_upload),
+        contentDescription = null,
+        Modifier.size(SENDING_ICON_SIZE),
+        tint = accent,
+    )
+    Text(stringResource(R.string.waiting_to_send), style = AroundTextStyles.Badge, color = accent)
+  }
+}
+
 @StringRes
 private fun statusLabel(status: QuestStatus): Int =
     when (status) {
@@ -341,6 +372,7 @@ private fun ColumnScope.Centered(content: @Composable () -> Unit) {
 private val CARD_BORDER = 1.dp
 private val CARD_BUTTON_SIZE = 28.dp
 private val CARD_ICON_SIZE = 16.dp
+private val SENDING_ICON_SIZE = 12.dp
 private val BUTTON_HEIGHT = 52.dp
 /** The width of the empty state's text and button in Figma. */
 private val EMPTY_STATE_WIDTH = 260.dp
