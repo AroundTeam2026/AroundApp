@@ -69,7 +69,11 @@ class PartyRepositoryFirestore(
                 .commit()
         write.addOnFailureListener { Log.w(TAG, "Write of membership $id failed", it) }
         // Null when the server hasn't answered in time; a refusal throws
-        val answered = withTimeoutOrNull(confirmTimeoutMs) { write.await().let { true } } == true
+        val answered =
+            withTimeoutOrNull(confirmTimeoutMs) {
+              write.await()
+              true
+            } == true
         Result.success(if (answered) WriteConfirmation.CONFIRMED else WriteConfirmation.QUEUED)
       } catch (e: CancellationException) {
         throw e

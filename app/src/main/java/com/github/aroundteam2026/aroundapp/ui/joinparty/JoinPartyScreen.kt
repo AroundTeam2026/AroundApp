@@ -296,7 +296,7 @@ private fun SubmitButton(state: JoinPartyUiState, onSubmit: () -> Unit) {
       Icon(
           painterResource(R.drawable.ic_cloud_upload),
           contentDescription = null,
-          Modifier.size(PROGRESS_SIZE),
+          Modifier.size(SENDING_ICON_SIZE),
       )
       Spacer(Modifier.width(AroundSpacing.Small))
     }
@@ -317,6 +317,7 @@ private val CONTROL_SIZE = 44.dp
 private val FIELD_MIN_HEIGHT = 52.dp
 private val SUBMIT_MIN_HEIGHT = 54.dp
 private val PROGRESS_SIZE = 20.dp
+private val SENDING_ICON_SIZE = 20.dp
 private val PROGRESS_STROKE = 2.dp
 private val INFO_SIZE = 16.dp
 private val BORDER_WIDTH = 1.dp

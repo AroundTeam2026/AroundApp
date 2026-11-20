@@ -102,8 +102,10 @@ class JoinPartyViewModel(
         .join(party.reservationId, explorerUid)
         .onSuccess { confirmation ->
           val join =
-              if (confirmation == WriteConfirmation.CONFIRMED) JoinPartyUiState.Join.JOINED
-              else JoinPartyUiState.Join.SENDING
+              when (confirmation) {
+                WriteConfirmation.CONFIRMED -> JoinPartyUiState.Join.JOINED
+                WriteConfirmation.QUEUED -> JoinPartyUiState.Join.SENDING
+              }
           mutableUiState.update { it.copy(join = join) }
         }
         .onFailure { failure ->
