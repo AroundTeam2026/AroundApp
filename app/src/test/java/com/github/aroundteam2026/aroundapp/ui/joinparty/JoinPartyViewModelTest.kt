@@ -8,9 +8,11 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -19,6 +21,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -60,10 +63,13 @@ class JoinPartyViewModelTest {
   private val parties = ScriptedParty(reservations.party)
   private val connectivity = FakeConnectivityRepository()
 
+  /** The reservations the server hasn't confirmed yet. */
+  private val unsent = MutableStateFlow(emptySet<String>())
+
   private val viewModel by lazy {
     JoinPartyViewModel(
         EXPLORER,
-        lookups,
+        lookups.withUnsent(unsent),
         questRepository,
         FakeVenueRepository(listOf(testVenue(id = CAFE, name = "Café Lumen"))),
         parties,
@@ -241,10 +247,11 @@ class JoinPartyViewModelTest {
 
   // The server may not have the join yet: the device went offline right after the code was found
   @Test
-  fun aJoinTheServerHasntConfirmedIsWaitingToSendNotJoined() = test {
+  fun aJoinTheServerHasntConfirmedIsWaitingToSendThenJoinedOnceItDoes() = test {
     val id = book()
     type()
     parties.queued = true
+    unsent.value = setOf(id)
 
     viewModel.join()
     runCurrent()
@@ -254,6 +261,26 @@ class JoinPartyViewModelTest {
     // It is written, and waits for the server
     val member = reservations.party.observeMembers(id).first().single { it.uid == EXPLORER }
     assertEquals(PartyMemberStatus.JOINED, member.status)
+
+    unsent.value = emptySet()
+    runCurrent()
+
+    assertEquals(JoinPartyUiState.Join.JOINED, state.join)
+  }
+
+  // Not hearing from the server again leaves the explorer's join where it was: saved, sent later
+  @Test
+  fun aJoinWhoseConfirmationCantBeWatchedStaysWaitingToSend() = test {
+    val id = book()
+    type()
+    parties.queued = true
+    unsent.value = setOf(id)
+    lookups.listingFails = true
+
+    viewModel.join()
+    runCurrent()
+
+    assertEquals(JoinPartyUiState.Join.SENDING, state.join)
   }
 
   @Test
@@ -365,6 +392,11 @@ class JoinPartyViewModelTest {
       ReservationRepository by delegate {
     var lookups = 0
     var gate: CompletableDeferred<Unit>? = null
+    var listingFails = false
+
+    override fun observeForExplorer(uid: String): Flow<List<Reservation>> =
+        if (listingFails) flow { throw IllegalStateException("Permission denied") }
+        else delegate.observeForExplorer(uid)
 
     override suspend fun findReservationIdByCode(code: String): Result<String> {
       lookups++

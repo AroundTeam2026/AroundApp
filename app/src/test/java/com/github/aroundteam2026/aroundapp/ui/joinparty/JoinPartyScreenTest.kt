@@ -35,6 +35,9 @@ import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRowStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -184,9 +187,10 @@ class JoinPartyScreenTest {
   private fun showScreenOn(
       fakes: JoinPartyOnFakes,
       party: PartyRepository = fakes.party,
+      unsent: Flow<Set<String>> = flowOf(emptySet()),
       onJoined: () -> Unit,
   ) {
-    val viewModel = fakes.viewModel(partyRepository = party)
+    val viewModel = fakes.viewModel(partyRepository = party, unsent = unsent)
     compose.setContent {
       AroundAppTheme { JoinPartyScreen(viewModel, onBack = {}, onJoined = onJoined) }
     }
@@ -206,27 +210,30 @@ class JoinPartyScreenTest {
         .onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT)
         .assertTextContains(text(R.string.waiting_to_send))
         .assertIsNotEnabled()
-    compose.onNodeWithText(text(R.string.waiting_to_send_note)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SENDING).assertIsDisplayed()
     compose.onNodeWithContentDescription(text(R.string.join_party_back)).assertIsEnabled()
   }
 
-  // The explorer decides when to leave: closing at once would hide that the join isn't sent yet
+  // The explorer decides when to leave, until the server has the join: then the screen closes
   @Test
-  fun aQueuedJoinKeepsTheScreenOpen() {
+  fun aQueuedJoinKeepsTheScreenOpenUntilTheServerHasIt() {
     val fakes = JoinPartyOnFakes()
+    val unsent = MutableStateFlow(setOf(fakes.reservationId))
     var joined = 0
-    showScreenOn(fakes, QueuedParty(fakes.party)) { joined++ }
+    showScreenOn(fakes, QueuedParty(fakes.party), unsent) { joined++ }
 
     compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()
     compose.waitUntil {
-      compose
-          .onAllNodes(hasText(text(R.string.waiting_to_send_note)))
-          .fetchSemanticsNodes()
-          .isNotEmpty()
+      compose.onAllNodes(hasTestTag(C.Tag.JOIN_PARTY_SENDING)).fetchSemanticsNodes().isNotEmpty()
     }
     compose.waitForIdle()
-
     assertEquals(0, joined)
+
+    unsent.value = emptySet()
+    compose.waitForIdle()
+    compose.waitUntil { joined == 1 }
+
+    assertEquals(1, joined)
   }
 
   // The screen below it (here a stand-in) is the one system back would otherwise reach

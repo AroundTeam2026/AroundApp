@@ -59,9 +59,9 @@ import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
  * sees the party it leads to, or why it can't be joined, and joins it.
  *
  * @param onBack Closes the screen, on its back arrow.
- * @param onJoined Called once the server confirmed the join, to close the screen: its quest then
- *   shows on the Quests tab. A join it hasn't confirmed yet keeps the screen open, saying it is
- *   waiting to send.
+ * @param onJoined Called once the server has the join, to close the screen: its quest then shows on
+ *   the Quests tab. A join it hasn't confirmed yet keeps the screen open, saying it is waiting to
+ *   send, until it does.
  */
 @Composable
 fun JoinPartyScreen(
@@ -137,6 +137,7 @@ fun JoinPartyContent(
         Spacer(Modifier.size(AroundSpacing.CompactGap))
         Text(
             stringResource(R.string.waiting_to_send_note),
+            Modifier.testTag(C.Tag.JOIN_PARTY_SENDING),
             style = AroundTextStyles.Caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

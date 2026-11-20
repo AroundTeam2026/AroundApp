@@ -1,7 +1,9 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.party
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryFirestore
@@ -90,7 +92,7 @@ class PartyRepositoryFirestoreTest {
    */
   @Test
   fun join_storesAJoinedMembershipUnderTheComposedId() = withTimeoutBlocking {
-    friend.join(reservationId, friendUid).getOrThrow()
+    assertEquals(WriteConfirmation.CONFIRMED, friend.join(reservationId, friendUid).getOrThrow())
 
     val document =
         friendDb
@@ -195,16 +197,17 @@ class PartyRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: join waits for the server without a limit, so it hangs while the device is offline, or
-   * fails instead of leaving the write queued until the device is back online.
+   * Bug: join waits for the server without a limit, so it hangs while the device is offline, fails
+   * instead of leaving the write queued until the device is back online, or reports a write the
+   * server hasn't answered as confirmed.
    */
   @Test
-  fun join_whileOffline_succeedsAfterTheTimeoutAndIsSentOnceBackOnline() = withTimeoutBlocking {
+  fun join_whileOffline_isQueuedAfterTheTimeoutAndSentOnceBackOnline() = withTimeoutBlocking {
     val repository =
         PartyRepositoryFirestore(friendDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) { JOINED_AT }
     friendDb.disableNetwork().await()
     try {
-      repository.join(reservationId, friendUid).getOrThrow()
+      assertEquals(WriteConfirmation.QUEUED, repository.join(reservationId, friendUid).getOrThrow())
     } finally {
       friendDb.enableNetwork().await()
     }

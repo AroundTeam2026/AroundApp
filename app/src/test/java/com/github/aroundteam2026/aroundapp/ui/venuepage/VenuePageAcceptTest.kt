@@ -18,6 +18,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -40,7 +41,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -178,13 +178,7 @@ class VenuePageAcceptTest {
   @Test
   fun aQuestAcceptedButNotSentYetIsWaitingToSend() = test {
     val unsent = MutableStateFlow(emptySet<String>())
-    reservationRepository =
-        object : ReservationRepository by reservations {
-          override fun observeForExplorer(uid: String): Flow<List<Reservation>> =
-              reservations.observeForExplorer(uid).combine(unsent) { list, ids ->
-                list.map { it.copy(pendingWrite = it.id in ids) }
-              }
-        }
+    reservationRepository = reservations.withUnsent(unsent)
     openAndPick("a")
     viewModel.accept()
     runCurrent()

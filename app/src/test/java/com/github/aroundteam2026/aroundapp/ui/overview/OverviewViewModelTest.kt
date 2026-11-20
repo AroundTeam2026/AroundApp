@@ -23,6 +23,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
@@ -42,7 +43,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -627,13 +627,7 @@ class OverviewViewModelTest {
 
   /** The ViewModel, with the reservations in [unsent] listed as not confirmed by the server. */
   private fun viewModelWithUnsent(unsent: Flow<Set<String>>): OverviewViewModel {
-    val unconfirmed =
-        object : ReservationRepository by listener {
-          override fun observeForExplorer(uid: String): Flow<List<Reservation>> =
-              listener.observeForExplorer(uid).combine(unsent) { list, ids ->
-                list.map { it.copy(pendingWrite = it.id in ids) }
-              }
-        }
+    val unconfirmed = listener.withUnsent(unsent)
     return OverviewViewModel(
         EXPLORER,
         unconfirmed,

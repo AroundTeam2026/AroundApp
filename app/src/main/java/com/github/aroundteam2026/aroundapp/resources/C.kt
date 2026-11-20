@@ -340,6 +340,7 @@ object C {
     const val JOIN_PARTY_ERROR = "join_party_error"
     const val JOIN_PARTY_FOUND = "join_party_found"
     const val JOIN_PARTY_SUBMIT = "join_party_submit"
+    const val JOIN_PARTY_SENDING = "join_party_sending"
 
     // Proof photo picker
     const val PROOF_PHOTO = "proof_photo"

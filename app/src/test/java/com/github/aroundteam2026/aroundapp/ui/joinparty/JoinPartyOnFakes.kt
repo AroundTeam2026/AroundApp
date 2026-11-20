@@ -8,9 +8,12 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -25,19 +28,21 @@ class JoinPartyOnFakes {
   val party = reservations.party as FakePartyRepository
   val venues = FakeVenueRepository(listOf(testVenue(id = "venue-1", name = "Café Lumen")))
 
-  init {
-    runBlocking {
-      reservations.createReservation(newPendingReservation("fox", "venue-1", "Ada", 0L), "friend")
-    }
+  /** The id of the friend's reservation. */
+  val reservationId: String = runBlocking {
+    reservations
+        .createReservation(newPendingReservation("fox", "venue-1", "Ada", 0L), "friend")
+        .getOrThrow()
   }
 
   fun viewModel(
       explorerUid: String = EXPLORER,
       partyRepository: PartyRepository = reservations.party,
+      unsent: Flow<Set<String>> = flowOf(emptySet()),
   ) =
       JoinPartyViewModel(
           explorerUid,
-          reservations,
+          reservations.withUnsent(unsent),
           questRepository,
           venues,
           partyRepository,
