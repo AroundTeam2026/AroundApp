@@ -721,6 +721,77 @@ class ReservationRepositoryFirestoreTest {
   }
 
   /**
+   * Bug: the reservation's listener leaves out metadata changes, or pendingWrite isn't read from
+   * them, so a reservation queued offline never shows as waiting to send, or still shows so once
+   * the server has it.
+   */
+  @Test
+  fun observeForExplorer_ofAReservationCreatedOffline_isPendingUntilTheServerHasIt() =
+      withTimeoutBlocking {
+        val repository =
+            ReservationRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) {
+              FIXED_NOW
+            }
+        val emissions = Channel<List<Reservation>>(Channel.UNLIMITED)
+        val collector =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+              repository.observeForExplorer(explorerUid).collect(emissions::send)
+            }
+        try {
+          explorerDb.disableNetwork().await()
+          val id: String
+          try {
+            id = repository.createReservation(reservation(), explorerUid).getOrThrow()
+            do {
+              val latest = emissions.receive()
+            } while (latest.none { it.id == id && it.pendingWrite })
+          } finally {
+            explorerDb.enableNetwork().await()
+          }
+
+          // The confirmation only changes the metadata, so without it this fails on TIMEOUT_MS
+          do {
+            val latest = emissions.receive()
+          } while (latest.none { it.id == id && !it.pendingWrite })
+        } finally {
+          collector.cancel()
+        }
+      }
+
+  /**
+   * Bug: the reservation's listener passes on metadata changes that leave the reservation equal, so
+   * a disconnection or a reconnection emits the same reservations again and whatever collects them
+   * starts over.
+   */
+  @Test
+  fun observeForExplorer_afterAReconnection_emitsOnlyWhenTheReservationChanges() =
+      withTimeoutBlocking {
+        val id = createAndSync()
+        val emissions = Channel<List<Reservation>>(Channel.UNLIMITED)
+        val collector =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+              explorerRepository.observeForExplorer(explorerUid).collect(emissions::send)
+            }
+        try {
+          do {
+            val latest = emissions.receive()
+          } while (latest.none { it.id == id && !it.pendingWrite })
+
+          explorerDb.disableNetwork().await()
+          explorerDb.enableNetwork().await()
+          venueRepository.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+
+          // A copy emitted for the disconnection or the reconnection comes before the answer
+          assertEquals(
+              ReservationStatus.APPROVED,
+              emissions.receive().single { it.id == id }.status,
+          )
+        } finally {
+          collector.cancel()
+        }
+      }
+
+  /**
    * Bug: observeForVenue or observeForExplorer lets a malformed reservation or membership crash the
    * listener or end the flow instead of skipping it.
    */
