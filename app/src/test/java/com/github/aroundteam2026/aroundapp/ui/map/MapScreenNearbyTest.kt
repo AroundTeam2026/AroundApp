@@ -224,7 +224,13 @@ class MapScreenNearbyTest {
   @Test
   fun acceptOnAPageBooksItsQuestAndSaysItIsAccepted() {
     val reservations = FakeReservationRepository({ 0L })
-    val accept = NearbyAcceptViewModel(reservations, testUsers(EXPLORER), EXPLORER)
+    val accept =
+        NearbyAcceptViewModel(
+            reservations,
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+        )
     show(acceptViewModel = accept)
     openNearby()
 

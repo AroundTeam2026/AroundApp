@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -41,9 +42,10 @@ class NearbyAcceptViewModelTest {
   private val users = ScriptedUserRepository(testUsers(EXPLORER))
   private var reservations: ReservationRepository = gated
   private val local = LocalWrites(fake)
+  private val connectivity = FakeConnectivityRepository()
 
   private val viewModel by lazy {
-    NearbyAcceptViewModel(reservations, users, EXPLORER, clock = { NOW })
+    NearbyAcceptViewModel(reservations, users, EXPLORER, connectivity, clock = { NOW })
   }
 
   private val state
@@ -74,6 +76,37 @@ class NearbyAcceptViewModelTest {
     // The first list arrived meanwhile, but the tap before it booked nothing
     assertTrue(state.available)
     assertEquals(emptyList<Reservation>(), stored())
+  }
+
+  // Booking needs a connection, as it does from a venue's page: the quest shows the failure
+  @Test
+  fun acceptingFailsAtOnceWhenTheDeviceDisconnects() = test {
+    open()
+
+    connectivity.online.value = false
+    runCurrent()
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    assertEquals(emptyList<Reservation>(), stored())
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+  }
+
+  @Test
+  fun acceptingWorksAgainBackOnline() = test {
+    open()
+    connectivity.online.value = false
+    runCurrent()
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    connectivity.online.value = true
+    runCurrent()
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    assertEquals("a", stored().single().questId)
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
   }
 
   @Test
@@ -178,7 +211,8 @@ class NearbyAcceptViewModelTest {
 
   @Test
   fun withoutAProfileAcceptingFailsWithoutBooking() = test {
-    val noProfile = NearbyAcceptViewModel(gated, ScriptedUserRepository(), EXPLORER) { NOW }
+    val noProfile =
+        NearbyAcceptViewModel(gated, ScriptedUserRepository(), EXPLORER, connectivity) { NOW }
     runCurrent()
 
     noProfile.accept(quest("a"))

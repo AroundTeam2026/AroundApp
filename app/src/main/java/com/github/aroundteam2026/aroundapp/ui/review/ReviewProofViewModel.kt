@@ -36,6 +36,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.ui.dashboard.AnswerSaver
 import com.github.aroundteam2026.aroundapp.ui.dashboard.savingAmong
 import com.github.aroundteam2026.aroundapp.ui.observeOffline
+import com.github.aroundteam2026.aroundapp.ui.observeOnlineNow
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -123,6 +124,9 @@ class ReviewProofViewModel(
    */
   private val offline = MutableStateFlow(false)
 
+  /** Whether the device is online now: the screen says it isn't a moment later. */
+  private val online = connectivityRepository.observeOnlineNow(viewModelScope, TAG)
+
   init {
     viewModelScope.launch {
       connectivityRepository.observeOffline(TAG).collect { offline.value = it }
@@ -170,8 +174,9 @@ class ReviewProofViewModel(
 
   /** Approves the proof, which gives the party the quest's reward. Does nothing offline. */
   fun approve() {
-    // The state can be stale while the screen resumes, so offline is read where it is followed
-    if (offline.value || !uiState.value.canApprove) return
+    // The state can be stale while the screen resumes, so the connection is read where it is
+    // followed
+    if (!online.value || !uiState.value.canApprove) return
     answers.answer(completionId, "proof $completionId with an approval") {
       whileWriting { completionRepository.approve(completionId) }
     }
@@ -186,7 +191,7 @@ class ReviewProofViewModel(
     if (
         trimmed.isEmpty() ||
             trimmed.length > MAX_REJECT_REASON_LENGTH ||
-            offline.value ||
+            !online.value ||
             !uiState.value.canReject
     ) {
       return
