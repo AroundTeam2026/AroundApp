@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.party.PARTY_CODE_LENGTH
@@ -99,7 +100,12 @@ class JoinPartyViewModel(
   private suspend fun joinParty(party: OverviewRow) {
     partyRepository
         .join(party.reservationId, explorerUid)
-        .onSuccess { mutableUiState.update { it.copy(join = JoinPartyUiState.Join.JOINED) } }
+        .onSuccess { confirmation ->
+          val join =
+              if (confirmation == WriteConfirmation.CONFIRMED) JoinPartyUiState.Join.JOINED
+              else JoinPartyUiState.Join.SENDING
+          mutableUiState.update { it.copy(join = join) }
+        }
         .onFailure { failure ->
           Log.w(TAG, "Joining the party of ${party.reservationId} failed", failure)
           // The rules refuse a full, ended or already joined party alike: look it up to tell which

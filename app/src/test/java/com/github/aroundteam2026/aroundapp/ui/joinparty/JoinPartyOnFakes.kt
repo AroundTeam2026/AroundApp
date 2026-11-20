@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
@@ -50,4 +51,13 @@ class JoinPartyOnFakes {
     /** The code as an explorer might type it: lowercase, with a space in the middle. */
     val TYPED = CODE.lowercase().let { "${it.take(3)} ${it.drop(3)}" }
   }
+}
+
+/**
+ * A party whose join is written, but not confirmed by the server yet, as when the device went
+ * offline.
+ */
+class QueuedParty(private val inner: PartyRepository) : PartyRepository by inner {
+  override suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation> =
+      inner.join(reservationId, uid).map { WriteConfirmation.QUEUED }
 }

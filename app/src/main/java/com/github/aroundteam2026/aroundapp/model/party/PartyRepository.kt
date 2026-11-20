@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.party
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -16,10 +17,10 @@ interface PartyRepository {
    * it has fewer joined members than the [partyCapacity] of its quest: the Firestore implementation
    * fails when the server refuses.
    *
-   * @return success, or a failure if [uid] already has a membership for this reservation, whatever
-   *   its status, if the party is full, or if the write failed.
+   * @return whether the server confirmed the join, or a failure if [uid] already has a membership
+   *   for this reservation, whatever its status, if the party is full, or if the write failed.
    */
-  suspend fun join(reservationId: String, uid: String): Result<Unit>
+  suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation>
 
   /**
    * Moves [uid]'s membership in the party of [reservationId] to [PartyMemberStatus.WITHDRAWN] and

@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.party
 
 import android.util.Log
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -47,9 +48,9 @@ class PartyRepositoryFirestore(
    * `ReservationRepositoryFirestore.createReservation`: a refusal in that time is returned as the
    * Firestore exception (`PERMISSION_DENIED`), which is also what joining twice or a full party
    * gives, since the second write is an update the rules refuse. Without an answer in time, e.g.
-   * while offline, it returns success and the write stays queued.
+   * while offline, it returns [WriteConfirmation.QUEUED] and the write stays queued.
    */
-  override suspend fun join(reservationId: String, uid: String): Result<Unit> =
+  override suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation> =
       try {
         val id = partyMemberId(reservationId, uid)
         val time = Timestamp(Date(now()))
@@ -67,8 +68,8 @@ class PartyRepositoryFirestore(
                 .commit()
         write.addOnFailureListener { Log.w(TAG, "Write of membership $id failed", it) }
         // Null when the server hasn't answered in time; a refusal throws
-        withTimeoutOrNull(confirmTimeoutMs) { write.await() }
-        Result.success(Unit)
+        val answered = withTimeoutOrNull(confirmTimeoutMs) { write.await().let { true } } == true
+        Result.success(if (answered) WriteConfirmation.CONFIRMED else WriteConfirmation.QUEUED)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {

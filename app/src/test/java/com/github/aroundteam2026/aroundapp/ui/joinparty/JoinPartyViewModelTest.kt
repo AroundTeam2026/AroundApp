@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
@@ -238,6 +239,24 @@ class JoinPartyViewModelTest {
     assertTrue(reservations.observeForExplorer(EXPLORER).first().any { it.id == id })
   }
 
+  // The server may not have the join yet, e.g. the device went offline right after the code was
+  // found
+  @Test
+  fun aJoinTheServerHasntConfirmedIsWaitingToSendNotJoined() = test {
+    val id = book()
+    type()
+    parties.queued = true
+
+    viewModel.join()
+    runCurrent()
+
+    assertEquals(JoinPartyUiState.Join.SENDING, state.join)
+    assertFalse(state.canSubmit)
+    // It is written, and waits for the server
+    val member = reservations.party.observeMembers(id).first().single { it.uid == EXPLORER }
+    assertEquals(PartyMemberStatus.JOINED, member.status)
+  }
+
   @Test
   fun joiningShowsJoiningAndATapWhileJoiningJoinsOnce() = test {
     book()
@@ -363,17 +382,18 @@ class JoinPartyViewModelTest {
     var joins = 0
     var gate: CompletableDeferred<Unit>? = null
     var refusing = false
+    var queued = false
     var membersRefused = false
 
     override fun observeMembers(reservationId: String): Flow<List<PartyMember>> =
         if (membersRefused) flow { throw IllegalStateException("Permission denied") }
         else delegate.observeMembers(reservationId)
 
-    override suspend fun join(reservationId: String, uid: String): Result<Unit> {
+    override suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation> {
       joins++
       gate?.await()
       if (refusing) return Result.failure(IllegalStateException("The rules refused the join"))
-      return delegate.join(reservationId, uid)
+      return delegate.join(reservationId, uid).map { if (queued) WriteConfirmation.QUEUED else it }
     }
   }
 

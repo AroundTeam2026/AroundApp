@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.pressBack
@@ -196,6 +197,39 @@ class JoinPartyScreenTest {
   }
 
   // The screen below it (here a stand-in) is the one system back would otherwise reach
+  // The Figma frame "Venue page · accept waiting to send", for a join: saved here, sent later
+  @Test
+  fun aQueuedJoinSaysWaitingToSendWithItsNoteAndLeavesBackOn() {
+    state = found(JoinPartyUiState.Join.SENDING)
+    show()
+
+    compose
+        .onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT)
+        .assertTextContains(text(R.string.waiting_to_send))
+        .assertIsNotEnabled()
+    compose.onNodeWithText(text(R.string.waiting_to_send_note)).assertIsDisplayed()
+    compose.onNodeWithContentDescription(text(R.string.join_party_back)).assertIsEnabled()
+  }
+
+  // The explorer decides when to leave: closing at once would hide that the join isn't sent yet
+  @Test
+  fun aQueuedJoinKeepsTheScreenOpen() {
+    val fakes = JoinPartyOnFakes()
+    var joined = 0
+    showScreenOn(fakes, QueuedParty(fakes.party)) { joined++ }
+
+    compose.onNodeWithTag(C.Tag.JOIN_PARTY_SUBMIT).performClick()
+    compose.waitUntil {
+      compose
+          .onAllNodes(hasText(text(R.string.waiting_to_send_note)))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
+    compose.waitForIdle()
+
+    assertEquals(0, joined)
+  }
+
   @Test
   fun systemBackIsOffWhileJoiningAsTheBackArrowIsAndWorksOtherwise() {
     var systemBacks = 0
@@ -275,7 +309,7 @@ class JoinPartyScreenTest {
       private val inner: PartyRepository,
       private val gate: CompletableDeferred<Unit>,
   ) : PartyRepository by inner {
-    override suspend fun join(reservationId: String, uid: String): Result<Unit> {
+    override suspend fun join(reservationId: String, uid: String): Result<WriteConfirmation> {
       gate.await()
       return inner.join(reservationId, uid)
     }

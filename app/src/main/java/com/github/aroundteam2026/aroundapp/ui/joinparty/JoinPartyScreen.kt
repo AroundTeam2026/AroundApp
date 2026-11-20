@@ -59,8 +59,9 @@ import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
  * sees the party it leads to, or why it can't be joined, and joins it.
  *
  * @param onBack Closes the screen, on its back arrow.
- * @param onJoined Called once the explorer has joined the party, to close the screen: its quest
- *   then shows on the Quests tab.
+ * @param onJoined Called once the server confirmed the join, to close the screen: its quest then
+ *   shows on the Quests tab. A join it hasn't confirmed yet keeps the screen open, saying it is
+ *   waiting to send.
  */
 @Composable
 fun JoinPartyScreen(
@@ -132,6 +133,14 @@ fun JoinPartyContent(
       Spacer(Modifier.size(AroundSpacing.SetupGap))
       CodeField(state, onCodeChange, onSubmit)
       LookupResult(state.lookup)
+      if (state.join == JoinPartyUiState.Join.SENDING) {
+        Spacer(Modifier.size(AroundSpacing.CompactGap))
+        Text(
+            stringResource(R.string.waiting_to_send_note),
+            style = AroundTextStyles.Caption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
     }
   }
 }
@@ -250,16 +259,25 @@ private fun ErrorLine(error: JoinPartyUiState.Error) {
 @Composable
 private fun SubmitButton(state: JoinPartyUiState, onSubmit: () -> Unit) {
   val joining = state.join == JoinPartyUiState.Join.JOINING
+  val sending = state.join == JoinPartyUiState.Join.SENDING
   Button(
       onClick = onSubmit,
       enabled = state.canSubmit,
       colors =
-          ButtonDefaults.buttonColors(
-              disabledContainerColor =
-                  MaterialTheme.colorScheme.primary.copy(alpha = DISABLED_ALPHA),
-              disabledContentColor =
-                  MaterialTheme.colorScheme.onPrimary.copy(alpha = DISABLED_ALPHA),
-          ),
+          if (sending) {
+            // Saved, not unavailable: container colours instead of the faded ones
+            ButtonDefaults.buttonColors(
+                disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+          } else {
+            ButtonDefaults.buttonColors(
+                disabledContainerColor =
+                    MaterialTheme.colorScheme.primary.copy(alpha = DISABLED_ALPHA),
+                disabledContentColor =
+                    MaterialTheme.colorScheme.onPrimary.copy(alpha = DISABLED_ALPHA),
+            )
+          },
       shape = MaterialTheme.shapes.medium,
       modifier =
           Modifier.fillMaxWidth()
@@ -274,8 +292,22 @@ private fun SubmitButton(state: JoinPartyUiState, onSubmit: () -> Unit) {
       )
       Spacer(Modifier.width(AroundSpacing.Small))
     }
+    if (sending) {
+      Icon(
+          painterResource(R.drawable.ic_cloud_upload),
+          contentDescription = null,
+          Modifier.size(PROGRESS_SIZE),
+      )
+      Spacer(Modifier.width(AroundSpacing.Small))
+    }
     Text(
-        stringResource(if (joining) R.string.join_party_joining else R.string.join_party_join),
+        stringResource(
+            when {
+              joining -> R.string.join_party_joining
+              sending -> R.string.waiting_to_send
+              else -> R.string.join_party_join
+            }
+        ),
         style = AroundTextStyles.Button,
     )
   }
