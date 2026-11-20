@@ -439,6 +439,11 @@ class VenuePageViewModel(
                   unconfirmed -
                   refusing,
           approved = it.reservations.approvedIds(),
+          unsent =
+              it.reservations
+                  .filter { reservation -> reservation.pendingWrite }
+                  .map { reservation -> reservation.id }
+                  .toSet(),
           codes = partyCodesOf(it.reservations, it.parties, explorerUid, venueId),
           leaves = leavesPartiesOf(it.reservations, it.parties, explorerUid),
           members =
@@ -588,6 +593,7 @@ private fun Reservation.acceptsAQuestOf(venueId: String): Boolean =
  * @property accepted The party size of each accepted quest, by quest id.
  * @property reservationIds The reservation of each accepted quest, by quest id.
  * @property approved Ids of the reservations the venue approved.
+ * @property unsent The reservations the server hasn't confirmed yet.
  * @property codes The party codes the explorer can share, by reservation id.
  * @property leaves Whether the explorer joined the party of each reservation rather than created
  *   it, by reservation id ([leavesPartiesOf]).
@@ -598,6 +604,7 @@ private data class BookedView(
     val accepted: Map<String, Int>,
     val reservationIds: Map<String, String>,
     val approved: Set<String>,
+    val unsent: Set<String>,
     val codes: Map<String, String>,
     val leaves: Map<String, Boolean>,
     val members: Map<String, List<PartyMemberUi>>?,
@@ -645,6 +652,7 @@ private fun VenuePageUiState.showing(
               failedCancelIds = failedCancelIds.intersect(booked?.reservationIds?.values.orEmpty()),
               acceptAvailable = booked != null,
               approvedIds = booked?.approved ?: approvedIds,
+              unsentIds = booked?.unsent ?: unsentIds,
               completions =
                   proofs?.completions?.associateBy { it.reservationId } ?: this.completions,
               proofSenders = proofs?.senders ?: proofSenders,

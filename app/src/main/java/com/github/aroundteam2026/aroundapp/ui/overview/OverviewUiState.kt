@@ -90,6 +90,11 @@ enum class OverviewStatus {
  *   answered it, and after it rejected it.
  */
 enum class OverviewRowStatus(val cancellable: Boolean, val proofReplaceable: Boolean = false) {
+  /**
+   * The server hasn't confirmed the reservation yet, as when it was accepted offline: it is sent
+   * once the device is online. Nothing is there to cancel until then.
+   */
+  SENDING(cancellable = false),
   /** Pending: the venue hasn't answered yet. */
   WAITING(cancellable = true),
   /** The venue approved it, and the party hasn't sent a proof yet. */

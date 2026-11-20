@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.util.Log
@@ -305,9 +306,9 @@ internal fun overviewRows(
 }
 
 /**
- * Where [reservation] stands: with its venue until approved, then with the proof in [proofs]. A
- * proof among [waiting] is newer than the one the venue has, unless the venue approved that one,
- * which ends the quest.
+ * Where [reservation] stands: on its way to the server while it has a pending write, then with its
+ * venue until approved, then with the proof in [proofs]. A proof among [waiting] is newer than the
+ * one the venue has, unless the venue approved that one, which ends the quest.
  */
 private fun rowStatus(
     reservation: Reservation,
@@ -315,17 +316,18 @@ private fun rowStatus(
     waiting: Set<String>,
 ): OverviewRowStatus {
   val proof = proofs[reservation.id]
-  return if (reservation.status != ReservationStatus.APPROVED) {
-    OverviewRowStatus.WAITING
-  } else if (reservation.id in waiting && proof != CompletionStatus.APPROVED) {
-    OverviewRowStatus.UPLOAD_WAITING
-  } else {
-    when (proof) {
-      null -> OverviewRowStatus.APPROVED
-      CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
-      CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED
-      CompletionStatus.REJECTED -> OverviewRowStatus.PROOF_REJECTED
-    }
+  return when {
+    reservation.pendingWrite -> OverviewRowStatus.SENDING
+    reservation.status != ReservationStatus.APPROVED -> OverviewRowStatus.WAITING
+    reservation.id in waiting && proof != CompletionStatus.APPROVED ->
+        OverviewRowStatus.UPLOAD_WAITING
+    else ->
+        when (proof) {
+          null -> OverviewRowStatus.APPROVED
+          CompletionStatus.PENDING -> OverviewRowStatus.PROOF_SENT
+          CompletionStatus.APPROVED -> OverviewRowStatus.COMPLETED
+          CompletionStatus.REJECTED -> OverviewRowStatus.PROOF_REJECTED
+        }
   }
 }
 

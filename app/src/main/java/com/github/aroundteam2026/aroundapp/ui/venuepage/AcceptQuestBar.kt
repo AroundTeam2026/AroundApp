@@ -111,16 +111,19 @@ fun AcceptQuestBar(
   val quest = state.selectedQuest ?: return
   val status = state.acceptStatus
   QuestBar(modifier) {
-    // One explanation of the button: an accepted quest is done whatever the listener does, and a
-    // failure can't be retried while accepting is unavailable
-    if (!state.acceptAvailable && status != AcceptStatus.ACCEPTED) {
-      Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
-    } else if (status == AcceptStatus.FAILED) {
-      Note(
-          stringResource(R.string.accept_quest_failed),
-          C.Tag.ACCEPT_QUEST_FAILED,
-          MaterialTheme.colorScheme.error,
-      )
+    // One explanation of the button: an accepted quest, waiting to send or not, is done whatever
+    // the listener does, and a failure can't be retried while accepting is unavailable
+    when {
+      status == AcceptStatus.SENDING ->
+          Note(stringResource(R.string.waiting_to_send_note), C.Tag.ACCEPT_QUEST_SENDING)
+      !state.acceptAvailable && status != AcceptStatus.ACCEPTED ->
+          Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
+      status == AcceptStatus.FAILED ->
+          Note(
+              stringResource(R.string.accept_quest_failed),
+              C.Tag.ACCEPT_QUEST_FAILED,
+              MaterialTheme.colorScheme.error,
+          )
     }
     val more = state.morePeopleNeeded
     if (more > 0) {
@@ -221,7 +224,10 @@ fun AcceptQuestButton(
   }
 }
 
-/** The button: "Accept quest", "Try again" after a failure, or disabled once accepted. */
+/**
+ * The button: "Accept quest", "Try again" after a failure, or disabled once accepted, saying
+ * "Waiting to send" while the server hasn't confirmed it.
+ */
 @Composable
 private fun AcceptButton(
     status: AcceptStatus,
@@ -233,11 +239,11 @@ private fun AcceptButton(
 ) {
   Button(
       onClick = onAccept,
-      enabled = enabled && status != AcceptStatus.ACCEPTED,
+      enabled = enabled && status != AcceptStatus.ACCEPTED && status != AcceptStatus.SENDING,
       shape = AroundPillShape,
       // Accepted is done, not unavailable: container colours instead of Material's 38% fade
       colors =
-          if (status == AcceptStatus.ACCEPTED) {
+          if (status == AcceptStatus.ACCEPTED || status == AcceptStatus.SENDING) {
             ButtonDefaults.buttonColors(
                 disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -256,6 +262,15 @@ private fun AcceptButton(
         )
         Spacer(Modifier.width(AroundSpacing.Small))
         Text(stringResource(acceptedLabel), style = AroundTextStyles.Button)
+      }
+      AcceptStatus.SENDING -> {
+        Icon(
+            painterResource(R.drawable.ic_cloud_upload),
+            contentDescription = null,
+            Modifier.size(CHECK_ICON_SIZE),
+        )
+        Spacer(Modifier.width(AroundSpacing.Small))
+        Text(stringResource(R.string.waiting_to_send), style = AroundTextStyles.Button)
       }
       // Without a working button there is nothing to try again
       AcceptStatus.FAILED if enabled ->

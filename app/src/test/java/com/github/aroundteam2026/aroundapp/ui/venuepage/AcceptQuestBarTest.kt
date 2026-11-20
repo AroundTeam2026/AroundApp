@@ -129,6 +129,22 @@ class AcceptQuestBarTest {
   }
 
   @Test
+  fun waitingToSendDisablesTheButtonAndSaysItWillBeSentWhenOnline() {
+    show(
+        LOADED.copy(
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1),
+            reservationIds = mapOf("a" to "r1"),
+            unsentIds = setOf("r1"),
+        )
+    )
+
+    button.assertIsNotEnabled().assertTextContains(text(R.string.waiting_to_send))
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_SENDING).assertIsDisplayed()
+    compose.onNodeWithText(text(R.string.accept_quest_accepted)).assertDoesNotExist()
+  }
+
+  @Test
   fun acceptedDisablesTheButtonAndSaysTheVenueIsToApprove() {
     show(LOADED.copy(selectedQuestId = "a", acceptedParties = mapOf("a" to 1)))
 
@@ -194,6 +210,22 @@ class AcceptQuestBarTest {
     compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_UNAVAILABLE).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_FAILED).assertDoesNotExist()
     button.assertIsNotEnabled().assertTextContains(text(R.string.accept_quest))
+  }
+
+  @Test
+  fun aQuestWaitingToSendDoesNotAlsoSayAcceptingIsUnavailable() {
+    show(
+        LOADED.copy(
+            selectedQuestId = "a",
+            acceptedParties = mapOf("a" to 1),
+            reservationIds = mapOf("a" to "r1"),
+            unsentIds = setOf("r1"),
+            acceptAvailable = false,
+        )
+    )
+
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_UNAVAILABLE).assertDoesNotExist()
+    button.assertIsNotEnabled().assertTextContains(text(R.string.waiting_to_send))
   }
 
   @Test

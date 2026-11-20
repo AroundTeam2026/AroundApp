@@ -204,10 +204,11 @@ private fun NewProofButton(onClick: () -> Unit) {
 
 /**
  * Where the reservation stands, in small capitals, as in the Figma frames of the Quests tab: a
- * muted dot and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then,
- * for the proof, an accent dot and "Waiting to upload" while a photo taken offline is queued, or
- * "Proof sent", or "Proof sent by Lea" when [sender] Lea sent the party's proof, a check and
- * "Completed", or a red dot and "Proof rejected".
+ * accent cloud and "Waiting to send" while the server doesn't have the reservation yet, a muted dot
+ * and "Waiting for the venue", or a check on the tertiary colour and "Approved"; then, for the
+ * proof, an accent dot and "Waiting to upload" while a photo taken offline is queued, or "Proof
+ * sent", or "Proof sent by Lea" when [sender] Lea sent the party's proof, a check and "Completed",
+ * or a red dot and "Proof rejected".
  */
 @Composable
 private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Modifier) {
@@ -219,6 +220,10 @@ private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Mo
   ) {
     val (text, color) =
         when (status) {
+          OverviewRowStatus.SENDING -> {
+            CloudUpload()
+            stringResource(R.string.waiting_to_send) to AroundTheme.colors.accentText
+          }
           OverviewRowStatus.WAITING -> {
             Dot(colors.onSurfaceVariant)
             stringResource(R.string.overview_status_waiting) to colors.onSurfaceVariant
@@ -261,6 +266,17 @@ private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Mo
 @Composable
 private fun Dot(color: Color) {
   Box(Modifier.size(DOT_SIZE).background(color, AroundPillShape))
+}
+
+/** The status's cloud with an arrow up, on the accent colour. */
+@Composable
+private fun CloudUpload() {
+  Icon(
+      painterResource(R.drawable.ic_cloud_upload),
+      contentDescription = null,
+      Modifier.size(CHECK_SIZE),
+      tint = AroundTheme.colors.accentText,
+  )
 }
 
 /** The status's check, on the tertiary colour. */

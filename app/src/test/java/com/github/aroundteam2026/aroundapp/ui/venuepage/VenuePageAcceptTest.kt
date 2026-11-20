@@ -40,6 +40,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -54,6 +55,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -170,6 +172,40 @@ class VenuePageAcceptTest {
     runCurrent()
 
     assertEquals(TEST_EXPLORER_NAME, stored().single().explorerName)
+  }
+
+  // The Figma frame "Venue page · accept waiting to send": the same accept, until the server has it
+  @Test
+  fun aQuestAcceptedButNotSentYetIsWaitingToSend() = test {
+    val unsent = MutableStateFlow(emptySet<String>())
+    reservationRepository =
+        object : ReservationRepository by reservations {
+          override fun observeForExplorer(uid: String): Flow<List<Reservation>> =
+              reservations.observeForExplorer(uid).combine(unsent) { list, ids ->
+                list.map { it.copy(pendingWrite = it.id in ids) }
+              }
+        }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    val id = stored().single().id
+    assertEquals(id, state.cancellableReservationId)
+    assertNotNull(state.partyCode)
+
+    unsent.value = setOf(id)
+    runCurrent()
+    assertEquals(AcceptStatus.SENDING, state.acceptStatus)
+    // It still counts as accepted: its party, and no second accept
+    assertEquals(setOf("a"), state.acceptedParties.keys)
+    // The server has neither the reservation to cancel nor the party code a friend would look up
+    assertNull(state.cancellableReservationId)
+    assertNull(state.partyCode)
+
+    unsent.value = emptySet()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
+    assertEquals(id, state.cancellableReservationId)
   }
 
   @Test

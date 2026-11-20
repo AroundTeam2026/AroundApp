@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import android.app.Application
@@ -114,6 +115,15 @@ class OverviewQuestRowTest {
           status(text).assertIsDisplayed()
           status("APPROVED").assertDoesNotExist()
         }
+  }
+
+  // The Figma frame "Explorer quests · waiting to send"
+  @Test
+  fun aReservationNotSentYetSaysItIsWaitingToSend() {
+    show(row(status = OverviewRowStatus.SENDING))
+
+    status(app.getString(R.string.waiting_to_send).uppercase()).assertIsDisplayed()
+    status(app.getString(R.string.overview_status_waiting).uppercase()).assertDoesNotExist()
   }
 
   // #414, the Figma frame "Quests tab · offline, proof waiting to upload"

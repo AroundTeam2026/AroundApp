@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
@@ -40,6 +41,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -599,6 +602,49 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(ProofSender(null), state.rows.single().proofSender)
+  }
+
+  // The Figma frame "Explorer quests · waiting to send": accepted offline, not on the server yet
+  @Test
+  fun aReservationTheServerHasntConfirmedIsWaitingToSend() = test {
+    val unsent = MutableStateFlow(emptySet<String>())
+    val id = book("fox")
+    val viewModel = viewModelWithUnsent(unsent)
+    runCurrent()
+    assertEquals(OverviewRowStatus.WAITING, viewModel.uiState.value.rows.single().status)
+
+    unsent.value = setOf(id)
+    runCurrent()
+    val sending = viewModel.uiState.value.rows.single().status
+    assertEquals(OverviewRowStatus.SENDING, sending)
+    // There is nothing on the server to cancel yet
+    assertFalse(sending.cancellable)
+
+    unsent.value = emptySet()
+    runCurrent()
+    assertEquals(OverviewRowStatus.WAITING, viewModel.uiState.value.rows.single().status)
+  }
+
+  /** The ViewModel, with the reservations in [unsent] listed as not confirmed by the server. */
+  private fun viewModelWithUnsent(unsent: Flow<Set<String>>): OverviewViewModel {
+    val unconfirmed =
+        object : ReservationRepository by listener {
+          override fun observeForExplorer(uid: String): Flow<List<Reservation>> =
+              listener.observeForExplorer(uid).combine(unsent) { list, ids ->
+                list.map { it.copy(pendingWrite = it.id in ids) }
+              }
+        }
+    return OverviewViewModel(
+        EXPLORER,
+        unconfirmed,
+        questRepository,
+        venues,
+        party,
+        completions,
+        users,
+        connectivity,
+        uploads,
+    )
   }
 
   // A profile can take a while offline: the rows show at once, and name the sender once it arrives
