@@ -27,6 +27,9 @@ import com.github.aroundteam2026.aroundapp.ui.SaveState
  * @property sentByTeammate Whether the venue approved the proof another member of the party sent:
  *   the form is locked, and [saveState] doesn't become [SaveState.Saved], which is kept for a proof
  *   this explorer sent.
+ * @property sendingLater Whether the explorer's submit is written, but the server hasn't confirmed
+ *   it yet, e.g. because the connection dropped: the form is locked and says it is waiting to send,
+ *   and [saveState] doesn't become [SaveState.Saved], so the screen stays open.
  */
 data class CompletionUiState(
     val status: CompletionFormStatus = CompletionFormStatus.LOADING,
@@ -40,15 +43,17 @@ data class CompletionUiState(
     val sentByTeammate: Boolean = false,
     val offline: Boolean = false,
     val photoWaiting: Boolean = false,
+    val sendingLater: Boolean = false,
 ) {
   /**
-   * Whether the form can still be changed: the quest is ready, nothing is saving or saved, and no
-   * teammate sent the party's proof.
+   * Whether the form can still be changed: the quest is ready, nothing is saving, saved or waiting
+   * to send, and no teammate sent the party's proof.
    */
   val isEditable: Boolean
     get() =
         status == CompletionFormStatus.READY &&
             !sentByTeammate &&
+            !sendingLater &&
             (saveState == SaveState.Idle || saveState == SaveState.Failed)
 
   /** Whether the answer exceeds the stored-answer limit after trimming, as on submission. */

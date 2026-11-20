@@ -3,6 +3,7 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -38,7 +39,10 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
 
   /**
    * Stores a pending completion under its [completionId] with [now] as its submission time, and
-   * returns the id. A pending or rejected one already stored there is replaced, as a new proof.
+   * returns [WriteConfirmation.CONFIRMED], as a server that answers at once would. To test a submit
+   * the server hasn't confirmed, wrap this fake in a [CompletionRepository] whose `submit` maps the
+   * result to [WriteConfirmation.QUEUED]. A pending or rejected one already stored there is
+   * replaced, as a new proof.
    * Returns [forcedFailure] instead, storing nothing, if it is set, and an [IllegalStateException],
    * changing nothing, if the one stored there is approved.
    */
@@ -47,7 +51,7 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
       venueId: String,
       explorerUid: String,
       proof: Proof,
-  ): Result<String> {
+  ): Result<WriteConfirmation> {
     forcedFailure?.let {
       return Result.failure(it)
     }
@@ -69,7 +73,7 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
             submittedAt = now(),
         )
     completions.update { it + (id to stored) }
-    return Result.success(id)
+    return Result.success(WriteConfirmation.CONFIRMED)
   }
 
   /** Emits every stored completion of [venueId], and again whenever that list changes. */

@@ -26,10 +26,12 @@ import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
+import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
@@ -37,6 +39,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepo
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -79,6 +82,10 @@ class CompletionScreenFlowTest {
   private lateinit var viewModel: CompletionViewModel
   private val submitted = mutableListOf<String>()
   private var loadFails = false
+  /**
+   * Whether a submit is written but not confirmed by the server, as when the device went offline.
+   */
+  private var queued = false
   private var backCalls = 0
   private var venueName by mutableStateOf(venue.name)
 
@@ -114,7 +121,17 @@ class CompletionScreenFlowTest {
               FakeQuestRepository(initialQuests = listOf(testQuest(proofType = proofType))),
               FakeVenueRepository(listOf(venue)),
               locations,
-              completions,
+              object : CompletionRepository by completions {
+                override suspend fun submit(
+                    reservationId: String,
+                    venueId: String,
+                    explorerUid: String,
+                    proof: Proof,
+                ) =
+                    completions.submit(reservationId, venueId, explorerUid, proof).map {
+                      if (queued) WriteConfirmation.QUEUED else it
+                    }
+              },
               photos,
               connectivity,
               FakeProofUploadQueue(),
@@ -142,6 +159,7 @@ class CompletionScreenFlowTest {
           completions
               .submit(reservationId, venue.id, "friend", Proof.Text("By the till"))
               .getOrThrow()
+              .let { completionId(reservationId) }
       completions.approve(sent).getOrThrow()
     }
 
@@ -152,6 +170,28 @@ class CompletionScreenFlowTest {
         .onNodeWithTag(C.Tag.COMPLETION_SUBMIT)
         .assertTextContains(app.getString(R.string.completion_sent))
         .assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.COMPLETION_SCREEN).assertIsDisplayed()
+    assertEquals(emptyList<String>(), submitted)
+  }
+
+  // A submit the server hasn't confirmed keeps the form open, saying it waits to send
+  @Test
+  fun anUnconfirmedSubmitKeepsTheScreenOpenWaitingToSend() {
+    queued = true
+    show()
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("Mochi")
+
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).performClick()
+    compose.waitUntil { viewModel.uiState.value.sendingLater }
+
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_SUBMIT)
+        .assertTextContains(app.getString(R.string.waiting_to_send))
+        .assertIsNotEnabled()
+    compose
+        .onNodeWithTag(C.Tag.COMPLETION_HINT)
+        .assertTextContains(app.getString(R.string.waiting_to_send_note))
+    compose.onNodeWithContentDescription(app.getString(R.string.completion_back)).assertIsEnabled()
     compose.onNodeWithTag(C.Tag.COMPLETION_SCREEN).assertIsDisplayed()
     assertEquals(emptyList<String>(), submitted)
   }

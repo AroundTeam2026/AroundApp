@@ -3,6 +3,7 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -39,7 +40,10 @@ class FakeCompletionRepositoryTest {
       reservationId: String = RESERVATION_ID,
       venueId: String = VENUE_ID,
       explorerUid: String = EXPLORER_UID,
-  ) = repository.submit(reservationId, venueId, explorerUid, PROOF).getOrThrow()
+  ) =
+      repository.submit(reservationId, venueId, explorerUid, PROOF).getOrThrow().let {
+        completionId(reservationId)
+      }
 
   /** The only completion stored for [VENUE_ID]. */
   private suspend fun stored() = repository.observeForVenue(VENUE_ID).first().single()
@@ -47,7 +51,10 @@ class FakeCompletionRepositoryTest {
   @Test
   fun submit_storesAPendingCompletionSubmittedNowUnderItsId() =
       runBlocking<Unit> {
-        assertEquals(COMPLETION_ID, submit())
+        assertEquals(
+            WriteConfirmation.CONFIRMED,
+            repository.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PROOF).getOrThrow(),
+        )
 
         val expected =
             Completion(
@@ -69,9 +76,10 @@ class FakeCompletionRepositoryTest {
         submit()
 
         clockNow = FIXED_NOW + 1_000L
-        val id = repository.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, OTHER_PROOF).getOrThrow()
+        val confirmation =
+            repository.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, OTHER_PROOF).getOrThrow()
 
-        assertEquals(COMPLETION_ID, id)
+        assertEquals(WriteConfirmation.CONFIRMED, confirmation)
         assertEquals(
             Completion(
                 COMPLETION_ID,
