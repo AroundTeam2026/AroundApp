@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.notification
 
 import android.content.Context
+import android.content.SharedPreferences
 import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -24,11 +25,13 @@ class NotificationPromptStoreSharedPrefs(
       withContext(ioDispatcher) { prefs.getBoolean(KEY_ANSWERED, false) }
 
   override suspend fun markAnswered() =
-      withContext(ioDispatcher) {
-        if (!prefs.edit().putBoolean(KEY_ANSWERED, true).commit()) {
-          throw IOException("Couldn't record the notification answer")
-        }
-      }
+      withContext(ioDispatcher) { prefs.edit().putBoolean(KEY_ANSWERED, true).commitOrThrow() }
+
+  // Not the KTX edit {}: it drops commit()'s result, which is how a failed write shows. The
+  // pending role's store does the same.
+  private fun SharedPreferences.Editor.commitOrThrow() {
+    if (!commit()) throw IOException("Couldn't record the notification answer")
+  }
 
   companion object {
     /** The preferences file; tests read it to check what reached the disk. */
