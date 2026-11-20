@@ -486,7 +486,8 @@ class QuestRepositoryFirestoreTest {
       withTimeoutBlocking {
         val id = repository.createQuest(quest()).getOrThrow()
         db.waitForPendingWrites().await()
-        observeQuestPendingUntilTheServerHasIt {
+        // Offline, an update only shows on a quest the cache holds, as it does under the list
+        observeQuestPendingUntilTheServerHasIt(ready = { list -> list.any { it.id == id } }) {
           repository.updateQuest(quest(id = id, status = QuestStatus.ARCHIVED)).getOrThrow()
           id
         }
@@ -659,11 +660,13 @@ class QuestRepositoryFirestoreTest {
   }
 
   /**
-   * Runs [write] offline and waits until observeQuestsByVenue lists the quest whose id it returns
-   * as pending, then, back online, as confirmed. Without that, it fails on the test's timeout.
+   * Once observeQuestsByVenue emits a list that is [ready], runs [write] offline and waits until it
+   * lists the quest whose id [write] returns as pending, then, back online, as confirmed. Without
+   * that, it fails on the test's timeout.
    */
   private suspend fun CoroutineScope.observeQuestPendingUntilTheServerHasIt(
-      write: suspend () -> String
+      ready: (List<Quest>) -> Boolean = { true },
+      write: suspend () -> String,
   ) {
     val emissions = Channel<List<Quest>>(Channel.UNLIMITED)
     val collector =
@@ -671,6 +674,9 @@ class QuestRepositoryFirestoreTest {
           repository.observeQuestsByVenue(venueId).collect(emissions::send)
         }
     try {
+      do {
+        val latest = emissions.receive()
+      } while (!ready(latest))
       db.disableNetwork().await()
       val id: String
       // The client is shared across tests, so it must come back online even if this test fails
