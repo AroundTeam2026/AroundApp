@@ -139,6 +139,7 @@ fun CompletionContent(
             Text(
                 when {
                   state.sentByTeammate -> stringResource(R.string.completion_sent_by_teammate)
+                  state.sendingLater -> stringResource(R.string.waiting_to_send_note)
                   state.photoWaiting -> stringResource(R.string.completion_photo_waiting)
                   else -> stringResource(R.string.completion_review_hint, venueName)
                 },
@@ -151,12 +152,20 @@ fun CompletionContent(
                 onClick = onSubmit,
                 enabled = state.canSubmit,
                 colors =
-                    ButtonDefaults.buttonColors(
-                        disabledContainerColor =
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        disabledContentColor =
-                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
-                    ),
+                    if (state.sendingLater) {
+                      // Saved, not unavailable: container colours instead of the faded ones
+                      ButtonDefaults.buttonColors(
+                          disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                          disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                      )
+                    } else {
+                      ButtonDefaults.buttonColors(
+                          disabledContainerColor =
+                              MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                          disabledContentColor =
+                              MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
+                      )
+                    },
                 shape = MaterialTheme.shapes.medium,
                 modifier =
                     Modifier.fillMaxWidth()
@@ -171,12 +180,23 @@ fun CompletionContent(
                 )
                 Spacer(Modifier.width(AroundSpacing.Small))
               }
+              if (state.sendingLater) {
+                Icon(
+                    painterResource(R.drawable.ic_cloud_upload),
+                    contentDescription = null,
+                    Modifier.size(SENDING_ICON_SIZE),
+                )
+                Spacer(Modifier.width(AroundSpacing.Small))
+              }
               Text(
                   stringResource(
-                      if (saving) R.string.completion_sending
-                      else if (saved || state.sentByTeammate) R.string.completion_sent
-                      else if (state.saveState == SaveState.Failed) R.string.completion_retry
-                      else R.string.completion_send
+                      when {
+                        saving -> R.string.completion_sending
+                        saved || state.sentByTeammate -> R.string.completion_sent
+                        state.sendingLater -> R.string.waiting_to_send
+                        state.saveState == SaveState.Failed -> R.string.completion_retry
+                        else -> R.string.completion_send
+                      }
                   ),
                   style = AroundTextStyles.Button,
               )
@@ -390,6 +410,7 @@ private val SUBMIT_MIN_HEIGHT = 54.dp
 private val ANSWER_MIN_HEIGHT = 150.dp
 private val PROGRESS_SIZE = 20.dp
 private val PROGRESS_STROKE = 2.dp
+private val SENDING_ICON_SIZE = 20.dp
 private val TITLE_GAP = 2.dp
 private val ERROR_BORDER_WIDTH = 1.dp
 

@@ -146,7 +146,10 @@ class ReviewProofViewModelTest {
 
   /** Sends [proof] for [reservationId] and makes it the proof the ViewModel reviews. */
   private suspend fun sendProof(reservationId: String, proof: Proof = TEXT_PROOF) {
-    id = completions.submit(reservationId, VENUE_ID, EXPLORER_UID, proof).getOrThrow()
+    id =
+        completions.submit(reservationId, VENUE_ID, EXPLORER_UID, proof).getOrThrow().let {
+          completionId(reservationId)
+        }
   }
 
   /** The completion the ViewModel reviews, as stored. */

@@ -5,6 +5,7 @@ package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
@@ -510,6 +511,7 @@ class CompletionViewModelTest {
         fakeCompletions
             .submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier"))
             .getOrThrow()
+            .let { completionId(reservationId) }
             .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
     gate.complete(Unit)
@@ -531,6 +533,7 @@ class CompletionViewModelTest {
         fakeCompletions
             .submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier"))
             .getOrThrow()
+            .let { completionId(reservationId) }
             .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
     gate.complete(Unit)
@@ -873,6 +876,87 @@ class CompletionViewModelTest {
     assertEquals(listOf(PHOTO), discarded)
   }
 
+  // The write may still be refused, so the form waits to send and the photo copy stays
+  @Test
+  fun aSubmitTheServerHasNotConfirmedWaitsToSendAndKeepsThePhotoCopy() = test {
+    open("photo")
+    viewModel.pickPhoto(PHOTO)
+    completions.queued = true
+
+    viewModel.submit()
+    runCurrent()
+
+    assertTrue(state.sendingLater)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertFalse(state.isEditable)
+    assertFalse(state.canSubmit)
+    assertEquals(emptyList<Uri>(), discarded)
+    assertEquals(Proof.Photo(location(1)), stored().single().proof)
+  }
+
+  @Test
+  fun aConfirmedSubmitIsSavedAndDoesNotWaitToSend() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+
+    viewModel.submit()
+    runCurrent()
+
+    assertFalse(state.sendingLater)
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+  }
+
+  @Test
+  fun aProofApprovedWhileWaitingToSendShowsSubmitted() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    completions.queued = true
+    viewModel.submit()
+    runCurrent()
+    assertTrue(state.sendingLater)
+
+    fakeCompletions.approve(completionId(reservationId)).getOrThrow()
+    runCurrent()
+
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+  }
+
+  @Test
+  fun aTeammatesProofApprovedWhileWaitingToSendLocksTheForm() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    completions.queued = true
+    viewModel.submit()
+    runCurrent()
+
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    fakeCompletions.approve(completionId(reservationId)).getOrThrow()
+    runCurrent()
+
+    assertTrue(state.sentByTeammate)
+    assertFalse(state.canSubmit)
+  }
+
+  // The listener showed the approved proof first: the late answer to the submit doesn't undo it
+  @Test
+  fun anUnconfirmedSubmitEndingAfterTheApprovedProofShowsSubmitted() = test {
+    open("fox")
+    val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
+    completions.queued = true
+    viewModel.updateAnswer("By the till")
+    viewModel.submit()
+    runCurrent()
+
+    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("Earlier")).getOrThrow()
+    fakeCompletions.approve(completionId(reservationId)).getOrThrow()
+    runCurrent()
+    submitGate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+    assertFalse(state.sendingLater)
+  }
+
   @Test
   fun aNewPhotoAfterAFailureIsUploadedInsteadOfTheOldOne() = test {
     open("photo")
@@ -896,6 +980,7 @@ class CompletionViewModelTest {
     fakeCompletions
         .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
         .getOrThrow()
+        .let { completionId(reservationId) }
         .also { fakeCompletions.approve(it).getOrThrow() }
     viewModel
     runCurrent()
@@ -914,6 +999,7 @@ class CompletionViewModelTest {
         fakeCompletions
             .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
             .getOrThrow()
+            .let { completionId(reservationId) }
     fakeCompletions.reject(id, "Not the right fox").getOrThrow()
     viewModel
     runCurrent()
@@ -965,6 +1051,7 @@ class CompletionViewModelTest {
     fakeCompletions
         .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
         .getOrThrow()
+        .let { completionId(reservationId) }
         .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
 
@@ -978,6 +1065,7 @@ class CompletionViewModelTest {
     fakeCompletions
         .submit(reservationId, CAFE, FRIEND, Proof.Text("By the till"))
         .getOrThrow()
+        .let { completionId(reservationId) }
         .also { fakeCompletions.approve(it).getOrThrow() }
     viewModel
     runCurrent()
@@ -996,6 +1084,7 @@ class CompletionViewModelTest {
     fakeCompletions
         .submit(reservationId, CAFE, FRIEND, Proof.Text("At the door"))
         .getOrThrow()
+        .let { completionId(reservationId) }
         .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
 
@@ -1023,6 +1112,7 @@ class CompletionViewModelTest {
     fakeCompletions
         .submit(reservationId, CAFE, FRIEND, Proof.Text("At the door"))
         .getOrThrow()
+        .let { completionId(reservationId) }
         .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
 
@@ -1044,6 +1134,7 @@ class CompletionViewModelTest {
     fakeCompletions
         .submit(reservationId, CAFE, FRIEND, Proof.Text("At the door"))
         .getOrThrow()
+        .let { completionId(reservationId) }
         .also { fakeCompletions.approve(it).getOrThrow() }
     runCurrent()
     assertEquals(SaveState.Saving, state.saveState)
@@ -1062,6 +1153,7 @@ class CompletionViewModelTest {
     fakeCompletions
         .submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till"))
         .getOrThrow()
+        .let { completionId(reservationId) }
         .also { fakeCompletions.approve(it).getOrThrow() }
     val listenerGate = CompletableDeferred<Unit>().also { completions.listenerGate = it }
     val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
@@ -1168,6 +1260,10 @@ private class GatedCompletions(private val inner: CompletionRepository) :
   var gate: CompletableDeferred<Unit>? = null
   var listenerGate: CompletableDeferred<Unit>? = null
   var listenerFails = false
+  /**
+   * Whether a submit is written but not confirmed by the server, as when the device went offline.
+   */
+  var queued = false
   var calls = 0
     private set
 
@@ -1176,10 +1272,12 @@ private class GatedCompletions(private val inner: CompletionRepository) :
       venueId: String,
       explorerUid: String,
       proof: Proof,
-  ): Result<String> {
+  ): Result<WriteConfirmation> {
     calls++
     gate?.await()
-    return inner.submit(reservationId, venueId, explorerUid, proof)
+    return inner.submit(reservationId, venueId, explorerUid, proof).map {
+      if (queued) WriteConfirmation.QUEUED else it
+    }
   }
 
   override fun observeForReservation(reservationId: String): Flow<List<Completion>> = flow {

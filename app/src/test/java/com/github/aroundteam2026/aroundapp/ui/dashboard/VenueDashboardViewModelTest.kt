@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -155,7 +156,9 @@ class VenueDashboardViewModelTest {
       venueId: String = VENUE_ID,
   ): String {
     createdAt = sentAt
-    return completions.submit(reservationId, venueId, explorerUid, proof).getOrThrow()
+    return completions.submit(reservationId, venueId, explorerUid, proof).getOrThrow().let {
+      completionId(reservationId)
+    }
   }
 
   private fun proofIds(rows: List<DashboardProof>) = rows.map { it.completionId }

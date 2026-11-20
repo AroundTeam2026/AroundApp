@@ -32,6 +32,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueu
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -250,7 +251,10 @@ class CompletionDestinationTest {
       reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
       if (alreadySent) {
         val sent =
-            completions.submit(id, venue.id, EXPLORER, Proof.Text("By the window")).getOrThrow()
+            completions
+                .submit(id, venue.id, EXPLORER, Proof.Text("By the window"))
+                .getOrThrow()
+                .let { completionId(id) }
         completions.approve(sent).getOrThrow()
       }
       id

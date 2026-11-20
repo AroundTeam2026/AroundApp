@@ -3,6 +3,7 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.model.reservation
 
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -20,22 +21,23 @@ interface CompletionRepository {
    *
    * Waits a bounded time for the backend. A refusal by the security rules in that time is returned
    * as a failure. Without an answer, e.g. while offline, the write stays queued and this returns
-   * success, so a later refusal is not reported.
+   * [WriteConfirmation.QUEUED]: a later refusal is not reported. The completion's id is always
+   * [completionId] of [reservationId].
    *
    * @param reservationId id of the approved reservation the proof belongs to.
    * @param venueId id of the venue that owns the reservation's quest.
    * @param explorerUid uid of the party member submitting the proof.
    * @param proof what the member submits.
-   * @return the completion's id, or a failure if the one stored under it is approved
-   *   ([IllegalStateException]), if the write could not be issued, or if the backend refused it in
-   *   time.
+   * @return whether the server confirmed the submit, or a failure if the completion stored under
+   *   its id is approved ([IllegalStateException]), if the write could not be issued, or if the
+   *   backend refused it in time.
    */
   suspend fun submit(
       reservationId: String,
       venueId: String,
       explorerUid: String,
       proof: Proof,
-  ): Result<String>
+  ): Result<WriteConfirmation>
 
   /**
    * Observes the completions submitted for one venue's quests. Emits the current list on

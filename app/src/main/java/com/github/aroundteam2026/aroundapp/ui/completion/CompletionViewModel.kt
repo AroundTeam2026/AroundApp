@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
@@ -123,7 +124,8 @@ class CompletionViewModel(
    * form is not already saving or saved, so a double tap submits once. A failure, at the upload or
    * at the submit, keeps what the explorer filled in and shows [SaveState.Failed]; calling this
    * again retries. A precise location is checked before any photo upload or completion write.
-   * Offline once it is checked, a photo proof is queued instead of uploaded.
+   * Offline once it is checked, a photo proof is queued instead of uploaded. A submit the server
+   * hasn't confirmed in time locks the form as [CompletionUiState.sendingLater] instead of saving.
    */
   fun submit() {
     val form = mutableUiState.value
@@ -141,7 +143,10 @@ class CompletionViewModel(
         // Approval may be withdrawn while the device is finding its position.
         current.status != CompletionFormStatus.READY -> finishSubmit(SaveState.Idle)
         current.photoSentLater || current.photoWaiting -> finishSubmit(enqueueProof(form, venueId))
-        else -> finishSubmit(submitProof(form, venueId))
+        else ->
+            submitProof(form, venueId).let {
+              finishSubmit(it.saveState, sendingLater = it.sendingLater)
+            }
       }
     }
   }
@@ -168,39 +173,58 @@ class CompletionViewModel(
   }
 
   /** Uploads the proof of [form] if needed and submits it; says where that left the form. */
-  private suspend fun submitProof(form: CompletionUiState, venueId: String): SaveState =
+  private suspend fun submitProof(form: CompletionUiState, venueId: String): Submitted =
       try {
         proofOf(form)
             ?.let { completionRepository.submit(reservationId, venueId, explorerUid, it) }
             ?.fold(
-                { completionId ->
-                  // The photo is uploaded and its proof saved: the app's copy isn't needed anymore.
-                  // If the listener showed it saved first, this doesn't run; discardStale clears it
-                  form.photo?.let { discardPhoto(it) }
-                  SaveState.Saved(completionId)
+                { confirmation ->
+                  when (confirmation) {
+                    WriteConfirmation.CONFIRMED -> {
+                      // The photo is uploaded and its proof saved: the app's copy isn't needed.
+                      // If the listener showed it saved first, this doesn't run; discardStale
+                      // clears it
+                      form.photo?.let { discardPhoto(it) }
+                      Submitted(SaveState.Saved(completionId(reservationId)))
+                    }
+                    // The server may still refuse it, so the copy stays; discardStale clears it
+                    WriteConfirmation.QUEUED -> Submitted(SaveState.Idle, sendingLater = true)
+                  }
                 },
                 {
                   Log.w(TAG, "Submitting the completion of $reservationId failed", it)
-                  SaveState.Failed
+                  Submitted(SaveState.Failed)
                 },
-            ) ?: SaveState.Failed
+            ) ?: Submitted(SaveState.Failed)
       } catch (e: IllegalArgumentException) {
         Log.w(TAG, "Invalid proof for $reservationId", e)
-        SaveState.Failed
+        Submitted(SaveState.Failed)
       }
 
+  /** Where a submit left the form: its [saveState], and whether it is [sendingLater]. */
+  private data class Submitted(val saveState: SaveState, val sendingLater: Boolean = false)
+
   /**
-   * Ends a submit with [saveState] and [locationError]. The listener may have shown the completion
-   * as saved meanwhile, e.g. when the answer to an earlier submit was lost, or as the proof a
-   * teammate sent that the venue approved: this submit then fails as approved, and a retry could
-   * only fail again, so what the listener showed stays.
+   * Ends a submit with [saveState], [locationError] and [sendingLater]. The listener may have shown
+   * the completion as saved meanwhile, e.g. when the answer to an earlier submit was lost, or as
+   * the proof a teammate sent that the venue approved: this submit then fails as approved, and a
+   * retry could only fail again, so what the listener showed stays.
    */
-  private fun finishSubmit(saveState: SaveState, locationError: CompletionLocationError? = null) {
+  private fun finishSubmit(
+      saveState: SaveState,
+      locationError: CompletionLocationError? = null,
+      sendingLater: Boolean = false,
+  ) {
     mutableUiState.update {
       when {
         it.saveState is SaveState.Saved -> it
         it.sentByTeammate -> it.copy(saveState = SaveState.Idle, locationError = null)
-        else -> it.copy(saveState = saveState, locationError = locationError)
+        else ->
+            it.copy(
+                saveState = saveState,
+                locationError = locationError,
+                sendingLater = sendingLater,
+            )
       }
     }
   }

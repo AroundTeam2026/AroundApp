@@ -4,6 +4,7 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryFirestore
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -246,10 +247,12 @@ class CompletionRepositoryFirestoreTest {
   fun submit_byAnotherJoinedMember_isThePartysCompletion() = withTimeoutBlocking {
     val reservationId = approvedReservationWithFriend()
 
-    val id = friendRepository().submit(reservationId, venueId, friendUid, TEXT_PROOF).getOrThrow()
+    val confirmation =
+        friendRepository().submit(reservationId, venueId, friendUid, TEXT_PROOF).getOrThrow()
 
+    val id = completionId(reservationId)
     val partys = explorerRepository.observeForReservation(reservationId).first { it.isNotEmpty() }
-    assertEquals(completionId(reservationId), id)
+    assertEquals(WriteConfirmation.CONFIRMED, confirmation)
     assertEquals(listOf(id to friendUid), partys.map { it.id to it.explorerUid })
   }
 
@@ -286,19 +289,21 @@ class CompletionRepositoryFirestoreTest {
    * fails instead of leaving the write queued until the device is back online.
    */
   @Test
-  fun submit_whileOffline_succeedsAfterTheTimeoutAndIsSentOnceBackOnline() = withTimeoutBlocking {
+  fun submit_whileOffline_isQueuedAfterTheTimeoutAndSentOnceBackOnline() = withTimeoutBlocking {
     val reservationId = approvedReservation()
     val repository =
         CompletionRepositoryFirestore(explorerDb, confirmTimeoutMs = SHORT_TIMEOUT_MS) { FIXED_NOW }
     explorerDb.disableNetwork().await()
-    val id: String
+    val confirmation: WriteConfirmation
     try {
-      id = repository.submit(reservationId, venueId, explorerUid, TEXT_PROOF).getOrThrow()
+      confirmation = repository.submit(reservationId, venueId, explorerUid, TEXT_PROOF).getOrThrow()
     } finally {
       explorerDb.enableNetwork().await()
     }
     explorerDb.waitForPendingWrites().await()
 
+    assertEquals(WriteConfirmation.QUEUED, confirmation)
+    val id = completionId(reservationId)
     assertEquals(id, fetchAsVenue(id).id)
   }
 
@@ -614,7 +619,9 @@ class CompletionRepositoryFirestoreTest {
 
   /** Submits [proof] as the explorer and returns the completion's id. */
   private suspend fun submit(reservationId: String, proof: Proof = TEXT_PROOF): String =
-      explorerRepository.submit(reservationId, venueId, explorerUid, proof).getOrThrow()
+      explorerRepository.submit(reservationId, venueId, explorerUid, proof).getOrThrow().let {
+        completionId(reservationId)
+      }
 
   /**
    * Reads the completion with [id] through the venue's client, once [until] accepts it. The
