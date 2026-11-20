@@ -46,6 +46,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.map.INITIALS_AVATAR
 import com.github.aroundteam2026.aroundapp.ui.map.NEWEST_FIRST
 import com.github.aroundteam2026.aroundapp.ui.observeOffline
+import com.github.aroundteam2026.aroundapp.ui.observeOnlineNow
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
@@ -169,6 +170,9 @@ class VenuePageViewModel(
       val proofs: Proofs?,
   )
 
+  /** Whether the device is online now: the page says it isn't a moment later. */
+  private val online = connectivityRepository.observeOnlineNow(viewModelScope, TAG)
+
   init {
     viewModelScope.launch {
       connectivityRepository.observeOffline(TAG).collect { offline ->
@@ -221,7 +225,7 @@ class VenuePageViewModel(
     val id = quest.questId
     if (
         !current.acceptAvailable ||
-            current.offline ||
+            !online.value ||
             id in current.acceptingQuestIds ||
             id in current.acceptedParties
     ) {
@@ -272,7 +276,7 @@ class VenuePageViewModel(
     val reservationId = current.cancellableReservationId ?: return
     // Without the explorer's membership, cancelling for everyone might not be theirs to do
     val leaving = current.leavesParty ?: return
-    if (current.offline || reservationId in current.cancellingIds) return
+    if (!online.value || reservationId in current.cancellingIds) return
     mutableUiState.update {
       it.copy(
           cancellingIds = it.cancellingIds + reservationId,

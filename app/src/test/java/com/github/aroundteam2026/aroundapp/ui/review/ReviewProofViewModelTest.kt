@@ -321,6 +321,20 @@ class ReviewProofViewModelTest {
     assertFalse(state.saving)
   }
 
+  // The screen waits to say so, but this can't succeed once disconnected
+  @Test
+  fun approveAndRejectAreUnavailableAtOnceWhenTheDeviceDisconnects() = test {
+    sendProof(reserve())
+    watch()
+
+    connectivity.online.value = false
+    assertFalse(state.offline)
+    viewModel.approve()
+    viewModel.reject("Photo is blurry")
+
+    assertEquals(CompletionStatus.PENDING, stored().status)
+  }
+
   @Test
   fun offlineApproveAndRejectAreUnavailableUntilBackOnline() = test {
     sendProof(reserve())

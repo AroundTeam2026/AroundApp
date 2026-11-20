@@ -4,9 +4,12 @@ package com.github.aroundteam2026.aroundapp.ui.map
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -16,6 +19,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.bookQuest
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
+import com.github.aroundteam2026.aroundapp.ui.observeOnlineNow
 import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +67,7 @@ class NearbyAcceptViewModel(
     private val reservationRepository: ReservationRepository,
     private val userRepository: UserRepository,
     private val explorerUid: String,
+    connectivityRepository: ConnectivityRepository,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(NearbyAcceptUiState())
@@ -71,6 +76,9 @@ class NearbyAcceptViewModel(
 
   /** The explorer's reservations, as last listed; null until listed. */
   private var latest: List<Reservation>? = null
+
+  /** Whether the device is online now: booking needs a connection, as from a venue's page. */
+  private val online = connectivityRepository.observeOnlineNow(viewModelScope, TAG)
 
   /** The reservations this ViewModel created, to tell which ones the server then refused. */
   private val writes = RefusedWrites()
@@ -139,6 +147,10 @@ class NearbyAcceptViewModel(
     if (!current.available || id in current.acceptedQuestIds || id in current.acceptingQuestIds) {
       return
     }
+    if (!online.value) {
+      _uiState.update { it.copy(failedQuestIds = it.failedQuestIds + id) }
+      return
+    }
     _uiState.update {
       it.copy(
           acceptingQuestIds = it.acceptingQuestIds + id,
@@ -181,6 +193,7 @@ class NearbyAcceptViewModel(
             ReservationRepositoryProvider.repository,
             UserRepositoryProvider.repository,
             explorerUid,
+            ConnectivityRepositoryProvider.repository(this[APPLICATION_KEY]!!),
         )
       }
     }
