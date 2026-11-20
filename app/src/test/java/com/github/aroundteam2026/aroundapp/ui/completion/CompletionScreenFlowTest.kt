@@ -41,6 +41,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -50,6 +51,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import java.io.IOException
 import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -86,6 +88,8 @@ class CompletionScreenFlowTest {
    * Whether a submit is written but not confirmed by the server, as when the device went offline.
    */
   private var queued = false
+  /** The reservations whose proof the server hasn't confirmed yet. */
+  private val unsent = MutableStateFlow(emptySet<String>())
   private var backCalls = 0
   private var venueName by mutableStateOf(venue.name)
 
@@ -122,16 +126,17 @@ class CompletionScreenFlowTest {
               FakeVenueRepository(listOf(venue)),
               locations,
               object : CompletionRepository by completions {
-                override suspend fun submit(
-                    reservationId: String,
-                    venueId: String,
-                    explorerUid: String,
-                    proof: Proof,
-                ) =
-                    completions.submit(reservationId, venueId, explorerUid, proof).map {
-                      if (queued) WriteConfirmation.QUEUED else it
-                    }
-              },
+                    override suspend fun submit(
+                        reservationId: String,
+                        venueId: String,
+                        explorerUid: String,
+                        proof: Proof,
+                    ) =
+                        completions.submit(reservationId, venueId, explorerUid, proof).map {
+                          if (queued) WriteConfirmation.QUEUED else it
+                        }
+                  }
+                  .withUnsent(unsent),
               photos,
               connectivity,
               FakeProofUploadQueue(),
@@ -178,7 +183,8 @@ class CompletionScreenFlowTest {
   @Test
   fun anUnconfirmedSubmitKeepsTheScreenOpenWaitingToSend() {
     queued = true
-    show()
+    val reservationId = show()
+    unsent.value = setOf(reservationId)
     compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("Mochi")
 
     compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).performClick()
@@ -194,6 +200,25 @@ class CompletionScreenFlowTest {
     compose.onNodeWithContentDescription(app.getString(R.string.completion_back)).assertIsEnabled()
     compose.onNodeWithTag(C.Tag.COMPLETION_SCREEN).assertIsDisplayed()
     assertEquals(emptyList<String>(), submitted)
+  }
+
+  // The screen waits to send until the server has the proof, then closes as for any sent proof
+  @Test
+  fun anUnconfirmedSubmitClosesTheScreenOnceTheServerHasTheProof() {
+    queued = true
+    val reservationId = show()
+    unsent.value = setOf(reservationId)
+    compose.onNodeWithTag(C.Tag.COMPLETION_ANSWER).performTextInput("Mochi")
+    compose.onNodeWithTag(C.Tag.COMPLETION_SUBMIT).performClick()
+    compose.waitUntil { viewModel.uiState.value.sendingLater }
+    compose.waitForIdle()
+    assertEquals(emptyList<String>(), submitted)
+
+    unsent.value = emptySet()
+    compose.waitForIdle()
+    compose.waitUntil { submitted.isNotEmpty() }
+
+    assertEquals(listOf(completionId(reservationId)), submitted)
   }
 
   @Test

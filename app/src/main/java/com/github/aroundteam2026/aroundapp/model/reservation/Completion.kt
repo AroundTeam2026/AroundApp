@@ -20,6 +20,9 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
  * @property rejectReason Why the venue rejected the proof; required when [status] is
  *   [CompletionStatus.REJECTED], and null otherwise.
  * @property submittedAt Submission time of the latest proof, in epoch milliseconds.
+ * @property pendingWrite Whether this device wrote the proof and the server hasn't confirmed it
+ *   yet, as when it was sent offline: Firestore sends it once the device is back online. Only
+ *   [CompletionRepository.observeForReservation] keeps it up to date; it is false elsewhere.
  * @throws IllegalArgumentException if [status] is [CompletionStatus.REJECTED] without a reason, or
  *   if a reason is given for any other status.
  */
@@ -32,6 +35,7 @@ data class Completion(
     val status: CompletionStatus,
     val rejectReason: String?,
     val submittedAt: Long,
+    val pendingWrite: Boolean = false,
 ) {
   init {
     require(status != CompletionStatus.REJECTED || !rejectReason.isNullOrBlank()) {

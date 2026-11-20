@@ -53,7 +53,7 @@ interface CompletionRepository {
   /**
    * Observes the completion of one reservation, so every member of its party sees the party's proof
    * and its result. Emits the current list on collection, then again whenever one is added or
-   * changes.
+   * changes, or the server confirms a write of this device ([Completion.pendingWrite]).
    *
    * The security rules only let a joined member of the party run this, so the Firestore
    * implementation's flow fails for anyone else; a venue uses [observeForVenue] instead.

@@ -419,6 +419,7 @@ class QuestDetailsScreenTest {
       quest: VenuePageQuest,
       status: CompletionStatus,
       rejectReason: String? = null,
+      pendingWrite: Boolean = false,
   ) =
       accepted(quest)
           .copy(
@@ -435,6 +436,7 @@ class QuestDetailsScreenTest {
                               status = status,
                               rejectReason = rejectReason,
                               submittedAt = 0L,
+                              pendingWrite = pendingWrite,
                           )
                   ),
           )
@@ -472,6 +474,18 @@ class QuestDetailsScreenTest {
         .assertIsEnabled()
         .performClick()
     assertEquals(listOf("r"), proofsOpened)
+  }
+
+  @Test
+  fun aProofTheServerHasntConfirmedSaysItWaitsToSend() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.PENDING, pendingWrite = true))
+
+    compose.onNodeWithText(app.getString(R.string.waiting_to_send)).assertIsDisplayed()
+    compose.onNodeWithText(app.getString(R.string.waiting_to_send_note)).assertIsDisplayed()
+    compose
+        .onNodeWithText(app.getString(R.string.quest_detail_proof_pending_title))
+        .assertDoesNotExist()
   }
 
   // Figma's "Quest details · proof sent by a member"

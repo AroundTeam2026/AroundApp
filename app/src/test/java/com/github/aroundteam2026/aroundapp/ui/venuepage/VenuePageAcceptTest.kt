@@ -473,6 +473,23 @@ class VenuePageAcceptTest {
         .let { completionId(id) }
   }
 
+  @Test
+  fun aProofTheServerHasntConfirmedIsPendingUntilItHasIt() = test {
+    val unsent = MutableStateFlow(emptySet<String>())
+    completionRepository = completions.withUnsent(unsent)
+    val id = proofOfAnApprovedQuestBy(EXPLORER)
+    openAndPick("a")
+    assertEquals(false, state.proof?.pendingWrite)
+
+    unsent.value = setOf(id)
+    runCurrent()
+    assertEquals(true, state.proof?.pendingWrite)
+
+    unsent.value = emptySet()
+    runCurrent()
+    assertEquals(false, state.proof?.pendingWrite)
+  }
+
   // As the Figma frame "Quest details · proof sent by a member": "Lea sent your party's proof"
   @Test
   fun aProofSentByAnotherMemberNamesThemAndFollowsARename() = test {

@@ -608,6 +608,42 @@ class OverviewViewModelTest {
     assertEquals(ProofSender(null), state.rows.single().proofSender)
   }
 
+  // The proof was written, but the server doesn't have it yet: not "Proof sent"
+  @Test
+  fun aProofTheServerHasntConfirmedIsWaitingToSendThenSent() = test {
+    val unsent = MutableStateFlow(emptySet<String>())
+    val id = approvedReservation()
+    sendProof(id)
+    val viewModel = viewModelWithUnsentProofs(unsent)
+    runCurrent()
+    assertEquals(OverviewRowStatus.PROOF_SENT, viewModel.uiState.value.rows.single().status)
+
+    unsent.value = setOf(id)
+    runCurrent()
+    val sending = viewModel.uiState.value.rows.single().status
+    assertEquals(OverviewRowStatus.SENDING, sending)
+    // A proof the server doesn't have can't be replaced from here either
+    assertFalse(sending.proofReplaceable)
+
+    unsent.value = emptySet()
+    runCurrent()
+    assertEquals(OverviewRowStatus.PROOF_SENT, viewModel.uiState.value.rows.single().status)
+  }
+
+  /** The ViewModel, with the proofs of the reservations in [unsent] not confirmed by the server. */
+  private fun viewModelWithUnsentProofs(unsent: Flow<Set<String>>) =
+      OverviewViewModel(
+          EXPLORER,
+          listener,
+          questRepository,
+          venues,
+          party,
+          completions.withUnsent(unsent),
+          users,
+          connectivity,
+          uploads,
+      )
+
   // The Figma frame "Explorer quests · waiting to send": accepted offline, not on the server yet
   @Test
   fun aReservationTheServerHasntConfirmedIsWaitingToSend() = test {

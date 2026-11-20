@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ReservationReposito
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
+import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
@@ -41,6 +42,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -102,6 +104,9 @@ class CompletionViewModelTest {
   private val discarded = mutableListOf<Uri>()
   private val queue = FakeProofUploadQueue()
 
+  /** The reservations whose proof the server hasn't confirmed yet. */
+  private val unsent = MutableStateFlow(emptySet<String>())
+
   private val viewModel by lazy {
     CompletionViewModel(
         reservationId,
@@ -110,7 +115,7 @@ class CompletionViewModelTest {
         questRepository,
         venues,
         locations,
-        completions,
+        completions.withUnsent(unsent),
         photoRepository,
         connectivityRepository,
         queue,
@@ -882,6 +887,7 @@ class CompletionViewModelTest {
     open("photo")
     viewModel.pickPhoto(PHOTO)
     completions.queued = true
+    unsent.value = setOf(reservationId)
 
     viewModel.submit()
     runCurrent()
@@ -907,10 +913,68 @@ class CompletionViewModelTest {
   }
 
   @Test
+  fun aSubmitTheServerHasNotConfirmedIsSavedOnceItDoes() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    completions.queued = true
+    unsent.value = setOf(reservationId)
+    viewModel.submit()
+    runCurrent()
+    assertTrue(state.sendingLater)
+
+    unsent.value = emptySet()
+    runCurrent()
+
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+    assertFalse(state.sendingLater)
+  }
+
+  // Their proof is on the server, but this explorer's write is still queued and will replace it
+  @Test
+  fun aProofAnotherMemberSentDoesNotEndMyWaitingToSend() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    completions.queued = true
+    unsent.value = setOf(reservationId)
+    viewModel.submit()
+    runCurrent()
+    assertTrue(state.sendingLater)
+
+    fakeCompletions.submit(reservationId, CAFE, FRIEND, Proof.Text("At the door")).getOrThrow()
+    unsent.value = emptySet()
+    runCurrent()
+
+    assertTrue(state.sendingLater)
+    assertEquals(SaveState.Idle, state.saveState)
+  }
+
+  // Only the server can have rejected it, so it has the proof: the form unlocks for a new one
+  @Test
+  fun aProofRejectedWhileWaitingToSendUnlocksTheForm() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    completions.queued = true
+    unsent.value = setOf(reservationId)
+    viewModel.submit()
+    runCurrent()
+    assertTrue(state.sendingLater)
+
+    fakeCompletions.reject(completionId(reservationId), "Not the right fox").getOrThrow()
+    unsent.value = emptySet()
+    runCurrent()
+
+    assertFalse(state.sendingLater)
+    assertEquals(SaveState.Idle, state.saveState)
+    assertTrue(state.isEditable)
+    assertEquals("By the till", state.answer)
+  }
+
+  @Test
   fun aProofApprovedWhileWaitingToSendShowsSubmitted() = test {
     open("fox")
     viewModel.updateAnswer("By the till")
     completions.queued = true
+    unsent.value = setOf(reservationId)
     viewModel.submit()
     runCurrent()
     assertTrue(state.sendingLater)
@@ -921,29 +985,12 @@ class CompletionViewModelTest {
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
-  // Only the server rejects a proof, so the one waiting reached it: a new proof can replace it
-  @Test
-  fun aProofRejectedWhileWaitingToSendCanBeAnsweredWithANewProof() = test {
-    open("fox")
-    viewModel.updateAnswer("By the till")
-    completions.queued = true
-    viewModel.submit()
-    runCurrent()
-    assertTrue(state.sendingLater)
-
-    fakeCompletions.reject(completionId(reservationId), "Not the right fox").getOrThrow()
-    runCurrent()
-
-    assertFalse(state.sendingLater)
-    assertTrue(state.canSubmit)
-    assertEquals("By the till", state.answer)
-  }
-
   @Test
   fun aTeammatesProofApprovedWhileWaitingToSendLocksTheForm() = test {
     open("fox")
     viewModel.updateAnswer("By the till")
     completions.queued = true
+    unsent.value = setOf(reservationId)
     viewModel.submit()
     runCurrent()
 
@@ -955,12 +1002,32 @@ class CompletionViewModelTest {
     assertFalse(state.canSubmit)
   }
 
+  // The server has the proof before the submit's answer comes: nothing else would settle the form
+  @Test
+  fun aSubmitTheServerConfirmedBeforeItEndedIsSaved() = test {
+    open("fox")
+    val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
+    completions.queued = true
+    viewModel.updateAnswer("By the till")
+    viewModel.submit()
+    runCurrent()
+
+    fakeCompletions.submit(reservationId, CAFE, EXPLORER, Proof.Text("By the till")).getOrThrow()
+    runCurrent()
+    submitGate.complete(Unit)
+    runCurrent()
+
+    assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
+    assertFalse(state.sendingLater)
+  }
+
   // The listener showed the approved proof first: the late answer to the submit doesn't undo it
   @Test
   fun anUnconfirmedSubmitEndingAfterTheApprovedProofShowsSubmitted() = test {
     open("fox")
     val submitGate = CompletableDeferred<Unit>().also { completions.gate = it }
     completions.queued = true
+    unsent.value = setOf(reservationId)
     viewModel.updateAnswer("By the till")
     viewModel.submit()
     runCurrent()
