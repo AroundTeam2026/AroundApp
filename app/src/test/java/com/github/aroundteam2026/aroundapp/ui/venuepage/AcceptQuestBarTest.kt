@@ -140,7 +140,7 @@ class AcceptQuestBarTest {
     )
 
     button.assertIsNotEnabled().assertTextContains(text(R.string.waiting_to_send))
-    compose.onNodeWithText(text(R.string.waiting_to_send_note)).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_SENDING).assertIsDisplayed()
     compose.onNodeWithText(text(R.string.accept_quest_accepted)).assertDoesNotExist()
   }
 

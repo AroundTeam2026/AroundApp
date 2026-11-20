@@ -114,7 +114,8 @@ fun AcceptQuestBar(
     // One explanation of the button: an accepted quest, waiting to send or not, is done whatever
     // the listener does, and a failure can't be retried while accepting is unavailable
     when {
-      status == AcceptStatus.SENDING -> Note(stringResource(R.string.waiting_to_send_note))
+      status == AcceptStatus.SENDING ->
+          Note(stringResource(R.string.waiting_to_send_note), C.Tag.ACCEPT_QUEST_SENDING)
       !state.acceptAvailable && status != AcceptStatus.ACCEPTED ->
           Note(stringResource(R.string.accept_quest_unavailable), C.Tag.ACCEPT_QUEST_UNAVAILABLE)
       status == AcceptStatus.FAILED ->
@@ -311,7 +312,7 @@ private fun AcceptingSkeleton(description: String, modifier: Modifier, tag: Stri
 @Composable
 private fun Note(
     text: String,
-    tag: String? = null,
+    tag: String,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
   Text(
@@ -319,7 +320,7 @@ private fun Note(
       style = AroundTextStyles.Caption,
       color = color,
       textAlign = TextAlign.Center,
-      modifier = if (tag != null) Modifier.testTag(tag) else Modifier,
+      modifier = Modifier.testTag(tag),
   )
 }
 
