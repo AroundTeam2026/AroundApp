@@ -13,6 +13,7 @@ import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.ui.observeOffline
+import com.github.aroundteam2026.aroundapp.ui.observeOnlineNow
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,6 +65,9 @@ class ProfileSetupViewModel(
   /** Whether the phone is offline, so saving is unavailable; brief disconnects are ignored. */
   val offline: StateFlow<Boolean> =
       connectivity.observeOffline(TAG).stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+  /** Whether the phone is online now: the screen says it isn't a moment later. */
+  private val online = connectivity.observeOnlineNow(viewModelScope, TAG)
 
   private val retries = MutableStateFlow(0)
   private val mutableProfile = MutableStateFlow<User?>(null)
@@ -153,7 +157,7 @@ class ProfileSetupViewModel(
     val isEditing = editing.value
     if (
         current.saving ||
-            offline.value ||
+            !online.value ||
             (destination.value != ProfileSetupDestination.SETUP && !isEditing)
     )
         return

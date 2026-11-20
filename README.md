@@ -22,9 +22,9 @@ The app uses GPS to show nearby quests and their distance on the map, and to che
 
 When the phone loses its internet connection, a banner under the header says "You're offline" and "Showing what's saved on this phone." Firestore's local cache keeps what the app already loaded viewable: the map keeps the venues and quests it last showed, and quests, reservations and the profile stay readable.
 
-These actions need a connection and are disabled after two seconds offline, with a hint or the banner saying why:
+These actions need a connection. They stop working the moment the phone disconnects, and the hint or the banner saying why shows after two seconds offline, so a brief network handover doesn't flicker it:
 
-- Explorers can't accept a quest from a venue's page or a quest's details, cancel a reservation, leave a party or save their profile. Joining a party with a code says the phone is offline.
+- Explorers can't accept a quest from the map, a venue's page or a quest's details, cancel a reservation, leave a party or save their profile. Joining a party with a code says the phone is offline.
 - Venues can't approve or decline a reservation, or approve or reject a proof.
 
 These still work offline, and are sent once the phone is back online:

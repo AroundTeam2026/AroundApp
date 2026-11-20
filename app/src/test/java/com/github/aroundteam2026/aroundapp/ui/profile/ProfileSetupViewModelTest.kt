@@ -67,6 +67,24 @@ class ProfileSetupViewModelTest {
       }
 
   // Saving uploads the picture and writes on the server, so it waits for a connection
+  // The screen waits to say it is offline, but a save can't succeed from the first moment
+  @Test
+  fun savingDoesNothingAtOnceWhenThePhoneDisconnects() =
+      runTest(dispatcher) {
+        create()
+        val model = ProfileSetupViewModel(uid, users, pictures, connectivity)
+        advanceUntilIdle()
+
+        connectivity.online.value = false
+        runCurrent()
+        assertFalse(model.offline.value)
+        model.setName("Ada")
+        model.save()
+        advanceUntilIdle()
+
+        assertEquals("", users.getUser(uid)?.displayName)
+      }
+
   @Test
   fun offlineSavingDoesNothingAndWorksAgainBackOnline() =
       runTest(dispatcher) {

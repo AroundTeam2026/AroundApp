@@ -122,6 +122,22 @@ class OverviewCancelTest {
     assertEquals(OverviewUiState(status = OverviewStatus.LOADED), state)
   }
 
+  // The overview waits OFFLINE_HINT_DELAY_MS to say so, but a cancel can't succeed from the first
+  // moment
+  @Test
+  fun cancellingIsUnavailableAtOnceWhenTheDeviceDisconnects() = test {
+    val id = bookAndOpen()
+
+    connectivity.online.value = false
+    runCurrent()
+    assertFalse(state.offline)
+    viewModel.cancel(id)
+    runCurrent()
+
+    assertEquals(0, reservations.updates)
+    assertEquals(ReservationStatus.PENDING, stored(id))
+  }
+
   @Test
   fun offlineCancellingIsUnavailable() = test {
     val id = bookAndOpen()
