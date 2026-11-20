@@ -79,6 +79,30 @@ class VenueQuestsScreenTest {
   }
 
   @Test
+  fun aQuestTheServerHasNotConfirmedIsWaitingToSendAndCanStillBeEditedAndArchived() {
+    show(VenueQuestsUiState.Loaded(listOf(testQuest(id = "fox").copy(pendingWrite = true))))
+
+    compose
+        .onNodeWithTag(C.Tag.VENUE_QUEST_SENDING)
+        .assertIsDisplayed()
+        .assertTextEquals(string(R.string.waiting_to_send))
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_EDIT).performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE).performClick()
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_ARCHIVE_CONFIRM).performClick()
+
+    assertEquals(listOf("fox"), questsEdited)
+    assertEquals(listOf("fox" to true), archiveCalls)
+  }
+
+  @Test
+  fun aQuestTheServerHasConfirmedIsNotWaitingToSend() {
+    show(VenueQuestsUiState.Loaded(listOf(testQuest())))
+
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_TITLE).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.VENUE_QUEST_SENDING).assertDoesNotExist()
+  }
+
+  @Test
   fun aQuestsPencilEditsIt() {
     show(VenueQuestsUiState.Loaded(listOf(testQuest(id = "a"), testQuest(id = "b"))))
 

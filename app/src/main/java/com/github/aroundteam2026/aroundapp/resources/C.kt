@@ -56,6 +56,7 @@ object C {
     const val VENUE_QUESTS_LIST = "venue_quests_list"
     const val VENUE_QUEST_TITLE = "venue_quest_title"
     const val VENUE_QUEST_STATUS = "venue_quest_status"
+    const val VENUE_QUEST_SENDING = "venue_quest_sending"
     const val VENUE_QUEST_EDIT = "venue_quest_edit"
     const val VENUE_QUEST_ARCHIVE = "venue_quest_archive"
     const val VENUE_QUEST_ARCHIVE_CONFIRM = "venue_quest_archive_confirm"
