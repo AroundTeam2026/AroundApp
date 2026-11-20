@@ -20,7 +20,20 @@ The app uses GPS to show nearby quests and their distance on the map, and to che
 
 ## Offline mode
 
-Offline, Firestore's local cache keeps data the app has already loaded, such as quests and the user's profile, viewable. Actions that need the network, such as joining a party or sending a proof, show an offline error instead. Queuing quest completions offline to sync them later (#412–#414) and leaderboards are planned.
+When the phone loses its internet connection, a banner under the header says "You're offline" and "Showing what's saved on this phone." Firestore's local cache keeps what the app already loaded viewable: the map keeps the venues and quests it last showed, and quests, reservations and the profile stay readable.
+
+These actions need a connection and are disabled after two seconds offline, with a hint or the banner saying why:
+
+- Explorers can't accept a quest from a venue's page or a quest's details, cancel a reservation, leave a party or save their profile. Joining a party with a code says the phone is offline.
+- Venues can't approve or decline a reservation, or approve or reject a proof.
+
+These still work offline, and are sent once the phone is back online:
+
+- Venues can create and edit quests: Firestore keeps the change.
+- Explorers can send a text proof: Firestore keeps the write.
+- Explorers can send a photo proof: it's queued, and a background upload sends it once online, even if the app was closed in the meantime. The proof screen says "Your photo will be sent once you're back online." Sending another photo replaces the queued one.
+
+If the venue approved the party's proof in the meantime, a late proof is dropped; after a rejection, it becomes the party's new proof.
 
 ## Architecture
 
