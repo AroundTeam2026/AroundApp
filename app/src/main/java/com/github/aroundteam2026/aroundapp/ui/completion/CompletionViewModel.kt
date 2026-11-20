@@ -329,26 +329,37 @@ class CompletionViewModel(
   /**
    * Shows the reservation as completed once the venue approved its party's completion: as saved if
    * [explorerUid] sent it, or as [CompletionUiState.sentByTeammate] if another member did. A
-   * completion still waiting or rejected doesn't lock the form: a new proof replaces it.
+   * completion still waiting or rejected doesn't lock the form: a new proof replaces it. Only the
+   * server rejects one, so a rejection also ends [CompletionUiState.sendingLater].
    */
   private suspend fun listenToCompletions() {
     val id = completionId(reservationId)
     try {
       completionRepository.observeForReservation(reservationId).collect { completions ->
-        val stored =
-            completions.find { it.id == id && it.status == CompletionStatus.APPROVED }
-                ?: return@collect
-        mutableUiState.update {
-          if (stored.explorerUid == explorerUid) it.copy(saveState = SaveState.Saved(id))
-          // A send in progress ends in finishSubmit; an earlier one's error no longer applies
-          else if (it.saveState == SaveState.Saving) it.copy(sentByTeammate = true)
-          else it.copy(sentByTeammate = true, saveState = SaveState.Idle, locationError = null)
+        val stored = completions.find { it.id == id } ?: return@collect
+        when (stored.status) {
+          CompletionStatus.APPROVED -> showApproved(stored.explorerUid, id)
+          // The proof waiting to send reached the server: a new one can replace it
+          CompletionStatus.REJECTED -> mutableUiState.update { it.copy(sendingLater = false) }
+          CompletionStatus.PENDING -> Unit
         }
       }
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
       Log.w(TAG, "Listening to the completions of $reservationId failed", e)
+    }
+  }
+
+  /** Shows the party's completion [id], which [sender] sent, as approved by the venue. */
+  private fun showApproved(sender: String, id: String) {
+    mutableUiState.update {
+      when {
+        sender == explorerUid -> it.copy(saveState = SaveState.Saved(id))
+        // A send in progress ends in finishSubmit; an earlier one's error no longer applies
+        it.saveState == SaveState.Saving -> it.copy(sentByTeammate = true)
+        else -> it.copy(sentByTeammate = true, saveState = SaveState.Idle, locationError = null)
+      }
     }
   }
 

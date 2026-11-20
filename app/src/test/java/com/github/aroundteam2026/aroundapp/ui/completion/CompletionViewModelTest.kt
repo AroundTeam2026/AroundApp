@@ -921,6 +921,24 @@ class CompletionViewModelTest {
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
   }
 
+  // Only the server rejects a proof, so the one waiting reached it: a new proof can replace it
+  @Test
+  fun aProofRejectedWhileWaitingToSendCanBeAnsweredWithANewProof() = test {
+    open("fox")
+    viewModel.updateAnswer("By the till")
+    completions.queued = true
+    viewModel.submit()
+    runCurrent()
+    assertTrue(state.sendingLater)
+
+    fakeCompletions.reject(completionId(reservationId), "Not the right fox").getOrThrow()
+    runCurrent()
+
+    assertFalse(state.sendingLater)
+    assertTrue(state.canSubmit)
+    assertEquals("By the till", state.answer)
+  }
+
   @Test
   fun aTeammatesProofApprovedWhileWaitingToSendLocksTheForm() = test {
     open("fox")
