@@ -355,21 +355,29 @@ class CompletionViewModel(
     try {
       completionRepository.observeForReservation(reservationId).collect { completions ->
         val stored = completions.find { it.id == id } ?: return@collect
-        if (stored.status != CompletionStatus.APPROVED) {
-          settleSendingLater(stored)
-          return@collect
-        }
-        mutableUiState.update {
-          if (stored.explorerUid == explorerUid) it.copy(saveState = SaveState.Saved(id))
-          // A send in progress ends in finishSubmit; an earlier one's error no longer applies
-          else if (it.saveState == SaveState.Saving) it.copy(sentByTeammate = true)
-          else it.copy(sentByTeammate = true, saveState = SaveState.Idle, locationError = null)
+        when (stored.status) {
+          CompletionStatus.APPROVED -> showApproved(stored.explorerUid, id)
+          // A form waiting to send ends once the server has the proof, or the venue rejected it
+          CompletionStatus.PENDING,
+          CompletionStatus.REJECTED -> settleSendingLater(stored)
         }
       }
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
       Log.w(TAG, "Listening to the completions of $reservationId failed", e)
+    }
+  }
+
+  /** Shows the party's completion [id], which [sender] sent, as approved by the venue. */
+  private fun showApproved(sender: String, id: String) {
+    mutableUiState.update {
+      when {
+        sender == explorerUid -> it.copy(saveState = SaveState.Saved(id))
+        // A send in progress ends in finishSubmit; an earlier one's error no longer applies
+        it.saveState == SaveState.Saving -> it.copy(sentByTeammate = true)
+        else -> it.copy(sentByTeammate = true, saveState = SaveState.Idle, locationError = null)
+      }
     }
   }
 
