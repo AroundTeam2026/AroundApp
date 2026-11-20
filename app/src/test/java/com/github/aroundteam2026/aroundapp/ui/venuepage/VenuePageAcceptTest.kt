@@ -1117,8 +1117,7 @@ class VenuePageAcceptTest {
     runCurrent()
   }
 
-  // The page waits OFFLINE_HINT_DELAY_MS to say so, but a request can't succeed from the first
-  // moment
+  // The screen waits to say so, but this can't succeed once disconnected
   @Test
   fun cancellingIsUnavailableAtOnceWhenTheDeviceDisconnects() = test {
     val id = storeFor("a")

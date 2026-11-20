@@ -66,8 +66,7 @@ class ProfileSetupViewModelTest {
         assertEquals(ProfileSetupDestination.HOME, model.destination.value)
       }
 
-  // Saving uploads the picture and writes on the server, so it waits for a connection
-  // The screen waits to say it is offline, but a save can't succeed from the first moment
+  // The screen waits to say so, but this can't succeed once disconnected
   @Test
   fun savingDoesNothingAtOnceWhenThePhoneDisconnects() =
       runTest(dispatcher) {
@@ -85,6 +84,7 @@ class ProfileSetupViewModelTest {
         assertEquals("", users.getUser(uid)?.displayName)
       }
 
+  // Saving uploads the picture and writes on the server, so it waits for a connection
   @Test
   fun offlineSavingDoesNothingAndWorksAgainBackOnline() =
       runTest(dispatcher) {

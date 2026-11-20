@@ -321,9 +321,7 @@ class ReviewProofViewModelTest {
     assertFalse(state.saving)
   }
 
-  // The screen waits OFFLINE_HINT_DELAY_MS to say so, but a transaction can't succeed from the
-  // first
-  // moment
+  // The screen waits to say so, but this can't succeed once disconnected
   @Test
   fun approveAndRejectAreUnavailableAtOnceWhenTheDeviceDisconnects() = test {
     sendProof(reserve())
