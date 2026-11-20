@@ -239,8 +239,7 @@ class JoinPartyViewModelTest {
     assertTrue(reservations.observeForExplorer(EXPLORER).first().any { it.id == id })
   }
 
-  // The server may not have the join yet, e.g. the device went offline right after the code was
-  // found
+  // The server may not have the join yet: the device went offline right after the code was found
   @Test
   fun aJoinTheServerHasntConfirmedIsWaitingToSendNotJoined() = test {
     val id = book()

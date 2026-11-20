@@ -196,8 +196,7 @@ class JoinPartyScreenTest {
     }
   }
 
-  // The screen below it (here a stand-in) is the one system back would otherwise reach
-  // The Figma frame "Venue page · accept waiting to send", for a join: saved here, sent later
+  // The Figma frame "Join a party · waiting to send": saved here, sent later
   @Test
   fun aQueuedJoinSaysWaitingToSendWithItsNoteAndLeavesBackOn() {
     state = found(JoinPartyUiState.Join.SENDING)
@@ -230,6 +229,7 @@ class JoinPartyScreenTest {
     assertEquals(0, joined)
   }
 
+  // The screen below it (here a stand-in) is the one system back would otherwise reach
   @Test
   fun systemBackIsOffWhileJoiningAsTheBackArrowIsAndWorksOtherwise() {
     var systemBacks = 0
