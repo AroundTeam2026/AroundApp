@@ -242,6 +242,32 @@ service cloud.firestore {
       return /databases/$(database)/documents/party_codes/$(code);
     }
 
+    // How many party codes an explorer may look up in an hour: MAX_PARTY_CODE_LOOKUPS in the app.
+    function maxPartyCodeLookups() {
+      return 10;
+    }
+
+    function partyCodeLookup(uid) {
+      return /databases/$(database)/documents/party_code_lookups/$(uid);
+    }
+
+    // [data] starts a new hour of lookups with the party code it names.
+    function startsPartyCodeLookups(data) {
+      return data.keys().hasOnly(['code', 'count', 'windowStart'])
+          && isPartyCode(data.code)
+          && data.count == 1
+          && data.windowStart == request.time;
+    }
+
+    // [after] counts one more lookup than [before], within its hour and the limit.
+    function countsPartyCodeLookup(before, after) {
+      return after.keys().hasOnly(['code', 'count', 'windowStart'])
+          && isPartyCode(after.code)
+          && after.windowStart == before.windowStart
+          && after.count == before.count + 1
+          && after.count <= maxPartyCodeLookups();
+    }
+
     // The reservation [data], created as [reservationId], has a party code written in the same
     // batch that leads back to it. Reservations created before party codes have none.
     function hasOwnPartyCode(data, reservationId) {
@@ -481,12 +507,15 @@ service cloud.firestore {
     }
 
     // A party code, under its id, leads to its reservation, so an explorer who was given the code
-    // can find the reservation to join. Anyone signed in may get a code they know, but nobody
-    // lists them. It is created only in one batch with its reservation, by the reservation's
-    // creator, and never changes: writing a code that is taken is an update, which is refused, so
-    // codes stay unique.
+    // can find the reservation to join. Anyone signed in may get a code they counted in their
+    // party_code_lookups document first, so nobody finds parties by trying codes; nobody lists
+    // them. It is created only in one batch with its reservation, by the reservation's creator, and
+    // never changes: writing a code that is taken is an update, which is refused, so codes stay
+    // unique.
     match /party_codes/{code} {
-      allow get: if signedIn();
+      allow get: if signedIn()
+          && exists(partyCodeLookup(request.auth.uid))
+          && get(partyCodeLookup(request.auth.uid)).data.code == code;
       allow create: if signedIn()
           && isPartyCode(code)
           && request.resource.data.keys().hasOnly(['reservationId'])
@@ -494,6 +523,20 @@ service cloud.firestore {
           && !exists(reservation(request.resource.data.reservationId))
           && getAfter(reservation(request.resource.data.reservationId)).data.get('partyCode', null)
               == code;
+    }
+
+    // The party codes a user looked up, under their uid: the last one, which party_codes lets
+    // them get, and how many they looked up in the hour since windowStart, at most
+    // maxPartyCodeLookups (#542). Each new code counts one more; once the hour is over, the next
+    // one starts a new hour, at the server's time. Only its user reads and writes it; never
+    // deleted, so deleting it can't reset the count.
+    match /party_code_lookups/{uid} {
+      allow get: if isUser(uid);
+      allow create: if isUser(uid) && startsPartyCodeLookups(request.resource.data);
+      allow update: if isUser(uid)
+          && (countsPartyCodeLookup(resource.data, request.resource.data)
+              || (request.time >= resource.data.windowStart + duration.value(1, 'h')
+                  && startsPartyCodeLookups(request.resource.data)));
     }
 
     // One completion per reservation, under the reservation's id: one proof for the whole party.

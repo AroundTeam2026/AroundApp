@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import android.app.Application
@@ -122,6 +123,7 @@ class JoinPartyScreenTest {
             JoinPartyUiState.Error.Closed to text(R.string.join_party_closed),
             JoinPartyUiState.Error.AlreadyJoined to text(R.string.join_party_already_joined),
             JoinPartyUiState.Error.Left to text(R.string.join_party_left),
+            JoinPartyUiState.Error.TooManyTries to text(R.string.join_party_too_many_tries),
             JoinPartyUiState.Error.Offline to text(R.string.join_party_offline),
             JoinPartyUiState.Error.Failed to text(R.string.join_party_failed),
         )

@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import android.util.Log
@@ -15,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.party.PARTY_CODE_LENGTH
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.party.TooManyPartyCodeLookupsException
 import com.github.aroundteam2026.aroundapp.model.party.partyCapacity
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
@@ -194,11 +196,15 @@ class JoinPartyViewModel(
     }
   }
 
-  /** The refusal a failed read or join stands for: no such party, offline, or neither. */
+  /**
+   * The refusal a failed read or join stands for: no such party, too many codes tried, offline, or
+   * none of those.
+   */
   private suspend fun refusalFor(failure: Throwable): JoinPartyUiState.Lookup.Refused =
       refused(
           when {
             failure is NoSuchElementException -> JoinPartyUiState.Error.NotFound
+            failure is TooManyPartyCodeLookupsException -> JoinPartyUiState.Error.TooManyTries
             !connectivityRepository.isOnline.first() -> JoinPartyUiState.Error.Offline
             else -> JoinPartyUiState.Error.Failed
           }

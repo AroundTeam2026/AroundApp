@@ -60,3 +60,16 @@ fun normalizePartyCode(typed: String): String? =
  */
 class PartyCodeNotFoundException(val code: String) :
     NoSuchElementException("No party has the code $code")
+
+/**
+ * How many party codes an explorer may look up in an hour, so nobody can find parties by trying
+ * codes. The same number as `maxPartyCodeLookups` in firestore.rules.
+ */
+const val MAX_PARTY_CODE_LOOKUPS = 10
+
+/**
+ * The explorer looked up [MAX_PARTY_CODE_LOOKUPS] codes within the hour, so the backend refuses
+ * another one until it is over.
+ */
+class TooManyPartyCodeLookupsException :
+    IllegalStateException("More than $MAX_PARTY_CODE_LOOKUPS party codes looked up in an hour")
