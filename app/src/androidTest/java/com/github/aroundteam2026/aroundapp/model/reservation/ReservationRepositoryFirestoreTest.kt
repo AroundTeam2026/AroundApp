@@ -24,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
 import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
@@ -464,6 +465,61 @@ class ReservationRepositoryFirestoreTest {
         assertTrue(
             "Expected too many lookups but got $error",
             error is TooManyPartyCodeLookupsException,
+        )
+      }
+
+  /**
+   * Bug (#542): an explorer at the limit stays locked out once the hour is over, instead of their
+   * next lookup starting a new hour.
+   */
+  @Test
+  fun findReservationIdByCode_atTheLimitOnceTheHourIsOver_startsANewHour() = withTimeoutBlocking {
+    val id = createAndSync()
+    val code = fetchAsVenue(id).partyCode!!
+    val twoHoursAgo = Timestamp(Timestamp.now().seconds - 2 * SECONDS_PER_HOUR, 0)
+    writeBypassingRules(
+        "$PARTY_CODE_LOOKUPS/$explorerUid",
+        mapOf(
+            "code" to newPartyCode(),
+            "count" to MAX_PARTY_CODE_LOOKUPS,
+            "windowStart" to twoHoursAgo,
+        ),
+    )
+
+    assertEquals(id, explorerRepository.findReservationIdByCode(code).getOrThrow())
+    val lookups = explorerDb.document("$PARTY_CODE_LOOKUPS/$explorerUid").get(Source.SERVER).await()
+    assertEquals(1L, lookups.getLong("count"))
+    assertTrue(lookups.getTimestamp("windowStart")!! > twoHoursAgo)
+  }
+
+  /** Bug: a lookup while signed out crashes, or reads the code without counting it. */
+  @Test
+  fun findReservationIdByCode_whileSignedOut_failsWithIllegalState() = withTimeoutBlocking {
+    val code = fetchAsVenue(createAndSync()).partyCode!!
+    val signedOut = emulatorClient(FRIEND_APP)
+    FirebaseAuth.getInstance(signedOut.app).signOut()
+
+    val error = ReservationRepositoryFirestore(signedOut).findReservationIdByCode(code)
+
+    assertTrue("${error.exceptionOrNull()}", error.exceptionOrNull() is IllegalStateException)
+  }
+
+  /**
+   * Bug (#542): a lookup the rules refuse for another reason than the limit, here checking whether
+   * a drawn code that isn't one is taken, is reported as too many tries instead of the refusal.
+   */
+  @Test
+  fun createReservation_whenTheLookupOfItsCodeIsRefused_failsWithTheRefusal() =
+      withTimeoutBlocking {
+        val error =
+            repositoryDrawing(NOT_A_PARTY_CODE)
+                .createReservation(reservation(), explorerUid)
+                .exceptionOrNull()
+
+        assertEquals(
+            "$error",
+            FirebaseFirestoreException.Code.PERMISSION_DENIED,
+            (error as? FirebaseFirestoreException)?.code,
         )
       }
 
@@ -1088,6 +1144,11 @@ class ReservationRepositoryFirestoreTest {
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
+
+    /** Each user's party code lookups, which the rules limit (#542). */
+    const val PARTY_CODE_LOOKUPS = "party_code_lookups"
+
+    const val SECONDS_PER_HOUR = 3_600L
 
     /** The size of a quest for more than one explorer, so its creator alone can't be approved. */
     const val GROUP_SIZE = 2
