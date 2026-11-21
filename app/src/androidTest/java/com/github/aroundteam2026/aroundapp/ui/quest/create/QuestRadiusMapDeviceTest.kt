@@ -74,12 +74,13 @@ class QuestRadiusMapDeviceTest {
     }
   }
 
-  private fun showPicker() = showInScrollingScreen {
+  /** Shows the form's map, with the venue's own pin at [venue] for a quest away from it. */
+  private fun showPicker(venue: Location? = null) = showInScrollingScreen {
     QuestRadiusMap(
         location,
         radiusMeters,
         WALK_MINUTES,
-        venue = null,
+        venue = venue,
         venueName = VENUE_NAME,
         onMoved = { to ->
           moves.add(to)
@@ -279,6 +280,19 @@ class QuestRadiusMapDeviceTest {
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
       composeTestRule.runOnUiThread { map.cameraPosition.target.isNear(picked) }
     }
+  }
+
+  @Test
+  fun aQuestAwayFromItsVenueFramesItsOwnCircle() {
+    // The venue's own pin draws on the map too; the Maps SDK can't list its markers, so this checks
+    // the map frames the quest's circle, not the venue
+    showPicker(venue = picked)
+    val map = composeTestRule.awaitGoogleMap()
+
+    val framed = map.awaitFramed()
+
+    assertFalse("The map framed the venue", framed.target.isNear(picked))
+    composeTestRule.onNodeWithTag(C.Tag.CREATE_QUEST_DISTANCE_FROM_VENUE).assertExists()
   }
 
   @Test
