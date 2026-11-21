@@ -116,6 +116,20 @@ npm run test:emulator   # start the Firestore emulator, run the tests, stop it
 
 To add a function, write it in its own file under `functions/src/`, export it from `functions/src/index.ts`, and test it in `functions/test/` with [firebase-functions-test](https://firebase.google.com/docs/functions/unit-testing). Mock `../src/notify` with `jest.mock` and check what the function passes to `sendToUser`.
 
+`sendToUser` sends a data-only message (title, body, kind, route and reservation id all in FCM's `data`) to every token saved at `users/{uid}/tokens/{token}`, so the app builds the notification itself, even in the background. A token FCM refuses is logged and skipped.
+
+Production only gets the functions when someone deploys them (the project is on the Blaze plan, which Cloud Functions need):
+
+```sh
+firebase login
+npm --prefix functions ci   # the build before the deploy needs the functions' dependencies
+firebase deploy --only functions --project around-67942
+```
+
+- **Who:** a team member with the Owner or Editor role on the `around-67942` Firebase project.
+- **When:** right after a PR that changes `functions/` is merged, from an up-to-date `main`. Announce it in the team channel, then check the Functions page and its logs in the Firebase console.
+- **First deploy:** the CLI asks how many days to keep the built container images; 1 is enough and avoids Artifact Registry storage costs. The first deploy of Firestore-triggered functions can fail once while Google sets up Eventarc's permissions: retry after a few minutes.
+
 ### Security rules
 
 `firestore.rules` protects the production database and `storage.rules` the production Cloud Storage bucket. The emulators load both through `firebase.json`, so `FirestoreRulesTest` and `StorageRulesTest` check them on every CI run, but production only gets it when someone deploys it:
