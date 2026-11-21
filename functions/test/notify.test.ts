@@ -12,12 +12,13 @@ describe("sendToUser (stub)", () => {
     await sendToUser("explorer-1", {
       title: "Reservation accepted",
       body: "Café Lumen accepted your reservation",
-      data: { route: "quests", reservationId: "reservation-1" },
+      data: { kind: "reservation", route: "quests", reservationId: "reservation-1" },
     });
 
     expect(info).toHaveBeenCalledWith("sendToUser is a stub: nothing was sent", {
       uid: "explorer-1",
       title: "Reservation accepted",
+      kind: "reservation",
       route: "quests",
       reservationId: "reservation-1",
     });

@@ -5,11 +5,17 @@ import { logger } from "firebase-functions";
 /** The screen a tapped notification opens; the app reads it in AroundMessagingService (#637). */
 export type NotificationRoute = "quests" | "venue_dashboard";
 
+/**
+ * What the notification is about, which picks its Android channel (#637), so the user can turn
+ * each kind off on its own (#643). The route alone can't: both kinds can open the Quests tab.
+ */
+export type NotificationKind = "reservation" | "proof";
+
 /** What every notification function sends: the text shown, and where a tap leads. */
 export interface NotificationMessage {
   title: string;
   body: string;
-  data: { route: NotificationRoute; reservationId: string };
+  data: { kind: NotificationKind; route: NotificationRoute; reservationId: string };
 }
 
 /**
@@ -24,6 +30,7 @@ export async function sendToUser(uid: string, message: NotificationMessage): Pro
   logger.info("sendToUser is a stub: nothing was sent", {
     uid,
     title: message.title,
+    kind: message.data.kind,
     route: message.data.route,
     reservationId: message.data.reservationId,
   });
