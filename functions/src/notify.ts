@@ -6,10 +6,13 @@ import { logger } from "firebase-functions";
 export type NotificationRoute = "quests" | "venue_dashboard";
 
 /**
- * What the notification is about, which picks its Android channel (#637), so the user can turn
- * each kind off on its own (#643). The route alone can't: both kinds can open the Quests tab.
+ * What the notification is about. With the user's role, the app picks its Android channel from it
+ * (#637), one per row of #631's Figma, so the user can turn each off on its own (#643):
+ * - "reservation": "Reservations" for an explorer (#638), "Booking requests" for a venue (#639)
+ * - "proof": "Proofs" for an explorer (#640), "Proofs to review" for a venue (#642)
+ * - "cancellation": "Cancellations", for a venue (#641)
  */
-export type NotificationKind = "reservation" | "proof";
+export type NotificationKind = "reservation" | "proof" | "cancellation";
 
 /** What every notification function sends: the text shown, and where a tap leads. */
 export interface NotificationMessage {
