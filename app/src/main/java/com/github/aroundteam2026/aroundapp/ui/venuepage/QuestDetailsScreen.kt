@@ -72,7 +72,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestChips
-import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
+import com.github.aroundteam2026.aroundapp.ui.quest.RadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.quest.offlineCancelHint
@@ -700,7 +700,7 @@ private fun RadiusCard(state: VenuePageUiState, quest: VenuePageQuest) {
       trailingTag = C.Tag.QUEST_DETAIL_RADIUS,
   ) {
     (quest.location ?: state.venueLocation)?.let { location ->
-      StillRadiusMap(
+      RadiusMap(
           location,
           quest.radiusMeters,
           stringResource(R.string.quest_detail_radius_map, quest.radiusMeters, state.venueName),

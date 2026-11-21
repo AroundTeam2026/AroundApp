@@ -31,7 +31,7 @@ import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
 import com.github.aroundteam2026.aroundapp.ui.map.isNear
 import com.github.aroundteam2026.aroundapp.ui.map.tapMapUntil
-import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
+import com.github.aroundteam2026.aroundapp.ui.quest.RadiusMap
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -89,7 +89,7 @@ class QuestRadiusMapDeviceTest {
   }
 
   private fun showDetailsMap() = showInScrollingScreen {
-    StillRadiusMap(
+    RadiusMap(
         questLocation,
         RADIUS_METERS,
         DETAILS_MAP_DESCRIPTION,

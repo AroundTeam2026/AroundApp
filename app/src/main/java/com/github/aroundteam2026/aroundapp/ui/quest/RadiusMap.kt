@@ -68,10 +68,10 @@ import com.google.maps.android.compose.rememberUpdatedMarkerState
  *
  * With [onMoved], tapping the map or dragging the pin calls it with where the pin goes, and the map
  * can be dragged and pinch-zoomed, even inside a scrolling screen. Without it, the map stays still,
- * as on the quest details, which the name comes from.
+ * as on the quest details.
  */
 @Composable
-internal fun StillRadiusMap(
+internal fun RadiusMap(
     center: Location,
     radiusMeters: Int,
     description: String,
