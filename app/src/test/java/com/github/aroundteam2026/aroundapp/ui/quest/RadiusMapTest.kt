@@ -15,14 +15,14 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w413dp-h917dp-mdpi")
-class StillRadiusMapTest {
+class RadiusMapTest {
   @get:Rule val compose = createComposeRule()
 
   @Test
   fun theStillMapIsDescribedAndDrawsItsOverlay() {
     compose.setContent {
       AroundAppTheme {
-        StillRadiusMap(Location(46.5220, 6.6330), 200, "Within 200 m") { Text("Overlay") }
+        RadiusMap(Location(46.5220, 6.6330), 200, "Within 200 m") { Text("Overlay") }
       }
     }
 
