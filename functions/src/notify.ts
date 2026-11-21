@@ -4,6 +4,13 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 
+/**
+ * How long FCM keeps a message for a phone that is off: a day. Past that, a reservation or a proof
+ * has likely been answered or ended, and a late notification would only mislead (FCM's default is
+ * 4 weeks).
+ */
+export const MESSAGE_TTL_MS = 24 * 60 * 60 * 1000;
+
 /** The screen a tapped notification opens; the app reads it in AroundMessagingService (#637). */
 export type NotificationRoute = "quests" | "venue_dashboard";
 
@@ -32,7 +39,7 @@ export interface NotificationMessage {
  * Android then calls AroundMessagingService.onMessageReceived even when the app is in the
  * background, so the app builds the notification itself, on the channel of its kind and the
  * user's role (#637). High priority makes Android deliver it at once rather than at the next
- * maintenance window.
+ * maintenance window, and a phone that stays off longer than [MESSAGE_TTL_MS] never gets it.
  *
  * A phone FCM refuses (e.g. an expired token) is logged and skipped: the others still get the
  * message. It rejects only when FCM can't be reached at all, or the tokens can't be read.
@@ -54,7 +61,7 @@ export async function sendToUser(uid: string, message: NotificationMessage): Pro
       route: message.data.route,
       reservationId: message.data.reservationId,
     },
-    android: { priority: "high" },
+    android: { priority: "high", ttl: MESSAGE_TTL_MS },
   });
 
   if (response.failureCount > 0) {

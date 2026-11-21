@@ -122,11 +122,13 @@ Production only gets the functions when someone deploys them (the project is on 
 
 ```sh
 firebase login
+npm --prefix functions ci   # the build before the deploy needs the functions' dependencies
 firebase deploy --only functions --project around-67942
 ```
 
 - **Who:** a team member with the Owner or Editor role on the `around-67942` Firebase project.
 - **When:** right after a PR that changes `functions/` is merged, from an up-to-date `main`. Announce it in the team channel, then check the Functions page and its logs in the Firebase console.
+- **First deploy:** the CLI asks how many days to keep the built container images; 1 is enough and avoids Artifact Registry storage costs. The first deploy of Firestore-triggered functions can fail once while Google sets up Eventarc's permissions: retry after a few minutes.
 
 ### Security rules
 

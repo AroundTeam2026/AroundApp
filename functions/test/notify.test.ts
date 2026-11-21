@@ -50,7 +50,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("sendToUser", () => {
-  it("sends a data-only, high-priority message to every phone of the user", async () => {
+  it("sends a data-only, high-priority, one-day message to every phone of the user", async () => {
     const uid = await userWithTokens("phone-a", "phone-b");
     await userWithTokens("someone-elses-phone");
     sendEachForMulticast.mockResolvedValue(sentTo(2));
@@ -69,7 +69,7 @@ describe("sendToUser", () => {
         route: "quests",
         reservationId: "reservation-1",
       },
-      android: { priority: "high" },
+      android: { priority: "high", ttl: 24 * 60 * 60 * 1000 },
     });
   });
 
