@@ -102,6 +102,20 @@ firebase emulators:start --only auth,firestore,storage --project demo-project
 
 `--project demo-project` matters: the tests connect to `demo-project`, and `storage.rules` reads Firestore, so both emulators must run on that same project. Without it, the emulators take `around-67942` from `.firebaserc`.
 
+### Cloud Functions
+
+`functions/` holds the Cloud Functions, in TypeScript, that send the notifications: each one runs when a reservation or a proof changes and calls `sendToUser` (`functions/src/notify.ts`). They need Node 22. From `functions/`:
+
+```sh
+npm ci                  # install the dependencies, as locked in package-lock.json
+npm run build           # compile to lib/, as the deploy does
+npm run test:emulator   # start the Firestore emulator, run the tests, stop it
+```
+
+`npm test` runs the tests alone, against Firestore emulators you already started (port 8080, `demo-project`). The tests never reach the real project. The CI's `functions` job runs all three.
+
+To add a function, write it in its own file under `functions/src/`, export it from `functions/src/index.ts`, and test it in `functions/test/` with [firebase-functions-test](https://firebase.google.com/docs/functions/unit-testing). Mock `../src/notify` with `jest.mock` and check what the function passes to `sendToUser`.
+
 ### Security rules
 
 `firestore.rules` protects the production database and `storage.rules` the production Cloud Storage bucket. The emulators load both through `firebase.json`, so `FirestoreRulesTest` and `StorageRulesTest` check them on every CI run, but production only gets it when someone deploys it:
