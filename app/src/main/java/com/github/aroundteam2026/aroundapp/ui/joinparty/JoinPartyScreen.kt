@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import androidx.activity.compose.BackHandler
@@ -236,6 +237,7 @@ private fun ErrorLine(error: JoinPartyUiState.Error) {
         JoinPartyUiState.Error.Closed -> stringResource(R.string.join_party_closed)
         JoinPartyUiState.Error.AlreadyJoined -> stringResource(R.string.join_party_already_joined)
         JoinPartyUiState.Error.Left -> stringResource(R.string.join_party_left)
+        JoinPartyUiState.Error.TooManyTries -> stringResource(R.string.join_party_too_many_tries)
         JoinPartyUiState.Error.Offline -> stringResource(R.string.join_party_offline)
         JoinPartyUiState.Error.Failed -> stringResource(R.string.join_party_failed)
       }

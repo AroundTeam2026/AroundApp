@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
@@ -6,6 +7,7 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRe
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.TooManyPartyCodeLookupsException
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -215,6 +217,18 @@ class JoinPartyViewModelTest {
     reservations.forcedFailure = null
     submit()
     assertTrue(state.lookup is JoinPartyUiState.Lookup.Found)
+  }
+
+  /** #542: the backend limits lookups; that refusal says so, even offline, not that it failed. */
+  @Test
+  fun tooManyLookupsSaySoRatherThanFailedOrOffline() = test {
+    book()
+    reservations.forcedFailure = TooManyPartyCodeLookupsException()
+    connectivity.online.value = false
+
+    type()
+
+    assertEquals(JoinPartyUiState.Error.TooManyTries, refusal)
   }
 
   @Test

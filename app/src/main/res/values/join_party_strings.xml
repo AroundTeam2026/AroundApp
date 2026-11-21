@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
     <!-- The Join a party screen, opened from the Quests tab -->
     <string name="join_party_back">Back</string>
@@ -19,6 +20,7 @@
     <string name="join_party_closed">The venue already approved this party, so it takes no one else.</string>
     <string name="join_party_already_joined">You\'re already in this party.</string>
     <string name="join_party_left">You left this party, so you can\'t join it again.</string>
+    <string name="join_party_too_many_tries">You tried too many codes. Try again in an hour.</string>
     <string name="join_party_offline">You\'re offline. Joining needs a connection.</string>
     <string name="join_party_failed">Couldn\'t join this party. Try again.</string>
 </resources>

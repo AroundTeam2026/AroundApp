@@ -4,8 +4,10 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_LOOKUPS
 import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryFirestore
+import com.github.aroundteam2026.aroundapp.model.party.TooManyPartyCodeLookupsException
 import com.github.aroundteam2026.aroundapp.model.party.isPartyCode
 import com.github.aroundteam2026.aroundapp.model.party.newPartyCode
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -442,6 +444,27 @@ class ReservationRepositoryFirestoreTest {
           assertTrue("$typed: $error", error is PartyCodeNotFoundException)
           assertEquals(code, (error as PartyCodeNotFoundException).code)
         }
+      }
+
+  /**
+   * #542: past the limit within the hour, a code that exists is reported as too many tries, not
+   * found nor unknown, so trying codes can't find parties.
+   */
+  @Test
+  fun findReservationIdByCode_pastTheLimitWithinAnHour_failsWithTooManyLookups() =
+      withTimeoutBlocking {
+        val code = fetchAsVenue(createAndSync()).partyCode!!
+        repeat(MAX_PARTY_CODE_LOOKUPS) {
+          val error = explorerRepository.findReservationIdByCode(newPartyCode()).exceptionOrNull()
+          assertTrue("Lookup ${it + 1}: $error", error is PartyCodeNotFoundException)
+        }
+
+        val error = explorerRepository.findReservationIdByCode(code).exceptionOrNull()
+
+        assertTrue(
+            "Expected too many lookups but got $error",
+            error is TooManyPartyCodeLookupsException,
+        )
       }
 
   /** Bug: offline, a code is reported as unknown, or found in the cache rather than the server. */
@@ -986,14 +1009,12 @@ class ReservationRepositoryFirestoreTest {
     return ReservationRepositoryFirestore(explorerDb, newCode = next::next) { FIXED_NOW }
   }
 
-  /** The reservation id the server stores for the party code [code], read as the venue. */
-  private suspend fun storedCodeTarget(code: String): String? =
-      venueDb
-          .collection(PARTY_CODES)
-          .document(code)
-          .get(Source.SERVER)
-          .await()
-          .getString("reservationId")
+  /**
+   * The reservation id the server stores for the party code [code], looked up by the venue, which
+   * counts the lookup as the rules ask before reading a code.
+   */
+  private suspend fun storedCodeTarget(code: String): String =
+      venueRepository.findReservationIdByCode(code).getOrThrow()
 
   /**
    * Reads the reservation with [id] through the venue's client, once [until] accepts it. The venue
@@ -1028,9 +1049,6 @@ class ReservationRepositoryFirestoreTest {
      * The Firestore collection the repository stores reservations in; some tests use it directly.
      */
     const val RESERVATIONS = "reservations"
-
-    /** The Firestore collection of party codes, which some tests read directly. */
-    const val PARTY_CODES = "party_codes"
 
     /** How many characters an explorer types before a space when typing a party code. */
     const val TYPED_GROUP_SIZE = 3
