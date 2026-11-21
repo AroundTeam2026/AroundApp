@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The Profile row that opens Android's notification settings (#643, Figma #631) -->
+    <string name="profile_notifications_title">Notifications</string>
+    <string name="profile_notifications_subtitle">Choose which ones Around sends</string>
+</resources>
