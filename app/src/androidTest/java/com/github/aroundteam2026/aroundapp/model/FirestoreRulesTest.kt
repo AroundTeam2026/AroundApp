@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_LOOKUPS
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
@@ -1685,10 +1686,14 @@ class FirestoreRulesTest {
             mapOf(
                 "status" to status,
                 "proofType" to proofType,
-                "minPartySize" to minPartySize,
+                "minPartySize" to minPartySize.coerceAtMost(MAX_PARTY_SIZE),
             ) +
             listOfNotNull(exactPartySize?.let { "exactPartySize" to it })
     assertSucceeds(quest.set(data))
+    // The rules refuse a size above the cap, which only quests written before #541 have.
+    if (minPartySize > MAX_PARTY_SIZE) {
+      writeBypassingRules("quests/${quest.id}", mapOf("minPartySize" to minPartySize))
+    }
     return quest.id
   }
 
