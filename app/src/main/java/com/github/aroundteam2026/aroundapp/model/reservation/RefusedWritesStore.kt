@@ -11,6 +11,9 @@ enum class WriteState {
 
   /** The server refused it; the quest shows "try again" until it is booked again. */
   REFUSED,
+
+  /** Refused, and the explorer was told; the quest still shows "try again". */
+  REPORTED,
 }
 
 /** A reservation of the quest [questId] that this device wrote, and where it [state] stands. */

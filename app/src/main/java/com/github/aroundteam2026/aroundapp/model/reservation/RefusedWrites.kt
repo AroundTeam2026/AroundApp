@@ -10,8 +10,9 @@ package com.github.aroundteam2026.aroundapp.model.reservation
  * write that wasn't sent yet across restarts. A refused write then vanishes from the explorer's
  * reservations, while one the venue answered or the explorer cancelled stays listed with its new
  * status. A refusal is remembered until the quest is booked again or another reservation of it
- * stands, so a screen opened after the restart can still say "try again". Not thread-safe: use it
- * from the main thread, as a ViewModel does.
+ * stands, so a screen opened after the restart can still say "try again", and whether the explorer
+ * was told about it is remembered too. Not thread-safe: use it from the main thread, as a ViewModel
+ * does.
  */
 class RefusedWrites(private val store: RefusedWritesStore) {
   /** The writes not settled yet, by reservation id. */
@@ -33,6 +34,20 @@ class RefusedWrites(private val store: RefusedWritesStore) {
   /** The quests whose reservation the server refused, until they are booked again. */
   val refusedQuests: Set<String>
     get() = refused.values.mapTo(mutableSetOf()) { it.questId }
+
+  /** Whether the server refused a reservation that [markReported] hasn't covered yet. */
+  val hasUnreportedRefusal: Boolean
+    get() = refused.values.any { it.state == WriteState.REFUSED }
+
+  /**
+   * Records that the explorer was told about the refusals so far, so they aren't told again after a
+   * restart. The quests keep showing "try again" in [refusedQuests].
+   */
+  fun markReported() {
+    refused.values
+        .filter { it.state == WriteState.REFUSED }
+        .forEach { save(it.copy(state = WriteState.REPORTED)) }
+  }
 
   /**
    * Remembers that this device created the reservation [reservationId] for the quest [questId],
@@ -106,7 +121,7 @@ class RefusedWrites(private val store: RefusedWritesStore) {
 
   /** Files [write] under what is unsettled or refused, whichever its state says. */
   private fun track(write: RecordedWrite) {
-    val refusedNow = write.state == WriteState.REFUSED
+    val refusedNow = write.state == WriteState.REFUSED || write.state == WriteState.REPORTED
     (if (refusedNow) refused else written)[write.reservationId] = write
     (if (refusedNow) written else refused).remove(write.reservationId)
   }
