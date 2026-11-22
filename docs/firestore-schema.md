@@ -185,6 +185,71 @@ From `storage.rules`. Anything not listed is denied, including listing, overwrit
 
 The rules read the reservation and the membership from Firestore, so a proof follows the same party as `reservations`. A completion's `photoUrl` points to its photo here.
 
+## Planned: party and venue chat (E42)
+
+Not built yet: this section is the plan from #645, following the designs of #644. The chat's model, repository and rules update the tables above when they land, and this section goes.
+
+A reservation's party and its venue get one chat, to say they're running late or to ask a question before the visit. A chat only inside the party comes later.
+
+### `chats/{reservationId}/messages/{messageId}`
+
+One document per message, under an auto id. Messages are never edited or deleted.
+
+| Field | Type | Notes |
+|---|---|---|
+| `senderUid` | string | The sender: a member of the party or the venue owner. |
+| `senderRole` | `EXPLORER` or `VENUE` | `VENUE` exactly when `senderUid` is the reservation's `venueId`. The app shows a "Venue" tag on those messages. |
+| `text` | string | Not blank, at most 1000 characters. |
+| `sentAt` | timestamp | The server's time when it was written (`request.time`), so every phone sees the same order. |
+
+No sender name is copied here: the app reads a member's name and picture from `users/{uid}` and the venue's name from `venues/{venueId}`, so they never go stale (see the venue fields in [Decided changes](#decided-changes)).
+
+### `chats/{reservationId}`
+
+A summary of the chat, for the venue's list of chats and the last message shown in it. The id is the reservation's. Only a Cloud Function writes it, each time a message is created and when the reservation is cancelled; the app only reads it. Until that function is deployed (see the README), no summary is written and the venue's list stays empty.
+
+| Field | Type | Notes |
+|---|---|---|
+| `venueId` | string | The reservation's `venueId`, so a venue can list its chats. |
+| `lastMessageText` | string | The latest message's `text`. |
+| `lastSenderUid` | string | The latest message's `senderUid`. |
+| `lastMessageAt` | timestamp | The latest message's `sentAt`. The venue's list shows the newest first. |
+| `closesAt` | timestamp | When the chat [closes](#when-the-chat-closes). When the reservation is cancelled, the function sets it to the time of the cancellation, so the chat leaves the venue's list at once. |
+
+A chat without messages has no summary yet.
+
+### `chats/{reservationId}/reads/{uid}`
+
+When each person last read the chat, for the unread counts on the Quests tab, the Messages tab and the venue's Dashboard.
+
+| Field | Type | Notes |
+|---|---|---|
+| `lastReadAt` | timestamp | The server's time (`request.time`) when the user last had the chat open. |
+
+The unread count is the number of messages whose `sentAt` is after `lastReadAt`, or all of them without a `reads` document. The app counts them with a listener on that query, limited to 100 and shown as "99+" above 99, not with a count query: a count query needs the server and doesn't update live, while a listener updates as messages arrive and offline counts the cached messages. Sending a message also moves the sender's `lastReadAt` to now, in the same batch, so their own messages never count as unread.
+
+### Who can read and write
+
+| Path | Read | Write |
+|---|---|---|
+| `chats/{reservationId}/messages` | The reservation's `JOINED` members and its venue. A member who withdrew left the party and its chat. | The same people create a message as themselves (`senderUid`, and `senderRole` matching it) while the chat is open. No update or delete. |
+| `chats/{reservationId}` | The same people; a venue lists its open chats with `venueId == uid` and `closesAt` after now, ordered by `closesAt` (Firestore needs the first ordering on the range field), and the app sorts them by `lastMessageAt`. | Nobody: only the Cloud Function writes it. |
+| `chats/{reservationId}/reads/{uid}` | Only `uid` | Only `uid`, while they can read the chat, with `lastReadAt` set to `request.time`. |
+
+Checking a new message reads the reservation and, for an explorer, their `party_user` membership: at most 2 document reads.
+
+### When the chat closes
+
+The chat is open while the reservation is `APPROVED` and until its closing time. It never opens for a `PENDING` reservation, so the app shows no Messages tab before the venue approves.
+
+Once the reservation is cancelled or the closing time has passed, the chat is read-only: its messages stay readable in Quest details, and the venue's list only shows open chats (`closesAt` after now). A time limit closes the chat of a party that never comes, which waiting for its proof wouldn't, and the rules check it from the reservation they already read.
+
+**To decide before the chat is built: the closing time.** The plan was 1 day after `slotStart`, but explorers don't pick a slot yet: `slotStart` is the time they tapped accept, so the chat could close before the venue even approves. The options:
+
+- 7 days after the venue approves, from a new `approvedAt` on the reservation set on approval. Doesn't depend on slots; needs a rules change.
+- 7 days after `createdAt`. No new field, but a venue that approves late leaves the party less time.
+- 1 day after `slotStart`, once explorers pick a slot.
+
 ## Decided changes
 
 Decided in #259, from the review of #25 and from R2 (#274). The tables above describe `main`; a change still in progress updates them when it lands.
