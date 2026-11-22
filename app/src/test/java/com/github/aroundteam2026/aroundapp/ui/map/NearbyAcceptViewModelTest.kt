@@ -3,10 +3,15 @@ package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeRefusedWritesStore
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.RecordedWrite
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.WriteState
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
@@ -44,9 +49,21 @@ class NearbyAcceptViewModelTest {
   private val local = LocalWrites(fake)
   private val connectivity = FakeConnectivityRepository()
 
-  private val viewModel by lazy {
-    NearbyAcceptViewModel(reservations, users, EXPLORER, connectivity, clock = { NOW })
-  }
+  /** What the phone remembers of its writes; it survives the [viewModel] being made again. */
+  private val remembered = FakeRefusedWritesStore()
+
+  private val viewModel by lazy { newViewModel() }
+
+  /** A ViewModel as after the app was killed and opened again: only [remembered] is left. */
+  private fun newViewModel(writes: RefusedWrites = RefusedWrites(remembered)) =
+      NearbyAcceptViewModel(
+          reservations,
+          users,
+          EXPLORER,
+          connectivity,
+          clock = { NOW },
+          refusedWrites = writes,
+      )
 
   private val state
     get() = viewModel.uiState.value
@@ -212,7 +229,15 @@ class NearbyAcceptViewModelTest {
   @Test
   fun withoutAProfileAcceptingFailsWithoutBooking() = test {
     val noProfile =
-        NearbyAcceptViewModel(gated, ScriptedUserRepository(), EXPLORER, connectivity) { NOW }
+        NearbyAcceptViewModel(
+            gated,
+            ScriptedUserRepository(),
+            EXPLORER,
+            connectivity,
+            refusedWrites = fakeRefusedWrites(),
+        ) {
+          NOW
+        }
     runCurrent()
 
     noProfile.accept(quest("a"))
@@ -256,6 +281,83 @@ class NearbyAcceptViewModelTest {
     viewModel.accept(quest("a"))
     runCurrent()
     assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
+  // The write was queued, the app was killed, and the server refuses it once it is back online
+  @Test
+  fun aBookingTheServerRefusesAfterARestartShowsTryAgain() = test {
+    reservations = local
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    val restarted = newViewModel()
+    runCurrent()
+    // Firestore still lists the queued write
+    assertEquals(AcceptStatus.ACCEPTED, restarted.uiState.value.statusOf("a"))
+    local.refuse("local-1")
+    runCurrent()
+
+    assertEquals(AcceptStatus.FAILED, restarted.uiState.value.statusOf("a"))
+  }
+
+  // The venue page shares the RefusedWrites, and the refusal is reported only to who hears it first
+  @Test
+  fun aRefusalTheVenuePageHeardFirstStillShowsTryAgain() = test {
+    val shared = RefusedWrites(remembered)
+    reservations = local
+    val map = newViewModel(shared)
+    runCurrent()
+    map.accept(quest("a"))
+    runCurrent()
+
+    val page = shared.hearing()
+    page.refusedIn(local.listed.value)
+    local.refuse("local-1")
+    page.refusedIn(emptyList())
+    runCurrent()
+
+    assertEquals(AcceptStatus.FAILED, map.uiState.value.statusOf("a"))
+  }
+
+  // The app opens on another tab, where the server refuses the queued write; the map opens after
+  @Test
+  fun aWriteTheServerRefusedBeforeTheMapOpenedShowsTryAgain() = test {
+    remembered.put(RecordedWrite("local-0", "a", WriteState.SHOWN))
+    reservations = local
+    open()
+
+    assertEquals(AcceptStatus.FAILED, viewModel.uiState.value.statusOf("a"))
+  }
+
+  @Test
+  fun aRefusalFromBeforeARestartStillShowsTryAgainAndCanBeRetried() = test {
+    remembered.put(RecordedWrite("local-0", "a", WriteState.REFUSED))
+    reservations = local
+    open()
+
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+    viewModel.accept(quest("a"))
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+    assertEquals(AcceptStatus.NONE, newViewModel().uiState.value.statusOf("a"))
+  }
+
+  // The quest was refused before the restart, then booked elsewhere and cancelled
+  @Test
+  fun aRefusedQuestBookedElsewhereAndCancelledDoesntShowTryAgain() = test {
+    remembered.put(RecordedWrite("local-0", "a", WriteState.REFUSED))
+    reservations = local
+    local.listed.value =
+        listOf(newPendingReservation("a", VENUE_ID, "Ada", NOW).copy(id = "elsewhere"))
+    open()
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+
+    local.cancel("elsewhere")
+    runCurrent()
+
+    assertEquals(AcceptStatus.NONE, state.statusOf("a"))
+    assertEquals(emptySet<String>(), state.failedQuestIds)
   }
 
   @Test

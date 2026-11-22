@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -128,6 +129,7 @@ class VenuePagePartyTest {
         FakeConnectivityRepository(),
         ME,
         clock = { NOW },
+        refusedWrites = fakeRefusedWrites(),
         pictureRepository = pictures.takeIf { withPictures },
         decodePicture = { picture.takeUnless { notAPicture } },
     )
