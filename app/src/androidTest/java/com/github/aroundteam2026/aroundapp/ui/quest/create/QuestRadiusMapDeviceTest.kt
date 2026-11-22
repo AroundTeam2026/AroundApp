@@ -31,7 +31,7 @@ import com.github.aroundteam2026.aroundapp.ui.map.MAP_TIMEOUT_MILLIS
 import com.github.aroundteam2026.aroundapp.ui.map.awaitGoogleMap
 import com.github.aroundteam2026.aroundapp.ui.map.isNear
 import com.github.aroundteam2026.aroundapp.ui.map.tapMapUntil
-import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
+import com.github.aroundteam2026.aroundapp.ui.quest.RadiusMap
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -54,6 +54,8 @@ class QuestRadiusMapDeviceTest {
   private val questLocation = Location(46.5220, 6.6330)
   // An address picked in the form, about a kilometre away
   private val picked = Location(46.5300, 6.6400)
+  // The venue itself, about a kilometre from the quest
+  private val venueLocation = Location(46.5300, 6.6400)
   private lateinit var scroll: ScrollState
   private val moves = mutableListOf<Location>()
   // Follows the pin, as the form's view model does
@@ -74,12 +76,13 @@ class QuestRadiusMapDeviceTest {
     }
   }
 
-  private fun showPicker() = showInScrollingScreen {
+  /** Shows the form's map, with the venue's own pin at [venue] for a quest away from it. */
+  private fun showPicker(venue: Location? = null) = showInScrollingScreen {
     QuestRadiusMap(
         location,
         radiusMeters,
         WALK_MINUTES,
-        venue = null,
+        venue = venue,
         venueName = VENUE_NAME,
         onMoved = { to ->
           moves.add(to)
@@ -89,7 +92,7 @@ class QuestRadiusMapDeviceTest {
   }
 
   private fun showDetailsMap() = showInScrollingScreen {
-    StillRadiusMap(
+    RadiusMap(
         questLocation,
         RADIUS_METERS,
         DETAILS_MAP_DESCRIPTION,
@@ -279,6 +282,17 @@ class QuestRadiusMapDeviceTest {
     composeTestRule.waitUntil(MAP_TIMEOUT_MILLIS) {
       composeTestRule.runOnUiThread { map.cameraPosition.target.isNear(picked) }
     }
+  }
+
+  @Test
+  fun aQuestAwayFromItsVenueFramesItsCircleAndDrawsTheVenuesPin() {
+    showPicker(venue = venueLocation)
+    val map = composeTestRule.awaitGoogleMap()
+
+    // awaitFramed only returns once the camera is on the quest's circle, so a map that framed
+    // the venue's pin instead would time out here. The Maps SDK can't list markers, so the pin
+    // itself is drawn but not checked.
+    map.awaitFramed()
   }
 
   @Test

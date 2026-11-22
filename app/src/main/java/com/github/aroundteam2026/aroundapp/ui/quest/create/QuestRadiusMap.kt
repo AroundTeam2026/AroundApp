@@ -22,7 +22,7 @@ import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
 import com.github.aroundteam2026.aroundapp.resources.C
-import com.github.aroundteam2026.aroundapp.ui.quest.StillRadiusMap
+import com.github.aroundteam2026.aroundapp.ui.quest.RadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.distanceText
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
@@ -47,7 +47,7 @@ internal fun QuestRadiusMap(
   val description =
       if (venue == null) R.string.create_quest_radius_map
       else R.string.create_quest_radius_map_elsewhere
-  StillRadiusMap(
+  RadiusMap(
       center,
       radiusMeters,
       stringResource(description, radiusMeters),
