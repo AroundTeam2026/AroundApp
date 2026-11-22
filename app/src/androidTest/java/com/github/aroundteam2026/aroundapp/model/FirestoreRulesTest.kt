@@ -1692,7 +1692,11 @@ class FirestoreRulesTest {
     assertSucceeds(quest.set(data))
     // The rules refuse a size above the cap, which only quests written before #541 have.
     if (minPartySize > MAX_PARTY_SIZE) {
-      writeBypassingRules("quests/${quest.id}", mapOf("minPartySize" to minPartySize))
+      writeBypassingRules(
+          "quests/${quest.id}",
+          mapOf("minPartySize" to minPartySize),
+          db.app.options.projectId!!,
+      )
     }
     return quest.id
   }
