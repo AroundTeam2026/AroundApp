@@ -52,8 +52,9 @@ export interface NotificationMessage {
  *
  * A phone FCM refuses is logged and skipped: the others still get the message. When FCM says the
  * token is gone for good ([GONE_TOKEN_ERRORS]), its document is deleted, so later messages don't
- * try it again and a user's tokens don't pile up. It rejects only when FCM can't be reached at
- * all, or the tokens can't be read or deleted.
+ * try it again and a user's tokens don't pile up. A token that can't be deleted is logged and
+ * kept, since the message has already gone out: the next message tries again. It rejects only
+ * when the tokens can't be read or FCM can't be reached at all.
  */
 export async function sendToUser(uid: string, message: NotificationMessage): Promise<void> {
   const saved = await getFirestore().collection("users").doc(uid).collection("tokens").get();
@@ -89,11 +90,16 @@ export async function sendToUser(uid: string, message: NotificationMessage): Pro
     const code = response.responses[i].error?.code;
     return code !== undefined && GONE_TOKEN_ERRORS.has(code);
   });
-  if (gone.length > 0) {
-    await Promise.all(gone.map((doc) => doc.ref.delete()));
+  if (gone.length === 0) return;
+  const results = await Promise.allSettled(gone.map((doc) => doc.ref.delete()));
+  const failed = results.filter((r) => r.status === "rejected").length;
+  if (failed < gone.length) {
     logger.info("sendToUser: deleted the tokens of phones that are gone", {
       uid,
-      deleted: gone.length,
+      deleted: gone.length - failed,
     });
+  }
+  if (failed > 0) {
+    logger.warn("sendToUser: couldn't delete some gone tokens", { uid, failed });
   }
 }
