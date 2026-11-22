@@ -100,6 +100,10 @@ export async function sendToUser(uid: string, message: NotificationMessage): Pro
     });
   }
   if (failed > 0) {
-    logger.warn("sendToUser: couldn't delete some gone tokens", { uid, failed });
+    logger.warn("sendToUser: couldn't delete some gone tokens", {
+      uid,
+      failed,
+      errors: results.flatMap((r) => (r.status === "rejected" ? [String(r.reason)] : [])),
+    });
   }
 }

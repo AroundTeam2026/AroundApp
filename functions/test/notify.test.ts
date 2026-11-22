@@ -182,6 +182,22 @@ describe("sendToUser", () => {
     expect(warn).toHaveBeenCalledWith("sendToUser: couldn't delete some gone tokens", {
       uid,
       failed: 1,
+      errors: ["Error: unavailable"],
     });
+  });
+
+  it("logs no deletion when the only gone token can't be deleted", async () => {
+    const uid = await userWithTokens("stuck-phone");
+    answerPerPhone({ "stuck-phone": "messaging/registration-token-not-registered" });
+    jest
+      .spyOn(DocumentReference.prototype, "delete")
+      .mockRejectedValue(new Error("unavailable"));
+    jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+
+    await expect(sendToUser(uid, MESSAGE)).resolves.toBeUndefined();
+
+    expect(await tokensOf(uid)).toEqual(["stuck-phone"]);
+    expect(info).not.toHaveBeenCalled();
   });
 });
