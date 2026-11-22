@@ -41,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -60,10 +59,12 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 
 /**
- * Shows [home] and, after sign-in on Android 13 and later, the explanation before Android's
- * notification permission dialog above it, until it's answered.
+ * After sign-in on Android 13 and later, shows the explanation before Android's notification
+ * permission dialog, then [home] once it's answered. Shows [home] straight away when there is
+ * nothing to ask: answered before, already allowed, or Android below 13.
  *
- * Home stays composed underneath, so it has loaded by the time the explanation goes away.
+ * Home isn't composed before then, so its own permission requests, such as the map's location
+ * dialog on its first resume, come after this one rather than over the explanation.
  *
  * @param role picks the explorer's or the venue's explanation.
  * @param store remembers the answer, so a refusal isn't asked about again.
@@ -80,11 +81,11 @@ fun NotificationPermissionGate(
 ) {
   val prompt by model.prompt.collectAsStateWithLifecycle()
   val dialog = rememberLauncherForActivityResult(RequestPermission()) { model.onDialogClosed() }
-  val explaining = prompt == NotificationPrompt.EXPLAINING || prompt == NotificationPrompt.ASKING
-  Box(Modifier.fillMaxSize()) {
-    // Hidden from TalkBack while the explanation covers it
-    Box(if (explaining) Modifier.clearAndSetSemantics {} else Modifier) { home() }
-    if (explaining) {
+  when (prompt) {
+    // The earlier answer is read in a moment; nothing until then, so home can't start early
+    NotificationPrompt.CHECKING -> Unit
+    NotificationPrompt.EXPLAINING,
+    NotificationPrompt.ASKING -> {
       BackHandler(onBack = model::notNow)
       NotificationPermissionScreen(
           role,
@@ -95,6 +96,7 @@ fun NotificationPermissionGate(
           onNotNow = model::notNow,
       )
     }
+    NotificationPrompt.DONE -> home()
   }
 }
 
@@ -115,7 +117,6 @@ private fun defaultModel(store: NotificationPromptStore): NotificationPermission
 @Composable
 internal fun NotificationPermissionScreen(role: Role, onAllow: () -> Unit, onNotNow: () -> Unit) {
   val explorer = role == Role.EXPLORER
-  // A Surface, so taps don't reach home underneath
   Surface(
       Modifier.fillMaxSize().testTag(C.Tag.NOTIFICATION_PROMPT),
       color = MaterialTheme.colorScheme.background,

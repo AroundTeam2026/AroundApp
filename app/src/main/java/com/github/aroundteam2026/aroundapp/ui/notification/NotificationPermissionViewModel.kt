@@ -76,7 +76,7 @@ class NotificationPermissionViewModel(
       try {
         store.markAnswered()
       } catch (_: IOException) {
-        // ponytail: the explanation comes back next launch, which is better than never asking
+        // The explanation comes back next launch, which is better than never asking
       }
     }
   }
