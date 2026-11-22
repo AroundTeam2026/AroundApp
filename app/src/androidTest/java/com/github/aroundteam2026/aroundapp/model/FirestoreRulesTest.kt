@@ -296,6 +296,7 @@ class FirestoreRulesTest {
             "a radius over 200 m" to valid + ("radiusMeters" to 201),
             "a radius that is not an integer" to valid + ("radiusMeters" to "50"),
             "a party of 0" to valid + ("minPartySize" to 0),
+            "a party above the maximum" to valid + ("minPartySize" to MAX_PARTY_SIZE + 1),
             "an exactPartySize that is not a boolean" to valid + ("exactPartySize" to "yes"),
             "an unknown proof type" to valid + ("proofType" to "VIDEO"),
             "an unknown status" to valid + ("status" to "LIVE"),

@@ -17,6 +17,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
@@ -207,9 +208,9 @@ class CreateQuestViewModel(
     edit { it.copy(addressQuery = "") }
   }
 
-  /** Raises the party size by one. */
+  /** Raises the party size by one, never above [MAX_PARTY_SIZE]. */
   fun incrementPartySize() {
-    editPartySize { it.copy(minPartySize = it.minPartySize + 1) }
+    editPartySize { it.copy(minPartySize = (it.minPartySize + 1).coerceAtMost(MAX_PARTY_SIZE)) }
   }
 
   /** Lowers the party size by one, never below [QuestLimits.MIN_PARTY_SIZE]. */

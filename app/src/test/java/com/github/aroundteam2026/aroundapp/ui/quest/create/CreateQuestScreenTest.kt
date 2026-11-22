@@ -30,6 +30,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -228,12 +229,12 @@ class CreateQuestScreenTest {
   }
 
   @Test
-  fun aLargerPartyCountsTheRestOnTheLastSeat() {
-    repeat(10) { viewModel.incrementPartySize() }
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).performScrollTo().assertIsEnabled()
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_SIZE).assertTextEquals("11")
+  fun aFullPartyCountsTheRestOnTheLastSeatAndCantGrow() {
+    repeat(MAX_PARTY_SIZE - 1) { viewModel.incrementPartySize() }
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_INCREMENT).performScrollTo().assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_SIZE).assertTextEquals("$MAX_PARTY_SIZE")
     compose.onAllNodesWithTag(C.Tag.CREATE_QUEST_PARTY_SEAT_FILLED).assertCountEquals(7)
-    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXTRA).assertTextEquals("+4")
+    compose.onNodeWithTag(C.Tag.CREATE_QUEST_PARTY_EXTRA).assertTextEquals("+3")
   }
 
   @Test

@@ -22,7 +22,7 @@ class PartySizeTest {
     assertEquals(MIN_SIZE, exact.partyCapacity)
   }
 
-  /** The quest form doesn't cap the size yet (#157), so the capacity does. */
+  /** Quests written before the size was capped (#541) can be larger, so the capacity caps them. */
   @Test
   fun partyCapacity_ofAnExactQuestAboveTheMaximum_isTheMaximum() {
     assertEquals(MAX_PARTY_SIZE, exact.copy(minPartySize = MAX_PARTY_SIZE + 1).partyCapacity)
