@@ -242,7 +242,7 @@ service cloud.firestore {
       return /databases/$(database)/documents/party_codes/$(code);
     }
 
-    // How many party codes an explorer may look up in an hour: MAX_PARTY_CODE_LOOKUPS in the app.
+    // How many party codes a user may look up in one window: MAX_PARTY_CODE_LOOKUPS in the app.
     function maxPartyCodeLookups() {
       return 10;
     }
@@ -513,9 +513,8 @@ service cloud.firestore {
     // never changes: writing a code that is taken is an update, which is refused, so codes stay
     // unique.
     match /party_codes/{code} {
-      allow get: if signedIn()
-          && exists(partyCodeLookup(request.auth.uid))
-          && get(partyCodeLookup(request.auth.uid)).data.code == code;
+      // A missing lookups document makes get() fail, which denies
+      allow get: if signedIn() && get(partyCodeLookup(request.auth.uid)).data.code == code;
       allow create: if signedIn()
           && isPartyCode(code)
           && request.resource.data.keys().hasOnly(['reservationId'])
@@ -526,10 +525,11 @@ service cloud.firestore {
     }
 
     // The party codes a user looked up, under their uid: the last one, which party_codes lets
-    // them get, and how many they looked up in the hour since windowStart, at most
-    // maxPartyCodeLookups (#542). Each new code counts one more; once the hour is over, the next
-    // one starts a new hour, at the server's time. Only its user reads and writes it; never
-    // deleted, so deleting it can't reset the count.
+    // them get, and how many they looked up in the window that began at windowStart, at most
+    // maxPartyCodeLookups (#542). Each new code counts one more; once an hour has passed since
+    // windowStart, a lookup may start a new window at the server's time. That is about 10 an hour
+    // on average, and up to 20 within an hour around a new window. Only its user reads and writes
+    // it; never deleted, so deleting it can't reset the count.
     match /party_code_lookups/{uid} {
       allow get: if isUser(uid);
       allow create: if isUser(uid) && startsPartyCodeLookups(request.resource.data);

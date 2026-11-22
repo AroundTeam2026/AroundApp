@@ -58,7 +58,7 @@ data class JoinPartyUiState(
     /** The explorer left the party, which the rules don't let them join again. */
     data object Left : Error
 
-    /** The explorer tried too many codes within the hour, which the backend limits. */
+    /** The explorer tried too many codes in the last hour, which the backend limits. */
     data object TooManyTries : Error
 
     /** The device is offline. */

@@ -346,6 +346,26 @@ class ReservationRepositoryFirestoreTest {
         assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
       }
 
+  /**
+   * Bug (#542, review): a creator with no lookups left whose reservation the rules refuse for
+   * another reason than its code gets too many tries instead of the refusal.
+   */
+  @Test
+  fun createReservation_refusedWithNoLookupsLeft_returnsPermissionDenied() = withTimeoutBlocking {
+    writeBypassingRules(
+        "$PARTY_CODE_LOOKUPS/$explorerUid",
+        mapOf(
+            "code" to newPartyCode(),
+            "count" to MAX_PARTY_CODE_LOOKUPS,
+            "windowStart" to Timestamp.now(),
+        ),
+    )
+
+    assertPermissionDenied(
+        explorerRepository.createReservation(reservation().copy(questId = "missing"), explorerUid)
+    )
+  }
+
   /** Bug: a reservation for a quest that doesn't exist is reported as created. */
   @Test
   fun createReservation_forAMissingQuest_returnsPermissionDenied() = withTimeoutBlocking {

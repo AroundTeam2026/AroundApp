@@ -36,7 +36,8 @@ interface ReservationRepository {
   /**
    * Finds the reservation whose party code an explorer typed, in any case and with spaces, so `7kq
    * m42` finds `7KQM42`. Asks the backend, never a cache, so a code is found only online. The
-   * backend lets each explorer look up at most [MAX_PARTY_CODE_LOOKUPS] codes an hour.
+   * backend lets each explorer look up [MAX_PARTY_CODE_LOOKUPS] codes in a window of at least an
+   * hour.
    *
    * @param code the party code as typed.
    * @return the reservation's id, or a [PartyCodeNotFoundException] if no reservation has that code

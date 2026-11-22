@@ -102,6 +102,10 @@ class ReservationRepositoryFirestore(
   /**
    * Writes the new reservation with the party code [code] like [create], but returns null instead
    * of throwing when the rules refused it because another reservation already has [code].
+   *
+   * The rules don't say why they refused it, so any refusal checks whether [code] is taken, which
+   * costs one of the creator's lookups. Past [MAX_PARTY_CODE_LOOKUPS], it can't check, and throws
+   * the refusal itself rather than [TooManyPartyCodeLookupsException].
    */
   private suspend fun createUnlessTaken(
       reservation: Reservation,
@@ -112,9 +116,19 @@ class ReservationRepositoryFirestore(
       try {
         create(reservation, creatorUid, time, code)
       } catch (e: FirebaseFirestoreException) {
-        if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED || !isTaken(code)) throw e
+        if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED || !isTakenIfKnown(code)) {
+          throw e
+        }
         Log.i(TAG, "Party code $code is taken, drawing another")
         null
+      }
+
+  /** Whether [code] is taken, as [isTaken]; false once the creator has no lookups left. */
+  private suspend fun isTakenIfKnown(code: String): Boolean =
+      try {
+        isTaken(code)
+      } catch (_: TooManyPartyCodeLookupsException) {
+        false
       }
 
   /**
@@ -154,8 +168,8 @@ class ReservationRepositoryFirestore(
   /**
    * Normalizes [code] and reads its `party_codes` document from the server. A code that is not one,
    * or whose document is missing or has no reservation id, is a [PartyCodeNotFoundException]. A
-   * lookup after the signed-in user's [MAX_PARTY_CODE_LOOKUPS] within the hour is a
-   * [TooManyPartyCodeLookupsException]; a read that fails, e.g. offline, is the Firestore
+   * lookup after the signed-in user's [MAX_PARTY_CODE_LOOKUPS] in a window less than an hour old is
+   * a [TooManyPartyCodeLookupsException]; a read that fails, e.g. offline, is the Firestore
    * exception.
    */
   override suspend fun findReservationIdByCode(code: String): Result<String> =
@@ -183,8 +197,9 @@ class ReservationRepositoryFirestore(
   /**
    * Writes [code] to the signed-in user's `party_code_lookups` document with one more lookup, in a
    * transaction, so lookups at the same time all count. After [MAX_PARTY_CODE_LOOKUPS] of them it
-   * starts a new hour, which the rules refuse until the current one is over: that refusal is a
-   * [TooManyPartyCodeLookupsException]. Fails without a signed-in user or a connection.
+   * starts a new window, which the rules refuse until an hour has passed since the current one
+   * began: that refusal is a [TooManyPartyCodeLookupsException]. Fails without a signed-in user or
+   * a connection.
    */
   private suspend fun countLookup(code: String) {
     val uid =
