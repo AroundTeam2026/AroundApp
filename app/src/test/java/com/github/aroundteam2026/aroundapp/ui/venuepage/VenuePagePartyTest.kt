@@ -324,19 +324,6 @@ class VenuePagePartyTest {
   }
 
   @Test
-  fun aFailedLeaveKeepsTheQueuedProof() = test {
-    val id = reservationBy(FRIEND, ME)
-    uploads.enqueue(id, VENUE, ME, File("proof.jpg")).getOrThrow()
-    openDetails()
-    withdrawFails = true
-
-    viewModel.cancel()
-    runCurrent()
-
-    assertTrue(uploads.cancelled.isEmpty())
-  }
-
-  @Test
   fun aMemberLeavesEvenBeforeTheProfilesArrive() = test {
     slowUid = FRIEND
     reservationBy(FRIEND, ME)

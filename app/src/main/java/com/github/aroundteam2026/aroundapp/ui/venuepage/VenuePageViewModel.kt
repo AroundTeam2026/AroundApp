@@ -53,6 +53,7 @@ import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
+import com.github.aroundteam2026.aroundapp.ui.quest.ReservationCanceller
 import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -99,7 +100,7 @@ class VenuePageViewModel(
     private val partyRepository: PartyRepository,
     private val completionRepository: CompletionRepository,
     connectivityRepository: ConnectivityRepository,
-    private val proofUploadQueue: ProofUploadQueue,
+    proofUploadQueue: ProofUploadQueue,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
     arrivalQuestId: String? = null,
@@ -115,6 +116,9 @@ class VenuePageViewModel(
 
   /** Who sent the proofs; the page doesn't wait for their profiles to show the proofs. */
   private val proofSenders = ProofSenders(userRepository, explorerUid)
+
+  private val canceller =
+      ReservationCanceller(reservationRepository, partyRepository, proofUploadQueue)
 
   /**
    * The quest whose details the page opens the first time it shows the venue; null afterwards. Kept
@@ -290,19 +294,7 @@ class VenuePageViewModel(
       )
     }
     viewModelScope.launch {
-      // Only its creator cancels the reservation; anyone else who joined withdraws instead
-      val result =
-          if (leaving) partyRepository.withdraw(reservationId, explorerUid)
-          else reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
-      result.onSuccess {
-        // The reservation is gone either way, so a failure here only leaves a stale copy behind
-        proofUploadQueue.cancel(reservationId).onFailure {
-          Log.w(TAG, "Cancelling the queued proof of $reservationId failed", it)
-        }
-      }
-      result.onFailure {
-        val what = if (leaving) "Leaving the party of" else "Cancelling"
-        Log.w(TAG, "$what reservation $reservationId failed", it)
+      canceller.cancel(reservationId, explorerUid, leaving).onFailure {
         mutableUiState.update { state ->
           // A reservation that left meanwhile, e.g. rejected by the venue, has nothing to mark
           val shown = reservationId in state.reservationIds.values

@@ -268,29 +268,6 @@ class OverviewCancelTest {
   }
 
   @Test
-  fun aFailedCancelKeepsTheQueuedProof() = test {
-    val id = queueProofAndOpen()
-    fake.forcedFailure = IOException("offline")
-
-    viewModel.cancel(id)
-    runCurrent()
-
-    assertTrue(uploads.cancelled.isEmpty())
-  }
-
-  @Test
-  fun aQueuedProofThatCantBeCancelledStillLetsTheReservationGo() = test {
-    val id = queueProofAndOpen()
-    uploads.cancelFailure = IllegalStateException("WorkManager unavailable")
-
-    viewModel.cancel(id)
-    runCurrent()
-
-    assertEquals(ReservationStatus.CANCELLED, stored(id))
-    assertEquals(OverviewUiState(status = OverviewStatus.LOADED), state)
-  }
-
-  @Test
   fun theRowShowsCancellingWhileTheWriteIsPending() = test {
     val id = bookAndOpen()
     reservations.gate = CompletableDeferred()

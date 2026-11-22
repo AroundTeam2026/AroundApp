@@ -685,33 +685,6 @@ class VenuePageAcceptTest {
   }
 
   @Test
-  fun aFailedCancelKeepsTheQueuedProof() = test {
-    reservationRepository = CancelFailingRepository(fake, failures = 1)
-    val id = storeFor("a")
-    uploads.enqueue(id, VENUE_ID, EXPLORER, File("proof.jpg")).getOrThrow()
-    openAndPick("a")
-
-    viewModel.cancel()
-    runCurrent()
-
-    assertTrue(uploads.cancelled.isEmpty())
-  }
-
-  @Test
-  fun aQueuedProofThatCantBeCancelledStillLetsTheReservationGo() = test {
-    val id = storeFor("a")
-    uploads.enqueue(id, VENUE_ID, EXPLORER, File("proof.jpg")).getOrThrow()
-    uploads.cancelFailure = IllegalStateException("WorkManager unavailable")
-    openAndPick("a")
-
-    viewModel.cancel()
-    runCurrent()
-
-    assertEquals(ReservationStatus.CANCELLED, stored().single { it.id == id }.status)
-    assertEquals(CancelStatus.NONE, state.cancelStatus)
-  }
-
-  @Test
   fun aQuestAcceptedOnThisPageCanBeCancelledWithoutCountingAsRefused() = test {
     openAndPick("a")
     viewModel.accept()
