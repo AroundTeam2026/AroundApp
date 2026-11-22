@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<resources>
+    <!-- The explanation before Android's notification permission dialog (#635, Figma #631) -->
+    <string name="notification_prompt_title_explorer">Know when the venue answers</string>
+    <string name="notification_prompt_body_explorer">Around can tell you as soon as a venue answers, even when the app is closed.</string>
+    <string name="notification_prompt_reservation">Your reservation is approved or declined</string>
+    <string name="notification_prompt_proof">Your proof is approved or rejected</string>
+    <string name="notification_prompt_title_venue">Know when parties book</string>
+    <string name="notification_prompt_body_venue">Around can tell you as soon as a party does something, even when the app is closed.</string>
+    <string name="notification_prompt_booking">A party asks to book one of your quests</string>
+    <string name="notification_prompt_proof_sent">A party sends a proof to review</string>
+    <string name="notification_prompt_cancelled">A party cancels its reservation</string>
+    <string name="notification_prompt_footnote">You can turn each kind off later in Profile.</string>
+    <string name="notification_prompt_allow">Turn on notifications</string>
+    <string name="notification_prompt_not_now">Not now</string>
+</resources>
