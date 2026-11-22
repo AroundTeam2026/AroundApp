@@ -7,6 +7,9 @@ package com.github.aroundteam2026.aroundapp.resources
 object C {
   /** Test tags that UI tests use to find composables. */
   object Tag {
+    const val NOTIFICATION_PROMPT = "notification_prompt"
+    const val NOTIFICATION_PROMPT_ALLOW = "notification_prompt_allow"
+    const val NOTIFICATION_PROMPT_NOT_NOW = "notification_prompt_not_now"
     const val PROFILE_SETUP_LOADING = "profile_setup_loading"
     const val PROFILE_SETUP_SCREEN = "profile_setup_screen"
     const val PROFILE_SETUP_AVATAR = "profile_setup_avatar"
