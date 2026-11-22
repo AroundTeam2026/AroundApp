@@ -23,6 +23,15 @@ export type NotificationRoute = "quests" | "venue_dashboard";
  */
 export type NotificationKind = "reservation" | "proof" | "cancellation";
 
+/**
+ * The FCM errors that mean a token is gone for good: the app was uninstalled or its data cleared.
+ * Other errors, e.g. "messaging/internal-error", may pass, so their tokens are kept.
+ */
+export const GONE_TOKEN_ERRORS: ReadonlySet<string> = new Set([
+  "messaging/registration-token-not-registered",
+  "messaging/invalid-registration-token",
+]);
+
 /** What every notification function sends: the text shown, and where a tap leads. */
 export interface NotificationMessage {
   title: string;
@@ -41,8 +50,10 @@ export interface NotificationMessage {
  * user's role (#637). High priority makes Android deliver it at once rather than at the next
  * maintenance window, and a phone that stays off longer than [MESSAGE_TTL_MS] never gets it.
  *
- * A phone FCM refuses (e.g. an expired token) is logged and skipped: the others still get the
- * message. It rejects only when FCM can't be reached at all, or the tokens can't be read.
+ * A phone FCM refuses is logged and skipped: the others still get the message. When FCM says the
+ * token is gone for good ([GONE_TOKEN_ERRORS]), its document is deleted, so later messages don't
+ * try it again and a user's tokens don't pile up. It rejects only when FCM can't be reached at
+ * all, or the tokens can't be read or deleted.
  */
 export async function sendToUser(uid: string, message: NotificationMessage): Promise<void> {
   const saved = await getFirestore().collection("users").doc(uid).collection("tokens").get();
@@ -70,6 +81,19 @@ export async function sendToUser(uid: string, message: NotificationMessage): Pro
       failed: response.failureCount,
       sent: response.successCount,
       errors: response.responses.flatMap((r) => (r.error ? [r.error.code] : [])),
+    });
+  }
+
+  // responses[i] answers tokens[i], which is saved.docs[i].id
+  const gone = saved.docs.filter((_, i) => {
+    const code = response.responses[i].error?.code;
+    return code !== undefined && GONE_TOKEN_ERRORS.has(code);
+  });
+  if (gone.length > 0) {
+    await Promise.all(gone.map((doc) => doc.ref.delete()));
+    logger.info("sendToUser: deleted the tokens of phones that are gone", {
+      uid,
+      deleted: gone.length,
     });
   }
 }

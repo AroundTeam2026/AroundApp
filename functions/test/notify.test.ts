@@ -38,6 +38,25 @@ function sentTo(count: number, failures: string[] = []): BatchResponse {
   } as BatchResponse;
 }
 
+/** Answers each phone FCM is asked to reach: refused with the code in [refused], else sent. */
+function answerPerPhone(refused: Record<string, string>) {
+  sendEachForMulticast.mockImplementation(async (message) => {
+    const { tokens } = message as { tokens: string[] };
+    const responses = tokens.map((token) =>
+      token in refused
+        ? { success: false, error: { code: refused[token] } }
+        : { success: true, messageId: "id" },
+    );
+    const failureCount = responses.filter((r) => !r.success).length;
+    return { responses, successCount: tokens.length - failureCount, failureCount } as BatchResponse;
+  });
+}
+
+async function tokensOf(uid: string): Promise<string[]> {
+  const saved = await getFirestore().collection("users").doc(uid).collection("tokens").get();
+  return saved.docs.map((doc) => doc.id).sort();
+}
+
 beforeAll(() => {
   if (getApps().length === 0) initializeApp({ projectId: process.env.GCLOUD_PROJECT });
 });
@@ -115,5 +134,37 @@ describe("sendToUser", () => {
     sendEachForMulticast.mockRejectedValue(new Error("app/network-error"));
 
     await expect(sendToUser(uid, MESSAGE)).rejects.toThrow("app/network-error");
+  });
+
+  it("deletes the tokens FCM says are gone and keeps the user's others", async () => {
+    const uid = await userWithTokens("uninstalled-phone", "cleared-phone", "working-phone");
+    const other = await userWithTokens("uninstalled-phone");
+    answerPerPhone({
+      "uninstalled-phone": "messaging/registration-token-not-registered",
+      "cleared-phone": "messaging/invalid-registration-token",
+    });
+    jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+
+    await sendToUser(uid, MESSAGE);
+
+    expect(await tokensOf(uid)).toEqual(["working-phone"]);
+    expect(await tokensOf(other)).toEqual(["uninstalled-phone"]);
+    expect(info).toHaveBeenCalledWith("sendToUser: deleted the tokens of phones that are gone", {
+      uid,
+      deleted: 2,
+    });
+  });
+
+  it("keeps a token FCM refuses for another reason", async () => {
+    const uid = await userWithTokens("busy-phone", "working-phone");
+    answerPerPhone({ "busy-phone": "messaging/internal-error" });
+    jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+
+    await sendToUser(uid, MESSAGE);
+
+    expect(await tokensOf(uid)).toEqual(["busy-phone", "working-phone"]);
+    expect(info).not.toHaveBeenCalled();
   });
 });
