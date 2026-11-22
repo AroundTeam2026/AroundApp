@@ -27,6 +27,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueue
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
@@ -85,7 +87,8 @@ import kotlinx.coroutines.launch
  *
  * It also shows who is in each party, downloading their pictures through [pictureRepository];
  * without one, members show their initials. While [VenuePageUiState.offline] says the device is
- * offline, which it follows from [connectivityRepository], the explorer can't [cancel].
+ * offline, which it follows from [connectivityRepository], the explorer can't [cancel]. Cancelling
+ * also cancels the reservation's proof waiting in [proofUploadQueue], if any.
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -96,6 +99,7 @@ class VenuePageViewModel(
     private val partyRepository: PartyRepository,
     private val completionRepository: CompletionRepository,
     connectivityRepository: ConnectivityRepository,
+    private val proofUploadQueue: ProofUploadQueue,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
     arrivalQuestId: String? = null,
@@ -269,7 +273,9 @@ class VenuePageViewModel(
    * without such a reservation, or when which of the two it is isn't known, or while it is being
    * cancelled, so a double tap cancels once, or while the device is offline, since cancelling needs
    * a connection. It shows as cancelling until the reservations no longer list it. A failure, such
-   * as being offline, shows [CancelStatus.FAILED]; calling this again retries.
+   * as being offline, shows [CancelStatus.FAILED]; calling this again retries. Once it succeeds,
+   * the reservation's proof waiting in the [ProofUploadQueue], if any, is cancelled too, since the
+   * rules would refuse it.
    */
   fun cancel() {
     val current = mutableUiState.value
@@ -288,6 +294,12 @@ class VenuePageViewModel(
       val result =
           if (leaving) partyRepository.withdraw(reservationId, explorerUid)
           else reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
+      result.onSuccess {
+        // The reservation is gone either way, so a failure here only leaves a stale copy behind
+        proofUploadQueue.cancel(reservationId).onFailure {
+          Log.w(TAG, "Cancelling the queued proof of $reservationId failed", it)
+        }
+      }
       result.onFailure {
         val what = if (leaving) "Leaving the party of" else "Cancelling"
         Log.w(TAG, "$what reservation $reservationId failed", it)
@@ -494,6 +506,9 @@ class VenuePageViewModel(
             PartyRepositoryProvider.repository,
             CompletionRepositoryProvider.repository,
             ConnectivityRepositoryProvider.repository(
+                this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+            ),
+            ProofUploadQueueProvider.queue(
                 this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
             ),
             explorerUid,

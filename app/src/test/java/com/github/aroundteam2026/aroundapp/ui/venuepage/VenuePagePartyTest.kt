@@ -10,6 +10,7 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -23,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import io.mockk.mockk
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,6 +59,8 @@ class VenuePagePartyTest {
   private var time = 0L
   private val party = FakePartyRepository { time }
   private val reservations = FakeReservationRepository(now = { time }, party = party)
+
+  private val uploads = FakeProofUploadQueue()
 
   /** Whether withdrawing fails, as offline. */
   private var withdrawFails = false
@@ -126,6 +130,7 @@ class VenuePagePartyTest {
         partyRepository,
         FakeCompletionRepository(),
         FakeConnectivityRepository(),
+        uploads,
         ME,
         clock = { NOW },
         pictureRepository = pictures.takeIf { withPictures },
@@ -303,6 +308,32 @@ class VenuePagePartyTest {
     val reservation = reservations.observeForExplorer(FRIEND).first().single()
     assertEquals(ReservationStatus.PENDING, reservation.status)
     assertNull(state.reservationIds[QUEST])
+  }
+
+  // The member's upload would be refused once they left, leaving an unused photo in Storage (#625)
+  @Test
+  fun aMemberWhoLeavesCancelsTheirQueuedProof() = test {
+    val id = reservationBy(FRIEND, ME)
+    uploads.enqueue(id, VENUE, ME, File("proof.jpg")).getOrThrow()
+    openDetails()
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(listOf(id), uploads.cancelled)
+  }
+
+  @Test
+  fun aFailedLeaveKeepsTheQueuedProof() = test {
+    val id = reservationBy(FRIEND, ME)
+    uploads.enqueue(id, VENUE, ME, File("proof.jpg")).getOrThrow()
+    openDetails()
+    withdrawFails = true
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertTrue(uploads.cancelled.isEmpty())
   }
 
   @Test

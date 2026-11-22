@@ -113,7 +113,8 @@ class OverviewViewModel(
    * unknown, or while it is being cancelled, so a double tap cancels once, or while the device is
    * offline, since the cancel needs a connection. The row shows as cancelling until the listener
    * drops it. A failure, such as being offline, keeps the row and marks it failed, unless the row
-   * left meanwhile; calling this again retries.
+   * left meanwhile; calling this again retries. Once it succeeds, the reservation's proof waiting
+   * in the [ProofUploadQueue], if any, is cancelled too, since the rules would refuse it.
    */
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
@@ -133,6 +134,12 @@ class OverviewViewModel(
       val result =
           if (leaving) partyRepository.withdraw(reservationId, explorerUid)
           else reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
+      result.onSuccess {
+        // The reservation is gone either way, so a failure here only leaves a stale copy behind
+        proofUploadQueue.cancel(reservationId).onFailure {
+          Log.w(TAG, "Cancelling the queued proof of $reservationId failed", it)
+        }
+      }
       result.onFailure {
         val what = if (leaving) "Leaving the party of" else "Cancelling"
         Log.w(TAG, "$what reservation $reservationId failed", it)

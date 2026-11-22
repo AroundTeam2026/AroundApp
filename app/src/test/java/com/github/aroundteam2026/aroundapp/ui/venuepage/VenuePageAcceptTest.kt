@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -34,6 +35,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +86,7 @@ class VenuePageAcceptTest {
   private val completions = FakeCompletionRepository { START }
   private var completionRepository: CompletionRepository = completions
   private val connectivity = FakeConnectivityRepository()
+  private val uploads = FakeProofUploadQueue()
   private var venueRepository: VenueRepository =
       FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))
 
@@ -97,6 +100,7 @@ class VenuePageAcceptTest {
         partyRepository,
         completionRepository,
         connectivity,
+        uploads,
         EXPLORER,
         clock,
     )
@@ -665,6 +669,46 @@ class VenuePageAcceptTest {
     assertEquals(CancelStatus.NONE, state.cancelStatus)
     assertNull(state.cancellableReservationId)
     assertTrue(state.failedQuestIds.isEmpty())
+  }
+
+  // Once cancelled, the rules would refuse the upload, leaving an unused photo in Storage (#625)
+  @Test
+  fun cancelAlsoCancelsTheQueuedProof() = test {
+    val id = storeFor("a")
+    uploads.enqueue(id, VENUE_ID, EXPLORER, File("proof.jpg")).getOrThrow()
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(listOf(id), uploads.cancelled)
+  }
+
+  @Test
+  fun aFailedCancelKeepsTheQueuedProof() = test {
+    reservationRepository = CancelFailingRepository(fake, failures = 1)
+    val id = storeFor("a")
+    uploads.enqueue(id, VENUE_ID, EXPLORER, File("proof.jpg")).getOrThrow()
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertTrue(uploads.cancelled.isEmpty())
+  }
+
+  @Test
+  fun aQueuedProofThatCantBeCancelledStillLetsTheReservationGo() = test {
+    val id = storeFor("a")
+    uploads.enqueue(id, VENUE_ID, EXPLORER, File("proof.jpg")).getOrThrow()
+    uploads.cancelFailure = IllegalStateException("WorkManager unavailable")
+    openAndPick("a")
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(ReservationStatus.CANCELLED, stored().single { it.id == id }.status)
+    assertEquals(CancelStatus.NONE, state.cancelStatus)
   }
 
   @Test

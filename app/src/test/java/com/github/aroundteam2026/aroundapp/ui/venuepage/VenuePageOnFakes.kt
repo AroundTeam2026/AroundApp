@@ -10,6 +10,7 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRe
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -78,6 +79,7 @@ fun VenuePageOnFakes(
             party,
             FakeCompletionRepository(),
             connectivity,
+            FakeProofUploadQueue(),
             FAKE_EXPLORER_UID,
             arrivalQuestId = arrivalQuestId,
         )
