@@ -25,6 +25,27 @@ class RefusedWritesProviderTest {
     )
   }
 
+  // Signing out: the next explorer on the phone starts clean, and so does this one signing in again
+  @Test
+  fun forgettingAnExplorerEmptiesWhatThePhoneRemembersOfThem() {
+    RefusedWritesProvider.refusedWrites(context, "grace").record("r2", "other")
+    val before = RefusedWritesProvider.refusedWrites(context, "ada")
+    before.record("r1", "quest")
+
+    RefusedWritesProvider.forget(context, "ada")
+
+    val after = RefusedWritesProvider.refusedWrites(context, "ada")
+    assertNotSame(before, after)
+    assertEquals(
+        emptyList<RecordedWrite>(),
+        RefusedWritesStoreSharedPrefs(context, "ada") { System.currentTimeMillis() }.all(),
+    )
+    assertEquals(
+        1,
+        RefusedWritesStoreSharedPrefs(context, "grace") { System.currentTimeMillis() }.all().size,
+    )
+  }
+
   @Test
   fun anotherExplorerGetsItsOwn() {
     val ada = RefusedWritesProvider.refusedWrites(context, "ada")
@@ -39,7 +60,8 @@ class RefusedWritesProviderTest {
   fun whatItLearnsIsKeptInThePhonesPreferences() {
     RefusedWritesProvider.refusedWrites(context, "ada").record("r1", "quest")
 
-    val remembered = RefusedWritesStoreSharedPrefs(context, "ada").all()
+    val remembered =
+        RefusedWritesStoreSharedPrefs(context, "ada") { System.currentTimeMillis() }.all()
 
     assertEquals(listOf(RecordedWrite("r1", "quest", WriteState.WRITTEN)), remembered)
   }

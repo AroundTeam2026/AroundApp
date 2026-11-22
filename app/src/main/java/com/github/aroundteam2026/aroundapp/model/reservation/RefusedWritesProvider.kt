@@ -23,11 +23,28 @@ object RefusedWritesProvider {
         ?.let {
           return it.second
         }
-    val writes =
-        RefusedWrites(RefusedWritesStoreSharedPrefs(context.applicationContext, explorerUid))
+    val writes = RefusedWrites(storeOf(context, explorerUid))
     current = explorerUid to writes
     return writes
   }
+
+  /**
+   * Forgets everything the phone remembers of the explorer [explorerUid], as when they sign out:
+   * whoever signs in next, them again included, starts clean.
+   */
+  @Synchronized
+  fun forget(context: Context, explorerUid: String) {
+    val store = storeOf(context, explorerUid)
+    store.all().forEach { store.remove(it.reservationId) }
+    if (current?.first == explorerUid) current = null
+  }
+
+  private fun storeOf(context: Context, explorerUid: String) =
+      RefusedWritesStoreSharedPrefs(
+          context.applicationContext,
+          explorerUid,
+          System::currentTimeMillis,
+      )
 
   /** Forgets the explorer's [RefusedWrites], as a new app process starts with none. */
   @Synchronized
