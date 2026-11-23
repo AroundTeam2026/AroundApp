@@ -10,6 +10,8 @@ import io.mockk.every
 import io.mockk.mockk
 import java.io.IOException
 import java.util.Locale
+import java.util.concurrent.Executors
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -104,6 +106,28 @@ class AndroidGeocodingTest {
 
   @Test
   @Config(sdk = [32])
+  fun beforeAndroid13TheBlockingLookupRunsOnTheIoDispatcher() = runTest {
+    val mock = mockk<Geocoder>()
+    var lookupThread: String? = null
+    @Suppress("DEPRECATION")
+    every { mock.getFromLocationName("Rue de Bourg", 5) } answers
+        {
+          lookupThread = Thread.currentThread().name
+          listOf(bourg)
+        }
+    val io = Executors.newSingleThreadExecutor { Thread(it, IO_THREAD) }.asCoroutineDispatcher()
+
+    try {
+      AndroidGeocoding(mock, io).fromName("Rue de Bourg", 5, null)
+    } finally {
+      io.close()
+    }
+
+    assertEquals(IO_THREAD, lookupThread)
+  }
+
+  @Test
+  @Config(sdk = [32])
   fun beforeAndroid13BoundsReachTheGeocoderAsSouthWestNorthEast() = runTest {
     val mock = mockk<Geocoder>()
     @Suppress("DEPRECATION")
@@ -142,4 +166,8 @@ class AndroidGeocodingTest {
   }
 
   private fun shadowGeocoder(): ShadowGeocoder = Shadows.shadowOf(geocoder)
+
+  private companion object {
+    const val IO_THREAD = "geocoding-io"
+  }
 }

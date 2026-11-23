@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
  * its avatar stops being equal.
  */
 @Stable
-interface VenueAvatar {
+fun interface VenueAvatar {
   /** Draws the avatar to fill [modifier]; [tint] is the colour for single-colour avatars. */
   @Composable fun Content(tint: Color, modifier: Modifier)
 

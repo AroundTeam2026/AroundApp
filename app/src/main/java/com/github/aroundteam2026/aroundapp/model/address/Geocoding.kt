@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.common.GeoBounds
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -31,8 +32,12 @@ interface Geocoding {
  * [Geocoding] through Android's [geocoder], which Google Play services provides.
  *
  * @param geocoder The geocoder to ask; tests pass their own.
+ * @param ioDispatcher Where the blocking lookup used before Android 13 runs.
  */
-class AndroidGeocoding(private val geocoder: Geocoder) : Geocoding {
+class AndroidGeocoding(
+    private val geocoder: Geocoder,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : Geocoding {
   /** Looks addresses up with the device's geocoder; any context will do. */
   constructor(context: Context) : this(Geocoder(context.applicationContext))
 
@@ -64,7 +69,7 @@ class AndroidGeocoding(private val geocoder: Geocoder) : Geocoding {
         }
       } else {
         // The only lookup before Android 13 blocks until the answer arrives
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
               @Suppress("DEPRECATION")
               if (within == null) geocoder.getFromLocationName(query, maxResults)
               else
