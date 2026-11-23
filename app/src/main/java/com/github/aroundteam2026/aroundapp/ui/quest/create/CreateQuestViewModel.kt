@@ -24,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -361,32 +362,37 @@ class CreateQuestViewModel(
     try {
       reservations.observeForVenue(venueId).collect { all ->
         val ofQuest = all.filter { it.questId == id }
-        val partyLocked = ofQuest.any { it.status == ReservationStatus.PENDING }
-        val proofLocked = ofQuest.any { it.status.isActive }
-        val quest = editedQuest
-        mutableUiState.update {
-          val locked =
-              it.copy(
-                  partySizeLocked = partyLocked,
-                  proofTypeLocked = proofLocked,
-                  hasActiveReservations = proofLocked,
-              )
-          when {
-            quest == null -> locked
-            else ->
-                locked.copy(
-                    minPartySize = if (partyLocked) quest.minPartySize else it.minPartySize,
-                    exactPartySize = if (partyLocked) quest.exactPartySize else it.exactPartySize,
-                    proofType = if (proofLocked) quest.proofType else it.proofType,
-                )
-          }
-        }
+        mutableUiState.update { it.lockedBy(ofQuest, editedQuest) }
       }
     } catch (cancelled: CancellationException) {
       throw cancelled
     } catch (e: Exception) {
       Log.w(TAG, "Watching reservations failed", e)
     }
+  }
+
+  /**
+   * Locks the party size if [ofQuest] has a pending reservation and the proof type if it has an
+   * active one, putting back [quest]'s own while locked.
+   */
+  private fun CreateQuestUiState.lockedBy(
+      ofQuest: List<Reservation>,
+      quest: Quest?,
+  ): CreateQuestUiState {
+    val partyLocked = ofQuest.any { it.status == ReservationStatus.PENDING }
+    val proofLocked = ofQuest.any { it.status.isActive }
+    val locked =
+        copy(
+            partySizeLocked = partyLocked,
+            proofTypeLocked = proofLocked,
+            hasActiveReservations = proofLocked,
+        )
+    if (quest == null) return locked
+    return locked.copy(
+        minPartySize = if (partyLocked) quest.minPartySize else minPartySize,
+        exactPartySize = if (partyLocked) quest.exactPartySize else exactPartySize,
+        proofType = if (proofLocked) quest.proofType else proofType,
+    )
   }
 
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
