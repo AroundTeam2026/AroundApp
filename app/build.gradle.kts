@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+import com.ncorti.ktfmt.gradle.tasks.KtfmtBaseTask
 import java.util.Properties
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -142,6 +143,13 @@ sonar {
         "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml",
     )
   }
+}
+
+// ktfmt reads each source set's srcDirs, not the kotlin.directories added above, so it would skip
+// the shared fakes in src/testSupport (#543). Its `test` tasks, which ktfmtCheck and ktfmtFormat
+// run, check and format them too.
+tasks.withType<KtfmtBaseTask>().configureEach {
+  if (name == "ktfmtCheckTest" || name == "ktfmtFormatTest") source("src/testSupport/java")
 }
 
 // When a library is used both by robolectric and connected tests, use this function
