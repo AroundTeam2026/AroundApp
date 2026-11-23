@@ -39,7 +39,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -332,7 +331,7 @@ class CreateQuestViewModel(
    * that doesn't exist or isn't the venue's as unavailable.
    */
   private suspend fun loadQuest(id: String) {
-    val quest =
+    val quest: Quest? =
         try {
           questRepository.getQuest(id)
         } catch (cancelled: CancellationException) {
@@ -359,32 +358,35 @@ class CreateQuestViewModel(
   private suspend fun watchPendingParties(id: String) {
     val venueId = authRepository.currentUserId.value ?: return
     val reservations = reservationRepository ?: return
-    reservations
-        .observeForVenue(venueId)
-        .catch { Log.w(TAG, "Watching reservations failed", it) }
-        .collect { all ->
-          val ofQuest = all.filter { it.questId == id }
-          val partyLocked = ofQuest.any { it.status == ReservationStatus.PENDING }
-          val proofLocked = ofQuest.any { it.status.isActive }
-          val quest = editedQuest
-          mutableUiState.update {
-            val locked =
-                it.copy(
-                    partySizeLocked = partyLocked,
-                    proofTypeLocked = proofLocked,
-                    hasActiveReservations = proofLocked,
+    try {
+      reservations.observeForVenue(venueId).collect { all ->
+        val ofQuest = all.filter { it.questId == id }
+        val partyLocked = ofQuest.any { it.status == ReservationStatus.PENDING }
+        val proofLocked = ofQuest.any { it.status.isActive }
+        val quest = editedQuest
+        mutableUiState.update {
+          val locked =
+              it.copy(
+                  partySizeLocked = partyLocked,
+                  proofTypeLocked = proofLocked,
+                  hasActiveReservations = proofLocked,
+              )
+          when {
+            quest == null -> locked
+            else ->
+                locked.copy(
+                    minPartySize = if (partyLocked) quest.minPartySize else it.minPartySize,
+                    exactPartySize = if (partyLocked) quest.exactPartySize else it.exactPartySize,
+                    proofType = if (proofLocked) quest.proofType else it.proofType,
                 )
-            when {
-              quest == null -> locked
-              else ->
-                  locked.copy(
-                      minPartySize = if (partyLocked) quest.minPartySize else it.minPartySize,
-                      exactPartySize = if (partyLocked) quest.exactPartySize else it.exactPartySize,
-                      proofType = if (proofLocked) quest.proofType else it.proofType,
-                  )
-            }
           }
         }
+      }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (e: Exception) {
+      Log.w(TAG, "Watching reservations failed", e)
+    }
   }
 
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
@@ -414,7 +416,7 @@ class CreateQuestViewModel(
    */
   private suspend fun loadVenue() {
     val venueId = authRepository.currentUserId.value ?: return
-    val venue =
+    val venue: Venue? =
         try {
           venueRepository.getVenue(venueId)
         } catch (cancelled: CancellationException) {
