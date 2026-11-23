@@ -124,84 +124,13 @@ fun CompletionContent(
     locationServicesEnabled: Boolean = true,
     photoPicker: @Composable () -> Unit,
 ) {
-  val saving = state.saveState == SaveState.Saving
-  val saved = state.saveState is SaveState.Saved
   val showOfflineHint = state.isEditable && state.photoSentLater
   Scaffold(
       modifier = modifier.testTag(C.Tag.COMPLETION_SCREEN).imePadding(),
       containerColor = MaterialTheme.colorScheme.background,
       bottomBar = {
         if (state.status == CompletionFormStatus.READY) {
-          Column(
-              Modifier.fillMaxWidth().navigationBarsPadding().padding(AroundSpacing.SectionGap),
-              verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
-          ) {
-            Text(
-                when {
-                  state.sentByTeammate -> stringResource(R.string.completion_sent_by_teammate)
-                  state.sendingLater -> stringResource(R.string.waiting_to_send_note)
-                  state.photoWaiting -> stringResource(R.string.completion_photo_waiting)
-                  else -> stringResource(R.string.completion_review_hint, venueName)
-                },
-                Modifier.fillMaxWidth().testTag(C.Tag.COMPLETION_HINT),
-                style = AroundTextStyles.Small,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Button(
-                onClick = onSubmit,
-                enabled = state.canSubmit,
-                colors =
-                    if (state.sendingLater) {
-                      // Saved, not unavailable: container colours instead of the faded ones
-                      ButtonDefaults.buttonColors(
-                          disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                          disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                      )
-                    } else {
-                      ButtonDefaults.buttonColors(
-                          disabledContainerColor =
-                              MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                          disabledContentColor =
-                              MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
-                      )
-                    },
-                shape = MaterialTheme.shapes.medium,
-                modifier =
-                    Modifier.fillMaxWidth()
-                        .heightIn(min = SUBMIT_MIN_HEIGHT)
-                        .testTag(C.Tag.COMPLETION_SUBMIT),
-            ) {
-              if (saving) {
-                CircularProgressIndicator(
-                    Modifier.size(PROGRESS_SIZE),
-                    color = LocalContentColor.current,
-                    strokeWidth = PROGRESS_STROKE,
-                )
-                Spacer(Modifier.width(AroundSpacing.Small))
-              }
-              if (state.sendingLater) {
-                Icon(
-                    painterResource(R.drawable.ic_cloud_upload),
-                    contentDescription = null,
-                    Modifier.size(SENDING_ICON_SIZE),
-                )
-                Spacer(Modifier.width(AroundSpacing.Small))
-              }
-              Text(
-                  stringResource(
-                      when {
-                        saving -> R.string.completion_sending
-                        saved || state.sentByTeammate -> R.string.completion_sent
-                        state.sendingLater -> R.string.waiting_to_send
-                        state.saveState == SaveState.Failed -> R.string.completion_retry
-                        else -> R.string.completion_send
-                      }
-                  ),
-                  style = AroundTextStyles.Button,
-              )
-            }
-          }
+          CompletionBottomBar(state, venueName, onSubmit)
         }
       },
   ) { padding ->
@@ -213,20 +142,10 @@ fun CompletionContent(
             .padding(horizontal = AroundSpacing.SectionGap, vertical = AroundSpacing.SectionGap),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
     ) {
-      Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        OutlinedIconButton(
-            onClick = onBack,
-            enabled = !saving && !saved,
-            modifier = Modifier.align(Alignment.CenterStart).size(HEADER_CONTROL_SIZE),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        ) {
-          Icon(
-              painterResource(R.drawable.ic_chevron_left),
-              stringResource(R.string.completion_back),
-          )
-        }
-        Text(stringResource(R.string.completion_heading), style = AroundTextStyles.CardTitle)
-      }
+      CompletionHeader(
+          onBack = onBack,
+          backEnabled = state.saveState != SaveState.Saving && state.saveState !is SaveState.Saved,
+      )
       // The app-wide banner, unless the hint already says the device is offline
       if (state.offline && !showOfflineHint) OfflineBanner()
       when (state.status) {
@@ -240,125 +159,19 @@ fun CompletionContent(
             CompletionMessage(stringResource(R.string.completion_unavailable))
         CompletionFormStatus.READY -> {
           if (showOfflineHint) OfflineHint(message = R.string.offline_photo_sent_later)
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Surface(
-                modifier = Modifier.size(HEADER_CONTROL_SIZE),
-                shape = AroundPillShape,
-                color = MaterialTheme.colorScheme.tertiary,
-                contentColor = MaterialTheme.colorScheme.onTertiary,
-            ) {
-              Box(contentAlignment = Alignment.Center) {
-                Text(
-                    initialsOf(venueName),
-                    style = AroundTextStyles.AvatarSmall,
-                )
-              }
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TITLE_GAP)) {
-              Text(
-                  venueName,
-                  style = AroundTextStyles.Caption,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-              Text(
-                  state.questTitle,
-                  Modifier.semantics { heading() },
-                  style = AroundTextStyles.OverlayTitle,
-                  color = MaterialTheme.colorScheme.onBackground,
-              )
-            }
-          }
-          if (state.requirements.isNotBlank()) {
-            Surface(
-                shape = MaterialTheme.shapes.large,
-                color = AroundTheme.colors.panel,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ) {
-              Column(
-                  Modifier.fillMaxWidth().padding(AroundSpacing.InsetPadding),
-                  verticalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
-              ) {
-                Text(
-                    stringResource(R.string.completion_requirements),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = AroundTextStyles.Label,
-                )
-                Text(state.requirements, style = AroundTextStyles.Body)
-              }
-            }
-          }
+          CompletionQuestTitle(venueName, state.questTitle)
+          if (state.requirements.isNotBlank()) CompletionRequirements(state.requirements)
           when (state.proofType) {
-            ProofType.TEXT -> {
-              Text(stringResource(R.string.completion_answer), style = AroundTextStyles.FieldLabel)
-              OutlinedTextField(
-                  value = state.answer,
-                  onValueChange = onAnswerChange,
-                  enabled = state.isEditable,
-                  isError = state.answerTooLong,
-                  supportingText =
-                      if (state.answerTooLong) {
-                        {
-                          CompletionMessage(
-                              pluralStringResource(
-                                  R.plurals.completion_answer_too_long,
-                                  MAX_TEXT_ANSWER_LENGTH,
-                                  MAX_TEXT_ANSWER_LENGTH,
-                              )
-                          )
-                        }
-                      } else null,
-                  placeholder = { Text(stringResource(R.string.completion_answer_hint)) },
-                  modifier =
-                      Modifier.fillMaxWidth()
-                          .heightIn(min = ANSWER_MIN_HEIGHT)
-                          .testTag(C.Tag.COMPLETION_ANSWER),
-                  shape = MaterialTheme.shapes.small,
-                  textStyle = AroundTextStyles.TextArea,
-                  colors =
-                      OutlinedTextFieldDefaults.colors(
-                          unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                      ),
-              )
-            }
+            ProofType.TEXT -> CompletionAnswerField(state, onAnswerChange)
             ProofType.PHOTO -> photoPicker()
             null -> Unit
           }
-          if (preciseLocationRefused) {
-            CompletionMessage(stringResource(R.string.completion_precise_required))
-          } else {
-            when (state.locationError) {
-              CompletionLocationError.TOO_FAR ->
-                  CompletionMessage(stringResource(R.string.completion_too_far))
-              CompletionLocationError.UNAVAILABLE ->
-                  CompletionMessage(stringResource(R.string.completion_location_unavailable))
-              null -> Unit
-            }
-          }
-          if (
-              preciseLocationRefused || state.locationError == CompletionLocationError.UNAVAILABLE
-          ) {
-            OutlinedButton(
-                onClick = onRequestLocation,
-                enabled = state.isEditable,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                colors =
-                    ButtonDefaults.outlinedButtonColors(
-                        contentColor = AroundTheme.colors.accentText
-                    ),
-            ) {
-              Text(
-                  stringResource(
-                      if (!locationServicesEnabled) R.string.completion_location_settings
-                      else if (preciseLocationRefused) R.string.completion_enable_location
-                      else R.string.completion_check_location
-                  )
-              )
-            }
-          }
+          CompletionLocation(
+              state,
+              preciseLocationRefused,
+              locationServicesEnabled,
+              onRequestLocation,
+          )
           if (
               state.saveState == SaveState.Failed &&
                   state.locationError == null &&
@@ -368,6 +181,235 @@ fun CompletionContent(
           }
         }
       }
+    }
+  }
+}
+
+/** The hint above the send button, and the button itself, which shows how the send is going. */
+@Composable
+private fun CompletionBottomBar(state: CompletionUiState, venueName: String, onSubmit: () -> Unit) {
+  Column(
+      Modifier.fillMaxWidth().navigationBarsPadding().padding(AroundSpacing.SectionGap),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+  ) {
+    Text(
+        when {
+          state.sentByTeammate -> stringResource(R.string.completion_sent_by_teammate)
+          state.sendingLater -> stringResource(R.string.waiting_to_send_note)
+          state.photoWaiting -> stringResource(R.string.completion_photo_waiting)
+          else -> stringResource(R.string.completion_review_hint, venueName)
+        },
+        Modifier.fillMaxWidth().testTag(C.Tag.COMPLETION_HINT),
+        style = AroundTextStyles.Small,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+    CompletionSubmitButton(state, onSubmit)
+  }
+}
+
+@Composable
+private fun CompletionSubmitButton(state: CompletionUiState, onSubmit: () -> Unit) {
+  Button(
+      onClick = onSubmit,
+      enabled = state.canSubmit,
+      colors =
+          if (state.sendingLater) {
+            // Saved, not unavailable: container colours instead of the faded ones
+            ButtonDefaults.buttonColors(
+                disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+          } else {
+            ButtonDefaults.buttonColors(
+                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
+            )
+          },
+      shape = MaterialTheme.shapes.medium,
+      modifier =
+          Modifier.fillMaxWidth()
+              .heightIn(min = SUBMIT_MIN_HEIGHT)
+              .testTag(C.Tag.COMPLETION_SUBMIT),
+  ) {
+    if (state.saveState == SaveState.Saving) {
+      CircularProgressIndicator(
+          Modifier.size(PROGRESS_SIZE),
+          color = LocalContentColor.current,
+          strokeWidth = PROGRESS_STROKE,
+      )
+      Spacer(Modifier.width(AroundSpacing.Small))
+    }
+    if (state.sendingLater) {
+      Icon(
+          painterResource(R.drawable.ic_cloud_upload),
+          contentDescription = null,
+          Modifier.size(SENDING_ICON_SIZE),
+      )
+      Spacer(Modifier.width(AroundSpacing.Small))
+    }
+    Text(stringResource(submitLabel(state)), style = AroundTextStyles.Button)
+  }
+}
+
+/** What the send button says for [state]. */
+private fun submitLabel(state: CompletionUiState): Int =
+    when {
+      state.saveState == SaveState.Saving -> R.string.completion_sending
+      state.saveState is SaveState.Saved || state.sentByTeammate -> R.string.completion_sent
+      state.sendingLater -> R.string.waiting_to_send
+      state.saveState == SaveState.Failed -> R.string.completion_retry
+      else -> R.string.completion_send
+    }
+
+/** The back button and the screen's title. */
+@Composable
+private fun CompletionHeader(onBack: () -> Unit, backEnabled: Boolean) {
+  Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    OutlinedIconButton(
+        onClick = onBack,
+        enabled = backEnabled,
+        modifier = Modifier.align(Alignment.CenterStart).size(HEADER_CONTROL_SIZE),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
+      Icon(
+          painterResource(R.drawable.ic_chevron_left),
+          stringResource(R.string.completion_back),
+      )
+    }
+    Text(stringResource(R.string.completion_heading), style = AroundTextStyles.CardTitle)
+  }
+}
+
+/** The venue's initials and name, above the quest's title. */
+@Composable
+private fun CompletionQuestTitle(venueName: String, questTitle: String) {
+  Row(
+      horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Surface(
+        modifier = Modifier.size(HEADER_CONTROL_SIZE),
+        shape = AroundPillShape,
+        color = MaterialTheme.colorScheme.tertiary,
+        contentColor = MaterialTheme.colorScheme.onTertiary,
+    ) {
+      Box(contentAlignment = Alignment.Center) {
+        Text(
+            initialsOf(venueName),
+            style = AroundTextStyles.AvatarSmall,
+        )
+      }
+    }
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(TITLE_GAP)) {
+      Text(
+          venueName,
+          style = AroundTextStyles.Caption,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Text(
+          questTitle,
+          Modifier.semantics { heading() },
+          style = AroundTextStyles.OverlayTitle,
+          color = MaterialTheme.colorScheme.onBackground,
+      )
+    }
+  }
+}
+
+/** The panel listing what the quest asks for. */
+@Composable
+private fun CompletionRequirements(requirements: String) {
+  Surface(
+      shape = MaterialTheme.shapes.large,
+      color = AroundTheme.colors.panel,
+      contentColor = MaterialTheme.colorScheme.onSurface,
+  ) {
+    Column(
+        Modifier.fillMaxWidth().padding(AroundSpacing.InsetPadding),
+        verticalArrangement = Arrangement.spacedBy(AroundSpacing.SegmentGap),
+    ) {
+      Text(
+          stringResource(R.string.completion_requirements),
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          style = AroundTextStyles.Label,
+      )
+      Text(requirements, style = AroundTextStyles.Body)
+    }
+  }
+}
+
+/** The text proof's label and field, with an error under it when the answer is too long. */
+@Composable
+private fun CompletionAnswerField(state: CompletionUiState, onAnswerChange: (String) -> Unit) {
+  Text(stringResource(R.string.completion_answer), style = AroundTextStyles.FieldLabel)
+  OutlinedTextField(
+      value = state.answer,
+      onValueChange = onAnswerChange,
+      enabled = state.isEditable,
+      isError = state.answerTooLong,
+      supportingText =
+          if (state.answerTooLong) {
+            {
+              CompletionMessage(
+                  pluralStringResource(
+                      R.plurals.completion_answer_too_long,
+                      MAX_TEXT_ANSWER_LENGTH,
+                      MAX_TEXT_ANSWER_LENGTH,
+                  )
+              )
+            }
+          } else null,
+      placeholder = { Text(stringResource(R.string.completion_answer_hint)) },
+      modifier =
+          Modifier.fillMaxWidth()
+              .heightIn(min = ANSWER_MIN_HEIGHT)
+              .testTag(C.Tag.COMPLETION_ANSWER),
+      shape = MaterialTheme.shapes.small,
+      textStyle = AroundTextStyles.TextArea,
+      colors =
+          OutlinedTextFieldDefaults.colors(
+              unfocusedContainerColor = MaterialTheme.colorScheme.surface
+          ),
+  )
+}
+
+/** Why the location check failed, if it did, and the button that fixes it when one can. */
+@Composable
+private fun CompletionLocation(
+    state: CompletionUiState,
+    preciseLocationRefused: Boolean,
+    locationServicesEnabled: Boolean,
+    onRequestLocation: () -> Unit,
+) {
+  if (preciseLocationRefused) {
+    CompletionMessage(stringResource(R.string.completion_precise_required))
+  } else {
+    when (state.locationError) {
+      CompletionLocationError.TOO_FAR ->
+          CompletionMessage(stringResource(R.string.completion_too_far))
+      CompletionLocationError.UNAVAILABLE ->
+          CompletionMessage(stringResource(R.string.completion_location_unavailable))
+      null -> Unit
+    }
+  }
+  if (preciseLocationRefused || state.locationError == CompletionLocationError.UNAVAILABLE) {
+    OutlinedButton(
+        onClick = onRequestLocation,
+        enabled = state.isEditable,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = AroundTheme.colors.accentText),
+    ) {
+      Text(
+          stringResource(
+              when {
+                !locationServicesEnabled -> R.string.completion_location_settings
+                preciseLocationRefused -> R.string.completion_enable_location
+                else -> R.string.completion_check_location
+              }
+          )
+      )
     }
   }
 }
