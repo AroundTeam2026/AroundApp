@@ -49,6 +49,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -170,8 +172,10 @@ internal fun ProfileForm(
         onRemove = model::removePhoto,
     )
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
+    // The label is a separate Text, so TalkBack gets it as the field's name
+    val nameLabel = stringResource(R.string.profile_setup_name)
     Text(
-        stringResource(R.string.profile_setup_name),
+        nameLabel,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onBackground,
     )
@@ -187,7 +191,10 @@ internal fun ProfileForm(
                 form.error == ProfileSetupError.NAME_TOO_LONG,
         colors = aroundFieldColors(),
         shape = AroundShapes.extraSmall,
-        modifier = Modifier.fillMaxWidth().testTag(C.Tag.PROFILE_SETUP_NAME),
+        modifier =
+            Modifier.fillMaxWidth().testTag(C.Tag.PROFILE_SETUP_NAME).semantics {
+              contentDescription = nameLabel
+            },
     )
     errorTextOf(form.error, editing, photoError)?.let { errorText ->
       Spacer(Modifier.height(AroundSpacing.Small))
