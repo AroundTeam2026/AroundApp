@@ -3,22 +3,12 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
@@ -101,17 +91,10 @@ fun RoleNavigation(
 /** A failed profile read is distinct from an absent profile; retry keeps the auth session. */
 @Composable
 internal fun ProfileError(onRetry: () -> Unit, onSignOut: () -> Unit) {
-  Column(
-      Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp).testTag(C.Tag.ROLE_PROFILE_ERROR),
-      verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-      horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    Text(stringResource(R.string.role_profile_error))
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.ROLE_PROFILE_RETRY)) {
-      Text(stringResource(R.string.role_profile_retry))
-    }
-    TextButton(onClick = onSignOut, modifier = Modifier.testTag(C.Tag.ROLE_PROFILE_SIGN_OUT)) {
-      Text(stringResource(R.string.auth_sign_out))
-    }
-  }
+  RetryOrSignOut(
+      stringResource(R.string.role_profile_error),
+      onRetry,
+      onSignOut,
+      Modifier.testTag(C.Tag.ROLE_PROFILE_ERROR),
+  )
 }
