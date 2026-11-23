@@ -309,6 +309,7 @@ class FirestoreRulesTest {
         ),
     )
     assertSucceeds(newQuest().set(valid + ("exactPartySize" to true)))
+    assertSucceeds(newQuest().set(valid + ("minPartySize" to MAX_PARTY_SIZE)))
   }
 
   // #430: a quest may have a location of its own, away from its venue
