@@ -57,7 +57,7 @@ class RetryOrSignOutTest {
 
     compose
         .onNodeWithTag(C.Tag.RETRY_OR_SIGN_OUT_RETRY)
-        .assertTextEquals(context.getString(R.string.role_profile_retry))
+        .assertTextEquals(context.getString(R.string.retry_or_sign_out_retry))
         .performClick()
 
     assertEquals(1, retries)

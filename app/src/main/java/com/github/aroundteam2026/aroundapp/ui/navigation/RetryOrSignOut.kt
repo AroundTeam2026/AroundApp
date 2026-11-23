@@ -39,7 +39,7 @@ internal fun RetryOrSignOut(
   ) {
     Text(message)
     Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.RETRY_OR_SIGN_OUT_RETRY)) {
-      Text(stringResource(R.string.role_profile_retry))
+      Text(stringResource(R.string.retry_or_sign_out_retry))
     }
     TextButton(onClick = onSignOut, modifier = Modifier.testTag(C.Tag.RETRY_OR_SIGN_OUT_SIGN_OUT)) {
       Text(stringResource(R.string.auth_sign_out))
