@@ -372,6 +372,14 @@ class NearbyQuestPagerTest {
   }
 
   @Test
+  fun whileOfflineTheButtonCantBeTapped() {
+    show(rows(1), acceptState = NearbyAcceptUiState(available = true, offline = true))
+
+    acceptButton().assertIsNotEnabled().performClick()
+    assertEquals(emptyList<NearbyQuest>(), accepted)
+  }
+
+  @Test
   fun withoutLocationTheQuestsAreByVenueNameWithAHint() {
     show(rows(2), locationOn = false)
 

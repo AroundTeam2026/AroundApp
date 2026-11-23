@@ -20,6 +20,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.bookQuest
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
+import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import com.github.aroundteam2026.aroundapp.ui.observeOnlineNow
 import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,13 +38,22 @@ import kotlinx.coroutines.launch
  * @property failedQuestIds Quests whose last booking failed; accepting again retries.
  * @property available Whether quests can be accepted: not until the explorer's reservations are
  *   known, nor while they can't be read, so a quest already accepted isn't booked twice.
+ * @property offline Whether the device is offline, as the app-wide offline banner says: accepting
+ *   needs a connection.
  */
 data class NearbyAcceptUiState(
     val acceptedQuestIds: Set<String> = emptySet(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
     val available: Boolean = false,
+    val offline: Boolean = false,
 ) {
+  /**
+   * Whether "Accept quest" can be tapped: accepting is [available] and the device isn't [offline].
+   */
+  val canAccept: Boolean
+    get() = available && !offline
+
   /** Where accepting the quest [questId] stands. */
   fun statusOf(questId: String): AcceptStatus =
       when (questId) {
@@ -62,7 +72,9 @@ data class NearbyAcceptUiState(
  * quest being accepted stays so until the server answered and its reservation shows up. One whose
  * booking failed shows the failure until it is accepted again, and so does one whose reservation
  * the server refused after the app wrote it. If the reservations can't be read, accepting is
- * unavailable until the map is opened again.
+ * unavailable until the map is opened again. While [NearbyAcceptUiState.offline] says the device is
+ * offline, which it follows from [connectivityRepository] as the offline banner does, accepting
+ * can't be tapped.
  */
 class NearbyAcceptViewModel(
     private val reservationRepository: ReservationRepository,
@@ -97,6 +109,11 @@ class NearbyAcceptViewModel(
   private val refusing = mutableSetOf<String>()
 
   init {
+    viewModelScope.launch {
+      connectivityRepository.observeOffline(TAG).collect { offline ->
+        _uiState.update { it.copy(offline = offline) }
+      }
+    }
     // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
     viewModelScope.launch {
       reservationRepository
