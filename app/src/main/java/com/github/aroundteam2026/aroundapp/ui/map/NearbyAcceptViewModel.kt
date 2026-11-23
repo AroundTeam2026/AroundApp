@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -109,11 +111,10 @@ class NearbyAcceptViewModel(
   private val refusing = mutableSetOf<String>()
 
   init {
-    viewModelScope.launch {
-      connectivityRepository.observeOffline(TAG).collect { offline ->
-        _uiState.update { it.copy(offline = offline) }
-      }
-    }
+    connectivityRepository
+        .observeOffline(TAG)
+        .onEach { offline -> _uiState.update { it.copy(offline = offline) } }
+        .launchIn(viewModelScope)
     // NOSONAR below: Sonar's S1874 takes Flow.catch for deprecated code, but it isn't deprecated
     viewModelScope.launch {
       reservationRepository

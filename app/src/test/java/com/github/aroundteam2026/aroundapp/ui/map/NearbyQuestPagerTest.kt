@@ -57,6 +57,8 @@ class NearbyQuestPagerTest {
   private val accepted = mutableListOf<NearbyQuest>()
   /** The filters the pager shows; a change from the pager is applied, as the map does. */
   private var filters by mutableStateOf(NearbyFilters())
+  /** Where accepting stands, as the pager shows it; a change redraws it, as the map does. */
+  private var shownAcceptState by mutableStateOf<NearbyAcceptUiState?>(null)
   private val filterChanges = mutableListOf<NearbyFilters>()
 
   private fun row(
@@ -90,6 +92,7 @@ class NearbyQuestPagerTest {
       acceptState: NearbyAcceptUiState? = null,
   ) {
     quests = shown
+    shownAcceptState = acceptState
     composeTestRule.setContent {
       NearbyQuestPager(
           quests = quests,
@@ -107,7 +110,7 @@ class NearbyQuestPagerTest {
               } else {
                 null
               },
-          acceptState = acceptState,
+          acceptState = shownAcceptState,
           onAccept = { accepted += it },
       )
     }
@@ -372,11 +375,15 @@ class NearbyQuestPagerTest {
   }
 
   @Test
-  fun whileOfflineTheButtonCantBeTapped() {
+  fun whileOfflineTheButtonCantBeTappedAndBackOnlineItCan() {
     show(rows(1), acceptState = NearbyAcceptUiState(available = true, offline = true))
 
     acceptButton().assertIsNotEnabled().performClick()
     assertEquals(emptyList<NearbyQuest>(), accepted)
+
+    shownAcceptState = NearbyAcceptUiState(available = true)
+    acceptButton().assertIsEnabled().performClick()
+    assertEquals(quests, accepted)
   }
 
   @Test
