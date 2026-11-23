@@ -281,10 +281,10 @@ class VenueEntryTest {
     enter()
 
     node(C.Tag.VENUE_ENTRY_FAILED).assertIsDisplayed()
-    node(C.Tag.VENUE_ENTRY_SIGN_OUT).performClick()
+    node(C.Tag.RETRY_OR_SIGN_OUT_SIGN_OUT).performClick()
     assertEquals(1, signOuts)
 
-    node(C.Tag.VENUE_ENTRY_RETRY).performClick()
+    node(C.Tag.RETRY_OR_SIGN_OUT_RETRY).performClick()
     compose.waitForIdle()
     node(C.Tag.VENUE_HOME).assertIsDisplayed()
   }

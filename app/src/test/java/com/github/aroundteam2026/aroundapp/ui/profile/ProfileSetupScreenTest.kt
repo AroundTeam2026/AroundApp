@@ -144,10 +144,10 @@ class ProfileSetupScreenTest {
     }
     compose.onNodeWithTag(C.Tag.ROLE_PROFILE_ERROR).assertIsDisplayed()
     compose.onNodeWithText("Could not load your profile.").assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_SIGN_OUT).performClick()
+    compose.onNodeWithTag(C.Tag.RETRY_OR_SIGN_OUT_SIGN_OUT).performClick()
     assertEquals(1, signOuts)
 
-    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_RETRY).performClick()
+    compose.onNodeWithTag(C.Tag.RETRY_OR_SIGN_OUT_RETRY).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_SCREEN).assertIsDisplayed()
   }
 
