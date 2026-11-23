@@ -1,5 +1,6 @@
 # Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 # Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com>
+# Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 name: CI - Test Runner
 
 # Run the workflow when commits are pushed on main or when a PR is modified
@@ -45,6 +46,36 @@ jobs:
         with:
           google-services: ${{ secrets.GOOGLE_SERVICES }}
           debug-keystore: ${{ secrets.DEBUG_KEYSTORE }}
+
+      # Robolectric downloads the Android jar of each SDK the unit tests run on from Maven Central,
+      # and when that fails every Robolectric test class fails with it. So the jars are cached, and
+      # the ones the cache lacks are fetched here, with retries, where Robolectric looks first:
+      # ~/.m2. They are the versions of Robolectric 4.16.1 for the SDKs the tests use, 34 (the
+      # default in robolectric.properties), 32 and 30 (@Config); another Robolectric or SDK only
+      # downloads its jar as before.
+      - name: Robolectric Android jars cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-jars-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: robolectric-jars-
+
+      - name: Fetch the Robolectric Android jars
+        run: |
+          base=https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented
+          dir="$HOME/.m2/repository/org/robolectric/android-all-instrumented"
+          for version in 11-robolectric-6757853-i7 12.1-robolectric-8229987-i7 14-robolectric-10818077-i7; do
+            mkdir -p "$dir/$version"
+            for extension in jar jar.sha512 pom pom.sha512; do
+              file="android-all-instrumented-$version.$extension"
+              # Into a .part file first, so an interrupted download is never taken for the jar
+              [ -s "$dir/$version/$file" ] || {
+                curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
+                  --retry-delay 10 --output "$dir/$version/$file.part" "$base/$version/$file" &&
+                  mv "$dir/$version/$file.part" "$dir/$version/$file"
+              }
+            done
+          done
 
       # Formatting, then unit tests and lint. Only the steps that build the app get the Maps API
       # key, which app/build.gradle.kts writes into the manifest; the other steps never see it.
