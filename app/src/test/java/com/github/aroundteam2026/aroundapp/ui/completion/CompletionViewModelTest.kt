@@ -593,9 +593,7 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    // The same file, compared as files: as strings, a Uri's path (/C:\…) and a File's (C:\…)
-    // differ on Windows (#682)
-    assertEquals(listOf(PHOTO.toFile()), queue.queued.map { it.photo })
+    assertEquals(listOf(PHOTO_FILE), queue.queued.map { it.photo })
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
@@ -621,7 +619,7 @@ class CompletionViewModelTest {
   @Test
   fun aWaitingPhotoIsReplacedThroughTheQueueEvenOnline() = test {
     open("photo")
-    queue.enqueue(reservationId, CAFE, EXPLORER, File(checkNotNull(PHOTO.path)))
+    queue.enqueue(reservationId, CAFE, EXPLORER, PHOTO_FILE)
     runCurrent()
     assertTrue(state.photoWaiting)
     viewModel.pickPhoto(PHOTO)
@@ -682,9 +680,7 @@ class CompletionViewModelTest {
     gate.complete(Unit)
     runCurrent()
 
-    // The same file, compared as files: as strings, a Uri's path (/C:\…) and a File's (C:\…)
-    // differ on Windows (#682)
-    assertEquals(listOf(PHOTO.toFile()), queue.queued.map { it.photo })
+    assertEquals(listOf(PHOTO_FILE), queue.queued.map { it.photo })
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
   }
@@ -1318,6 +1314,13 @@ class CompletionViewModelTest {
     val AWAY = Location(46.5191, 6.5668)
     /** A copy ProofPhotos keeps, as the picker gives. */
     val PHOTO: Uri = Uri.fromFile(File("/proofs/proof-1.jpg"))
+
+    /**
+     * [PHOTO] as the file the app queues. Compare files, not path strings: on Windows a Uri's path
+     * (/C:\…) and a File's (C:\…) differ though they name the same file (#682). Built with
+     * toFile(), as the app does: File("/proofs/proof-1.jpg") has no drive letter on Windows.
+     */
+    val PHOTO_FILE: File = PHOTO.toFile()
     val OTHER_PHOTO: Uri = Uri.parse("content://media/photos/2")
   }
 }
