@@ -13,11 +13,15 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositor
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeRefusedWritesStore
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.RecordedWrite
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.WriteState
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
@@ -90,21 +94,27 @@ class VenuePageAcceptTest {
   private var venueRepository: VenueRepository =
       FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))
 
-  private val viewModel by lazy {
-    VenuePageViewModel(
-        VENUE_ID,
-        venueRepository,
-        ScriptedQuestRepository(activeQuestsByVenue = { flowOf(quests) }),
-        reservationRepository,
-        userRepository,
-        partyRepository,
-        completionRepository,
-        connectivity,
-        uploads,
-        EXPLORER,
-        clock,
-    )
-  }
+  /** What the phone remembers of its writes; it survives the [viewModel] being made again. */
+  private val remembered = FakeRefusedWritesStore()
+
+  private val viewModel by lazy { newViewModel() }
+
+  /** A ViewModel as after the app was killed and opened again: only [remembered] is left. */
+  private fun newViewModel(writes: RefusedWrites = RefusedWrites(remembered)) =
+      VenuePageViewModel(
+          VENUE_ID,
+          venueRepository,
+          ScriptedQuestRepository(activeQuestsByVenue = { flowOf(quests) }),
+          reservationRepository,
+          userRepository,
+          partyRepository,
+          completionRepository,
+          connectivity,
+          uploads,
+          EXPLORER,
+          clock,
+          refusedWrites = writes,
+      )
 
   private val state
     get() = viewModel.uiState.value
@@ -952,6 +962,104 @@ class VenuePageAcceptTest {
     runCurrent()
     assertEquals(AcceptStatus.ACCEPTED, state.acceptStatus)
     assertEquals("server-2", server.list.value.single().id)
+  }
+
+  // The map shares the RefusedWrites, and the refusal is reported only to who hears it first
+  @Test
+  fun aWriteTheMapHeardRefusedFirstStillShowsFailed() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    val shared = RefusedWrites(remembered)
+    val page = newViewModel(shared)
+    runCurrent()
+    page.onQuestSelected("a")
+    page.accept()
+    runCurrent()
+
+    val map = shared.hearing()
+    map.refusedIn(server.list.value)
+    server.list.value = emptyList()
+    map.refusedIn(emptyList())
+    runCurrent()
+
+    assertEquals(AcceptStatus.FAILED, page.uiState.value.acceptStatus)
+  }
+
+  // The page's list can be older than the map's: not listing a write yet isn't a refusal
+  @Test
+  fun aWriteOnlyTheMapListedYetStaysAcceptingWhenThePageRecomputes() = test {
+    ScriptedReservationRepository().also { reservationRepository = it }
+    val shared = RefusedWrites(remembered)
+    shared.record("elsewhere-1", "a")
+    val map = shared.hearing()
+    map.refusedIn(
+        listOf(newPendingReservation("a", VENUE_ID, NAME, START).copy(id = "elsewhere-1"))
+    )
+    val page = newViewModel(shared)
+    runCurrent()
+
+    assertEquals(emptySet<String>(), page.uiState.value.failedQuestIds)
+    assertEquals(emptySet<String>(), shared.refusedQuests)
+  }
+
+  // The app opens on another tab, where the server refuses the queued write; the page opens after
+  @Test
+  fun aWriteTheServerRefusedBeforeThePageOpenedShowsFailed() = test {
+    ScriptedReservationRepository().also { reservationRepository = it }
+    remembered.put(RecordedWrite("local-1", "a", WriteState.SHOWN))
+
+    val page = newViewModel(RefusedWrites(remembered))
+    runCurrent()
+
+    assertEquals(setOf("a"), page.uiState.value.failedQuestIds)
+  }
+
+  // The write was queued, the app was killed, and the server refuses it once it is back online
+  @Test
+  fun aWriteTheServerRefusesAfterARestartShowsFailedAndCanBeRetried() = test {
+    val server = ScriptedReservationRepository().also { reservationRepository = it }
+    openAndPick("a")
+    viewModel.accept()
+    runCurrent()
+
+    val restarted = newViewModel()
+    runCurrent()
+    restarted.onQuestSelected("a")
+    assertEquals(AcceptStatus.ACCEPTED, restarted.uiState.value.acceptStatus)
+    server.list.value = emptyList()
+    runCurrent()
+    assertEquals(AcceptStatus.FAILED, restarted.uiState.value.acceptStatus)
+
+    // And again after the next restart, until it is accepted again
+    val again = newViewModel()
+    runCurrent()
+    again.onQuestSelected("a")
+    assertEquals(AcceptStatus.FAILED, again.uiState.value.acceptStatus)
+    again.accept()
+    runCurrent()
+    assertEquals(AcceptStatus.ACCEPTED, again.uiState.value.acceptStatus)
+  }
+
+  @Test
+  fun aRefusalFromBeforeARestartShowsFailedAndSurvivesAFailedLoadAndARetry() = test {
+    remembered.put(RecordedWrite("gone", "a", WriteState.REFUSED))
+    var loads = 0
+    val venues = FakeVenueRepository(listOf(testVenue(id = VENUE_ID)))
+    venueRepository =
+        object : VenueRepository by venues {
+          override fun observeVenue(venueId: String): Flow<Venue?> =
+              if (loads++ > 0) venues.observeVenue(venueId)
+              else flow { throw IOException("No venue") }
+        }
+    viewModel
+    runCurrent()
+    assertEquals(VenuePageStatus.FAILED, state.status)
+
+    viewModel.onRetry()
+    runCurrent()
+    viewModel.onQuestSelected("a")
+
+    assertEquals(VenuePageStatus.LOADED, state.status)
+    assertEquals(AcceptStatus.FAILED, state.acceptStatus)
   }
 
   @Test

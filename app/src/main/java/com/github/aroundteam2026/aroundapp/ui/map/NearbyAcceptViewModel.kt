@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -68,9 +69,12 @@ class NearbyAcceptViewModel(
     private val userRepository: UserRepository,
     private val explorerUid: String,
     connectivityRepository: ConnectivityRepository,
+    private val refusedWrites: RefusedWrites,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
-  private val _uiState = MutableStateFlow(NearbyAcceptUiState())
+  private val hearing = refusedWrites.hearing()
+  private val _uiState =
+      MutableStateFlow(NearbyAcceptUiState(failedQuestIds = refusedWrites.refusedQuests))
   /** Where accepting each nearby quest stands. */
   val uiState: StateFlow<NearbyAcceptUiState> = _uiState.asStateFlow()
 
@@ -79,9 +83,6 @@ class NearbyAcceptViewModel(
 
   /** Whether the device is online now: booking needs a connection, as from a venue's page. */
   private val online = connectivityRepository.observeOnlineNow(viewModelScope, TAG)
-
-  /** The reservations this ViewModel created, to tell which ones the server then refused. */
-  private val writes = RefusedWrites()
 
   /**
    * The quests whose reservation is being created and the backend hasn't answered yet. Firestore
@@ -123,14 +124,16 @@ class NearbyAcceptViewModel(
    */
   private fun show() {
     val listed = latest ?: return
-    val refused = writes.refusedIn(listed)
+    hearing.refusedIn(listed)
+    // All of them, not only the newly refused: the venue page may have heard the refusal first
+    val refused = refusedWrites.refusedQuests
     val accepted =
         listed.filter { it.status.isActive }.map { it.questId }.toSet() - unconfirmed - refusing
     _uiState.update {
       it.copy(
           acceptedQuestIds = accepted,
           acceptingQuestIds = it.acceptingQuestIds - accepted - refused,
-          failedQuestIds = it.failedQuestIds + refused,
+          failedQuestIds = it.failedQuestIds - accepted + refused,
           available = true,
       )
     }
@@ -166,7 +169,7 @@ class NearbyAcceptViewModel(
       result
           .onSuccess { reservationId ->
             // The quest stays "accepting" until the reservation shows up in the listener
-            writes.record(reservationId, id)
+            refusedWrites.record(reservationId, id)
             show()
           }
           .onFailure {
@@ -194,6 +197,8 @@ class NearbyAcceptViewModel(
             UserRepositoryProvider.repository,
             explorerUid,
             ConnectivityRepositoryProvider.repository(this[APPLICATION_KEY]!!),
+            refusedWrites =
+                RefusedWritesProvider.refusedWrites(this[APPLICATION_KEY]!!, explorerUid),
         )
       }
     }

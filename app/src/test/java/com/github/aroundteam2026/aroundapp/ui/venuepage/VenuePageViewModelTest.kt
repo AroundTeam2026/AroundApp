@@ -10,6 +10,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.rewardExpiringAt
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
@@ -75,6 +76,7 @@ class VenuePageViewModelTest {
         clock,
         arrival,
         focus,
+        refusedWrites = fakeRefusedWrites(),
     )
   }
 

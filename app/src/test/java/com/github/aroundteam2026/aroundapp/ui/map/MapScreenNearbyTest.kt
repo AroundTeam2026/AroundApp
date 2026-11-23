@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRe
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -230,6 +231,7 @@ class MapScreenNearbyTest {
             testUsers(EXPLORER),
             EXPLORER,
             FakeConnectivityRepository(),
+            refusedWrites = fakeRefusedWrites(),
         )
     show(acceptViewModel = accept)
     openNearby()

@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositor
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
@@ -106,9 +107,12 @@ class VenuePageViewModel(
     arrivalQuestId: String? = null,
     focusQuestId: String? = null,
     pictureRepository: UserPictureRepository? = null,
+    private val refusedWrites: RefusedWrites,
     decodePicture: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
 ) : ViewModel() {
-  private val mutableUiState = MutableStateFlow(VenuePageUiState())
+  private val hearing = refusedWrites.hearing()
+  private val mutableUiState =
+      MutableStateFlow(VenuePageUiState(failedQuestIds = refusedWrites.refusedQuests))
   /** What the page shows now; the page observes it. */
   val uiState: StateFlow<VenuePageUiState> = mutableUiState.asStateFlow()
 
@@ -129,9 +133,6 @@ class VenuePageViewModel(
 
   /** The quest the page scrolls to and picks the first time it shows the venue; null afterwards. */
   private var focusing: String? = focusQuestId
-
-  /** The reservations this page created, to tell which ones the server then refused. */
-  private val writes = RefusedWrites()
 
   /**
    * The explorer's [reservations], the memberships of the parties of the pending and approved ones
@@ -255,7 +256,7 @@ class VenuePageViewModel(
       result
           .onSuccess { reservationId ->
             // The page stays "accepting" until the reservation shows up in the listener
-            writes.record(reservationId, id)
+            refusedWrites.record(reservationId, id)
             show()
           }
           .onFailure {
@@ -312,8 +313,9 @@ class VenuePageViewModel(
   fun onRetry() {
     if (mutableUiState.value.status != VenuePageStatus.FAILED) return
     // Whether the device is offline doesn't depend on the venue
-    mutableUiState.update { VenuePageUiState(offline = it.offline) }
-    writes.clear()
+    mutableUiState.update {
+      VenuePageUiState(offline = it.offline, failedQuestIds = refusedWrites.refusedQuests)
+    }
     refusing.clear()
     latest = null
     listen()
@@ -462,7 +464,9 @@ class VenuePageViewModel(
               },
       )
     }
-    val refused = booked?.reservations?.let(writes::refusedIn).orEmpty()
+    // All the refused quests, not only the newly refused: the map may have heard the refusal first
+    booked?.reservations?.let(hearing::refusedIn)
+    val refused = refusedWrites.refusedQuests
     mutableUiState.update { it.showing(venue, quests, view, refused, proofs) }
     arriving?.let { questId ->
       arriving = null
@@ -510,6 +514,11 @@ class VenuePageViewModel(
                 this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]?.let {
                   UserPictureRepositoryProvider.repository(it)
                 },
+            refusedWrites =
+                RefusedWritesProvider.refusedWrites(
+                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!,
+                    explorerUid,
+                ),
         )
       }
     }

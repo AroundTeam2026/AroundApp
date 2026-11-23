@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueu
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
@@ -69,6 +70,7 @@ class VenuePagePartyCodeTest {
         FakeProofUploadQueue(),
         EXPLORER,
         { START + dispatcher.scheduler.currentTime },
+        refusedWrites = fakeRefusedWrites(),
     )
   }
 

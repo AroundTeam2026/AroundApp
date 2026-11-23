@@ -13,6 +13,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepos
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
@@ -82,6 +83,7 @@ fun VenuePageOnFakes(
             FakeProofUploadQueue(),
             FAKE_EXPLORER_UID,
             arrivalQuestId = arrivalQuestId,
+            refusedWrites = fakeRefusedWrites(),
         )
       }
   VenuePageScreen(viewModel, onBack, onSubmitProof)
