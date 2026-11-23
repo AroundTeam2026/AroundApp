@@ -169,26 +169,16 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun retry_whenThePhotoIsNoLongerKept_failsAndStaysFailed() = runWithTimeout {
+  fun retry_withoutAKeptFailedProof_failsAndChangesNothing() = runWithTimeout {
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, folder.newFile())
     val photo = folder.newFile()
     failUpload(photo)
     photo.delete()
 
-    val result = queue.retry(RESERVATION_ID)
-
-    assertTrue(result.exceptionOrNull() is FileNotFoundException)
+    assertTrue(queue.retry(RESERVATION_ID).exceptionOrNull() is FileNotFoundException)
+    assertTrue(queue.retry(OTHER_RESERVATION_ID).exceptionOrNull() is NoSuchElementException)
     assertEquals(setOf(RESERVATION_ID), queue.failed.first())
-    assertTrue(queue.waiting.first().isEmpty())
-  }
-
-  @Test
-  fun retry_whileTheProofIsWaiting_failsAndKeepsItWaiting() = runWithTimeout {
-    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, folder.newFile())
-
-    val result = queue.retry(RESERVATION_ID)
-
-    assertTrue(result.exceptionOrNull() is NoSuchElementException)
-    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+    assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
   }
 
   @Test

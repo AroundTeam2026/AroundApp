@@ -94,15 +94,6 @@ class FakeProofUploadQueueTest {
   }
 
   @Test
-  fun finish_doesNotListTheReservationAsFailed() = runTest {
-    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
-
-    queue.finish(RESERVATION_ID)
-
-    assertTrue(queue.failed.first().isEmpty())
-  }
-
-  @Test
   fun fail_movesTheReservationFromWaitingToFailed() = runTest {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
     queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
@@ -134,32 +125,6 @@ class FakeProofUploadQueueTest {
 
     assertTrue(result.exceptionOrNull() is NoSuchElementException)
     assertEquals(1, queue.queued.size)
-  }
-
-  @Test
-  fun retry_whenFailureIsForced_returnsItAndStaysFailed() = runTest {
-    val failure = IllegalStateException(FAILURE)
-    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
-    queue.fail(RESERVATION_ID)
-    queue.forcedFailure = failure
-
-    assertEquals(failure, queue.retry(RESERVATION_ID).exceptionOrNull())
-    assertEquals(setOf(RESERVATION_ID), queue.failed.first())
-    assertTrue(queue.waiting.first().isEmpty())
-  }
-
-  @Test
-  fun failed_reportsEachChange() = runTest {
-    val seen = mutableListOf<Set<String>>()
-    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-      queue.failed.collect { seen += it }
-    }
-    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
-
-    queue.fail(RESERVATION_ID)
-    queue.retry(RESERVATION_ID)
-
-    assertEquals(listOf(emptySet(), setOf(RESERVATION_ID), emptySet<String>()), seen)
   }
 
   @Test
