@@ -4,6 +4,7 @@
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
+import androidx.core.net.toFile
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -592,7 +593,9 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(listOf(PHOTO.path), queue.queued.map { it.photo.path })
+    // The same file, compared as files: as strings, a Uri's path (/C:\…) and a File's (C:\…)
+    // differ on Windows (#682)
+    assertEquals(listOf(PHOTO.toFile()), queue.queued.map { it.photo })
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
@@ -679,7 +682,9 @@ class CompletionViewModelTest {
     gate.complete(Unit)
     runCurrent()
 
-    assertEquals(listOf(PHOTO.path), queue.queued.map { it.photo.path })
+    // The same file, compared as files: as strings, a Uri's path (/C:\…) and a File's (C:\…)
+    // differ on Windows (#682)
+    assertEquals(listOf(PHOTO.toFile()), queue.queued.map { it.photo })
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
   }
