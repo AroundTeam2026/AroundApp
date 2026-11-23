@@ -23,8 +23,9 @@ class FakeProofUploadQueueTest {
   }
 
   @Test
-  fun startsWithNothingWaiting() = runTest {
+  fun startsWithNothingWaitingOrFailed() = runTest {
     assertTrue(queue.waiting.first().isEmpty())
+    assertTrue(queue.failed.first().isEmpty())
     assertTrue(queue.queued.isEmpty())
   }
 
@@ -90,6 +91,75 @@ class FakeProofUploadQueueTest {
     queue.finish(RESERVATION_ID)
 
     assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
+  fun finish_doesNotListTheReservationAsFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+
+    queue.finish(RESERVATION_ID)
+
+    assertTrue(queue.failed.first().isEmpty())
+  }
+
+  @Test
+  fun fail_movesTheReservationFromWaitingToFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    queue.fail(RESERVATION_ID)
+
+    assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+    assertEquals(setOf(RESERVATION_ID), queue.failed.first())
+  }
+
+  @Test
+  fun retry_queuesTheFailedProofAgainWithTheSameArguments() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+
+    assertTrue(queue.retry(RESERVATION_ID).isSuccess)
+
+    val proof = QueuedProof(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    assertEquals(listOf(proof, proof), queue.queued)
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+    assertTrue(queue.failed.first().isEmpty())
+  }
+
+  @Test
+  fun retry_whileTheProofIsWaiting_failsAndQueuesNothing() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+
+    val result = queue.retry(RESERVATION_ID)
+
+    assertTrue(result.exceptionOrNull() is NoSuchElementException)
+    assertEquals(1, queue.queued.size)
+  }
+
+  @Test
+  fun retry_whenFailureIsForced_returnsItAndStaysFailed() = runTest {
+    val failure = IllegalStateException(FAILURE)
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+    queue.forcedFailure = failure
+
+    assertEquals(failure, queue.retry(RESERVATION_ID).exceptionOrNull())
+    assertEquals(setOf(RESERVATION_ID), queue.failed.first())
+    assertTrue(queue.waiting.first().isEmpty())
+  }
+
+  @Test
+  fun failed_reportsEachChange() = runTest {
+    val seen = mutableListOf<Set<String>>()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      queue.failed.collect { seen += it }
+    }
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+
+    queue.fail(RESERVATION_ID)
+    queue.retry(RESERVATION_ID)
+
+    assertEquals(listOf(emptySet(), setOf(RESERVATION_ID), emptySet<String>()), seen)
   }
 
   @Test

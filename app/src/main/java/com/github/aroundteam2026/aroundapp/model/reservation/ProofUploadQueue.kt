@@ -31,7 +31,27 @@ interface ProofUploadQueue {
   /**
    * The ids of the reservations whose photo proof is waiting to upload: the current ones on
    * collection, then each change. A reservation leaves once its proof is submitted, or once its
-   * upload stops for good.
+   * upload stops for good, which lists it in [failed] unless its proof is no longer needed.
    */
   val waiting: Flow<Set<String>>
+
+  /**
+   * The ids of the reservations whose photo proof failed for good and wasn't sent, e.g. refused by
+   * the security rules, its photo gone, or out of attempts: the current ones on collection, then
+   * each change. A reservation whose completion the venue already approved isn't listed, since its
+   * proof is no longer needed. A reservation leaves once its proof is queued again, or once the
+   * queue forgets the failure, which may happen after about a day.
+   */
+  val failed: Flow<Set<String>>
+
+  /**
+   * Queues [reservationId]'s failed proof again, with the same photo, if it is still kept: it
+   * leaves [failed] and is listed in [waiting].
+   *
+   * @param reservationId id of a reservation listed in [failed].
+   * @return success once the proof is queued again; a [NoSuchElementException] if [reservationId]
+   *   has no failed proof, a [java.io.FileNotFoundException] if its photo is no longer kept, or the
+   *   failure that kept it from being queued.
+   */
+  suspend fun retry(reservationId: String): Result<Unit>
 }
