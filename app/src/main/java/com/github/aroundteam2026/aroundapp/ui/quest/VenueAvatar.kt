@@ -22,6 +22,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+// NOSONAR below: Sonar's S6517 asks for a fun interface, but a lambda avatar has no meaningful
+// equals, so the map would redraw its marker every time
 /**
  * What a venue's pin, card and nearby page show for it. Each kind draws itself, so adding one, such
  * as an image the venue uploads, needs no change to them.
@@ -30,7 +32,7 @@ import kotlinx.coroutines.withContext
  * its avatar stops being equal.
  */
 @Stable
-interface VenueAvatar {
+interface VenueAvatar { // NOSONAR
   /** Draws the avatar to fill [modifier]; [tint] is the colour for single-colour avatars. */
   @Composable fun Content(tint: Color, modifier: Modifier)
 
