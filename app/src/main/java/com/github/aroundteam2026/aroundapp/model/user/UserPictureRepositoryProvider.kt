@@ -7,4 +7,8 @@ import android.content.Context
 object UserPictureRepositoryProvider {
   /** The repository to use; any context will do, since the repository keeps only the app's. */
   fun repository(context: Context): UserPictureRepository = UserPictureRepositoryStorage(context)
+
+  /** The repository of venues' profile pictures, stored apart from users' ones. */
+  fun venueRepository(context: Context): UserPictureRepository =
+      UserPictureRepositoryStorage(context, folder = UserPictureRepositoryStorage.VENUE_PICTURES)
 }

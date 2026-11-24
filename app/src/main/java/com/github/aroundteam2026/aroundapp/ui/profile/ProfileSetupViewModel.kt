@@ -12,6 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityReposi
 import com.github.aroundteam2026.aroundapp.model.user.User
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
+import com.github.aroundteam2026.aroundapp.ui.PictureUpload
 import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import com.github.aroundteam2026.aroundapp.ui.observeOnlineNow
 import kotlin.coroutines.cancellation.CancellationException
@@ -59,7 +60,7 @@ enum class ProfileSetupError {
 class ProfileSetupViewModel(
     private val uid: String,
     private val users: UserRepository,
-    private val pictures: UserPictureRepository,
+    pictures: UserPictureRepository,
     connectivity: ConnectivityRepository,
 ) : ViewModel() {
   /** Whether the phone is offline, so saving is unavailable; brief disconnects are ignored. */
@@ -106,7 +107,7 @@ class ProfileSetupViewModel(
   private val mutableForm = MutableStateFlow(ProfileSetupFormState())
   /** The form's name, picture, saving flag and error. */
   val form: StateFlow<ProfileSetupFormState> = mutableForm
-  private var uploadedPhoto: Pair<Uri, String>? = null
+  private val upload = PictureUpload(pictures)
 
   /** Edits the name and clears the error; ignored while saving. */
   fun setName(name: String) {
@@ -116,7 +117,6 @@ class ProfileSetupViewModel(
   /** Picks a new picture, or none, to upload on the next save; ignored while saving. */
   fun setPhoto(photo: Uri?) {
     if (!form.value.saving) {
-      uploadedPhoto = null
       mutableForm.update { it.copy(photo = photo, removePhoto = false, error = null) }
     }
   }
@@ -124,7 +124,6 @@ class ProfileSetupViewModel(
   /** Marks the picture for removal on the next save; ignored while saving. */
   fun removePhoto() {
     if (!form.value.saving) {
-      uploadedPhoto = null
       mutableForm.update { it.copy(photo = null, removePhoto = true, error = null) }
     }
   }
@@ -133,7 +132,6 @@ class ProfileSetupViewModel(
   fun startEditing() {
     val saved = profile.value ?: return
     if (destination.value != ProfileSetupDestination.HOME) return
-    uploadedPhoto = null
     mutableForm.value = ProfileSetupFormState(name = saved.displayName)
     mutableEditing.value = true
   }
@@ -176,15 +174,7 @@ class ProfileSetupViewModel(
     viewModelScope.launch {
       try {
         val location =
-            when {
-              current.removePhoto -> null
-              current.photo != null -> {
-                val photo = current.photo
-                uploadedPhoto?.takeIf { it.first == photo }?.second
-                    ?: pictures.upload(uid, photo).getOrThrow().also { uploadedPhoto = photo to it }
-              }
-              else -> profile.value?.pictureUrl
-            }
+            upload.locationOf(uid, current.photo, current.removePhoto, profile.value?.pictureUrl)
         users.updateProfile(uid, name, location).getOrThrow()
         mutableProfile.update { it?.copy(displayName = name, pictureUrl = location) }
         if (isEditing) mutableEditing.value = false

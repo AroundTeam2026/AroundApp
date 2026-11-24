@@ -74,7 +74,7 @@ class ProfileSetupScreenTest {
       }
     }
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_SCREEN).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_CONTINUE).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ERROR).assertTextEquals("Enter a display name.")
     compose.onNodeWithTag(C.Tag.APP).assertDoesNotExist()
@@ -229,13 +229,13 @@ class ProfileSetupScreenTest {
         pictures = pictures,
         results = FakeActivityResults(gallery = galleryPhoto(android.graphics.Color.RED)),
     )
-    val avatar = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_AVATAR)
+    val avatar = compose.onNodeWithTag(C.Tag.PICTURE_AVATAR)
     // The shrinking runs off the main thread, so wait for its preview
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).performClick()
     compose.waitUntil(5_000) { avatar.showsRed() && preparedCopies().size == 1 }
     val first = preparedCopies().single()
     // A second pick makes a new copy and discards the first, so only the new one is left
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).performClick()
     compose.waitUntil(5_000) { preparedCopies().let { it.size == 1 && it.single() != first } }
     compose.waitUntil(5_000) { avatar.showsRed() }
 
@@ -260,7 +260,7 @@ class ProfileSetupScreenTest {
           writeText("not an image")
         }
     showSetup(results = FakeActivityResults(gallery = Uri.fromFile(notAnImage)))
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).performClick()
     compose.waitUntil(5_000) {
       compose.onAllNodesWithTag(C.Tag.PROFILE_SETUP_ERROR).fetchSemanticsNodes().isNotEmpty()
     }

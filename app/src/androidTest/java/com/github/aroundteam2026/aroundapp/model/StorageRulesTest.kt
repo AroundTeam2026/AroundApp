@@ -68,12 +68,14 @@ class StorageRulesTest {
 
   /** Type, size and overwrite checks are shared with user pictures, so they're tested there. */
   @Test
-  fun onlyTheOwnerUploadsAVenuePictureAndSignedInUsersCanReadIt() {
+  fun onlyAnExistingVenueUploadsItsPictureAndSignedInUsersCanReadIt() {
     val owner = newAccount()
     val other = newAccount()
     val path = "venue-pictures/${owner.uid}/${UUID.randomUUID()}"
     val signedOut = emulatorStorage("storage-${UUID.randomUUID()}")
 
+    assertDenied(owner.upload(path), "a venue picture from an account with no venue")
+    writeBypassingRules("venues/${owner.uid}", mapOf("name" to "Café"))
     assertDenied(other.upload(path), "another user uploading a venue picture")
     assertDenied(signedOut.upload(path), "a signed-out venue picture upload")
     assertSucceeds(owner.upload(path))

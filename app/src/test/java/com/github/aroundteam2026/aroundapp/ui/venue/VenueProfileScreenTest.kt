@@ -1,6 +1,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -16,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "en-w413dp-h917dp-mdpi")
@@ -47,6 +49,22 @@ class VenueProfileScreenTest {
     // The avatar shows the name's initials, as on the dashboard
     compose.onNodeWithText("CL").assertIsDisplayed()
     signOut()
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun showsTheVenuesPictureInsteadOfItsInitials() {
+    show(
+        VenueProfileUiState(
+            VenueProfileStatus.LOADED,
+            "Café Lumière",
+            null,
+            ImageBitmap(4, 4),
+        )
+    )
+
+    compose.onNodeWithTag(C.Tag.VENUE_PICTURE_AVATAR).assertIsDisplayed()
+    compose.onNodeWithText("CL").assertDoesNotExist()
   }
 
   @Test

@@ -37,6 +37,9 @@ class MainActivity : ComponentActivity() {
       val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
       val users = UserRepositoryProvider.repository
       val pictures = remember { UserPictureRepositoryProvider.repository(applicationContext) }
+      val venuePictures = remember {
+        UserPictureRepositoryProvider.venueRepository(applicationContext)
+      }
       val connectivity = remember { ConnectivityRepositoryProvider.repository(applicationContext) }
       val notificationPrompt = remember { NotificationPromptStoreSharedPrefs(applicationContext) }
       AroundAppTheme {
@@ -58,7 +61,13 @@ class MainActivity : ComponentActivity() {
             },
             venueScreen = { uid ->
               NotificationPermissionGate(Role.VENUE, notificationPrompt) {
-                VenueEntry(uid, auth, VenueRepositoryProvider.repository, profile::signOut)
+                VenueEntry(
+                    uid,
+                    auth,
+                    VenueRepositoryProvider.repository,
+                    profile::signOut,
+                    venuePictures,
+                )
               }
             },
         )

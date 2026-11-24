@@ -4,7 +4,10 @@
 package com.github.aroundteam2026.aroundapp.ui.venue
 
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -13,8 +16,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,11 +27,13 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.completion.FakeActivityResults
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundColors
 import com.github.aroundteam2026.aroundapp.ui.theme.DarkColorScheme
@@ -49,24 +56,97 @@ import org.robolectric.annotation.GraphicsMode
 class VenueInitializationScreenTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val repository = ScreenVenueRepository()
+  private val pictures = FakeUserPictureRepository()
+  private var editing = false
   private val viewModel by lazy {
-    VenueInitializationViewModel(FakeAuthRepository("owner-1"), repository)
+    VenueInitializationViewModel(
+        FakeAuthRepository("owner-1"),
+        repository,
+        pictures,
+        editing = editing,
+    )
   }
   private val navigatedIds = mutableListOf<String>()
   private var backCalls = 0
   private val recompositions = mutableIntStateOf(0)
 
-  private fun launch(darkTheme: Boolean = false) {
+  private fun launch(
+      darkTheme: Boolean = false,
+      results: FakeActivityResults = FakeActivityResults(),
+  ) {
     compose.setContent {
       recompositions.intValue
-      AroundAppTheme(darkTheme = darkTheme) {
-        VenueInitializationScreen(
-            viewModel,
-            onBack = { backCalls++ },
-            onContinueToLocation = { navigatedIds.add(it) },
-        )
+      CompositionLocalProvider(LocalActivityResultRegistryOwner provides results) {
+        AroundAppTheme(darkTheme = darkTheme) {
+          VenueInitializationScreen(
+              viewModel,
+              pictures,
+              onBack = { backCalls++ },
+              onContinueToLocation = { navigatedIds.add(it) },
+          )
+        }
       }
     }
+  }
+
+  /** A picture file the gallery hands back. */
+  private fun galleryPicture(): Uri {
+    val file = File.createTempFile("gallery", ".jpg", compose.activity.cacheDir)
+    val bitmap =
+        Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
+          eraseColor(android.graphics.Color.RED)
+        }
+    file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
+    return Uri.fromFile(file)
+  }
+
+  @Test
+  fun setupUploadsAPickedPictureWithTheVenue() {
+    launch(results = FakeActivityResults(gallery = galleryPicture()))
+    compose.onNodeWithText("Optional, you can add one later").assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).assertTextEquals("Add a picture").performClick()
+    // The picture is shrunk off the main thread before the form takes it
+    compose.waitUntil(5_000) { viewModel.uiState.value.photo != null }
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).performTextInput("Café")
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+
+    compose.waitUntil(5_000) { navigatedIds.isNotEmpty() }
+    val saved = runBlocking { repository.getVenue("owner-1") }
+    assertTrue(saved?.pictureUrl.orEmpty().contains("/owner-1/"))
+  }
+
+  @Test
+  fun editingOffersToChangeOrRemoveTheSavedPicture() {
+    runBlocking {
+      repository.seed(Venue("owner-1", "Café", null, 50, null, 1L, pictureUrl = "gs://b/p"))
+    }
+    editing = true
+    launch()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).assertTextEquals("Change picture")
+    compose.onNodeWithText("Optional, you can add one later").assertDoesNotExist()
+
+    compose.onNodeWithTag(C.Tag.PICTURE_REMOVE).assertTextEquals("Remove picture").performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_REMOVE).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).performClick()
+    compose.waitForIdle()
+    assertNull(runBlocking { repository.getVenue("owner-1") }?.pictureUrl)
+  }
+
+  @Test
+  fun anUnreadablePictureSaysSoAndKeepsTheForm() {
+    val notAnImage =
+        File.createTempFile("gallery", ".jpg", compose.activity.cacheDir).apply {
+          writeText("not an image")
+        }
+    launch(results = FakeActivityResults(gallery = Uri.fromFile(notAnImage)))
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).performClick()
+    compose.waitUntil(5_000) {
+      compose.onAllNodesWithTag(C.Tag.VENUE_INITIALIZATION_ERROR).fetchSemanticsNodes().isNotEmpty()
+    }
+    compose
+        .onNodeWithTag(C.Tag.VENUE_INITIALIZATION_ERROR)
+        .assertTextEquals("Could not prepare that picture. Try another.")
+    compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_CONTINUE).assertIsEnabled()
   }
 
   @Test
@@ -172,6 +252,7 @@ class VenueInitializationScreenTest {
         .assertTextContains("Saving", substring = true)
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_NAME).assertIsNotEnabled()
     compose.onNodeWithTag(C.Tag.VENUE_INITIALIZATION_BACK).assertIsNotEnabled()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).assertIsNotEnabled()
     assertTrue(navigatedIds.isEmpty())
     compose.runOnIdle { repository.gate!!.complete(Unit) }
     compose.waitForIdle()

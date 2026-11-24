@@ -56,8 +56,14 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.profile.PictureLabels
+import com.github.aroundteam2026.aroundapp.ui.profile.PicturePicker
+import com.github.aroundteam2026.aroundapp.ui.profile.PictureRow
+import com.github.aroundteam2026.aroundapp.ui.profile.ProfileAvatar
+import com.github.aroundteam2026.aroundapp.ui.profile.rememberPicturePicker
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
@@ -65,13 +71,26 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.aroundFieldColors
 
 /**
+ * The form's picture row and the [picker] behind it, whose state also locks saving and explains a
+ * picture that couldn't be read.
+ */
+class VenueFormPicture
+internal constructor(
+    internal val picker: PicturePicker,
+    internal val row: @Composable () -> Unit,
+)
+
+/**
  * Entry point for the venue sign-up flow. The navigation owner supplies the existing ViewModel and
  * moves to location setup when [onContinueToLocation] receives the saved venue id. With no
  * [onBack], this is a root screen: hide the arrow and leave system Back to the activity.
+ *
+ * @param pictures shows the venue's saved picture.
  */
 @Composable
 fun VenueInitializationScreen(
     viewModel: VenueInitializationViewModel,
+    pictures: UserPictureRepository,
     onBack: (() -> Unit)?,
     onContinueToLocation: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -87,16 +106,42 @@ fun VenueInitializationScreen(
   if (onBack != null) {
     BackHandler { if (!state.isSaving) onBack() }
   }
+  val picker = rememberPicturePicker(state.photo, viewModel::setPhoto)
+  val savedPicture = state.savedPicture.takeIf { !state.removePhoto }
+  val picture =
+      VenueFormPicture(picker) {
+        PictureRow(
+            avatar = {
+              ProfileAvatar(
+                  savedPicture,
+                  state.photo,
+                  pictures,
+                  Modifier.testTag(C.Tag.PICTURE_AVATAR),
+                  fallbackIcon = R.drawable.ic_storefront,
+              )
+            },
+            labels = VENUE_PICTURE_LABELS,
+            editing = state.editing,
+            hasPicture = state.photo != null || savedPicture != null,
+            saving = !state.canContinue,
+            picker = picker,
+            onRemove = viewModel::removePhoto,
+        )
+      }
   VenueInitializationContent(
       state = state,
       onNameChange = viewModel::updateBusinessName,
       onSubmit = viewModel::submit,
       onBack = onBack,
       modifier = modifier,
+      picture = picture,
   )
 }
 
-/** Stateless form, also used by previews without authentication or repository dependencies. */
+/**
+ * Stateless form, also used by previews without authentication or repository dependencies. Without
+ * a [picture], the form has no picture row.
+ */
 @Composable
 fun VenueInitializationContent(
     state: VenueInitializationUiState,
@@ -104,7 +149,9 @@ fun VenueInitializationContent(
     onSubmit: () -> Unit,
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    picture: VenueFormPicture? = null,
 ) {
+  val preparingPicture = picture?.picker?.preparing == true
   val keyboard = LocalSoftwareKeyboardController.current
   val nameLabel = stringResource(R.string.venue_initialization_name)
   BoxWithConstraints(
@@ -180,7 +227,11 @@ fun VenueInitializationContent(
           style = MaterialTheme.typography.bodyLarge,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
-      Spacer(Modifier.height(28.dp))
+      Spacer(Modifier.height(PICTURE_GAP))
+      picture?.let {
+        it.row()
+        Spacer(Modifier.height(PICTURE_GAP))
+      }
       Text(
           stringResource(R.string.venue_initialization_name),
           style = AroundTextStyles.FieldLabel,
@@ -222,8 +273,8 @@ fun VenueInitializationContent(
                 contentDescription = nameLabel
               },
       )
-      state.error?.let { error ->
-        val message =
+      val message =
+          state.error?.let { error ->
             when (error) {
               VenueInitializationError.EMPTY_NAME ->
                   stringResource(R.string.venue_initialization_empty_name)
@@ -238,8 +289,13 @@ fun VenueInitializationContent(
               VenueInitializationError.SAVE_FAILED ->
                   stringResource(R.string.venue_initialization_save_failed)
             }
+          }
+              ?: stringResource(R.string.venue_picture_failed).takeIf {
+                picture?.picker?.failed == true
+              }
+      message?.let {
         Text(
-            message,
+            it,
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodyMedium,
             modifier =
@@ -254,7 +310,7 @@ fun VenueInitializationContent(
             keyboard?.hide()
             onSubmit()
           },
-          enabled = state.canContinue,
+          enabled = state.canContinue && !preparingPicture,
           shape = AroundShapes.medium,
           contentPadding =
               androidx.compose.foundation.layout.PaddingValues(
@@ -293,3 +349,15 @@ private fun VenueInitializationPreview() {
       onBack = {},
   )
 }
+
+/** The venue's words for its picture, from the Figma setup and details frames. */
+private val VENUE_PICTURE_LABELS =
+    PictureLabels(
+        add = R.string.venue_picture_add,
+        change = R.string.venue_picture_change,
+        remove = R.string.venue_picture_remove,
+        optional = R.string.venue_picture_optional,
+    )
+
+/** The gap around the picture row, from the Figma setup frame. */
+private val PICTURE_GAP = 28.dp
