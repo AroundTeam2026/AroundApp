@@ -1,9 +1,12 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
+import android.net.Uri
+import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
@@ -24,10 +27,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.GraphicsMode
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -48,6 +53,24 @@ class VenueProfileViewModelTest {
   private fun TestScope.watch(model: VenueProfileViewModel) {
     backgroundScope.launch(dispatcher) { model.uiState.collect {} }
   }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun showsTheVenuesPictureOnceDownloaded() =
+      runTest(dispatcher) {
+        val pictures = FakeUserPictureRepository()
+        val location = pictures.upload("v", Uri.parse("content://photos/venue")).getOrThrow()
+        val picture = ImageBitmap(1, 1)
+        val venues =
+            FakeVenueRepository(
+                listOf(testVenue(id = "v", name = "Café").copy(pictureUrl = location))
+            )
+        val model = VenueProfileViewModel(FakeAuthRepository("v"), venues, pictures) { picture }
+        watch(model)
+        advanceUntilIdle()
+
+        assertSame(picture, model.uiState.value.picture)
+      }
 
   @Test
   fun showsTheSignedInVenuesNameAndAddress() =

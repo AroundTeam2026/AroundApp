@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
 import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
@@ -176,6 +177,60 @@ class ProofUploadQueueWorkManagerTest {
     assertEquals(CANCELLED, thrown.message)
   }
 
+  @Test
+  fun cancel_stopsTheWaitingUploadAndDeletesItsCopy() = runWithTimeout {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancel(RESERVATION_ID).isSuccess)
+
+    val works =
+        workManager.getWorkInfosForUniqueWorkFlow(ProofUploadWorker.uniqueWorkName(RESERVATION_ID))
+    assertEquals(listOf(WorkInfo.State.CANCELLED), works.first().map { it.state })
+    assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+    assertEquals(listOf(Uri.fromFile(PHOTO)), discarded)
+  }
+
+  @Test
+  fun cancel_afterTheUploadEnded_deletesNothing() = runWithTimeout {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    runOnline(RESERVATION_ID)
+
+    assertTrue(queue.cancel(RESERVATION_ID).isSuccess)
+
+    assertTrue(discarded.isEmpty())
+  }
+
+  @Test
+  fun cancel_whenWorkManagerFails_returnsTheFailureAndDeletesNothing() = runWithTimeout {
+    val failure = IllegalStateException(UNAVAILABLE)
+
+    val result =
+        ProofUploadQueueWorkManager(brokenWorkManager(failure)) {
+              discarded += it
+              true
+            }
+            .cancel(RESERVATION_ID)
+
+    assertEquals(failure, result.exceptionOrNull())
+    assertTrue(discarded.isEmpty())
+  }
+
+  @Test
+  fun cancel_whenCancelled_rethrowsTheCancellation() = runWithTimeout {
+    val thrown =
+        assertThrows(CancellationException::class.java) {
+          runBlocking {
+            ProofUploadQueueWorkManager(brokenWorkManager(CancellationException(CANCELLED))) {
+                  true
+                }
+                .cancel(RESERVATION_ID)
+          }
+        }
+
+    assertEquals(CANCELLED, thrown.message)
+  }
+
   /**
    * Brings the network back for [reservationId]'s upload and waits until its work has finished, so
    * the test itself checks what [ProofUploadQueue.waiting] says then.
@@ -196,11 +251,15 @@ class ProofUploadQueueWorkManagerTest {
     withTimeout(TIMEOUT_MS, body)
   }
 
-  /** A WorkManager whose every [WorkManager.enqueueUniqueWork] throws [error]. */
+  /**
+   * A WorkManager whose every [WorkManager.enqueueUniqueWork] and [cancelUniqueWork] throws
+   * [error].
+   */
   private fun brokenWorkManager(error: Throwable): WorkManager =
       mockk<WorkManager>(relaxed = true) {
         every { getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList())
         every { enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws error
+        every { cancelUniqueWork(any()) } throws error
       }
 
   private companion object {

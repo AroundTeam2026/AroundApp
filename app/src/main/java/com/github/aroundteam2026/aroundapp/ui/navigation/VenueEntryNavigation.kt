@@ -14,6 +14,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
@@ -47,11 +48,13 @@ val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
  * @param start where the graph opens: business setup, its area, or the home of a venue already set
  *   up. A venue resuming on its area starts at business setup with the area opened above it.
  * @param navController the graph's controller; [VenueEntry] and tests pass their own to drive it.
+ * @param venuePictures stores the venue's picture, from its business details.
  */
 @Composable
 fun VenueEntryNavigation(
     authRepository: AuthRepository,
     venueRepository: VenueRepository = VenueRepositoryProvider.repository,
+    venuePictures: UserPictureRepository,
     locationScreen: VenueAreaStep = defaultVenueAreaStep,
     createQuestFactory: ViewModelProvider.Factory = CreateQuestViewModel.factory(),
     venueQuestsFactory: ViewModelProvider.Factory,
@@ -71,6 +74,7 @@ fun VenueEntryNavigation(
         navController,
         authRepository,
         venueRepository,
+        venuePictures,
         // Setup is the root right after sign-up: Back signs out instead of trapping the owner.
         initializationOnBack = profile::signOut,
     ) { venueId, onBack ->
@@ -92,9 +96,13 @@ fun VenueEntryNavigation(
         VenueTabFactories(venueQuestsFactory, dashboardFactory, venueProfileFactory),
     )
     // Editing from the profile: saving the area returns to the Profile tab
-    venueOnboardingDestinations(navController, authRepository, venueRepository, editing = true) {
-        venueId,
-        onBack ->
+    venueOnboardingDestinations(
+        navController,
+        authRepository,
+        venueRepository,
+        venuePictures,
+        editing = true,
+    ) { venueId, onBack ->
       locationScreen(
           venueId,
           { navController.popBackStack(VenueOnboardingRoutes.EDIT, inclusive = true) },

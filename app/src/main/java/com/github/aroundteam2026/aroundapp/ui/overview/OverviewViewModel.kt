@@ -41,6 +41,7 @@ import com.github.aroundteam2026.aroundapp.ui.observeOffline
 import com.github.aroundteam2026.aroundapp.ui.observeOnlineNow
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
+import com.github.aroundteam2026.aroundapp.ui.quest.ReservationCanceller
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -90,6 +91,9 @@ class OverviewViewModel(
   /** Who sent the proofs; the rows don't wait for their profiles to name them. */
   private val proofSenders = ProofSenders(userRepository, explorerUid)
 
+  private val canceller =
+      ReservationCanceller(reservationRepository, partyRepository, proofUploadQueue)
+
   init {
     watchConnectivity()
     listen()
@@ -113,7 +117,8 @@ class OverviewViewModel(
    * unknown, or while it is being cancelled, so a double tap cancels once, or while the device is
    * offline, since the cancel needs a connection. The row shows as cancelling until the listener
    * drops it. A failure, such as being offline, keeps the row and marks it failed, unless the row
-   * left meanwhile; calling this again retries.
+   * left meanwhile; calling this again retries. Once it succeeds, the reservation's proof waiting
+   * in the [ProofUploadQueue], if any, is cancelled too, since the rules would refuse it.
    */
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
@@ -129,13 +134,7 @@ class OverviewViewModel(
       )
     }
     viewModelScope.launch {
-      // Only its creator cancels the reservation; anyone else who joined withdraws instead
-      val result =
-          if (leaving) partyRepository.withdraw(reservationId, explorerUid)
-          else reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
-      result.onFailure {
-        val what = if (leaving) "Leaving the party of" else "Cancelling"
-        Log.w(TAG, "$what reservation $reservationId failed", it)
+      canceller.cancel(reservationId, explorerUid, leaving).onFailure {
         mutableUiState.update { state ->
           // A row that left meanwhile, e.g. rejected by the venue, has nothing to mark
           val shown = state.rows.any { row -> row.reservationId == reservationId }

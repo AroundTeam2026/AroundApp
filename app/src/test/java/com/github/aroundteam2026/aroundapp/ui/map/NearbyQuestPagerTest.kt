@@ -3,10 +3,10 @@
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -15,47 +15,49 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.map.marker.assertDpEquals
 import com.github.aroundteam2026.aroundapp.ui.quest.TestAvatar
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Tests the nearby quest pager: what each page shows, paging, the taps, and its two states. */
+/** Tests the nearby quest list: what each card shows, the list, the taps, and its two states. */
 @RunWith(AndroidJUnit4::class)
 class NearbyQuestPagerTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   private val context = ApplicationProvider.getApplicationContext<Context>()
 
-  /** The pager's quests; tests change them to stand for live updates. */
+  /** The list's quests; tests change them to stand for live updates. */
   private var quests by mutableStateOf(emptyList<NearbyQuest>())
   private val opened = mutableListOf<NearbyQuest>()
   private val shownOnMap = mutableListOf<NearbyQuest>()
   private val accepted = mutableListOf<NearbyQuest>()
-  /** The filters the pager shows; a change from the pager is applied, as the map does. */
+  /** The filters the list shows; a change from the list is applied, as the map does. */
   private var filters by mutableStateOf(NearbyFilters())
   private val filterChanges = mutableListOf<NearbyFilters>()
 
@@ -124,33 +126,116 @@ class NearbyQuestPagerTest {
   private fun node(tag: String): SemanticsNodeInteraction =
       composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
 
-  /** The page's "Accept quest", merged with its label. */
+  private fun list() = node(C.Tag.NEARBY_LIST)
+
+  private fun title(text: String) = composeTestRule.onNodeWithText(text, useUnmergedTree = true)
+
+  /** The single card's "Accept quest", merged with its label. */
   private fun acceptButton() = composeTestRule.onNodeWithTag(C.Tag.NEARBY_ACCEPT)
 
-  private fun previous() =
-      composeTestRule.onNodeWithContentDescription(context.getString(R.string.map_nearby_previous))
-
-  private fun next() =
-      composeTestRule.onNodeWithContentDescription(context.getString(R.string.map_nearby_next))
-
-  /** Asserts the page of the [page]th quest (from 1) of [count] is the one on screen. */
-  private fun assertShows(title: String, page: Int, count: Int, locationOn: Boolean = true) {
-    composeTestRule.onNodeWithText(title, useUnmergedTree = true).assertIsDisplayed()
-    val counter = if (locationOn) R.string.map_nearby_closest_first else R.string.map_nearby_by_name
-    node(C.Tag.NEARBY_COUNTER).assertTextEquals(context.getString(counter, page, count))
+  /** Asserts the header counts [count] quests, ordered as [order] says. */
+  private fun assertHeader(count: Int, @StringRes order: Int = R.string.map_nearby_closest_first) {
+    node(C.Tag.NEARBY_COUNTER)
+        .assertTextEquals(nearbyHeader(context, count, context.getString(order)))
   }
 
   @Test
-  fun opensOnTheFirstQuest() {
+  fun listsTheQuestsAndCountsThemAll() {
     show(rows(3))
 
     composeTestRule.onNodeWithText(context.getString(R.string.map_nearby_title)).assertIsDisplayed()
-    assertShows("Quest q1", page = 1, count = 3)
+    title("Quest q1").assertIsDisplayed()
+    assertHeader(3)
     node(C.Tag.NEARBY_EMPTY).assertDoesNotExist()
   }
 
   @Test
-  fun aPageShowsItsQuestVenueAvatarAndChips() {
+  fun aSingleQuestIsCountedAsOne() {
+    show(rows(1))
+
+    assertHeader(1)
+  }
+
+  @Test
+  fun theQuestsAreListedInOrderOneUnderTheOther() {
+    show(rows(3))
+
+    val first = title("Quest q1").getBoundsInRoot()
+    val second = title("Quest q2").getBoundsInRoot()
+    assertTrue("q1 above q2", first.bottom < second.top)
+  }
+
+  @Test
+  fun theListScrollsToTheLastQuest() {
+    show(rows(6))
+    // Only the cards near the top are composed at first
+    title("Quest q6").assertDoesNotExist()
+
+    list().performScrollToNode(hasText("Quest q6"))
+
+    title("Quest q6").assertIsDisplayed()
+  }
+
+  @Test
+  fun aCardFurtherDownCanBeOpenedShownOnTheMapAndAccepted() {
+    val shown = rows(5)
+    show(shown, acceptState = NearbyAcceptUiState(available = true))
+    list().performScrollToNode(hasTestTag("${C.Tag.NEARBY_QUEST}_q4"))
+
+    composeTestRule.inQuest("q4", C.Tag.NEARBY_CARD).performClick()
+    composeTestRule.inQuest("q4", C.Tag.NEARBY_SHOW_ON_MAP).performClick()
+    composeTestRule.inQuest("q4", C.Tag.NEARBY_ACCEPT).performClick()
+
+    assertEquals(listOf(shown[3]), opened)
+    assertEquals(listOf(shown[3]), shownOnMap)
+    assertEquals(listOf(shown[3]), accepted)
+  }
+
+  @Test
+  fun aQuestLeavingTheListDoesNotMoveTheOnesInView() {
+    val shown = rows(6)
+    show(shown)
+    list().performScrollToIndex(2)
+    val top = title("Quest q3").getBoundsInRoot().top
+
+    // A quest above the ones in view goes, as when it is taken or filtered out
+    quests = shown.drop(1)
+    composeTestRule.waitForIdle()
+
+    assertDpEquals("q3 top", top, title("Quest q3").getBoundsInRoot().top)
+  }
+
+  @Test
+  fun aQuestArrivingAboveDoesNotMoveTheOnesInView() {
+    val shown = rows(4)
+    show(shown)
+    list().performScrollToIndex(2)
+    val top = title("Quest q3").getBoundsInRoot().top
+
+    // A quest nearer than the ones in view appears above them
+    quests = listOf(row("new")) + shown
+    composeTestRule.waitForIdle()
+
+    assertDpEquals("q3 top", top, title("Quest q3").getBoundsInRoot().top)
+    assertHeader(5)
+  }
+
+  @Test
+  fun questsArrivingAfterTheListEmptiedStartFromTheTop() {
+    show(rows(4))
+    list().performScrollToIndex(3)
+    quests = emptyList()
+    node(C.Tag.NEARBY_EMPTY).assertIsDisplayed()
+
+    quests = rows(4)
+
+    title("Quest q1").assertIsDisplayed()
+    assertHeader(4)
+    node(C.Tag.NEARBY_EMPTY).assertDoesNotExist()
+  }
+
+  @Test
+  fun aCardShowsItsQuestVenueAvatarAndChips() {
     show(
         listOf(
             row(
@@ -188,7 +273,7 @@ class NearbyQuestPagerTest {
   }
 
   @Test
-  fun theCloseButtonClosesThePager() {
+  fun theCloseButtonClosesTheList() {
     var closed = 0
     show(rows(2), onClose = { closed++ })
 
@@ -205,7 +290,7 @@ class NearbyQuestPagerTest {
   }
 
   @Test
-  fun anEmptyPagerCanStillBeClosed() {
+  fun anEmptyListCanStillBeClosed() {
     // The empty state has its own header, so the button must be there too
     var closed = 0
     show(emptyList(), onClose = { closed++ })
@@ -216,119 +301,49 @@ class NearbyQuestPagerTest {
   }
 
   @Test
-  fun nextShowsTheFollowingQuest() {
-    show(rows(3))
-
-    next().performClick()
-
-    assertShows("Quest q2", page = 2, count = 3)
-  }
-
-  @Test
-  fun previousGoesBackAQuest() {
-    show(rows(3))
-    next().performClick()
-
-    previous().performClick()
-
-    assertShows("Quest q1", page = 1, count = 3)
-  }
-
-  @Test
-  fun previousOnTheFirstQuestWrapsToTheLast() {
-    show(rows(3))
-
-    previous().performClick()
-
-    assertShows("Quest q3", page = 3, count = 3)
-  }
-
-  @Test
-  fun nextOnTheLastQuestWrapsToTheFirst() {
-    show(rows(3))
-    previous().performClick()
-    assertShows("Quest q3", page = 3, count = 3)
-
-    next().performClick()
-
-    assertShows("Quest q1", page = 1, count = 3)
-  }
-
-  @Test
-  fun swipingShowsTheNextQuest() {
-    show(rows(3))
-
-    node(C.Tag.NEARBY_PAGES).performTouchInput { swipeLeft() }
-    composeTestRule.waitForIdle()
-
-    assertShows("Quest q2", page = 2, count = 3)
-  }
-
-  @Test
-  fun aSingleQuestHasNothingToPageTo() {
-    show(rows(1))
-
-    previous().assertIsNotEnabled()
-    next().assertIsNotEnabled()
-    composeTestRule.onAllNodesWithTag(C.Tag.NEARBY_DOT, useUnmergedTree = true).assertCountEquals(0)
-  }
-
-  @Test
-  fun severalQuestsCanBePaged() {
-    // The opposite of a single quest, so the arrows can't be disabled for good
-    show(rows(2))
-
-    previous().assertIsEnabled()
-    next().assertIsEnabled()
-  }
-
-  @Test
-  fun tappingAnywhereOnThePageOpensItsQuest() {
-    val shown = rows(3)
+  fun tappingAnywhereOnTheCardOpensItsQuest() {
+    val shown = rows(1)
     show(shown)
-    next().performClick()
 
     // Away from the middle, on the venue's name, the line under the title
     node(C.Tag.NEARBY_VENUE).performClick()
 
-    assertEquals(listOf(shown[1]), opened)
+    assertEquals(shown, opened)
     assertEquals(emptyList<NearbyQuest>(), shownOnMap)
   }
 
   @Test
-  fun thePinShowsItsPagesQuestOnTheMap() {
-    val shown = rows(3)
+  fun thePinShowsItsCardsQuestOnTheMap() {
+    val shown = rows(1)
     show(shown)
-    next().performClick()
 
     composeTestRule
         .onNodeWithContentDescription(context.getString(R.string.map_nearby_show_on_map))
         .performClick()
 
-    assertEquals(listOf(shown[1]), shownOnMap)
+    assertEquals(shown, shownOnMap)
     assertEquals(emptyList<NearbyQuest>(), opened)
   }
 
   @Test
   fun withoutAcceptStateThereIsNoAcceptButton() {
-    show(rows(2))
+    show(rows(1))
 
     node(C.Tag.NEARBY_SHOW_ON_MAP).assertIsDisplayed()
     node(C.Tag.NEARBY_ACCEPT).assertDoesNotExist()
   }
 
   @Test
-  fun acceptReportsItsPagesQuest() {
-    val shown = rows(3)
+  fun acceptReportsItsCardsQuest() {
+    val shown = rows(1)
     show(shown, acceptState = NearbyAcceptUiState(available = true))
-    next().performClick()
 
     acceptButton()
         .assertTextEquals(context.getString(R.string.accept_quest))
         .assertIsEnabled()
         .performClick()
 
-    assertEquals(listOf(shown[1]), accepted)
+    assertEquals(shown, accepted)
     assertEquals(emptyList<NearbyQuest>(), opened)
   }
 
@@ -375,7 +390,7 @@ class NearbyQuestPagerTest {
   fun withoutLocationTheQuestsAreByVenueNameWithAHint() {
     show(rows(2), locationOn = false)
 
-    assertShows("Quest q1", page = 1, count = 2, locationOn = false)
+    assertHeader(2, R.string.map_nearby_by_name)
     node(C.Tag.NEARBY_LOCATION_HINT).assertIsDisplayed()
   }
 
@@ -387,15 +402,13 @@ class NearbyQuestPagerTest {
   }
 
   @Test
-  fun noQuestsShowsTheEmptyStateAndNothingToPage() {
+  fun noQuestsShowsTheEmptyStateAndNoList() {
     show(emptyList())
 
     node(C.Tag.NEARBY_EMPTY).assertIsDisplayed()
     node(C.Tag.NEARBY_COUNTER).assertDoesNotExist()
-    node(C.Tag.NEARBY_PAGES).assertDoesNotExist()
+    list().assertDoesNotExist()
     node(C.Tag.NEARBY_SHOW_ON_MAP).assertDoesNotExist()
-    previous().assertDoesNotExist()
-    next().assertDoesNotExist()
     node(C.Tag.NEARBY_LOCATION_HINT).assertDoesNotExist()
   }
 
@@ -408,71 +421,11 @@ class NearbyQuestPagerTest {
   }
 
   @Test
-  fun questsArrivingAfterTheListEmptiedArePagedFromTheFirst() {
-    show(rows(3))
-    previous().performClick()
-    assertShows("Quest q3", page = 3, count = 3)
-    quests = emptyList()
-    node(C.Tag.NEARBY_EMPTY).assertIsDisplayed()
-
-    // The quest that was shown comes back with others: the pager starts over, closest first
-    quests = rows(4)
-
-    assertShows("Quest q1", page = 1, count = 4)
-    node(C.Tag.NEARBY_EMPTY).assertDoesNotExist()
-  }
-
-  @Test
-  fun quickTapsOnNextEachMoveAQuest() {
-    show(rows(4))
-    composeTestRule.mainClock.autoAdvance = false
-
-    next().performClick()
-    // The first move is under way, but its page isn't the current one yet
-    composeTestRule.mainClock.advanceTimeByFrame()
-    next().performClick()
-    composeTestRule.mainClock.autoAdvance = true
-
-    assertShows("Quest q3", page = 3, count = 4)
-  }
-
-  @Test
-  fun quickTapsOnPreviousEachMoveAQuest() {
-    show(rows(4))
-    composeTestRule.mainClock.autoAdvance = false
-
-    previous().performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
-    previous().performClick()
-    composeTestRule.mainClock.autoAdvance = true
-
-    assertShows("Quest q3", page = 3, count = 4)
-  }
-
-  @Test
-  fun theCounterNeverPassesTheCountWhileTheLastQuestGoes() {
-    val (a, b, c) = rows(3)
-    show(listOf(a, b, c))
-    previous().performClick()
-    assertShows("Quest q3", page = 3, count = 3)
-    composeTestRule.mainClock.autoAdvance = false
-
-    quests = listOf(a, b)
-    // With the clock paused, the change must be announced for the next frame to recompose
-    Snapshot.sendApplyNotifications()
-    // The frame where the pager hasn't yet moved back to the new last page
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    node(C.Tag.NEARBY_COUNTER)
-        .assertTextEquals(context.getString(R.string.map_nearby_closest_first, 2, 2))
-  }
-
-  @Test
-  fun thePageTellsScreenReadersWhatATapDoes() {
+  fun theCardTellsScreenReadersWhatATapDoes() {
     show(rows(1))
 
     composeTestRule
-        .onNodeWithTag(C.Tag.NEARBY_PAGE)
+        .onNodeWithTag(C.Tag.NEARBY_CARD)
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         .assert(
             SemanticsMatcher("taps open the quest's details") {
@@ -480,67 +433,6 @@ class NearbyQuestPagerTest {
                   context.getString(R.string.map_nearby_open_details)
             }
         )
-  }
-
-  @Test
-  fun theShownQuestStaysShownWhenOthersArriveBeforeIt() {
-    val (a, b, c) = rows(3)
-    show(listOf(a, b, c))
-    next().performClick()
-    assertShows("Quest q2", page = 2, count = 3)
-
-    // A quest nearer than the shown one appears, pushing it back a page
-    quests = listOf(row("new"), a, b, c)
-
-    assertShows("Quest q2", page = 3, count = 4)
-  }
-
-  @Test
-  fun whenTheShownQuestGoesTheNextOneTakesItsPlace() {
-    val (a, b, c) = rows(3)
-    show(listOf(a, b, c))
-    next().performClick()
-
-    quests = listOf(a, c)
-
-    assertShows("Quest q3", page = 2, count = 2)
-  }
-
-  @Test
-  fun whenTheLastQuestGoesTheNewLastIsShown() {
-    val (a, b, c) = rows(3)
-    show(listOf(a, b, c))
-    previous().performClick()
-    assertShows("Quest q3", page = 3, count = 3)
-
-    quests = listOf(a, b)
-
-    assertShows("Quest q2", page = 2, count = 2)
-  }
-
-  @Test
-  fun aFewQuestsHaveADotEachAndTheShownOneIsSelected() {
-    show(rows(3))
-    next().performClick()
-
-    val dots = composeTestRule.onAllNodesWithTag(C.Tag.NEARBY_DOT, useUnmergedTree = true)
-    dots.assertCountEquals(3)
-    dots[0].assertIsNotSelected()
-    dots[1].assertIsSelected()
-    dots[2].assertIsNotSelected()
-  }
-
-  @Test
-  fun manyQuestsShowFiveDotsWithTheLastSelectedOnTheLastQuest() {
-    show(rows(12))
-
-    previous().performClick()
-
-    assertShows("Quest q12", page = 12, count = 12)
-    val dots = composeTestRule.onAllNodesWithTag(C.Tag.NEARBY_DOT, useUnmergedTree = true)
-    dots.assertCountEquals(5)
-    dots[4].assertIsSelected()
-    dots[0].assertIsNotSelected()
   }
 
   @Test
@@ -598,22 +490,21 @@ class NearbyQuestPagerTest {
   }
 
   @Test
-  fun activeFiltersReplaceTheOrderInTheCounter() {
+  fun activeFiltersReplaceTheOrderInTheHeader() {
     filters = NearbyFilters(DistanceFilter.WITHIN_3_KM, RewardFilter.DISCOUNT)
     show(rows(2), withFilters = true)
 
     val summary =
         context.getString(
-            R.string.map_nearby_filter_pair,
+            R.string.map_nearby_pair,
             context.getString(R.string.map_nearby_within_3_km),
             context.getString(R.string.map_nearby_discounts),
         )
-    node(C.Tag.NEARBY_COUNTER)
-        .assertTextEquals(context.getString(R.string.map_nearby_filtered, 1, 2, summary))
+    node(C.Tag.NEARBY_COUNTER).assertTextEquals(nearbyHeader(context, 2, summary))
   }
 
   @Test
-  fun whenNothingMatchesThePagerSaysSoAndKeepsTheFilters() {
+  fun whenNothingMatchesTheListSaysSoAndKeepsTheFilters() {
     filters = NearbyFilters(reward = RewardFilter.OTHER)
     show(emptyList(), withFilters = true)
 

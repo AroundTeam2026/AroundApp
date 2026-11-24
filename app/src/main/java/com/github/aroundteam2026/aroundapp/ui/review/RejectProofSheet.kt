@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -194,9 +195,11 @@ private fun RejectProofForm(
         )
       }
     }
+    // The label is a separate Text, so TalkBack gets it as the field's name
+    val label = stringResource(R.string.reject_proof_note_label)
     Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small)) {
       Text(
-          stringResource(R.string.reject_proof_note_label),
+          label,
           color = MaterialTheme.colorScheme.onSurface,
           style = AroundTextStyles.FieldLabel,
       )
@@ -211,7 +214,8 @@ private fun RejectProofForm(
           modifier =
               Modifier.fillMaxWidth()
                   .heightIn(min = NOTE_MIN_HEIGHT)
-                  .testTag(C.Tag.REJECT_PROOF_NOTE),
+                  .testTag(C.Tag.REJECT_PROOF_NOTE)
+                  .semantics { contentDescription = label },
           shape = MaterialTheme.shapes.small,
           textStyle = AroundTextStyles.Body,
           colors =

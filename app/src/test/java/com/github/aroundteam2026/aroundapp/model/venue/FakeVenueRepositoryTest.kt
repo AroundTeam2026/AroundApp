@@ -351,6 +351,18 @@ class FakeVenueRepositoryTest {
   }
 
   @Test
+  fun setPicture_replacesOnlyThePictureAndNullRemovesIt() = runTest {
+    val original = testVenue(name = "Café Lumen")
+    val repository = FakeVenueRepository(listOf(original))
+
+    Assert.assertEquals(Result.success(Unit), repository.setPicture(original.id, PICTURE))
+    Assert.assertEquals(original.copy(pictureUrl = PICTURE), repository.getVenue(original.id))
+
+    repository.setPicture(original.id, null)
+    Assert.assertEquals(original, repository.getVenue(original.id))
+  }
+
+  @Test
   fun setName_doesNotChangeAnotherVenue() = runTest {
     val repository = FakeVenueRepository()
     val venueB = testVenue(id = "venue-b")
@@ -412,3 +424,6 @@ class FakeVenueRepositoryTest {
     Assert.assertEquals(venue, repository.observeVenue("cafe").first())
   }
 }
+
+/** Where a venue picture would be stored; the fake never reads it. */
+private const val PICTURE = "gs://bucket/venue-pictures/venue-1/photo"

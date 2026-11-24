@@ -16,6 +16,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardViewModel
@@ -32,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
  * @param authRepository the session, used by the business-name step and the home's sign-out.
  * @param venueRepository where the venue is read and saved.
  * @param onSignOut signs the venue out when its venue can't be read.
+ * @param venuePictures stores the venue's picture.
  * @param viewModel chooses where the venue starts.
  * @param navController the venue's NavHost controller; tests pass their own to read it.
  * @param areaStep draws the area step; [defaultVenueAreaStep] unless replaced, e.g. by tests.
@@ -46,6 +48,7 @@ fun VenueEntry(
     authRepository: AuthRepository,
     venueRepository: VenueRepository,
     onSignOut: () -> Unit,
+    venuePictures: UserPictureRepository,
     viewModel: VenueEntryViewModel =
         viewModel(key = userId, factory = VenueEntryViewModel.factory(userId, venueRepository)),
     navController: NavHostController = rememberNavController(),
@@ -74,6 +77,7 @@ fun VenueEntry(
       VenueEntryNavigation(
           authRepository,
           venueRepository,
+          venuePictures,
           locationScreen = areaStep,
           createQuestFactory = createQuestFactory,
           venueQuestsFactory = venueQuestsFactory,

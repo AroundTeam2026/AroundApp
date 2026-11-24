@@ -70,7 +70,7 @@ class ProfileEditScreenTest {
 
   /** Whether the edit form's avatar shows the red picture rather than the placeholder. */
   private fun avatarShowsThePicture(): Boolean {
-    val image = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_AVATAR).captureToImage()
+    val image = compose.onNodeWithTag(C.Tag.PICTURE_AVATAR).captureToImage()
     val centre = image.toPixelMap()[image.width / 2, image.height / 2].toArgb()
     return android.graphics.Color.red(centre) > 200 && android.graphics.Color.green(centre) < 60
   }
@@ -159,7 +159,7 @@ class ProfileEditScreenTest {
   fun removePhotoActionClearsTheSavedPicture() {
     launch(pictureUrl = "gs://old-picture")
     compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).performClick()
-    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_REMOVE).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_CONTINUE).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).assertIsDisplayed()
     assertEquals(null, runBlocking { users.getUser("explorer")?.pictureUrl })
@@ -171,9 +171,9 @@ class ProfileEditScreenTest {
     compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).performClick()
     compose.waitUntil(5_000) { avatarShowsThePicture() }
 
-    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_REMOVE).performClick()
     compose.waitUntil(5_000) { !avatarShowsThePicture() }
-    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.PICTURE_REMOVE).assertDoesNotExist()
   }
 
   @Test
@@ -181,7 +181,7 @@ class ProfileEditScreenTest {
     launch()
     compose.onNodeWithTag(C.Tag.PROFILE_EDIT_ACTION).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_NAME).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO).assertDoesNotExist()
+    compose.onNodeWithTag(C.Tag.PICTURE_REMOVE).assertDoesNotExist()
   }
 
   @Test

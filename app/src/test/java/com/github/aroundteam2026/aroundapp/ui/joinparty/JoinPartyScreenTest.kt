@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
@@ -16,6 +17,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -85,6 +88,17 @@ class JoinPartyScreenTest {
 
   private val hasError = SemanticsMatcher.keyIsDefined(SemanticsProperties.Error)
   private val hasNoError = SemanticsMatcher.keyNotDefined(SemanticsProperties.Error)
+
+  // The label is a separate Text, so TalkBack only reads it if the field carries it as its name
+  @Test
+  fun theCodeFieldIsNamedAfterItsLabel() {
+    show()
+
+    compose
+        .onNode(hasContentDescription(text(R.string.join_party_code_label)) and hasSetTextAction())
+        .assertIsDisplayed()
+        .assert(hasTestTag(C.Tag.JOIN_PARTY_CODE))
+  }
 
   @Test
   fun showsTheTitleTheExplanationTheLabelAndTheButtonAndTheBackArrowGoesBack() {

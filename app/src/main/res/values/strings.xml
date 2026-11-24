@@ -41,23 +41,25 @@
     <string name="map_card_reward_chf_off">CHF %1$s off</string>
     <string name="map_card_reward_free_item">Free %1$s</string>
 
-    <!-- The pager of quests near the explorer, one quest per page -->
+    <!-- The list of quests near the explorer -->
     <string name="map_nearby_title">Nearby quests</string>
-    <!-- Which page is shown, of how many, and how the quests are ordered -->
-    <string name="map_nearby_closest_first">%1$d of %2$d · closest first</string>
-    <string name="map_nearby_by_name">%1$d of %2$d · by venue name</string>
+    <!-- How many quests the list holds, then how they are ordered -->
+    <plurals name="map_nearby_count">
+        <item quantity="one">%1$d quest</item>
+        <item quantity="other">%1$d quests</item>
+    </plurals>
+    <string name="map_nearby_closest_first">closest first</string>
+    <string name="map_nearby_by_name">by venue name</string>
     <string name="map_nearby_location_off">Turn on location to see the closest quests first.</string>
     <string name="map_nearby_empty">No quests around here yet. Check back soon.</string>
-    <!-- What screen readers say a tap on a quest's page does -->
+    <!-- What screen readers say a tap on a quest's card does -->
     <string name="map_nearby_open_details">Open the quest\'s details</string>
-    <!-- The pin under a quest's page, which shows the quest on the map -->
+    <!-- The pin under a quest's card, which shows the quest on the map -->
     <string name="map_nearby_show_on_map">Show on the map</string>
-    <string name="map_nearby_previous">Previous quest</string>
-    <string name="map_nearby_next">Next quest</string>
     <string name="map_nearby_close">Close nearby quests</string>
     <string name="map_nearby_filters">Filter nearby quests</string>
-    <string name="map_nearby_filtered">%1$d of %2$d · %3$s</string>
-    <string name="map_nearby_filter_pair">%1$s · %2$s</string>
+    <!-- Two parts of a line: the count and the order or filters, or the distance and the reward -->
+    <string name="map_nearby_pair">%1$s · %2$s</string>
     <string name="map_nearby_no_match">No quests match these filters.</string>
     <string name="map_nearby_filter_distance">Distance</string>
     <string name="map_nearby_filter_reward">Reward</string>
