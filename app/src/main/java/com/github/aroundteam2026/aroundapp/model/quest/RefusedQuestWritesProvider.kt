@@ -6,8 +6,8 @@ import androidx.annotation.VisibleForTesting
 
 /**
  * Builds the app's [RefusedQuestWrites], so ViewModels never depend on an implementation. Every
- * screen of a venue gets the same one, as the form that writes a quest and the list that hears the
- * outcome don't share a ViewModel.
+ * screen of a venue gets the same one, as any screen that hears the venue's quests should judge the
+ * same writes.
  */
 object RefusedQuestWritesProvider {
   private var current: Pair<String, RefusedQuestWrites>? = null
