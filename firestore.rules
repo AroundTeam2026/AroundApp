@@ -40,28 +40,34 @@ service cloud.firestore {
       return value is int && value >= 20 && value <= 200;
     }
 
+    // [data] has no picture, or one that [uid] uploaded to its own folder in Cloud Storage's
+    // [folder], as storage.rules lays them out.
+    function hasOwnPicture(data, folder, uid) {
+      return !('pictureUrl' in data)
+          || (isText(data.pictureUrl, 2000)
+              && data.pictureUrl.matches('gs://[^/]+/' + folder + '/' + uid + '/[^/]+'));
+    }
+
     function isValidUser(data, uid) {
       return data.keys().hasAll(['displayName', 'createdAt'])
           && data.keys().hasOnly(['displayName', 'pictureUrl', 'role', 'createdAt'])
           && isText(data.displayName, 100)
-          && (!('pictureUrl' in data)
-              || (isText(data.pictureUrl, 2000)
-                  && data.pictureUrl.matches(
-                      'gs://[^/]+/user-pictures/' + uid + '/[^/]+')))
+          && hasOwnPicture(data, 'user-pictures', uid)
           && data.get('role', null) in [null, 'EXPLORER', 'VENUE']
           && data.createdAt is timestamp;
     }
 
-    function isValidVenue(data) {
+    function isValidVenue(data, ownerUid) {
       return data.keys().hasAll(['name', 'radiusMeters', 'createdAt'])
-          && data.keys().hasOnly(
-              ['name', 'location', 'radiusMeters', 'address', 'createdAt', 'featuredQuestId'])
+          && data.keys().hasOnly(['name', 'location', 'radiusMeters', 'address', 'createdAt',
+              'featuredQuestId', 'pictureUrl'])
           && isText(data.name, 100)
           && (!('location' in data) || data.location is latlng)
           && isRadius(data.radiusMeters)
           && (!('address' in data) || data.address is string)
           && data.createdAt is timestamp
-          && (!('featuredQuestId' in data) || data.featuredQuestId is string);
+          && (!('featuredQuestId' in data) || data.featuredQuestId is string)
+          && hasOwnPicture(data, 'venue-pictures', ownerUid);
     }
 
     // A quest without a location takes place at its venue's location.
@@ -79,6 +85,7 @@ service cloud.firestore {
           && data.proofType in ['PHOTO', 'TEXT']
           && data.minPartySize is int
           && data.minPartySize >= 1
+          && data.minPartySize <= maxPartySize()
           && (!('exactPartySize' in data) || data.exactPartySize is bool)
           && (!('reward' in data) || isValidReward(data.reward))
           && data.status in ['DRAFT', 'ACTIVE', 'ARCHIVED']
@@ -398,7 +405,7 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create, update: if isUser(ownerUid)
           && hasRole('VENUE')
-          && isValidVenue(request.resource.data);
+          && isValidVenue(request.resource.data, ownerUid);
       allow delete: if isUser(ownerUid) && hasRole('VENUE');
     }
 

@@ -4,6 +4,7 @@
 package com.github.aroundteam2026.aroundapp.ui.completion
 
 import android.net.Uri
+import androidx.core.net.toFile
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
 import com.github.aroundteam2026.aroundapp.model.WriteConfirmation
 import com.github.aroundteam2026.aroundapp.model.common.Location
@@ -592,7 +593,7 @@ class CompletionViewModelTest {
     viewModel.submit()
     runCurrent()
 
-    assertEquals(listOf(PHOTO.path), queue.queued.map { it.photo.path })
+    assertEquals(listOf(PHOTO_FILE), queue.queued.map { it.photo })
     assertEquals(SaveState.Saved(completionId(reservationId)), state.saveState)
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
@@ -618,7 +619,7 @@ class CompletionViewModelTest {
   @Test
   fun aWaitingPhotoIsReplacedThroughTheQueueEvenOnline() = test {
     open("photo")
-    queue.enqueue(reservationId, CAFE, EXPLORER, File(checkNotNull(PHOTO.path)))
+    queue.enqueue(reservationId, CAFE, EXPLORER, PHOTO_FILE)
     runCurrent()
     assertTrue(state.photoWaiting)
     viewModel.pickPhoto(PHOTO)
@@ -679,7 +680,7 @@ class CompletionViewModelTest {
     gate.complete(Unit)
     runCurrent()
 
-    assertEquals(listOf(PHOTO.path), queue.queued.map { it.photo.path })
+    assertEquals(listOf(PHOTO_FILE), queue.queued.map { it.photo })
     assertTrue(photos.uploads.isEmpty())
     assertEquals(0, completions.calls)
   }
@@ -1313,6 +1314,13 @@ class CompletionViewModelTest {
     val AWAY = Location(46.5191, 6.5668)
     /** A copy ProofPhotos keeps, as the picker gives. */
     val PHOTO: Uri = Uri.fromFile(File("/proofs/proof-1.jpg"))
+
+    /**
+     * [PHOTO] as the file the app queues. Compare files, not path strings: on Windows a Uri's path
+     * (/C:\…) and a File's (C:\…) differ though they name the same file (#682). Built with
+     * toFile(), as the app does: File("/proofs/proof-1.jpg") has no drive letter on Windows.
+     */
+    val PHOTO_FILE: File = PHOTO.toFile()
     val OTHER_PHOTO: Uri = Uri.parse("content://media/photos/2")
   }
 }

@@ -573,4 +573,6 @@ private class RecordingVenueRepository(
   ) = Result.success(Unit)
 
   override suspend fun setName(venueId: String, name: String) = Result.success(Unit)
+
+  override suspend fun setPicture(venueId: String, pictureUrl: String?) = Result.success(Unit)
 }

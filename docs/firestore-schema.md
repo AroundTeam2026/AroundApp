@@ -36,6 +36,7 @@ No email: Firebase Auth already has it. Signed-in users can get a profile by uid
 | `address` | string? | |
 | `createdAt` | timestamp | |
 | `featuredQuestId` | string? | Quest the venue wants shown first. Not checked against the venue's quests. |
+| `pictureUrl` | string? | Cloud Storage location (`gs://...`) under this venue's `venue-pictures/{venueId}/`; omitted until set. At most 2,000 characters. |
 
 One venue per account in v1, so the document id is the owner's uid.
 
@@ -197,6 +198,7 @@ From `storage.rules`. Anything not listed is denied, including listing, overwrit
 |---|---|---|
 | `proofs/{reservationId}/{photoId}` | The reservation's party's `JOINED` members and its venue | A `JOINED` member of the reservation creates it while the reservation is `APPROVED`: an image (`image/*`) under 5 MB. Each photo gets a new `photoId`, so a retake never replaces an earlier one. |
 | `user-pictures/{uid}/{photoId}` | Signed-in users | Only `uid` creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
+| `venue-pictures/{venueId}/{photoId}` | Signed-in users | Only the venue's owner (`venueId` is their uid), once the venue exists, creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
 
 The rules read the reservation and the membership from Firestore, so a proof follows the same party as `reservations`. A completion's `photoUrl` points to its photo here.
 

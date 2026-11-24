@@ -26,6 +26,7 @@ import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchReposi
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
@@ -67,6 +68,7 @@ class VenueEntryNavigationTest {
         VenueEntryNavigation(
             auth,
             venues,
+            FakeUserPictureRepository(),
             locationScreen = { uid, onSaved, onBack ->
               Column {
                 Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
@@ -263,6 +265,7 @@ class VenueEntryNavigationTest {
               VenueEntryNavigation(
                   auth,
                   venues,
+                  FakeUserPictureRepository(),
                   createQuestFactory = createQuestFactoryOnFakes(),
                   venueQuestsFactory = venueQuestsFactoryOnFakes(),
                   dashboardFactory = venueDashboardFactoryOnFakes(),
@@ -301,6 +304,7 @@ class VenueEntryNavigationTest {
         VenueEntryNavigation(
             auth,
             repository,
+            FakeUserPictureRepository(),
             locationScreen = { uid, onSaved, _ ->
               Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
             },

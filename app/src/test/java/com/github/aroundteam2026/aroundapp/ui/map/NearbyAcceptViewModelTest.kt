@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
@@ -486,6 +487,69 @@ class NearbyAcceptViewModelTest {
 
     assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
   }
+
+  // The server hasn't confirmed the reservation yet, as when the connection dropped meanwhile
+  @Test
+  fun aReservationTheServerHasntConfirmedWaitsToSend() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a"))
+    open()
+
+    assertEquals(AcceptStatus.SENDING, state.statusOf("a"))
+    assertEquals(AcceptStatus.NONE, state.statusOf("b"))
+  }
+
+  @Test
+  fun aQueuedReservationTheServerConfirmsIsAccepted() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a"))
+    open()
+
+    local.listed.value = local.listed.value.map { it.copy(pendingWrite = false) }
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
+  @Test
+  fun aQueuedReservationIsNotBookedAgain() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a"))
+    open()
+
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    assertEquals(1, local.listed.value.size)
+    assertEquals(AcceptStatus.SENDING, state.statusOf("a"))
+  }
+
+  @Test
+  fun aQuestBeingAcceptedIsNotWaitingToSendYet() = test {
+    reservations = local
+    local.gate = CompletableDeferred()
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    local.listed.value = local.listed.value.map { it.copy(pendingWrite = true) }
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTING, state.statusOf("a"))
+  }
+
+  @Test
+  fun aQueuedCancellationDoesntWaitToSendTheQuest() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a").copy(status = ReservationStatus.CANCELLED))
+    open()
+
+    assertEquals(AcceptStatus.NONE, state.statusOf("a"))
+  }
+
+  private fun queued(questId: String) =
+      newPendingReservation(questId, VENUE_ID, "Ada", NOW)
+          .copy(id = "queued-$questId", pendingWrite = true)
 
   private fun quest(id: String) =
       NearbyQuest(

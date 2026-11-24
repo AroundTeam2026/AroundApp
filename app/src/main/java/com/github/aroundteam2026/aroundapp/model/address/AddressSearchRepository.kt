@@ -30,7 +30,7 @@ sealed interface AddressSearchResult {
 }
 
 /** Finds addresses from what the user types. */
-interface AddressSearchRepository {
+fun interface AddressSearchRepository {
   /**
    * Addresses matching [query], preferring those around [near], the area the map shows, when it is
    * known.

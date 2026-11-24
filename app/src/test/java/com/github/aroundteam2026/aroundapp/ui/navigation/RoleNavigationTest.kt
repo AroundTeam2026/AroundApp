@@ -198,7 +198,7 @@ class RoleNavigationTest {
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
     compose.onNodeWithTag("venue").assertDoesNotExist()
     compose.runOnIdle { fails = false }
-    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_RETRY).performClick()
+    compose.onNodeWithTag(C.Tag.RETRY_OR_SIGN_OUT_RETRY).performClick()
     compose.onNodeWithTag("venue").assertTextEquals("restored")
     compose.runOnIdle { assertEquals("restored", auth.currentUserId.value) }
   }
@@ -256,7 +256,7 @@ class RoleNavigationTest {
         }
     val auth = FakeAuthRepository("restored")
     launch(auth, failing)
-    compose.onNodeWithTag(C.Tag.ROLE_PROFILE_SIGN_OUT).performClick()
+    compose.onNodeWithTag(C.Tag.RETRY_OR_SIGN_OUT_SIGN_OUT).performClick()
     compose.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.ROLE_PROFILE_ERROR).assertDoesNotExist()
     compose.runOnIdle { assertEquals(null, auth.currentUserId.value) }
