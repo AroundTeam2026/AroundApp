@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -100,7 +101,7 @@ internal fun VenueProfileContent(
               textAlign = TextAlign.Center,
           )
       VenueProfileStatus.LOADED -> {
-        VenueCard(state.name, state.address)
+        VenueCard(state.name, state.address, state.picture)
         EditDetailsCard(onEditDetails)
       }
     }
@@ -108,11 +109,17 @@ internal fun VenueProfileContent(
   }
 }
 
-/** The venue's avatar, name and address, as the explorer's profile card shows theirs. */
+/**
+ * The venue's picture, or its initials without one, its name and address, as the explorer's profile
+ * card shows theirs.
+ */
 @Composable
-private fun VenueCard(name: String, address: String?) {
+private fun VenueCard(name: String, address: String?, picture: ImageBitmap?) {
   ProfileCard {
-    QuestAvatar(VenueAvatar.Initials(initialsOf(name)), venueAvatarStyle())
+    QuestAvatar(
+        picture?.let(VenueAvatar::Picture) ?: VenueAvatar.Initials(initialsOf(name)),
+        venueAvatarStyle(),
+    )
     Column {
       Text(
           name,

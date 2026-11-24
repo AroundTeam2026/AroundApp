@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorStorage
 import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.storage.FirebaseStorage
 import java.io.File
 import java.util.UUID
@@ -55,6 +56,8 @@ class UserPictureRepositoryStorageTest {
             storage,
             folder = UserPictureRepositoryStorage.VENUE_PICTURES,
         )
+    // storage.rules lets only an existing venue upload its picture
+    writeBypassingRules("venues/$uid", mapOf("name" to "Café"))
 
     val location = venues.upload(uid, photo(byteArrayOf(7))).getOrThrow()
 

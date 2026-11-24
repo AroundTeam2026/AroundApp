@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -122,32 +123,7 @@ internal fun ProfileForm(
   val form by model.form.collectAsStateWithLifecycle()
   val profile by model.profile.collectAsStateWithLifecycle()
   val offline by model.offline.collectAsStateWithLifecycle()
-  val context = LocalContext.current.applicationContext
-  // Uploaded at once, so its copies stay in the cache, which the system clears
-  val photos = remember(context) { ProofPhotos(context, root = context.cacheDir) }
-  val scope = rememberCoroutineScope()
-  var preparingPhoto by remember { mutableStateOf(false) }
-  var photoError by remember { mutableStateOf(false) }
-  val picker =
-      rememberLauncherForActivityResult(PickVisualMedia()) { source: Uri? ->
-        if (source != null) {
-          preparingPhoto = true
-          photoError = false
-          scope.launch {
-            try {
-              val prepared = photos.shrink(source)
-              form.photo?.let { photos.discard(it) }
-              model.setPhoto(prepared)
-            } catch (cancelled: CancellationException) {
-              throw cancelled
-            } catch (_: Exception) {
-              photoError = true
-            } finally {
-              preparingPhoto = false
-            }
-          }
-        }
-      }
+  val picker = rememberPicturePicker(form.photo, model::setPhoto)
 
   Column(
       Modifier.fillMaxSize()
@@ -162,13 +138,21 @@ internal fun ProfileForm(
   ) {
     FormHeader(editing, backEnabled = !form.saving, onBack)
     Spacer(Modifier.height(AroundSpacing.SetupGap))
-    PhotoRow(
-        form,
-        savedPicture = profile?.pictureUrl?.takeIf { editing && !form.removePhoto },
-        editing,
-        pickEnabled = !form.saving && !preparingPhoto,
-        pictures,
-        onPick = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
+    val savedPicture = profile?.pictureUrl?.takeIf { editing && !form.removePhoto }
+    PictureRow(
+        avatar = {
+          ProfileAvatar(
+              savedPicture,
+              form.photo,
+              pictures,
+              Modifier.testTag(C.Tag.PICTURE_AVATAR),
+          )
+        },
+        labels = PHOTO_LABELS,
+        editing = editing,
+        hasPicture = form.photo != null || savedPicture != null,
+        saving = form.saving,
+        picker = picker,
         onRemove = model::removePhoto,
     )
     Spacer(Modifier.height(AroundSpacing.ExtraLarge))
@@ -196,7 +180,7 @@ internal fun ProfileForm(
               contentDescription = nameLabel
             },
     )
-    errorTextOf(form.error, editing, photoError)?.let { errorText ->
+    errorTextOf(form.error, editing, picker.failed)?.let { errorText ->
       Spacer(Modifier.height(AroundSpacing.Small))
       Text(
           stringResource(errorText),
@@ -212,7 +196,7 @@ internal fun ProfileForm(
     }
     Button(
         onClick = model::save,
-        enabled = !form.saving && !preparingPhoto && !offline,
+        enabled = !form.saving && !picker.preparing && !offline,
         shape = AroundShapes.medium,
         modifier =
             Modifier.fillMaxWidth().height(CONTINUE_HEIGHT).testTag(C.Tag.PROFILE_SETUP_CONTINUE),
@@ -253,34 +237,90 @@ private fun FormHeader(editing: Boolean, backEnabled: Boolean, onBack: () -> Uni
 }
 
 /**
- * The avatar beside the photo actions. It shows the picked photo, else [savedPicture]; "Remove
- * photo" appears in edit mode while there is either to remove, and the setup form says the photo is
- * optional instead.
+ * The words of a [PictureRow]: an explorer adds a "photo", a venue a "picture".
+ *
+ * @property add The pick button's label while there is nothing to replace, at setup.
+ * @property change The pick button's label when editing.
+ * @property remove The label of the button that removes the picture, when editing.
+ * @property optional The hint under the pick button at setup.
+ */
+internal data class PictureLabels(
+    @StringRes val add: Int,
+    @StringRes val change: Int,
+    @StringRes val remove: Int,
+    @StringRes val optional: Int,
+)
+
+/**
+ * Picks a picture from the gallery and prepares a small copy of it to upload.
+ *
+ * @property preparing Whether a picked picture is being shrunk, so picking or saving must wait.
+ * @property failed Whether the last picked picture couldn't be read, to say so under the form.
+ * @property launch Opens the gallery.
+ */
+internal class PicturePicker(val preparing: Boolean, val failed: Boolean, val launch: () -> Unit)
+
+/**
+ * A [PicturePicker] that passes each prepared copy to [onPicked], then discards [current], the copy
+ * it replaces. The copies stay in the cache, which the system clears, since they're uploaded at
+ * once.
  */
 @Composable
-private fun PhotoRow(
-    form: ProfileSetupFormState,
-    savedPicture: String?,
+internal fun rememberPicturePicker(current: Uri?, onPicked: (Uri) -> Unit): PicturePicker {
+  val context = LocalContext.current.applicationContext
+  val photos = remember(context) { ProofPhotos(context, root = context.cacheDir) }
+  val scope = rememberCoroutineScope()
+  var preparing by remember { mutableStateOf(false) }
+  var failed by remember { mutableStateOf(false) }
+  val launcher =
+      rememberLauncherForActivityResult(PickVisualMedia()) { source: Uri? ->
+        if (source != null) {
+          preparing = true
+          failed = false
+          scope.launch {
+            try {
+              val prepared = photos.shrink(source)
+              current?.let { photos.discard(it) }
+              onPicked(prepared)
+            } catch (cancelled: CancellationException) {
+              throw cancelled
+            } catch (_: Exception) {
+              failed = true
+            } finally {
+              preparing = false
+            }
+          }
+        }
+      }
+  return PicturePicker(preparing, failed) {
+    launcher.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+  }
+}
+
+/**
+ * The [avatar] beside the picture's actions, shared by the explorer's and the venue's forms: at
+ * setup, a button to add one and a hint that it is optional; when [editing], a button to change it
+ * and, while [hasPicture], one to remove it. [saving] locks both buttons.
+ */
+@Composable
+internal fun PictureRow(
+    avatar: @Composable () -> Unit,
+    labels: PictureLabels,
     editing: Boolean,
-    pickEnabled: Boolean,
-    pictures: UserPictureRepository,
-    onPick: () -> Unit,
+    hasPicture: Boolean,
+    saving: Boolean,
+    picker: PicturePicker,
     onRemove: () -> Unit,
 ) {
   Row(
       horizontalArrangement = Arrangement.spacedBy(AroundSpacing.Large),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    ProfileAvatar(
-        savedPicture,
-        form.photo,
-        pictures,
-        Modifier.testTag(C.Tag.PROFILE_SETUP_AVATAR),
-    )
+    avatar()
     Column(verticalArrangement = Arrangement.spacedBy(PHOTO_ACTIONS_GAP)) {
       OutlinedButton(
-          onClick = onPick,
-          enabled = pickEnabled,
+          onClick = picker.launch,
+          enabled = !saving && !picker.preparing,
           shape = AroundShapes.medium,
           border = BorderStroke(PHOTO_BUTTON_BORDER, MaterialTheme.colorScheme.primary),
           colors =
@@ -288,30 +328,22 @@ private fun PhotoRow(
                   containerColor = MaterialTheme.colorScheme.surface,
                   contentColor = AroundTheme.colors.accentText,
               ),
-          modifier = Modifier.height(PHOTO_BUTTON_HEIGHT).testTag(C.Tag.PROFILE_SETUP_ADD_PHOTO),
+          modifier = Modifier.height(PHOTO_BUTTON_HEIGHT).testTag(C.Tag.PICTURE_PICK),
       ) {
-        Text(
-            stringResource(
-                if (editing) R.string.profile_edit_change_photo
-                else R.string.profile_setup_add_photo
-            )
-        )
+        Text(stringResource(if (editing) labels.change else labels.add))
       }
       when {
-        editing && (form.photo != null || savedPicture != null) ->
+        editing && hasPicture ->
             TextButton(
                 onClick = onRemove,
-                enabled = !form.saving,
-                modifier = Modifier.testTag(C.Tag.PROFILE_EDIT_REMOVE_PHOTO),
+                enabled = !saving,
+                modifier = Modifier.testTag(C.Tag.PICTURE_REMOVE),
             ) {
-              Text(
-                  stringResource(R.string.profile_edit_remove_photo),
-                  color = MaterialTheme.colorScheme.error,
-              )
+              Text(stringResource(labels.remove), color = MaterialTheme.colorScheme.error)
             }
         !editing ->
             Text(
-                stringResource(R.string.profile_setup_photo_optional),
+                stringResource(labels.optional),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -342,7 +374,7 @@ internal fun continueLabelOf(saving: Boolean, editing: Boolean): Int =
 
 /**
  * Shows a selected local picture or the saved Storage picture, with the same fallback in both
- * forms.
+ * forms: [fallbackIcon] on the primary container.
  *
  * @param io Where the saved picture is downloaded and decoded, off the main thread.
  */
@@ -352,6 +384,7 @@ internal fun ProfileAvatar(
     photo: Uri?,
     pictures: UserPictureRepository,
     modifier: Modifier = Modifier,
+    @DrawableRes fallbackIcon: Int = R.drawable.ic_profile,
     io: CoroutineDispatcher = Dispatchers.IO,
 ) {
   val context = LocalContext.current.applicationContext
@@ -388,7 +421,7 @@ internal fun ProfileAvatar(
       ProfilePhoto(picture, Modifier.fillMaxSize())
     } else {
       Image(
-          painterResource(R.drawable.ic_profile),
+          painterResource(fallbackIcon),
           null,
           Modifier.size(AVATAR_ICON_SIZE),
           colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
@@ -406,3 +439,12 @@ private val PHOTO_BUTTON_BORDER = 1.5.dp
 private val CONTINUE_HEIGHT = 54.dp
 private val AVATAR_SIZE = 64.dp
 private val AVATAR_ICON_SIZE = 28.dp
+
+/** The explorer's words for their picture, a "photo". */
+private val PHOTO_LABELS =
+    PictureLabels(
+        add = R.string.profile_setup_add_photo,
+        change = R.string.profile_edit_change_photo,
+        remove = R.string.profile_edit_remove_photo,
+        optional = R.string.profile_setup_photo_optional,
+    )

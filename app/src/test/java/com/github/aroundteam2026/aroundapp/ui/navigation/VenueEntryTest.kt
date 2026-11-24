@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchReposi
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.testVenue
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
@@ -86,6 +87,7 @@ class VenueEntryTest {
         auth,
         venues,
         onSignOut = { signOuts++ },
+        venuePictures = FakeUserPictureRepository(),
         viewModel = remember { VenueEntryViewModel(USER, venues) },
         navController = navController,
         areaStep = { venueId, onSaved, onBack ->

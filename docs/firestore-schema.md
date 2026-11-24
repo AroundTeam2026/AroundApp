@@ -198,7 +198,7 @@ From `storage.rules`. Anything not listed is denied, including listing, overwrit
 |---|---|---|
 | `proofs/{reservationId}/{photoId}` | The reservation's party's `JOINED` members and its venue | A `JOINED` member of the reservation creates it while the reservation is `APPROVED`: an image (`image/*`) under 5 MB. Each photo gets a new `photoId`, so a retake never replaces an earlier one. |
 | `user-pictures/{uid}/{photoId}` | Signed-in users | Only `uid` creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
-| `venue-pictures/{venueId}/{photoId}` | Signed-in users | Only the venue's owner (`venueId` is their uid) creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
+| `venue-pictures/{venueId}/{photoId}` | Signed-in users | Only the venue's owner (`venueId` is their uid), once the venue exists, creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
 
 The rules read the reservation and the membership from Firestore, so a proof follows the same party as `reservations`. A completion's `photoUrl` points to its photo here.
 
