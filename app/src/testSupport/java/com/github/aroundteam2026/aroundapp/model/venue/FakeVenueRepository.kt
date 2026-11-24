@@ -56,31 +56,31 @@ class FakeVenueRepository(initialVenues: List<Venue> = emptyList()) : VenueRepos
       location: Location,
       radiusMeters: Int,
       address: String?,
-  ): Result<Unit> {
-    val previous = venues.getAndUpdate { current ->
-      val venue = current[venueId]
-      if (venue == null) current
-      else {
-        val area = venue.copy(location = location, radiusMeters = radiusMeters, address = address)
-        current + (venueId to area)
+  ): Result<Unit> =
+      updateExisting(venueId) {
+        it.copy(location = location, radiusMeters = radiusMeters, address = address)
       }
-    }
-    return if (venueId in previous) {
-      Result.success(Unit)
-    } else {
-      Result.failure(IllegalArgumentException("Venue not found"))
-    }
-  }
 
   /**
    * Replaces the name of the venue with [venueId] in one atomic step, deciding the result from the
    * state before the write. Fails with [IllegalArgumentException] if the venue does not exist,
    * without creating it. Does not check [name] against [VenueLimits].
    */
-  override suspend fun setName(venueId: String, name: String): Result<Unit> {
+  override suspend fun setName(venueId: String, name: String): Result<Unit> =
+      updateExisting(venueId) { it.copy(name = name) }
+
+  /**
+   * Replaces the picture of the venue with [venueId] in one atomic step; null removes it. Fails
+   * with [IllegalArgumentException] if the venue does not exist, without creating it.
+   */
+  override suspend fun setPicture(venueId: String, pictureUrl: String?): Result<Unit> =
+      updateExisting(venueId) { it.copy(pictureUrl = pictureUrl) }
+
+  /** Applies [change] to the venue with [venueId] in one atomic step, if it exists. */
+  private fun updateExisting(venueId: String, change: (Venue) -> Venue): Result<Unit> {
     val previous = venues.getAndUpdate { current ->
       val venue = current[venueId]
-      if (venue == null) current else current + (venueId to venue.copy(name = name))
+      if (venue == null) current else current + (venueId to change(venue))
     }
     return if (venueId in previous) {
       Result.success(Unit)

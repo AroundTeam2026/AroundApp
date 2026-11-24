@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.user
 
 import android.net.Uri
@@ -43,6 +44,22 @@ class UserPictureRepositoryStorageTest {
     assertTrue(first.startsWith("gs://${storage.reference.bucket}/user-pictures/$uid/"))
     assertArrayEquals(byteArrayOf(1, 2, 3), repository.download(first).getOrThrow())
     assertArrayEquals(byteArrayOf(4, 5, 6), repository.download(second).getOrThrow())
+  }
+
+  /** Bug: the folder is ignored, so a venue's picture lands among users' ones. */
+  @Test
+  fun venuePicturesAreStoredInTheirOwnFolder() = withTimeoutBlocking {
+    val venues =
+        UserPictureRepositoryStorage(
+            context,
+            storage,
+            folder = UserPictureRepositoryStorage.VENUE_PICTURES,
+        )
+
+    val location = venues.upload(uid, photo(byteArrayOf(7))).getOrThrow()
+
+    assertTrue(location.startsWith("gs://${storage.reference.bucket}/venue-pictures/$uid/"))
+    assertArrayEquals(byteArrayOf(7), venues.download(location).getOrThrow())
   }
 
   /** Invalid ids fail locally, before a Storage write can start. */
