@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import androidx.annotation.DrawableRes
@@ -29,10 +30,15 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,12 +61,14 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import kotlinx.coroutines.launch
 
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
  * status. The heading's + button calls [onCreateQuest]; while the venue has no quests, the empty
  * state's button does instead. A quest's pencil calls [onEditQuest] with its id; its box archives
- * it, once confirmed, or unarchives an archived one.
+ * it, once confirmed, or unarchives an archived one. A change the server refused is told once, in a
+ * snackbar.
  */
 @Composable
 fun VenueQuestsScreen(
@@ -70,6 +78,19 @@ fun VenueQuestsScreen(
     onEditQuest: (String) -> Unit = {},
 ) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val refused by viewModel.refusalNotice.collectAsStateWithLifecycle()
+  val snackbarHostState = remember { SnackbarHostState() }
+  val scope = rememberCoroutineScope()
+  val refusedMessage = stringResource(R.string.venue_quests_write_refused)
+  LaunchedEffect(refused) {
+    if (refused) {
+      // Launched in the screen's scope, not in this effect: clearing the notice changes the
+      // effect's key, which would cancel a snackbar shown from inside it
+      scope.launch { snackbarHostState.showSnackbar(refusedMessage) }
+      // Cleared at once, so the snackbar doesn't show again when the screen is recreated
+      viewModel.onRefusalNoticeShown()
+    }
+  }
   VenueQuestsContent(
       state,
       onCreateQuest,
@@ -77,12 +98,14 @@ fun VenueQuestsScreen(
       modifier,
       onEditQuest,
       viewModel::setArchived,
+      snackbarHostState,
   )
 }
 
 /**
  * Stateless Quests tab showing [state]; [onRetry] listens to the quests again after a failure, and
- * [onSetArchived] archives a quest (true) or makes it active again (false).
+ * [onSetArchived] archives a quest (true) or makes it active again (false). [snackbarHostState]
+ * shows what the screen tells in a snackbar.
  */
 @Composable
 internal fun VenueQuestsContent(
@@ -92,9 +115,25 @@ internal fun VenueQuestsContent(
     modifier: Modifier = Modifier,
     onEditQuest: (String) -> Unit = {},
     onSetArchived: (Quest, Boolean) -> Unit = { _, _ -> },
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+) {
+  Box(modifier.fillMaxSize()) {
+    QuestsTab(state, onCreateQuest, onRetry, onEditQuest, onSetArchived)
+    SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+  }
+}
+
+/** The heading and what the tab holds under it. */
+@Composable
+private fun QuestsTab(
+    state: VenueQuestsUiState,
+    onCreateQuest: () -> Unit,
+    onRetry: () -> Unit,
+    onEditQuest: (String) -> Unit,
+    onSetArchived: (Quest, Boolean) -> Unit,
 ) {
   val empty = state is VenueQuestsUiState.Loaded && state.quests.isEmpty()
-  Column(modifier.fillMaxSize().padding(AroundSpacing.ScreenHorizontal)) {
+  Column(Modifier.fillMaxSize().padding(AroundSpacing.ScreenHorizontal)) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Text(
           stringResource(R.string.venue_quests_title),

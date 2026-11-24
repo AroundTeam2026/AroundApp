@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import androidx.lifecycle.ViewModelProvider
@@ -8,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.fakeRefusedQuestWrites
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -17,7 +19,13 @@ import kotlinx.coroutines.flow.flow
  * would read Firestore.
  */
 fun venueQuestsFactoryOnFakes(): ViewModelProvider.Factory = viewModelFactory {
-  initializer { VenueQuestsViewModel(FakeAuthRepository(), FakeQuestRepository()) }
+  initializer {
+    VenueQuestsViewModel(
+        FakeAuthRepository(),
+        FakeQuestRepository(),
+        ::fakeRefusedQuestWrites,
+    )
+  }
 }
 
 /**

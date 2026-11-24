@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.quest.RefusedQuestWritesProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
@@ -58,7 +59,15 @@ class MainActivity : ComponentActivity() {
             },
             venueScreen = { uid ->
               NotificationPermissionGate(Role.VENUE, notificationPrompt) {
-                VenueEntry(uid, auth, VenueRepositoryProvider.repository, profile::signOut)
+                VenueEntry(
+                    uid,
+                    auth,
+                    VenueRepositoryProvider.repository,
+                    onSignOut = {
+                      RefusedQuestWritesProvider.forget(applicationContext, uid)
+                      profile.signOut()
+                    },
+                )
               }
             },
         )

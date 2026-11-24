@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import android.content.Context
@@ -9,16 +10,22 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.fakeRefusedQuestWrites
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -180,7 +187,8 @@ class VenueQuestsScreenTest {
   @Test
   fun tryingAgainAfterALoadErrorListsTheQuests() {
     val failingOnce = failingFirstListen(FakeQuestRepository())
-    val viewModel = VenueQuestsViewModel(FakeAuthRepository(VENUE_ID), failingOnce)
+    val viewModel =
+        VenueQuestsViewModel(FakeAuthRepository(VENUE_ID), failingOnce, ::fakeRefusedQuestWrites)
     compose.setContent {
       AroundAppTheme { VenueQuestsScreen(viewModel, onCreateQuest = { formsOpened++ }) }
     }
@@ -192,6 +200,28 @@ class VenueQuestsScreenTest {
 
     compose.onNodeWithTag(C.Tag.VENUE_QUESTS_FAILED).assertDoesNotExist()
     compose.onNodeWithTag(C.Tag.VENUE_QUESTS_EMPTY).assertIsDisplayed()
+  }
+
+  @Test
+  fun aQuestWriteTheServerRefusedIsToldOnceInASnackbar() {
+    val listed = MutableStateFlow<List<Quest>>(emptyList())
+    val viewModel =
+        VenueQuestsViewModel(
+            FakeAuthRepository(VENUE_ID),
+            ScriptedQuestRepository(questsByVenue = { listed }),
+            ::fakeRefusedQuestWrites,
+        )
+    compose.setContent { AroundAppTheme { VenueQuestsScreen(viewModel, onCreateQuest = {}) } }
+    listed.value = listOf(testQuest(id = "fox", venueId = VENUE_ID).copy(pendingWrite = true))
+    compose.waitForIdle()
+    compose.onNodeWithText(string(R.string.venue_quests_write_refused)).assertDoesNotExist()
+
+    // The server refuses it: Firestore takes the quest back out of the list
+    listed.value = emptyList()
+    compose.waitForIdle()
+
+    compose.onNodeWithText(string(R.string.venue_quests_write_refused)).assertIsDisplayed()
+    assertFalse(viewModel.refusalNotice.value)
   }
 
   @Test
