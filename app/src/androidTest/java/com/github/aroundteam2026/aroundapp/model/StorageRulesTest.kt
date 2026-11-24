@@ -66,6 +66,21 @@ class StorageRulesTest {
     )
   }
 
+  /** Type, size and overwrite checks are shared with user pictures, so they're tested there. */
+  @Test
+  fun onlyTheOwnerUploadsAVenuePictureAndSignedInUsersCanReadIt() {
+    val owner = newAccount()
+    val other = newAccount()
+    val path = "venue-pictures/${owner.uid}/${UUID.randomUUID()}"
+    val signedOut = emulatorStorage("storage-${UUID.randomUUID()}")
+
+    assertDenied(other.upload(path), "another user uploading a venue picture")
+    assertDenied(signedOut.upload(path), "a signed-out venue picture upload")
+    assertSucceeds(owner.upload(path))
+    assertSucceeds(other.read(path))
+    assertDenied(signedOut.read(path), "a signed-out venue picture read")
+  }
+
   @Test
   fun aJoinedExplorerUploadsAProofThatTheirPartyAndTheVenueRead() {
     val venue = newAccount()

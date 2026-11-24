@@ -394,6 +394,9 @@ class VenueInitializationViewModelTest {
     override suspend fun setName(venueId: String, name: String): Result<Unit> =
         renameFailure?.let { Result.failure(it) } ?: delegate.setName(venueId, name)
 
+    override suspend fun setPicture(venueId: String, pictureUrl: String?) =
+        delegate.setPicture(venueId, pictureUrl)
+
     override suspend fun getVenue(venueId: String): Venue? {
       reads++
       readFailure?.let { throw it }

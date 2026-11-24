@@ -200,6 +200,27 @@ class FirestoreRulesTest {
     assertSucceeds(venueOf(venue).set(valid - listOf("location", "address", "featuredQuestId")))
   }
 
+  /** The picture's type and length checks are shared with users, so they're tested there. */
+  @Test
+  fun venueSetsAPictureOnlyInItsOwnFolderAndCanStillBeRenamed() {
+    val venue = newUser(Role.VENUE)
+    val other = newUser(Role.VENUE)
+    signInAs(venue)
+    assertSucceeds(venueOf(venue).set(venueData()))
+
+    assertSucceeds(venueOf(venue).update("pictureUrl", "gs://bucket/venue-pictures/${venue.uid}/1"))
+    // The whole document is checked on every write, so a stored picture must not block a rename
+    assertSucceeds(venueOf(venue).update("name", "Café Lumière"))
+    assertDenied(
+        venueOf(venue).update("pictureUrl", "gs://bucket/venue-pictures/${other.uid}/1"),
+        "a picture in another venue's folder",
+    )
+    assertDenied(
+        venueOf(venue).update("pictureUrl", "gs://bucket/user-pictures/${venue.uid}/1"),
+        "a picture outside venue-pictures",
+    )
+  }
+
   // ---- quests ----
 
   @Test

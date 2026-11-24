@@ -69,4 +69,16 @@ interface VenueRepository {
    * @param name The venue's new name.
    */
   suspend fun setName(venueId: String, name: String): Result<Unit>
+
+  /**
+   * Sets the profile picture of the venue identified by [venueId]: replaces its [Venue.pictureUrl]
+   * and leaves every other field unchanged. A null [pictureUrl] removes the picture.
+   *
+   * The existence check and the write are one atomic step. Fails with [IllegalArgumentException] if
+   * the venue does not exist, without creating it.
+   *
+   * @param venueId Id of the venue to update.
+   * @param pictureUrl Where the venue's picture was uploaded, or null for none.
+   */
+  suspend fun setPicture(venueId: String, pictureUrl: String?): Result<Unit>
 }

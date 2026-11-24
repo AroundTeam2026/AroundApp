@@ -265,6 +265,9 @@ class VenueInitializationScreenTest {
 
     override suspend fun setName(venueId: String, name: String) = delegate.setName(venueId, name)
 
+    override suspend fun setPicture(venueId: String, pictureUrl: String?) =
+        delegate.setPicture(venueId, pictureUrl)
+
     override suspend fun getVenue(venueId: String) = delegate.getVenue(venueId)
 
     override suspend fun createVenue(venue: Venue): Result<Unit> {
