@@ -98,15 +98,15 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * The explorer closes it with the pager's close button, or by dragging it down past a third of its
  * height or flinging it down; a shorter drag springs it back.
  *
- * @param quests The quests to page through, already ordered.
+ * @param quests The quests to list, already ordered.
  * @param locationOn Whether the explorer's location is on, so [quests] are closest first.
- * @param onOpenQuest Called with a page's quest when the explorer taps the page.
- * @param onShowOnMap Called with a page's quest when the explorer taps its pin.
+ * @param onOpenQuest Called with a card's quest when the explorer taps the card.
+ * @param onShowOnMap Called with a card's quest when the explorer taps its pin.
  * @param onClose Called when the explorer closes the overlay.
  * @param filters The filters [quests] already passed.
  * @param onFiltersChange Called with the filters the explorer picks in the pager.
  * @param acceptState Where accepting each quest stands; "Accept quest" shows only when given.
- * @param onAccept Called with a page's quest when the explorer taps its "Accept quest".
+ * @param onAccept Called with a card's quest when the explorer taps its "Accept quest".
  * @param modifier Places the overlay; the map puts it along its bottom edge, and the overlay keeps
  *   its own margin inside it.
  */

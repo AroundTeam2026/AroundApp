@@ -13,6 +13,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -106,6 +108,20 @@ class MapScreenNearbyTest {
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
 
+  /** The node tagged [tag] in the card of the quest [questId], e.g. its pin. */
+  private fun inQuest(questId: String, tag: String) =
+      composeTestRule.onNode(
+          hasTestTag(tag) and hasAnyAncestor(hasTestTag("${C.Tag.NEARBY_QUEST}_$questId"))
+      )
+
+  /** What the header says under its title: two quests, ordered as [order] says. */
+  private fun twoQuests(order: Int) =
+      context.getString(
+          R.string.map_nearby_pair,
+          context.resources.getQuantityString(R.plurals.map_nearby_count, 2, 2),
+          context.getString(order),
+      )
+
   // The shell leaves the Map's banner to the screen, so the screen must show it by default offline
   @Test
   fun theMapShowsTheBannerWhileTheShellSaysItIsOffline() {
@@ -161,8 +177,7 @@ class MapScreenNearbyTest {
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
     node(C.Tag.NEARBY_BUTTON).assertDoesNotExist()
     // The map's nearby quests: without the location, every valid quest, by venue name
-    node(C.Tag.NEARBY_COUNTER)
-        .assertTextEquals(context.getString(R.string.map_nearby_by_name, 1, 2))
+    node(C.Tag.NEARBY_COUNTER).assertTextEquals(twoQuests(R.string.map_nearby_by_name))
     node(C.Tag.NEARBY_LOCATION_HINT).assertIsDisplayed()
   }
 
@@ -182,8 +197,7 @@ class MapScreenNearbyTest {
 
     openNearby()
 
-    node(C.Tag.NEARBY_COUNTER)
-        .assertTextEquals(context.getString(R.string.map_nearby_closest_first, 1, 2))
+    node(C.Tag.NEARBY_COUNTER).assertTextEquals(twoQuests(R.string.map_nearby_closest_first))
     node(C.Tag.NEARBY_LOCATION_HINT).assertDoesNotExist()
   }
 
@@ -192,21 +206,21 @@ class MapScreenNearbyTest {
     show()
     openNearby()
 
-    node(C.Tag.NEARBY_SHOW_ON_MAP).performClick()
+    // Without the location the quests go by venue name, so the first card is the bar's
+    inQuest("bar-1", C.Tag.NEARBY_SHOW_ON_MAP).performClick()
     composeTestRule.waitForIdle()
 
     assertOverlayClosed()
-    // Without the location the quests go by venue name, so the first page is the bar's
     assertEquals("bar", viewModel.uiState.value.selectedPinKey)
   }
 
   @Test
-  fun tappingAPageOpensItsQuestsDetailsAndKeepsTheOverlay() {
+  fun tappingACardOpensItsQuestsDetailsAndKeepsTheOverlay() {
     val opened = mutableListOf<Pair<String, String>>()
     show(onOpenQuest = { venueId, questId -> opened += venueId to questId })
     openNearby()
 
-    node(C.Tag.NEARBY_PAGE).performClick()
+    inQuest("bar-1", C.Tag.NEARBY_CARD).performClick()
     composeTestRule.waitForIdle()
 
     assertEquals(listOf("bar" to "bar-1"), opened)
@@ -215,7 +229,7 @@ class MapScreenNearbyTest {
   }
 
   @Test
-  fun withoutAnAcceptViewModelThePagesOfferNoAccept() {
+  fun withoutAnAcceptViewModelTheCardsOfferNoAccept() {
     show()
     openNearby()
 
@@ -223,7 +237,7 @@ class MapScreenNearbyTest {
   }
 
   @Test
-  fun acceptOnAPageBooksItsQuestAndSaysItIsAccepted() {
+  fun acceptOnACardBooksItsQuestAndSaysItIsAccepted() {
     val reservations = FakeReservationRepository({ 0L })
     val accept =
         NearbyAcceptViewModel(
@@ -236,12 +250,10 @@ class MapScreenNearbyTest {
     show(acceptViewModel = accept)
     openNearby()
 
-    composeTestRule.onNodeWithTag(C.Tag.NEARBY_ACCEPT).performClick()
+    inQuest("bar-1", C.Tag.NEARBY_ACCEPT).performClick()
     composeTestRule.waitUntil { accept.uiState.value.statusOf("bar-1") == AcceptStatus.ACCEPTED }
 
-    // Without the location the quests go by venue name, so the first page is the bar's
-    composeTestRule
-        .onNodeWithTag(C.Tag.NEARBY_ACCEPT)
+    inQuest("bar-1", C.Tag.NEARBY_ACCEPT)
         .assertTextEquals(context.getString(R.string.accept_quest_accepted_short))
     // The quests stay open, so the explorer can go on to the next one
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
