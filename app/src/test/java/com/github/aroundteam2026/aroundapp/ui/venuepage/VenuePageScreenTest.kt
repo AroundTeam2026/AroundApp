@@ -37,6 +37,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
@@ -503,6 +504,7 @@ class VenuePageScreenTest {
             party,
             FakeCompletionRepository(),
             FakeConnectivityRepository(),
+            FakeProofUploadQueue(),
             "explorer",
             refusedWrites = fakeRefusedWrites(),
         )

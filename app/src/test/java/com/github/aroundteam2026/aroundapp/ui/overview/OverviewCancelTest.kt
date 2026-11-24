@@ -99,6 +99,16 @@ class OverviewCancelTest {
     return id
   }
 
+  /** Books a quest the venue approves, queues its proof and opens the overview; returns its id. */
+  private suspend fun TestScope.queueProofAndOpen(): String {
+    val id = book("fox")
+    fake.updateStatus(id, ReservationStatus.APPROVED)
+    uploads.enqueue(id, CAFE, EXPLORER, File("proof.jpg")).getOrThrow()
+    viewModel
+    runCurrent()
+    return id
+  }
+
   /** Takes the device offline for long enough that the overview says so. */
   private fun TestScope.goOffline() {
     connectivity.online.value = false
@@ -237,17 +247,24 @@ class OverviewCancelTest {
   // A queued proof isn't sent yet, so the party has no proof, as on the venue's page (#414)
   @Test
   fun aReservationWhoseProofIsQueuedCanBeCancelled() = test {
-    val id = book("fox")
-    fake.updateStatus(id, ReservationStatus.APPROVED)
-    uploads.enqueue(id, CAFE, EXPLORER, File("proof.jpg")).getOrThrow()
-    viewModel
-    runCurrent()
+    val id = queueProofAndOpen()
     assertEquals(OverviewRowStatus.UPLOAD_WAITING, state.rows.single().status)
 
     viewModel.cancel(id)
     runCurrent()
 
     assertEquals(ReservationStatus.CANCELLED, stored(id))
+  }
+
+  // Once cancelled, the rules would refuse the upload, leaving an unused photo in Storage (#625)
+  @Test
+  fun cancellingAReservationCancelsItsQueuedProof() = test {
+    val id = queueProofAndOpen()
+
+    viewModel.cancel(id)
+    runCurrent()
+
+    assertEquals(listOf(id), uploads.cancelled)
   }
 
   @Test

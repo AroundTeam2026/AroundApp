@@ -8,6 +8,7 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.rewardExpiringAt
@@ -70,6 +71,7 @@ class VenuePageViewModelTest {
         party,
         FakeCompletionRepository(),
         FakeConnectivityRepository(),
+        FakeProofUploadQueue(),
         "explorer",
         clock,
         arrival,

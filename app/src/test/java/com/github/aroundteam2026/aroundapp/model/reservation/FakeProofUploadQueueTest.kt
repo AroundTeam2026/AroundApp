@@ -93,6 +93,28 @@ class FakeProofUploadQueueTest {
   }
 
   @Test
+  fun cancel_recordsItAndRemovesOnlyThatReservationFromWaiting() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancel(RESERVATION_ID).isSuccess)
+
+    assertEquals(listOf(RESERVATION_ID), queue.cancelled)
+    assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
+  fun cancel_whenFailureIsForced_returnsItAndCancelsNothing() = runTest {
+    val failure = IllegalStateException(FAILURE)
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.cancelFailure = failure
+
+    assertEquals(failure, queue.cancel(RESERVATION_ID).exceptionOrNull())
+    assertTrue(queue.cancelled.isEmpty())
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
   fun waiting_reportsEachChange() = runTest {
     val seen = mutableListOf<Set<String>>()
     backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {

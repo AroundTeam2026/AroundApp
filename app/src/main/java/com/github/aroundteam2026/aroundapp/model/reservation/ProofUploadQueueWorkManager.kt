@@ -19,8 +19,8 @@ import kotlinx.coroutines.flow.map
  * [waiting] while its work hasn't finished, so it leaves once the proof is submitted, or once the
  * worker stops or is cancelled.
  *
- * @param discard Deletes the copy of a proof that a newer one replaced, since its cancelled work
- *   never runs to delete it.
+ * @param discard Deletes the copy of a proof that a newer one replaced or that was cancelled, since
+ *   its cancelled work never runs to delete it.
  */
 class ProofUploadQueueWorkManager(
     private val workManager: WorkManager,
@@ -35,12 +35,7 @@ class ProofUploadQueueWorkManager(
   ): Result<Unit> =
       try {
         val name = ProofUploadWorker.uniqueWorkName(reservationId)
-        val replaced =
-            workManager
-                .getWorkInfosForUniqueWorkFlow(name)
-                .first()
-                .filterNot { it.state.isFinished }
-                .flatMap { work -> work.tags.mapNotNull(ProofUploadWorker::photoOf) }
+        val replaced = waitingPhotos(name)
         workManager
             .enqueueUniqueWork(
                 name,
@@ -61,6 +56,27 @@ class ProofUploadQueueWorkManager(
       } catch (e: Exception) {
         Result.failure(e)
       }
+
+  override suspend fun cancel(reservationId: String): Result<Unit> =
+      try {
+        val name = ProofUploadWorker.uniqueWorkName(reservationId)
+        val cancelled = waitingPhotos(name)
+        workManager.cancelUniqueWork(name).await()
+        cancelled.forEach { discard(it) }
+        Result.success(Unit)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        Result.failure(e)
+      }
+
+  /** The photos of the unique work [name] that hasn't finished yet. */
+  private suspend fun waitingPhotos(name: String): List<Uri> =
+      workManager
+          .getWorkInfosForUniqueWorkFlow(name)
+          .first()
+          .filterNot { it.state.isFinished }
+          .flatMap { work -> work.tags.mapNotNull(ProofUploadWorker::photoOf) }
 
   override val waiting: Flow<Set<String>> =
       workManager
