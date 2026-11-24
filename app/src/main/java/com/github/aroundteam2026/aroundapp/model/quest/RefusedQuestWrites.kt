@@ -38,6 +38,12 @@ class RefusedQuestWrites(
    * Judges the writes against the venue's latest [quests]. One that was listed as pending and now
    * is gone, or listed with another `updatedAt` than before, was refused; one listed with the same
    * `updatedAt` and no longer pending was confirmed.
+   *
+   * Only the venue's Quests tab hears, and it passes the live listener's latest list. Don't pass a
+   * list older than one already heard, such as a cached one judged again: a quest listed as pending
+   * since would read as refused. A second screen that listens on its own needs its own view of the
+   * list first, as [com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites.Hearing]
+   * gives for reservations.
    */
   fun hear(quests: List<Quest>) {
     val byId = quests.associateBy { it.id }
