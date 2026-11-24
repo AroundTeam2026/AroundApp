@@ -231,6 +231,45 @@ class ProofUploadQueueWorkManagerTest {
     assertEquals(CANCELLED, thrown.message)
   }
 
+  @Test
+  fun cancelAll_stopsEveryWaitingUploadAndDeletesTheirCopies() = runWithTimeout {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    val works = workManager.getWorkInfosByTagFlow(ProofUploadWorker.TAG).first()
+    assertEquals(listOf(WorkInfo.State.CANCELLED, WorkInfo.State.CANCELLED), works.map { it.state })
+    assertTrue(queue.waiting.first().isEmpty())
+    assertEquals(setOf(Uri.fromFile(PHOTO), Uri.fromFile(RETAKE)), discarded.toSet())
+  }
+
+  @Test
+  fun cancelAll_deletesOnlyTheCopiesOfProofsStillWaiting() = runWithTimeout {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    runOnline(RESERVATION_ID)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    assertEquals(listOf(Uri.fromFile(RETAKE)), discarded)
+  }
+
+  @Test
+  fun cancelAll_whenWorkManagerFails_returnsTheFailureAndDeletesNothing() = runWithTimeout {
+    val failure = IllegalStateException(UNAVAILABLE)
+
+    val result =
+        ProofUploadQueueWorkManager(brokenWorkManager(failure)) {
+              discarded += it
+              true
+            }
+            .cancelAll()
+
+    assertEquals(failure, result.exceptionOrNull())
+    assertTrue(discarded.isEmpty())
+  }
+
   /**
    * Brings the network back for [reservationId]'s upload and waits until its work has finished, so
    * the test itself checks what [ProofUploadQueue.waiting] says then.
@@ -252,14 +291,16 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   /**
-   * A WorkManager whose every [WorkManager.enqueueUniqueWork] and [cancelUniqueWork] throws
-   * [error].
+   * A WorkManager whose every [WorkManager.enqueueUniqueWork], [WorkManager.cancelUniqueWork] and
+   * [WorkManager.cancelAllWorkByTag] throws [error].
    */
   private fun brokenWorkManager(error: Throwable): WorkManager =
       mockk<WorkManager>(relaxed = true) {
         every { getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList())
         every { enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws error
+        every { getWorkInfosByTagFlow(any()) } returns flowOf(emptyList())
         every { cancelUniqueWork(any()) } throws error
+        every { cancelAllWorkByTag(any()) } throws error
       }
 
   private companion object {

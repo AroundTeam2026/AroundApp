@@ -115,6 +115,28 @@ class FakeProofUploadQueueTest {
   }
 
   @Test
+  fun cancelAll_countsItAndEmptiesWaiting() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    assertEquals(1, queue.cancelAllCount)
+    assertTrue(queue.waiting.first().isEmpty())
+  }
+
+  @Test
+  fun cancelAll_whenFailureIsForced_returnsItAndCancelsNothing() = runTest {
+    val failure = IllegalStateException(FAILURE)
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.cancelFailure = failure
+
+    assertEquals(failure, queue.cancelAll().exceptionOrNull())
+    assertEquals(0, queue.cancelAllCount)
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
   fun waiting_reportsEachChange() = runTest {
     val seen = mutableListOf<Set<String>>()
     backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
