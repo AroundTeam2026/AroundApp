@@ -10,16 +10,16 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeWithVelocity
@@ -108,20 +108,6 @@ class MapScreenNearbyTest {
 
   private fun node(tag: String) = composeTestRule.onNodeWithTag(tag, useUnmergedTree = true)
 
-  /** The node tagged [tag] in the card of the quest [questId], e.g. its pin. */
-  private fun inQuest(questId: String, tag: String) =
-      composeTestRule.onNode(
-          hasTestTag(tag) and hasAnyAncestor(hasTestTag("${C.Tag.NEARBY_QUEST}_$questId"))
-      )
-
-  /** What the header says under its title: two quests, ordered as [order] says. */
-  private fun twoQuests(order: Int) =
-      context.getString(
-          R.string.map_nearby_pair,
-          context.resources.getQuantityString(R.plurals.map_nearby_count, 2, 2),
-          context.getString(order),
-      )
-
   // The shell leaves the Map's banner to the screen, so the screen must show it by default offline
   @Test
   fun theMapShowsTheBannerWhileTheShellSaysItIsOffline() {
@@ -177,7 +163,8 @@ class MapScreenNearbyTest {
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
     node(C.Tag.NEARBY_BUTTON).assertDoesNotExist()
     // The map's nearby quests: without the location, every valid quest, by venue name
-    node(C.Tag.NEARBY_COUNTER).assertTextEquals(twoQuests(R.string.map_nearby_by_name))
+    node(C.Tag.NEARBY_COUNTER)
+        .assertTextEquals(nearbyHeader(context, 2, context.getString(R.string.map_nearby_by_name)))
     node(C.Tag.NEARBY_LOCATION_HINT).assertIsDisplayed()
   }
 
@@ -197,7 +184,10 @@ class MapScreenNearbyTest {
 
     openNearby()
 
-    node(C.Tag.NEARBY_COUNTER).assertTextEquals(twoQuests(R.string.map_nearby_closest_first))
+    node(C.Tag.NEARBY_COUNTER)
+        .assertTextEquals(
+            nearbyHeader(context, 2, context.getString(R.string.map_nearby_closest_first))
+        )
     node(C.Tag.NEARBY_LOCATION_HINT).assertDoesNotExist()
   }
 
@@ -207,7 +197,7 @@ class MapScreenNearbyTest {
     openNearby()
 
     // Without the location the quests go by venue name, so the first card is the bar's
-    inQuest("bar-1", C.Tag.NEARBY_SHOW_ON_MAP).performClick()
+    composeTestRule.inQuest("bar-1", C.Tag.NEARBY_SHOW_ON_MAP).performClick()
     composeTestRule.waitForIdle()
 
     assertOverlayClosed()
@@ -220,7 +210,7 @@ class MapScreenNearbyTest {
     show(onOpenQuest = { venueId, questId -> opened += venueId to questId })
     openNearby()
 
-    inQuest("bar-1", C.Tag.NEARBY_CARD).performClick()
+    composeTestRule.inQuest("bar-1", C.Tag.NEARBY_CARD).performClick()
     composeTestRule.waitForIdle()
 
     assertEquals(listOf("bar" to "bar-1"), opened)
@@ -250,10 +240,11 @@ class MapScreenNearbyTest {
     show(acceptViewModel = accept)
     openNearby()
 
-    inQuest("bar-1", C.Tag.NEARBY_ACCEPT).performClick()
+    composeTestRule.inQuest("bar-1", C.Tag.NEARBY_ACCEPT).performClick()
     composeTestRule.waitUntil { accept.uiState.value.statusOf("bar-1") == AcceptStatus.ACCEPTED }
 
-    inQuest("bar-1", C.Tag.NEARBY_ACCEPT)
+    composeTestRule
+        .inQuest("bar-1", C.Tag.NEARBY_ACCEPT)
         .assertTextEquals(context.getString(R.string.accept_quest_accepted_short))
     // The quests stay open, so the explorer can go on to the next one
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
@@ -342,6 +333,117 @@ class MapScreenNearbyTest {
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
     // And it springs back into place
     assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+  }
+
+  @Test
+  fun aSlowDragDownOnTheListAtItsTopClosesTheOverlay() {
+    show()
+    openNearby()
+    val overlay = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot()
+
+    // The list has nothing above to scroll to, so the overlay takes the drag as from the grabber
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeDown(
+          startY = top + 10.dp.toPx(),
+          endY = top + 10.dp.toPx() + ((overlay.bottom - overlay.top) / 2).toPx(),
+          durationMillis = 1_000,
+      )
+    }
+    composeTestRule.waitForIdle()
+
+    assertOverlayClosed()
+  }
+
+  @Test
+  fun aShortFastFlingDownOnTheListClosesTheOverlay() {
+    show()
+    openNearby()
+
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeWithVelocity(
+          start = center,
+          end = center.copy(y = centerY + 40.dp.toPx()),
+          endVelocity = 1_500.dp.toPx(),
+      )
+    }
+    composeTestRule.waitForIdle()
+
+    assertOverlayClosed()
+  }
+
+  @Test
+  fun aShortDragDownOnTheListLeavesTheOverlayOpen() {
+    show()
+    openNearby()
+    val top = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeDown(startY = centerY, endY = centerY + 20.dp.toPx(), durationMillis = 1_000)
+    }
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+  }
+
+  @Test
+  fun aDragDownOnAScrolledListScrollsItBackBeforeMovingTheOverlay() {
+    // Enough quests that the list has far more than the drag to scroll back
+    quests.value = (1..5).map { testQuest(id = "cafe-$it", venueId = "cafe") }
+    show()
+    openNearby()
+    val top = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    node(C.Tag.NEARBY_LIST).performScrollToIndex(4)
+
+    // Checked with the finger still down, before a short drag would spring back
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      down(center)
+      moveBy(Offset(0f, 30.dp.toPx()))
+    }
+    composeTestRule.waitForIdle()
+
+    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    node(C.Tag.NEARBY_LIST).performTouchInput { up() }
+  }
+
+  @Test
+  fun aDragBackUpOnTheListReturnsTheOverlayFirst() {
+    show()
+    openNearby()
+    val top = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      down(center)
+      moveBy(Offset(0f, 60.dp.toPx()))
+      moveBy(Offset(0f, -60.dp.toPx()))
+    }
+    composeTestRule.waitForIdle()
+
+    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    node(C.Tag.NEARBY_LIST).performTouchInput { up() }
+  }
+
+  @Test
+  fun aFlingThatScrollsTheListBackToItsTopLeavesTheOverlayOpen() {
+    quests.value = (1..5).map { testQuest(id = "cafe-$it", venueId = "cafe") }
+    show()
+    openNearby()
+    val overlayTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    node(C.Tag.NEARBY_LIST).performScrollToIndex(4)
+
+    // The finger stops short of the top and the fling carries the list past it, but only a
+    // finger drags the overlay
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeWithVelocity(
+          start = center.copy(y = top + 10.dp.toPx()),
+          end = center.copy(y = top + 130.dp.toPx()),
+          endVelocity = 2_500.dp.toPx(),
+      )
+    }
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+    assertDpEquals("overlay top", overlayTop, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
   }
 
   @Test

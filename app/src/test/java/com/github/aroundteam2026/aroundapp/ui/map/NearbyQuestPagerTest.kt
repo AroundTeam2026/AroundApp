@@ -130,30 +130,17 @@ class NearbyQuestPagerTest {
 
   private fun title(text: String) = composeTestRule.onNodeWithText(text, useUnmergedTree = true)
 
-  /** The node tagged [tag] in the card of the quest [questId], e.g. its pin. */
-  private fun inQuest(questId: String, tag: String) =
-      composeTestRule.onNode(
-          hasTestTag(tag) and hasAnyAncestor(hasTestTag("${C.Tag.NEARBY_QUEST}_$questId"))
-      )
-
   /** The single card's "Accept quest", merged with its label. */
   private fun acceptButton() = composeTestRule.onNodeWithTag(C.Tag.NEARBY_ACCEPT)
 
-  /** What the header says under its title: how many quests, then [rest]. */
-  private fun header(count: Int, rest: String) =
-      context.getString(
-          R.string.map_nearby_pair,
-          context.resources.getQuantityString(R.plurals.map_nearby_count, count, count),
-          rest,
-      )
-
   /** Asserts the header counts [count] quests, ordered as [order] says. */
   private fun assertHeader(count: Int, @StringRes order: Int = R.string.map_nearby_closest_first) {
-    node(C.Tag.NEARBY_COUNTER).assertTextEquals(header(count, context.getString(order)))
+    node(C.Tag.NEARBY_COUNTER)
+        .assertTextEquals(nearbyHeader(context, count, context.getString(order)))
   }
 
   @Test
-  fun opensOnTheFirstQuestAndCountsThemAll() {
+  fun listsTheQuestsAndCountsThemAll() {
     show(rows(3))
 
     composeTestRule.onNodeWithText(context.getString(R.string.map_nearby_title)).assertIsDisplayed()
@@ -195,9 +182,9 @@ class NearbyQuestPagerTest {
     show(shown, acceptState = NearbyAcceptUiState(available = true))
     list().performScrollToNode(hasTestTag("${C.Tag.NEARBY_QUEST}_q4"))
 
-    inQuest("q4", C.Tag.NEARBY_CARD).performClick()
-    inQuest("q4", C.Tag.NEARBY_SHOW_ON_MAP).performClick()
-    inQuest("q4", C.Tag.NEARBY_ACCEPT).performClick()
+    composeTestRule.inQuest("q4", C.Tag.NEARBY_CARD).performClick()
+    composeTestRule.inQuest("q4", C.Tag.NEARBY_SHOW_ON_MAP).performClick()
+    composeTestRule.inQuest("q4", C.Tag.NEARBY_ACCEPT).performClick()
 
     assertEquals(listOf(shown[3]), opened)
     assertEquals(listOf(shown[3]), shownOnMap)
@@ -513,7 +500,7 @@ class NearbyQuestPagerTest {
             context.getString(R.string.map_nearby_within_3_km),
             context.getString(R.string.map_nearby_discounts),
         )
-    node(C.Tag.NEARBY_COUNTER).assertTextEquals(header(2, summary))
+    node(C.Tag.NEARBY_COUNTER).assertTextEquals(nearbyHeader(context, 2, summary))
   }
 
   @Test
