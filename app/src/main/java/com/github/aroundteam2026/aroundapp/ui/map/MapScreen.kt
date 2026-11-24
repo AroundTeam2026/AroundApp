@@ -17,7 +17,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -40,7 +39,6 @@ import com.google.maps.android.compose.ComposeMapColorScheme
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
-import kotlinx.coroutines.launch
 
 /**
  * The Explorer's map, styled for light and dark mode without Google's place icons (see [mapStyle]),
@@ -76,15 +74,13 @@ fun MapScreen(
   val state by viewModel.uiState.collectAsState()
   val acceptState = acceptViewModel?.uiState?.collectAsState()?.value
   val snackbarHostState = remember { SnackbarHostState() }
-  val scope = rememberCoroutineScope()
   val refusedNotice = stringResource(R.string.accept_quest_refused_notice)
   LaunchedEffect(acceptState?.refusalNotice) {
     if (acceptState?.refusalNotice == true) {
-      // Launched in the screen's scope, not in this effect: clearing the notice changes the
-      // effect's key, which would cancel a snackbar shown from inside it
-      scope.launch { snackbarHostState.showSnackbar(refusedNotice) }
-      // Cleared at once, so the snackbar doesn't show again when the screen is recreated
-      acceptViewModel?.onRefusalNoticeShown()
+      snackbarHostState.showSnackbar(refusedNotice)
+      // Only once it was shown through: leaving the map or rotating the phone cancels this effect
+      // before, and the explorer is then told when the map is back
+      acceptViewModel.onRefusalNoticeShown()
     }
   }
   RequestLocationPermission(viewModel::onLocationPermissionResult)

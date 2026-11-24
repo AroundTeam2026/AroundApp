@@ -116,8 +116,24 @@ class RefusedWritesStoreSharedPrefsTest {
     assertEquals(listOf(write), store("ada").all())
   }
 
+  // Signing out must leave nothing of the explorer, also what this version can't read
+  @Test
+  fun clearingForgetsEveryEntryOfTheExplorerAndOnlyTheirs() {
+    val prefs =
+        context.getSharedPreferences(RefusedWritesStoreSharedPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+    store("ada").put(write)
+    store("ada").put(RecordedWrite("r2", "other", WriteState.WRITTEN))
+    store("grace").put(write)
+    prefs.edit().putString("ada/old", "quest\tSHOWN").putString("ada/broken", "?").commit()
+
+    store("ada").clear()
+
+    assertEquals(emptyList<String>(), prefs.all.keys.filter { it.startsWith("ada/") })
+    assertEquals(listOf(write), store("grace").all())
+  }
+
   private companion object {
     const val START = 1_000_000L
-    const val TWO_WEEKS = 14L * 24 * 60 * 60 * 1000
+    val TWO_WEEKS = RefusedWritesStoreSharedPrefs.MAX_AGE_MILLIS
   }
 }

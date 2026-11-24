@@ -10,6 +10,9 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
@@ -271,9 +274,53 @@ class MapScreenNearbyTest {
     composeTestRule
         .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
         .assertIsDisplayed()
-    // Cleared once shown, so a recreated map doesn't say it again
+    // Kept while it shows, and cleared once it is gone, so a recreated map doesn't say it again
+    assertTrue(accept.uiState.value.refusalNotice)
+    composeTestRule.mainClock.advanceTimeBy(SNACKBAR_LONG_ENOUGH_MS)
+    composeTestRule.waitForIdle()
     assertFalse(accept.uiState.value.refusalNotice)
     assertFalse(RefusedWrites(remembered).hasUnreportedRefusal)
+  }
+
+  // Rotating the phone or leaving the map cancels the snackbar: the explorer must still be told
+  @Test
+  fun aRefusalIsNotMarkedToldIfTheMapLeavesBeforeItWasShownThrough() {
+    val remembered =
+        FakeRefusedWritesStore().apply { put(RecordedWrite("r1", "bar-1", WriteState.REFUSED)) }
+    val accept =
+        NearbyAcceptViewModel(
+            FakeReservationRepository({ 0L }),
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+            refusedWrites = RefusedWrites(remembered),
+        )
+    val dialog =
+        PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+    var onMap by mutableStateOf(true)
+    composeTestRule.setContent {
+      CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
+        if (onMap) {
+          MapScreen(
+              viewModel,
+              onFocusQuest = { _, _ -> },
+              onOpenQuest = { _, _ -> },
+              acceptViewModel = accept,
+              showOfflineBanner = false,
+          )
+        }
+      }
+    }
+    composeTestRule.waitForIdle()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
+        .assertIsDisplayed()
+
+    onMap = false
+    composeTestRule.waitForIdle()
+
+    assertTrue(accept.uiState.value.refusalNotice)
+    assertTrue(RefusedWrites(remembered).hasUnreportedRefusal)
   }
 
   @Test
@@ -432,5 +479,8 @@ class MapScreenNearbyTest {
 
   private companion object {
     const val EXPLORER = "explorer"
+
+    /** Longer than a snackbar stays up. */
+    const val SNACKBAR_LONG_ENOUGH_MS = 10_000L
   }
 }

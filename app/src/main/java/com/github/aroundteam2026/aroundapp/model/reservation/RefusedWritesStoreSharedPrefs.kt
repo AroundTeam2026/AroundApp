@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.content.Context
 import androidx.core.content.edit
+import java.util.concurrent.TimeUnit
 
 /**
  * [RefusedWritesStore] kept in the app's private SharedPreferences, one entry per reservation of
@@ -52,6 +53,11 @@ class RefusedWritesStoreSharedPrefs(
     prefs.edit { remove(prefix + reservationId) }
   }
 
+  override fun clear() {
+    // One edit for all of them, whether or not this version can read them
+    prefs.edit { prefs.all.keys.filter { it.startsWith(prefix) }.forEach(::remove) }
+  }
+
   private class Entry(val write: RecordedWrite, val writtenAt: Long)
 
   /** The entry [value] stands for, or null if it isn't a dated one this version wrote. */
@@ -67,6 +73,6 @@ class RefusedWritesStoreSharedPrefs(
     const val PREFS_NAME = "refused_writes"
 
     /** How long a write is remembered: two weeks. */
-    const val MAX_AGE_MILLIS = 14L * 24 * 60 * 60 * 1000
+    val MAX_AGE_MILLIS = TimeUnit.DAYS.toMillis(14)
   }
 }

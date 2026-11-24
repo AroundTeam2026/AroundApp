@@ -33,4 +33,7 @@ interface RefusedWritesStore {
 
   /** Forgets the write of the reservation [reservationId]. */
   fun remove(reservationId: String)
+
+  /** Forgets every write, also one that can't be read any more. */
+  fun clear()
 }

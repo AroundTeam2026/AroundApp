@@ -31,6 +31,12 @@ class RefusedWritesProviderTest {
     RefusedWritesProvider.refusedWrites(context, "grace").record("r2", "other")
     val before = RefusedWritesProvider.refusedWrites(context, "ada")
     before.record("r1", "quest")
+    // What this version can't read goes too
+    context
+        .getSharedPreferences(RefusedWritesStoreSharedPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+        .edit()
+        .putString("ada/broken", "?")
+        .commit()
 
     RefusedWritesProvider.forget(context, "ada")
 

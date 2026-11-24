@@ -34,8 +34,7 @@ object RefusedWritesProvider {
    */
   @Synchronized
   fun forget(context: Context, explorerUid: String) {
-    val store = storeOf(context, explorerUid)
-    store.all().forEach { store.remove(it.reservationId) }
+    storeOf(context, explorerUid).clear()
     if (current?.first == explorerUid) current = null
   }
 
