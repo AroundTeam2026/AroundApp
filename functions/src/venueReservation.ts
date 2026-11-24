@@ -1,17 +1,10 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
-import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { sendToUser } from "./notify";
-
-/** What the text calls an explorer who reserved before reservations stored their name. */
-export const UNNAMED_LEADER = "An explorer";
+import { PENDING, readQuest, sendToUser, storedName, UNNAMED_LEADER } from "./notify";
 
 /** The party size of a quest explorers take alone, whose text names no party. */
 export const SOLO_PARTY_SIZE = 1;
-
-/** The status of a reservation waiting for the venue's answer, the only one created. */
-export const PENDING = "PENDING";
 
 /**
  * Tells the venue about a new reservation request, as #631's Figma words it: "New request: {quest}"
@@ -32,11 +25,9 @@ export const notifyVenueReservation = onDocumentCreated(
     if (reservation?.status !== PENDING) return;
 
     const { questId, venueId, explorerName } = reservation;
-    const quest = await getFirestore().collection("quests").doc(questId).get();
-    if (!quest.exists) throw new Error(`Missing quest ${questId}`);
+    const quest = await readQuest(questId);
 
-    const leader =
-      typeof explorerName === "string" && explorerName.trim() ? explorerName : UNNAMED_LEADER;
+    const leader = storedName(explorerName) ?? UNNAMED_LEADER;
     const size = quest.get("minPartySize");
     const body =
       typeof size === "number" && size > SOLO_PARTY_SIZE

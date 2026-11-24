@@ -3,16 +3,14 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { NotificationMessage, sendToUser } from "../src/notify";
-import {
-  notifyVenueReservation,
-  PENDING,
-  SOLO_PARTY_SIZE,
-  UNNAMED_LEADER,
-} from "../src/venueReservation";
+import { NotificationMessage, PENDING, sendToUser, UNNAMED_LEADER } from "../src/notify";
+import { notifyVenueReservation, SOLO_PARTY_SIZE } from "../src/venueReservation";
 
-// The sending itself is sendToUser's, tested in notify.test.ts
-jest.mock("../src/notify", () => ({ sendToUser: jest.fn() }));
+// The sending itself is sendToUser's, tested in notify.test.ts; the shared helpers stay real
+jest.mock("../src/notify", () => ({
+  ...jest.requireActual("../src/notify"),
+  sendToUser: jest.fn(),
+}));
 
 const sent = jest.mocked(sendToUser);
 
