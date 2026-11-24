@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.model.quest
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import com.github.aroundteam2026.aroundapp.model.PerUser
 
 /**
  * Builds the app's [RefusedQuestWrites], so ViewModels never depend on an implementation. Every
@@ -10,29 +11,20 @@ import androidx.annotation.VisibleForTesting
  * same writes.
  */
 object RefusedQuestWritesProvider {
-  private var current: Pair<String, RefusedQuestWrites>? = null
+  private val perVenue = PerUser { context, venueUid ->
+    RefusedQuestWrites(RefusedQuestWritesStoreSharedPrefs(context, venueUid))
+  }
 
   /**
    * The refused quest writes of the venue [venueUid], kept in the app's private preferences.
    * Another venue signing in gets its own, and the previous one's is dropped from memory.
    */
-  @Synchronized
-  fun refusedWrites(context: Context, venueUid: String): RefusedQuestWrites {
-    current
-        ?.takeIf { (uid, _) -> uid == venueUid }
-        ?.let {
-          return it.second
-        }
-    val writes =
-        RefusedQuestWrites(RefusedQuestWritesStoreSharedPrefs(context.applicationContext, venueUid))
-    current = venueUid to writes
-    return writes
-  }
+  fun refusedWrites(context: Context, venueUid: String): RefusedQuestWrites =
+      perVenue.get(context, venueUid)
 
   /** Forgets the venue's [RefusedQuestWrites], as a new app process starts with none. */
-  @Synchronized
   @VisibleForTesting
   internal fun reset() {
-    current = null
+    perVenue.reset()
   }
 }
