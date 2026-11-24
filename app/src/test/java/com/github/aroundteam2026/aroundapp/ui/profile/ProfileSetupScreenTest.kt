@@ -13,17 +13,22 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
@@ -56,6 +61,31 @@ class ProfileSetupScreenTest {
   @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
   private val connectivity = FakeConnectivityRepository()
   private val users = FakeUserRepository()
+
+  // The label is a separate Text, so TalkBack only reads it if the field carries it as its name
+  @Test
+  fun theNameFieldIsNamedAfterItsLabel() {
+    runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
+    compose.setContent {
+      AroundAppTheme {
+        ExplorerProfileSetupGate(
+            "explorer",
+            users,
+            FakeUserPictureRepository(),
+            connectivity = connectivity,
+            onSignOut = {},
+        ) {}
+      }
+    }
+
+    compose
+        .onNode(
+            hasContentDescription(compose.activity.getString(R.string.profile_setup_name)) and
+                hasSetTextAction()
+        )
+        .assertIsDisplayed()
+        .assert(hasTestTag(C.Tag.PROFILE_SETUP_NAME))
+  }
 
   @Test
   fun firstTimeExplorerSeesSetupThenHomeOnlyAfterSaving() {

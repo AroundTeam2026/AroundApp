@@ -47,6 +47,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -342,7 +343,9 @@ private fun CompletionRequirements(requirements: String) {
 /** The text proof's label and field, with an error under it when the answer is too long. */
 @Composable
 private fun CompletionAnswerField(state: CompletionUiState, onAnswerChange: (String) -> Unit) {
-  Text(stringResource(R.string.completion_answer), style = AroundTextStyles.FieldLabel)
+  // The label is a separate Text, so TalkBack gets it as the field's name
+  val answerLabel = stringResource(R.string.completion_answer)
+  Text(answerLabel, style = AroundTextStyles.FieldLabel)
   OutlinedTextField(
       value = state.answer,
       onValueChange = onAnswerChange,
@@ -364,7 +367,8 @@ private fun CompletionAnswerField(state: CompletionUiState, onAnswerChange: (Str
       modifier =
           Modifier.fillMaxWidth()
               .heightIn(min = ANSWER_MIN_HEIGHT)
-              .testTag(C.Tag.COMPLETION_ANSWER),
+              .testTag(C.Tag.COMPLETION_ANSWER)
+              .semantics { contentDescription = answerLabel },
       shape = MaterialTheme.shapes.small,
       textStyle = AroundTextStyles.TextArea,
       colors =
