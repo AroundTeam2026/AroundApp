@@ -10,6 +10,9 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
@@ -17,6 +20,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -31,7 +35,11 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeRefusedWritesStore
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.RecordedWrite
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
+import com.github.aroundteam2026.aroundapp.model.reservation.WriteState
 import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
@@ -248,6 +256,92 @@ class MapScreenNearbyTest {
         .assertTextEquals(context.getString(R.string.accept_quest_accepted_short))
     // The quests stay open, so the explorer can go on to the next one
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+  }
+
+  // The write was queued, the app was killed, and the server refused it once it was back online
+  @Test
+  fun aRefusalFromBeforeARestartIsToldOnceOnTheMap() {
+    val remembered =
+        FakeRefusedWritesStore().apply { put(RecordedWrite("r1", "bar-1", WriteState.REFUSED)) }
+    val accept =
+        NearbyAcceptViewModel(
+            FakeReservationRepository({ 0L }),
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+            refusedWrites = RefusedWrites(remembered),
+        )
+
+    show(acceptViewModel = accept)
+
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
+        .assertIsDisplayed()
+    // Kept while it shows, and cleared once it is gone, so a recreated map doesn't say it again
+    assertTrue(accept.uiState.value.refusalNotice)
+    composeTestRule.mainClock.advanceTimeBy(SNACKBAR_LONG_ENOUGH_MS)
+    composeTestRule.waitForIdle()
+    assertFalse(accept.uiState.value.refusalNotice)
+    assertFalse(RefusedWrites(remembered).hasUnreportedRefusal)
+  }
+
+  // Rotating the phone or leaving the map cancels the snackbar: the explorer must still be told
+  @Test
+  fun aRefusalIsNotMarkedToldIfTheMapLeavesBeforeItWasShownThrough() {
+    val remembered =
+        FakeRefusedWritesStore().apply { put(RecordedWrite("r1", "bar-1", WriteState.REFUSED)) }
+    val accept =
+        NearbyAcceptViewModel(
+            FakeReservationRepository({ 0L }),
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+            refusedWrites = RefusedWrites(remembered),
+        )
+    val dialog =
+        PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+    var onMap by mutableStateOf(true)
+    composeTestRule.setContent {
+      CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
+        if (onMap) {
+          MapScreen(
+              viewModel,
+              onFocusQuest = { _, _ -> },
+              onOpenQuest = { _, _ -> },
+              acceptViewModel = accept,
+              showOfflineBanner = false,
+          )
+        }
+      }
+    }
+    composeTestRule.waitForIdle()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
+        .assertIsDisplayed()
+
+    onMap = false
+    composeTestRule.waitForIdle()
+
+    assertTrue(accept.uiState.value.refusalNotice)
+    assertTrue(RefusedWrites(remembered).hasUnreportedRefusal)
+  }
+
+  @Test
+  fun withoutARefusalTheMapSaysNothing() {
+    val accept =
+        NearbyAcceptViewModel(
+            FakeReservationRepository({ 0L }),
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+            refusedWrites = fakeRefusedWrites(),
+        )
+
+    show(acceptViewModel = accept)
+
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
+        .assertDoesNotExist()
   }
 
   @Test
@@ -499,5 +593,8 @@ class MapScreenNearbyTest {
 
   private companion object {
     const val EXPLORER = "explorer"
+
+    /** Longer than a snackbar stays up. */
+    const val SNACKBAR_LONG_ENOUGH_MS = 10_000L
   }
 }

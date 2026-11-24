@@ -47,6 +47,24 @@ class PerUserTest {
   }
 
   @Test
+  fun forgettingTheHeldUserStartsOverForThem() {
+    val before = perUser.get(context, "ada")
+
+    perUser.forget("ada")
+
+    assertNotSame(before, perUser.get(context, "ada"))
+  }
+
+  @Test
+  fun forgettingAnotherUserKeepsTheHeldOne() {
+    val held = perUser.get(context, "ada")
+
+    perUser.forget("grace")
+
+    assertSame(held, perUser.get(context, "ada"))
+  }
+
+  @Test
   fun resetStartsOver() {
     val before = perUser.get(context, "ada")
 

@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -20,8 +23,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.map.marker.MarkerDefaults
 import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
@@ -52,7 +57,8 @@ import com.google.maps.android.compose.MapUiSettings
  * @param onOpenQuest Opens the details of the quest with this id on its venue's page, when the
  *   quest is tapped in the nearby quests.
  * @param acceptViewModel Accepts the nearby quests from their "Accept quest"; without it, they
- *   offer none.
+ *   offer none. It also says once, in a snackbar under the banners, that the server refused a
+ *   booking the explorer hadn't been told about.
  * @param showOfflineBanner Overlays the shared offline banner at the top of the map; by default,
  *   while the shell says the device is offline.
  */
@@ -67,6 +73,16 @@ fun MapScreen(
 ) {
   val state by viewModel.uiState.collectAsState()
   val acceptState = acceptViewModel?.uiState?.collectAsState()?.value
+  val snackbarHostState = remember { SnackbarHostState() }
+  val refusedNotice = stringResource(R.string.accept_quest_refused_notice)
+  LaunchedEffect(acceptState?.refusalNotice) {
+    if (acceptState?.refusalNotice == true) {
+      snackbarHostState.showSnackbar(refusedNotice)
+      // Only once it was shown through: leaving the map or rotating the phone cancels this effect
+      // before, and the explorer is then told when the map is back
+      acceptViewModel.onRefusalNoticeShown()
+    }
+  }
   RequestLocationPermission(viewModel::onLocationPermissionResult)
   val turnOnLocation = rememberTurnOnLocation(viewModel::onLocationPermissionResult)
   // Unlike the context's, these follow configuration changes
@@ -160,6 +176,7 @@ fun MapScreen(
       if (showOfflineBanner) OfflineBanner()
       if (state.loadFailed) VenuesErrorBanner(viewModel::onRetry, retrying = state.retrying)
       if (state.locationRefused) LocationBanner(turnOnLocation)
+      SnackbarHost(snackbarHostState)
     }
   }
   BackHandler(enabled = state.showsNearby, onBack = viewModel::onNearbyClose)

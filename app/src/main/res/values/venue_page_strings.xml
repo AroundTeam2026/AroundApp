@@ -75,6 +75,7 @@
     <!-- The same, where the button is too narrow for it: in the nearby quests on the map -->
     <string name="accept_quest_accepted_short">Accepted</string>
     <string name="accept_quest_failed">Couldn\'t accept this quest.</string>
+    <string name="accept_quest_refused_notice">A reservation wasn\'t accepted. Open the quest to try again.</string>
     <string name="accept_quest_retry">Try again</string>
     <string name="accept_quest_unavailable">Can\'t accept quests right now. Open this page again to try.</string>
     <!-- Once the venue approved the reservation, on the quest's details -->
