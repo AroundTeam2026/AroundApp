@@ -7,6 +7,9 @@ package com.github.aroundteam2026.aroundapp.model.notification
  *
  * A user has one token per phone they are signed in on. Only the user writes and deletes their own
  * tokens; the app never reads them, since the functions read them with the admin SDK.
+ *
+ * Both calls return once the server has answered, so offline they may not return until the
+ * connection is back: a caller that mustn't wait for them, such as sign-out, doesn't block on them.
  */
 interface NotificationTokenRepository {
   /**

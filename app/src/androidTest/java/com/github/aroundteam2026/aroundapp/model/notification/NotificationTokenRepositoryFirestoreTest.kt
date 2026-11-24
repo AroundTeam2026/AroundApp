@@ -117,8 +117,9 @@ class NotificationTokenRepositoryFirestoreTest {
   }
 
   /**
-   * Bug: a slash in an id makes the write land on another document, e.g. a token "a/tokens/b"
-   * written under a uid of the user's choosing, instead of being refused before any write.
+   * Bug: a slash in an id makes the write land on another document, e.g. the token "a/b/c" saved at
+   * users/{uid}/tokens/a/b/c, or the uid "a/b/c" at users/a/b/c/tokens/{token}, instead of being
+   * refused before any write.
    */
   @Test
   fun invalidIdsAreRefusedBeforeWriting() = withTimeoutBlocking {
@@ -126,6 +127,8 @@ class NotificationTokenRepositoryFirestoreTest {
       assertTrue(repository.save(badUid, badToken).exceptionOrNull() is IllegalArgumentException)
       assertTrue(repository.delete(badUid, badToken).exceptionOrNull() is IllegalArgumentException)
     }
+    assertNull(readBypassingRules("users/$uid/tokens/$INVALID_ID"))
+    assertNull(readBypassingRules("users/$INVALID_ID/tokens/$TOKEN"))
   }
 
   /** The fields of [token]'s document under [owner], or null if it isn't saved. */
@@ -151,8 +154,11 @@ class NotificationTokenRepositoryFirestoreTest {
     const val OTHER_TOKEN = "fcm-token-2"
     const val UPDATED_AT = "updatedAt"
 
-    /** An id the repository refuses: a slash makes it a path instead of a document id. */
-    const val INVALID_ID = "a/b"
+    /**
+     * An id the repository refuses: its slashes make it a path instead of a document id. Two of
+     * them keep the whole path a valid document path, so the SDK alone wouldn't refuse it.
+     */
+    const val INVALID_ID = "a/b/c"
 
     /** How far the emulator's clock may be from the device's. */
     val CLOCK_TOLERANCE: Duration = Duration.ofMinutes(1)
