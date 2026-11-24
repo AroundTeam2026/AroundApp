@@ -3,17 +3,22 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.net.Uri
 import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.await
 import com.github.aroundteam2026.aroundapp.worker.ProofUploadWorker
 import java.io.File
 import java.io.FileNotFoundException
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * A [ProofUploadQueue] backed by WorkManager: each proof is a [ProofUploadWorker] run, enqueued as
@@ -22,31 +27,100 @@ import kotlinx.coroutines.flow.map
  * worker stops or is cancelled. It is [failed] while its work is in [WorkInfo.State.FAILED], until
  * WorkManager prunes finished works, about a day later.
  *
- * @param discard Deletes the copy of a proof that a newer one replaced, since its cancelled work
- *   never runs to delete it.
+ * [enqueue], [retry] and [cancel] run one at a time, across every instance, so one never acts on
+ * what another has just replaced.
+ *
+ * @param discard Deletes the copy of a proof that a newer one replaced or that was cancelled, since
+ *   its work never runs again to delete it.
  */
 class ProofUploadQueueWorkManager(
     private val workManager: WorkManager,
     private val discard: suspend (Uri) -> Boolean,
 ) : ProofUploadQueue {
 
+  private val uploads: Flow<List<WorkInfo>> =
+      workManager.getWorkInfosByTagFlow(ProofUploadWorker.TAG)
+
+  override val waiting: Flow<Set<String>> =
+      uploads
+          .map { works ->
+            works.filterNot { it.state.isFinished }.mapNotNull(::reservationOf).toSet()
+          }
+          .distinctUntilChanged()
+
+  override val failed: Flow<Map<String, UploadFailure>> =
+      uploads
+          .map { works ->
+            works
+                .mapNotNull { work ->
+                  val reservationId = reservationOf(work)
+                  val failure = failureOf(work)
+                  if (reservationId == null || failure == null) null else reservationId to failure
+                }
+                .toMap()
+          }
+          .distinctUntilChanged()
+
   override suspend fun enqueue(
+      reservationId: String,
+      venueId: String,
+      explorerUid: String,
+      photo: File,
+  ): Result<Unit> = lock.withLock { replace(reservationId, venueId, explorerUid, photo) }
+
+  override suspend fun retry(reservationId: String): Result<Unit> = lock.withLock {
+    try {
+      val tags =
+          works(reservationId).firstOrNull { failureOf(it) != null }?.tags
+              ?: throw NoSuchElementException("No failed proof for $reservationId")
+      val venueId = tags.firstNotNullOfOrNull(ProofUploadWorker::venueIdOf)
+      val explorerUid = tags.firstNotNullOfOrNull(ProofUploadWorker::explorerUidOf)
+      val photo = tags.firstNotNullOfOrNull(ProofUploadWorker::photoOf)?.path?.let(::File)
+      // A work queued before uploads were tagged with their venue and sender can't be rebuilt
+      if (venueId == null || explorerUid == null || photo == null) {
+        error("The failed proof of $reservationId can't be rebuilt")
+      }
+      if (!photo.exists()) throw FileNotFoundException("${photo.path} is no longer kept")
+      replace(reservationId, venueId, explorerUid, photo)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      Result.failure(e)
+    }
+  }
+
+  override suspend fun cancel(reservationId: String): Result<Unit> = lock.withLock {
+    try {
+      val name = ProofUploadWorker.uniqueWorkName(reservationId)
+      val cancelled = keptPhotos(reservationId)
+      // WorkManager can't delete one finished work, but REPLACE does, so a failed proof leaves
+      // failed too; the placeholder that takes its place is cancelled before it could run
+      workManager.enqueueUniqueWork(name, ExistingWorkPolicy.REPLACE, placeholder()).await()
+      workManager.cancelUniqueWork(name).await()
+      cancelled.forEach { discard(it) }
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      Result.failure(e)
+    }
+  }
+
+  /**
+   * Queues [photo] as [reservationId]'s proof in place of any other, and deletes the copy of the
+   * one it replaces. Callers hold [lock].
+   */
+  private suspend fun replace(
       reservationId: String,
       venueId: String,
       explorerUid: String,
       photo: File,
   ): Result<Unit> =
       try {
-        val name = ProofUploadWorker.uniqueWorkName(reservationId)
-        val replaced =
-            workManager
-                .getWorkInfosForUniqueWorkFlow(name)
-                .first()
-                .filterNot { it.state.isFinished }
-                .flatMap { work -> work.tags.mapNotNull(ProofUploadWorker::photoOf) }
+        val replaced = keptPhotos(reservationId)
         workManager
             .enqueueUniqueWork(
-                name,
+                ProofUploadWorker.uniqueWorkName(reservationId),
                 // A reservation has one proof waiting at a time, as ProofUploadQueue describes
                 ExistingWorkPolicy.REPLACE,
                 ProofUploadWorker.buildRequest(
@@ -65,53 +139,54 @@ class ProofUploadQueueWorkManager(
         Result.failure(e)
       }
 
-  override val waiting: Flow<Set<String>> = reservationsWhere { !it.state.isFinished }
-
-  override val failed: Flow<Set<String>> = reservationsWhere(::failedForGood)
-
-  override suspend fun retry(reservationId: String): Result<Unit> {
-    val tags =
-        try {
-          workManager
-              .getWorkInfosForUniqueWorkFlow(ProofUploadWorker.uniqueWorkName(reservationId))
-              .first()
-              .firstOrNull(::failedForGood)
-              ?.tags
-              .orEmpty()
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          return Result.failure(e)
-        }
-    val venueId = tags.firstNotNullOfOrNull(ProofUploadWorker::venueIdOf)
-    val explorerUid = tags.firstNotNullOfOrNull(ProofUploadWorker::explorerUidOf)
-    val photo = tags.firstNotNullOfOrNull(ProofUploadWorker::photoOf)?.path?.let(::File)
-    return when {
-      venueId == null || explorerUid == null || photo == null ->
-          Result.failure(NoSuchElementException("No failed proof for $reservationId"))
-      !photo.exists() -> Result.failure(FileNotFoundException("${photo.path} is no longer kept"))
-      else -> enqueue(reservationId, venueId, explorerUid, photo)
-    }
-  }
-
-  /** The ids of the reservations of the proof uploads that match [keep], on each change. */
-  private fun reservationsWhere(keep: (WorkInfo) -> Boolean): Flow<Set<String>> =
+  /** The works of [reservationId]'s proof upload. */
+  private suspend fun works(reservationId: String): List<WorkInfo> =
       workManager
-          .getWorkInfosByTagFlow(ProofUploadWorker.TAG)
-          .map { works ->
-            works
-                .filter(keep)
-                .mapNotNull { work ->
-                  work.tags.firstNotNullOfOrNull(ProofUploadWorker::reservationIdOf)
-                }
-                .toSet()
-          }
-          .distinctUntilChanged()
+          .getWorkInfosForUniqueWorkFlow(ProofUploadWorker.uniqueWorkName(reservationId))
+          .first()
 
-  /** Whether [work] failed without sending a proof that is still needed. */
-  private fun failedForGood(work: WorkInfo): Boolean =
-      work.state == WorkInfo.State.FAILED &&
-          // The venue approved the completion, so the explorer has nothing left to send
-          work.outputData.getString(ProofUploadWorker.KEY_ERROR) !=
-              ProofUploadWorker.ERROR_ALREADY_APPROVED
+  /**
+   * The copies [reservationId]'s works still keep: a waiting one's, and a failed one's, kept for
+   * [retry].
+   */
+  private suspend fun keptPhotos(reservationId: String): List<Uri> =
+      works(reservationId)
+          .filter { !it.state.isFinished || it.state == WorkInfo.State.FAILED }
+          .flatMap { work -> work.tags.mapNotNull(ProofUploadWorker::photoOf) }
+
+  private companion object {
+    /** Shared by every instance, since the provider may build more than one. */
+    val lock = Mutex()
+
+    /** Long enough that a placeholder is always cancelled before it could run. */
+    const val PLACEHOLDER_DELAY_DAYS = 365L
+
+    /** The id of the reservation whose upload [work] is, or null if it names none. */
+    fun reservationOf(work: WorkInfo): String? =
+        work.tags.firstNotNullOfOrNull(ProofUploadWorker::reservationIdOf)
+
+    /**
+     * Why [work] failed for good, or null if it hasn't, or if the venue approved the completion, so
+     * the explorer has nothing left to send.
+     */
+    fun failureOf(work: WorkInfo): UploadFailure? =
+        if (work.state != WorkInfo.State.FAILED) null
+        else
+            when (work.outputData.getString(ProofUploadWorker.KEY_ERROR)) {
+              ProofUploadWorker.ERROR_ALREADY_APPROVED -> null
+              ProofUploadWorker.ERROR_UPLOAD,
+              ProofUploadWorker.ERROR_SUBMIT -> UploadFailure.RETRYABLE
+              ProofUploadWorker.ERROR_PHOTO_MISSING -> UploadFailure.PHOTO_MISSING
+              else -> UploadFailure.REFUSED
+            }
+
+    /**
+     * An untagged work that never runs, so it is in neither [waiting] nor [failed]. [cancel]
+     * replaces a reservation's works with it, then cancels it.
+     */
+    fun placeholder(): OneTimeWorkRequest =
+        OneTimeWorkRequestBuilder<ProofUploadWorker>()
+            .setInitialDelay(PLACEHOLDER_DELAY_DAYS, TimeUnit.DAYS)
+            .build()
+  }
 }

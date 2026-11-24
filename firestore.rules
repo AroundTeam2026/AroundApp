@@ -79,6 +79,7 @@ service cloud.firestore {
           && data.proofType in ['PHOTO', 'TEXT']
           && data.minPartySize is int
           && data.minPartySize >= 1
+          && data.minPartySize <= maxPartySize()
           && (!('exactPartySize' in data) || data.exactPartySize is bool)
           && (!('reward' in data) || isValidReward(data.reward))
           && data.status in ['DRAFT', 'ACTIVE', 'ARCHIVED']

@@ -30,28 +30,42 @@ interface ProofUploadQueue {
 
   /**
    * The ids of the reservations whose photo proof is waiting to upload: the current ones on
-   * collection, then each change. A reservation leaves once its proof is submitted, or once its
-   * upload stops for good, which lists it in [failed] unless its proof is no longer needed.
+   * collection, then each change. A reservation leaves once its proof is submitted, once its upload
+   * stops for good, which lists it in [failed] unless its proof is no longer needed, or once it is
+   * [cancel]led.
    */
   val waiting: Flow<Set<String>>
 
   /**
-   * The ids of the reservations whose photo proof failed for good and wasn't sent, e.g. refused by
-   * the security rules, its photo gone, or out of attempts: the current ones on collection, then
-   * each change. A reservation whose completion the venue already approved isn't listed, since its
-   * proof is no longer needed. A reservation leaves once its proof is queued again, or once the
-   * queue forgets the failure, which may happen after about a day.
+   * The reservations whose photo proof failed for good and wasn't sent, each with why, so the
+   * explorer is offered a retry only where one can work: the current ones on collection, then each
+   * change. A reservation whose completion the venue already approved isn't listed, since its proof
+   * is no longer needed. A reservation leaves once its proof is queued again, once it is
+   * [cancel]led, or once the queue forgets the failure, which may happen after about a day.
    */
-  val failed: Flow<Set<String>>
+  val failed: Flow<Map<String, UploadFailure>>
 
   /**
    * Queues [reservationId]'s failed proof again, with the same photo, if it is still kept: it
-   * leaves [failed] and is listed in [waiting].
+   * leaves [failed] and is listed in [waiting]. Only a [UploadFailure.RETRYABLE] failure can pass
+   * on a retry; a [UploadFailure.PHOTO_MISSING] one can't be retried.
    *
    * @param reservationId id of a reservation listed in [failed].
    * @return success once the proof is queued again; a [NoSuchElementException] if [reservationId]
-   *   has no failed proof, a [java.io.FileNotFoundException] if its photo is no longer kept, or the
-   *   failure that kept it from being queued.
+   *   has no failed proof, an [IllegalStateException] if its failed proof can't be rebuilt, a
+   *   [java.io.FileNotFoundException] if its photo is no longer kept, or the failure that kept it
+   *   from being queued.
    */
   suspend fun retry(reservationId: String): Result<Unit>
+
+  /**
+   * Cancels [reservationId]'s waiting or failed proof, if any, and deletes its copy, for a
+   * reservation cancelled or whose party the explorer left, since the rules would refuse its upload
+   * (#625). It then leaves [waiting] and [failed].
+   *
+   * @param reservationId id of the reservation whose proof to cancel.
+   * @return success once no proof of [reservationId] is waiting or failed, including when none was,
+   *   or the failure that kept it from being cancelled.
+   */
+  suspend fun cancel(reservationId: String): Result<Unit>
 }

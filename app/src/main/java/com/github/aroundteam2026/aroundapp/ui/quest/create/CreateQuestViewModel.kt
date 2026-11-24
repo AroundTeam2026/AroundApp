@@ -17,12 +17,14 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
 import com.github.aroundteam2026.aroundapp.model.common.distanceTo
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
@@ -38,7 +40,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -207,9 +208,9 @@ class CreateQuestViewModel(
     edit { it.copy(addressQuery = "") }
   }
 
-  /** Raises the party size by one. */
+  /** Raises the party size by one, never above [MAX_PARTY_SIZE]. */
   fun incrementPartySize() {
-    editPartySize { it.copy(minPartySize = it.minPartySize + 1) }
+    editPartySize { it.copy(minPartySize = (it.minPartySize + 1).coerceAtMost(MAX_PARTY_SIZE)) }
   }
 
   /** Lowers the party size by one, never below [QuestLimits.MIN_PARTY_SIZE]. */
@@ -331,7 +332,7 @@ class CreateQuestViewModel(
    * that doesn't exist or isn't the venue's as unavailable.
    */
   private suspend fun loadQuest(id: String) {
-    val quest =
+    val quest: Quest? =
         try {
           questRepository.getQuest(id)
         } catch (cancelled: CancellationException) {
@@ -358,32 +359,40 @@ class CreateQuestViewModel(
   private suspend fun watchPendingParties(id: String) {
     val venueId = authRepository.currentUserId.value ?: return
     val reservations = reservationRepository ?: return
-    reservations
-        .observeForVenue(venueId)
-        .catch { Log.w(TAG, "Watching reservations failed", it) }
-        .collect { all ->
-          val ofQuest = all.filter { it.questId == id }
-          val partyLocked = ofQuest.any { it.status == ReservationStatus.PENDING }
-          val proofLocked = ofQuest.any { it.status.isActive }
-          val quest = editedQuest
-          mutableUiState.update {
-            val locked =
-                it.copy(
-                    partySizeLocked = partyLocked,
-                    proofTypeLocked = proofLocked,
-                    hasActiveReservations = proofLocked,
-                )
-            when {
-              quest == null -> locked
-              else ->
-                  locked.copy(
-                      minPartySize = if (partyLocked) quest.minPartySize else it.minPartySize,
-                      exactPartySize = if (partyLocked) quest.exactPartySize else it.exactPartySize,
-                      proofType = if (proofLocked) quest.proofType else it.proofType,
-                  )
-            }
-          }
-        }
+    try {
+      reservations.observeForVenue(venueId).collect { all ->
+        val ofQuest = all.filter { it.questId == id }
+        mutableUiState.update { it.lockedBy(ofQuest, editedQuest) }
+      }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (e: Exception) {
+      Log.w(TAG, "Watching reservations failed", e)
+    }
+  }
+
+  /**
+   * Locks the party size if [ofQuest] has a pending reservation and the proof type if it has an
+   * active one, putting back [quest]'s own while locked.
+   */
+  private fun CreateQuestUiState.lockedBy(
+      ofQuest: List<Reservation>,
+      quest: Quest?,
+  ): CreateQuestUiState {
+    val partyLocked = ofQuest.any { it.status == ReservationStatus.PENDING }
+    val proofLocked = ofQuest.any { it.status.isActive }
+    val locked =
+        copy(
+            partySizeLocked = partyLocked,
+            proofTypeLocked = proofLocked,
+            hasActiveReservations = proofLocked,
+        )
+    if (quest == null) return locked
+    return locked.copy(
+        minPartySize = if (partyLocked) quest.minPartySize else minPartySize,
+        exactPartySize = if (partyLocked) quest.exactPartySize else exactPartySize,
+        proofType = if (proofLocked) quest.proofType else proofType,
+    )
   }
 
   private fun isPast(date: LocalDate?) = date != null && date.isBefore(LocalDate.now(clock))
@@ -413,7 +422,7 @@ class CreateQuestViewModel(
    */
   private suspend fun loadVenue() {
     val venueId = authRepository.currentUserId.value ?: return
-    val venue =
+    val venue: Venue? =
         try {
           venueRepository.getVenue(venueId)
         } catch (cancelled: CancellationException) {

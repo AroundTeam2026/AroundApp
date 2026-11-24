@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import android.util.Log
@@ -33,6 +34,8 @@ import kotlinx.coroutines.launch
  * Where accepting each nearby quest stands, by quest id.
  *
  * @property acceptedQuestIds Quests the explorer has a pending or approved reservation for.
+ * @property unsentQuestIds Accepted quests whose reservation the server hasn't confirmed yet, as
+ *   when it was booked just as the connection dropped: they show as [AcceptStatus.SENDING].
  * @property acceptingQuestIds Quests being booked right now.
  * @property failedQuestIds Quests whose last booking failed; accepting again retries.
  * @property available Whether quests can be accepted: not until the explorer's reservations are
@@ -40,6 +43,7 @@ import kotlinx.coroutines.launch
  */
 data class NearbyAcceptUiState(
     val acceptedQuestIds: Set<String> = emptySet(),
+    val unsentQuestIds: Set<String> = emptySet(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
     val available: Boolean = false,
@@ -47,6 +51,7 @@ data class NearbyAcceptUiState(
   /** Where accepting the quest [questId] stands. */
   fun statusOf(questId: String): AcceptStatus =
       when (questId) {
+        in unsentQuestIds -> AcceptStatus.SENDING
         in acceptedQuestIds -> AcceptStatus.ACCEPTED
         in acceptingQuestIds -> AcceptStatus.ACCEPTING
         in failedQuestIds -> AcceptStatus.FAILED
@@ -59,10 +64,11 @@ data class NearbyAcceptUiState(
  * does.
  *
  * It keeps up with the explorer's reservations: a quest with one that still stands is accepted. A
- * quest being accepted stays so until the server answered and its reservation shows up. One whose
- * booking failed shows the failure until it is accepted again, and so does one whose reservation
- * the server refused after the app wrote it. If the reservations can't be read, accepting is
- * unavailable until the map is opened again.
+ * quest being accepted stays so until the server answered and its reservation shows up, and one
+ * whose reservation the server hasn't confirmed yet is waiting to send. One whose booking failed
+ * shows the failure until it is accepted again, and so does one whose reservation the server
+ * refused after the app wrote it. If the reservations can't be read, accepting is unavailable until
+ * the map is opened again.
  */
 class NearbyAcceptViewModel(
     private val reservationRepository: ReservationRepository,
@@ -127,11 +133,13 @@ class NearbyAcceptViewModel(
     hearing.refusedIn(listed)
     // All of them, not only the newly refused: the venue page may have heard the refusal first
     val refused = refusedWrites.refusedQuests
-    val accepted =
-        listed.filter { it.status.isActive }.map { it.questId }.toSet() - unconfirmed - refusing
+    val standing = listed.filter { it.status.isActive }
+    val accepted = standing.map { it.questId }.toSet() - unconfirmed - refusing
+    val unsent = standing.filter { it.pendingWrite }.map { it.questId }.toSet() intersect accepted
     _uiState.update {
       it.copy(
           acceptedQuestIds = accepted,
+          unsentQuestIds = unsent,
           acceptingQuestIds = it.acceptingQuestIds - accepted - refused,
           failedQuestIds = it.failedQuestIds - accepted + refused,
           available = true,

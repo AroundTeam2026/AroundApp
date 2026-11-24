@@ -98,10 +98,21 @@ class FakeProofUploadQueueTest {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
     queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
 
-    queue.fail(RESERVATION_ID)
+    queue.fail(RESERVATION_ID, UploadFailure.REFUSED)
 
     assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
-    assertEquals(setOf(RESERVATION_ID), queue.failed.first())
+    assertEquals(mapOf(RESERVATION_ID to UploadFailure.REFUSED), queue.failed.first())
+  }
+
+  @Test
+  fun enqueue_afterAFailure_removesTheReservationFromFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.failed.first().isEmpty())
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
   }
 
   @Test
@@ -125,6 +136,39 @@ class FakeProofUploadQueueTest {
 
     assertTrue(result.exceptionOrNull() is NoSuchElementException)
     assertEquals(1, queue.queued.size)
+  }
+
+  @Test
+  fun cancel_recordsItAndRemovesOnlyThatReservationFromWaiting() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancel(RESERVATION_ID).isSuccess)
+
+    assertEquals(listOf(RESERVATION_ID), queue.cancelled)
+    assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
+  fun cancel_afterAFailure_removesTheReservationFromFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+
+    assertTrue(queue.cancel(RESERVATION_ID).isSuccess)
+
+    assertTrue(queue.failed.first().isEmpty())
+    assertTrue(queue.retry(RESERVATION_ID).exceptionOrNull() is NoSuchElementException)
+  }
+
+  @Test
+  fun cancel_whenFailureIsForced_returnsItAndCancelsNothing() = runTest {
+    val failure = IllegalStateException(FAILURE)
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.cancelFailure = failure
+
+    assertEquals(failure, queue.cancel(RESERVATION_ID).exceptionOrNull())
+    assertTrue(queue.cancelled.isEmpty())
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
   }
 
   @Test

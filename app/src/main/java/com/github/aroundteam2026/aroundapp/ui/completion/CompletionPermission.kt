@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
 
@@ -64,29 +65,28 @@ internal fun rememberCompletionPermission(onSubmit: () -> Unit): CompletionPermi
       },
       request = {
         servicesEnabled = locationManager.isLocationEnabled
-        if (!servicesEnabled) {
-          context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-        } else if (fineGranted()) {
-          currentSubmit()
-        } else if (
-            refused &&
-                requested &&
-                (activity == null ||
-                    !ActivityCompat.shouldShowRequestPermissionRationale(
-                        activity,
-                        ACCESS_FINE_LOCATION,
-                    ))
-        ) {
-          // Only use settings once Android will no longer show its permission dialog.
-          context.startActivity(
-              Intent(
-                  Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                  Uri.fromParts("package", context.packageName, null),
+        when {
+          !servicesEnabled ->
+              context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+          fineGranted() -> currentSubmit()
+          refused &&
+              requested &&
+              (activity == null ||
+                  !ActivityCompat.shouldShowRequestPermissionRationale(
+                      activity,
+                      ACCESS_FINE_LOCATION,
+                  )) ->
+              // Only use settings once Android will no longer show its permission dialog.
+              context.startActivity(
+                  Intent(
+                      Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                      Uri.fromParts("package", context.packageName, null),
+                  )
               )
-          )
-        } else {
-          requested = true
-          launcher.launch(LocationPermissions.ALL)
+          else -> {
+            requested = true
+            launcher.launch(LocationPermissions.ALL)
+          }
         }
       },
   )

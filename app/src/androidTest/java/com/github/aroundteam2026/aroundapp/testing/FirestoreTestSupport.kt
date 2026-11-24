@@ -125,10 +125,10 @@ suspend fun signInNewUser(appName: String, role: Role? = null): String {
  * Values may be strings, whole numbers, timestamps, and lists or maps of those.
  *
  * It uses the emulator's REST API, which skips the rules for the `owner` token. No client sees the
- * write until it reads from the server.
+ * write until it reads from the server. [projectId] is the project of the clients that read it.
  */
-fun writeBypassingRules(path: String, fields: Map<String, Any>) {
-  val database = "projects/$PROJECT_ID/databases/(default)"
+fun writeBypassingRules(path: String, fields: Map<String, Any>, projectId: String = PROJECT_ID) {
+  val database = "projects/$projectId/databases/(default)"
   val update =
       JSONObject().put("name", "$database/documents/$path").put("fields", restFields(fields))
   val write =
