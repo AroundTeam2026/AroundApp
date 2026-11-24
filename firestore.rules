@@ -400,6 +400,17 @@ service cloud.firestore {
               || request.resource.data.get('role', null) == resource.data.role);
     }
 
+    // A phone's FCM token is the document id, so Cloud Functions know where to notify the user.
+    // Only the user saves and deletes their own; nobody reads them from the app, since the
+    // functions use the admin SDK. updatedAt is the server's time of the last save.
+    match /users/{uid}/tokens/{token} {
+      allow create, update: if isUser(uid)
+          && request.resource.data.keys().hasAll(['updatedAt'])
+          && request.resource.data.keys().hasOnly(['updatedAt'])
+          && request.resource.data.updatedAt == request.time;
+      allow delete: if isUser(uid);
+    }
+
     // One venue per account: the document id is the owner's uid, and the owner is a venue account.
     match /venues/{ownerUid} {
       allow read: if signedIn();
