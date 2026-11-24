@@ -3,19 +3,16 @@
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -25,13 +22,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -49,47 +46,46 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptQuestButton
 import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptStatus
-import kotlinx.coroutines.launch
 
-/** The most dots the pager shows; past that, they slide along with the shown page. */
-private const val MAX_DOTS = 5
-
-// The pager's own geometry, from Figma (frames 2006:688 and 5234:29428); its gaps come from
-// AroundSpacing
+// The pager's own geometry, from Figma (frames 2006:688, 5234:29428 and 5488:31322); its gaps
+// come from AroundSpacing
 private val AVATAR_SIZE = 60.dp
 private val LINE_SPACING = 3.dp
 private val TITLE_SPACING = 2.dp
 private val PIN_SIZE = 52.dp
 private val ICON_SIZE = 20.dp
 private val SMALL_BUTTON_SIZE = 36.dp
-private val DOT_SIZE = 6.dp
-private val SHOWN_DOT_WIDTH = 18.dp
 
 /**
- * The quests near the explorer, one per page in the order of [quests], with a counter and up to
- * five dots marking the shown page.
+ * The tallest the list grows before it scrolls: as in Figma, the second card shows only in part, so
+ * the list reads as scrollable, and the sheet leaves most of the map in view.
+ */
+private val LIST_MAX_HEIGHT = 302.dp
+
+/**
+ * The quests near the explorer, listed one card under the other in the order of [quests], under a
+ * header that counts them.
  *
- * Tapping a page opens its quest's details; under it, the pin shows the quest on the map instead,
- * and with [acceptState], "Accept quest" accepts it as the bar of its venue's page does. The
- * explorer swipes or uses the arrows either side of the dots, which wrap around. When [quests]
- * change, the shown quest stays shown wherever it moved; if it is gone, the one now in its place
- * shows, or the last one when the list got shorter, and quests arriving after it emptied start from
- * the first. Without [locationOn], a hint asks for the location, which orders the quests closest
- * first; with no quests, an empty state replaces the pages.
+ * Tapping a card opens its quest's details; under it, the pin shows the quest on the map instead,
+ * and with [acceptState], "Accept quest" accepts it as the bar of its venue's page does. Past
+ * [LIST_MAX_HEIGHT], the list scrolls. When [quests] change, the cards in view stay in view
+ * wherever they moved, and quests arriving after the list emptied start from the top. Without
+ * [locationOn], a hint asks for the location, which orders the quests closest first; with no
+ * quests, an empty state replaces the list.
  *
- * @param quests The quests to page through, already ordered.
+ * @param quests The quests to list, already ordered.
  * @param locationOn Whether the explorer's location is on, so [quests] are ordered closest first
  *   rather than by venue name.
- * @param onOpenQuest Called with a page's quest when the explorer taps the page.
- * @param onShowOnMap Called with a page's quest when the explorer taps its pin.
- * @param style How the pages look; by default, as in Figma, in the theme's colours.
+ * @param onOpenQuest Called with a card's quest when the explorer taps the card.
+ * @param onShowOnMap Called with a card's quest when the explorer taps its pin.
+ * @param style How the cards look; by default, as in Figma, in the theme's colours.
  * @param onClose Called when the explorer taps the close button, which shows only when given.
- * @param filters The filters [quests] already passed; while one is set, the counter names them in
+ * @param filters The filters [quests] already passed; while one is set, the header names them in
  *   place of the order.
  * @param onFiltersChange Called with the filters the explorer picks. The filter button, which opens
  *   and closes the filters under the header, shows only when given.
  * @param acceptState Where accepting each quest stands. "Accept quest" shows only when given.
- * @param onAccept Called with a page's quest when the explorer taps its "Accept quest".
+ * @param onAccept Called with a card's quest when the explorer taps its "Accept quest".
  */
 @Composable
 fun NearbyQuestPager(
@@ -129,8 +125,8 @@ fun NearbyQuestPager(
           style = AroundTextStyles.BodyMedium,
       )
     } else {
-      Pages(quests, locationOn, summary, header) { quest ->
-        QuestPage(
+      QuestList(quests, locationOn, summary, header) { quest ->
+        QuestCard(
             quest,
             style,
             onOpen = { onOpenQuest(quest) },
@@ -226,39 +222,31 @@ private fun Header(
 }
 
 /**
- * The [header] with its counter, the pages of [quests], each drawn by [page], their dots and the
- * arrows. Composed only while there are quests, so quests arriving after an empty list start again
- * from the first.
+ * The [header] with how many [quests] there are, then their cards, each drawn by [card], in a list
+ * that scrolls past [LIST_MAX_HEIGHT]. Composed only while there are quests, so quests arriving
+ * after an empty list start again from the top.
  *
- * @param summary The filters in words, which the counter names in place of the order, or null.
+ * @param summary The filters in words, which the header names in place of the order, or null.
  */
 @Composable
-private fun Pages(
+private fun QuestList(
     quests: List<NearbyQuest>,
     locationOn: Boolean,
     summary: String?,
     header: @Composable (counter: String) -> Unit,
-    page: @Composable (NearbyQuest) -> Unit,
+    card: @Composable (NearbyQuest) -> Unit,
 ) {
-  val pagerState = rememberPagerState { quests.size }
-  // For a frame after the list shrinks, the pager's page can still be past its end
-  val shown = pagerState.currentPage.coerceAtMost(quests.lastIndex)
+  val count = pluralStringResource(R.plurals.map_nearby_count, quests.size, quests.size)
   val order = if (locationOn) R.string.map_nearby_closest_first else R.string.map_nearby_by_name
-  header(
-      if (summary != null)
-          stringResource(R.string.map_nearby_filtered, shown + 1, quests.size, summary)
-      else stringResource(order, shown + 1, quests.size)
-  )
+  header(stringResource(R.string.map_nearby_pair, count, summary ?: stringResource(order)))
   LocationHint(locationOn)
-  // Keyed by quest, so the shown quest keeps its page when others come and go
-  HorizontalPager(
-      pagerState,
-      Modifier.testTag(C.Tag.NEARBY_PAGES).fillMaxWidth(),
-      key = { quests[it].questId },
+  LazyColumn(
+      Modifier.testTag(C.Tag.NEARBY_LIST).fillMaxWidth().heightIn(max = LIST_MAX_HEIGHT),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraLarge),
   ) {
-    page(quests[it])
+    // Keyed by quest, so the cards in view keep their place when others come and go
+    items(quests, key = { it.questId }) { card(it) }
   }
-  Navigation(pagerState, shown)
 }
 
 /** Without [locationOn], a hint that the location orders the quests closest first. */
@@ -280,12 +268,13 @@ private fun LocationHint(locationOn: Boolean) {
 private class Accept(val status: AcceptStatus, val enabled: Boolean, val onAccept: () -> Unit)
 
 /**
- * One quest's page: its venue's avatar, then its title, its venue's name and its chips, which open
- * the quest's details when tapped, as the chevron at the end says. Under them, its pin shows the
- * quest on the map, beside "Accept quest" when [accept] is given.
+ * One quest's card, tagged with its quest's id after [C.Tag.NEARBY_QUEST]: its venue's avatar, then
+ * its title, its venue's name and its chips, which open the quest's details when tapped, as the
+ * chevron at the end says. Under them, its pin shows the quest on the map, beside "Accept quest"
+ * when [accept] is given.
  */
 @Composable
-private fun QuestPage(
+private fun QuestCard(
     quest: NearbyQuest,
     style: MarkerStyle,
     onOpen: () -> Unit,
@@ -293,9 +282,12 @@ private fun QuestPage(
     accept: Accept?,
 ) {
   val colors = style.colors
-  Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.SectionGap)) {
+  Column(
+      Modifier.testTag("${C.Tag.NEARBY_QUEST}_${quest.questId}"),
+      verticalArrangement = Arrangement.spacedBy(AroundSpacing.SectionGap),
+  ) {
     Row(
-        Modifier.testTag(C.Tag.NEARBY_PAGE)
+        Modifier.testTag(C.Tag.NEARBY_CARD)
             .fillMaxWidth()
             .clickable(
                 onClickLabel = stringResource(R.string.map_nearby_open_details),
@@ -365,69 +357,10 @@ private fun QuestPage(
   }
 }
 
-/** A dot for each page of the window around [current]: a longer pill for the shown one. */
-@Composable
-private fun Dots(current: Int, count: Int, modifier: Modifier = Modifier) {
-  Row(
-      modifier,
-      horizontalArrangement =
-          Arrangement.spacedBy(AroundSpacing.SegmentGap, Alignment.CenterHorizontally),
-  ) {
-    for (page in dotWindow(current, count)) {
-      val selected = page == current
-      Box(
-          Modifier.testTag(C.Tag.NEARBY_DOT)
-              .semantics { this.selected = selected }
-              .size(width = if (selected) SHOWN_DOT_WIDTH else DOT_SIZE, height = DOT_SIZE)
-              .background(
-                  if (selected) MaterialTheme.colorScheme.primary
-                  else MaterialTheme.colorScheme.outline,
-                  CircleShape,
-              )
-      )
-    }
-  }
-}
-
-/**
- * The arrows, which wrap around, either side of the dots of the [shown] page, which show only when
- * there is more than one.
- */
-@Composable
-private fun Navigation(pagerState: PagerState, shown: Int) {
-  val scope = rememberCoroutineScope()
-  val count = pagerState.pageCount
-  fun pageBy(step: Int) {
-    // From where a move under way is going, so quick taps each move a page
-    scope.launch { pagerState.animateScrollToPage((pagerState.targetPage + step).mod(count)) }
-  }
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    RoundButton(
-        R.drawable.ic_chevron_left,
-        R.string.map_nearby_previous,
-        SMALL_BUTTON_SIZE,
-        ICON_SIZE,
-        enabled = count > 1,
-    ) {
-      pageBy(-1)
-    }
-    if (count > 1) Dots(shown, count, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
-    RoundButton(
-        R.drawable.ic_chevron_right,
-        R.string.map_nearby_next,
-        SMALL_BUTTON_SIZE,
-        ICON_SIZE,
-        enabled = count > 1,
-    ) {
-      pageBy(1)
-    }
-  }
-}
-
 /**
  * A round, outlined [size] button showing [icon] at [iconSize], which screen readers announce as
- * [label]: the arrows, the pin, the close button and the filter button. A toggle passes [selected],
- * which fills it in purple while on; the others leave it null.
+ * [label]: the pin, the close button and the filter button. A toggle passes [selected], which fills
+ * it in purple while on; the others leave it null.
  */
 @Composable
 private fun RoundButton(
@@ -436,7 +369,6 @@ private fun RoundButton(
     size: Dp,
     iconSize: Dp,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
     selected: Boolean? = null,
     onClick: () -> Unit,
 ) {
@@ -445,7 +377,6 @@ private fun RoundButton(
   OutlinedIconButton(
       onClick,
       modifier.size(size).semantics { selected?.let { this.selected = it } },
-      enabled = enabled,
       shape = CircleShape,
       colors =
           IconButtonDefaults.outlinedIconButtonColors(
@@ -456,14 +387,4 @@ private fun RoundButton(
   ) {
     Icon(painterResource(icon), stringResource(label), Modifier.size(iconSize))
   }
-}
-
-/**
- * The pages that get a dot when [current] of [count] pages is shown: all of them up to [MAX_DOTS],
- * else [MAX_DOTS] pages with [current] in the middle, slid to stay within the pages near either
- * end.
- */
-internal fun dotWindow(current: Int, count: Int): IntRange {
-  val first = (current - MAX_DOTS / 2).coerceIn(0, maxOf(0, count - MAX_DOTS))
-  return first until minOf(count, first + MAX_DOTS)
 }
