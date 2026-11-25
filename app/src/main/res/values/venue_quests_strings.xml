@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
+<!-- Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> -->
 <resources>
     <string name="venue_quests_status_draft">Draft</string>
     <string name="venue_quests_status_active">Active</string>
@@ -8,6 +9,7 @@
     <string name="venue_quests_empty_body">Create a quest to bring new people through your door.</string>
     <string name="venue_quests_create_first">Create your first quest</string>
     <string name="venue_quests_failed">Couldn\'t load your quests. Try again.</string>
+    <string name="venue_quests_write_refused">A change to your quests didn\'t go through. Try again.</string>
     <string name="venue_quests_retry">Try again</string>
     <string name="venue_quests_edit">Edit %1$s</string>
     <string name="venue_quests_archive">Archive %1$s</string>
