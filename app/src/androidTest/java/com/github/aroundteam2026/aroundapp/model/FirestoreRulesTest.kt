@@ -5,9 +5,11 @@ package com.github.aroundteam2026.aroundapp.model
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_LOOKUPS
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
@@ -140,6 +142,59 @@ class FirestoreRulesTest {
     )
   }
 
+  // ---- notification tokens ----
+
+  @Test
+  fun userSavesSavesAgainAndDeletesTheirOwnToken() {
+    val alice = newUser()
+
+    assertSucceeds(token(alice).set(tokenData()))
+    assertSucceeds(token(alice).set(tokenData()))
+    assertSucceeds(token(alice).delete())
+  }
+
+  @Test
+  fun nobodyWritesOrDeletesAnotherUsersToken() {
+    val alice = newUser()
+    assertSucceeds(token(alice).set(tokenData()))
+    newUser()
+
+    assertDenied(token(alice).set(tokenData()), "another user's save")
+    assertDenied(token(alice).delete(), "another user's delete")
+    signOut()
+    assertDenied(token(alice).set(tokenData()), "a signed-out save")
+    assertDenied(token(alice).delete(), "a signed-out delete")
+  }
+
+  @Test
+  fun nobodyReadsTokensFromTheApp() {
+    val alice = newUser()
+    assertSucceeds(token(alice).set(tokenData()))
+
+    assertDenied(token(alice).get(Source.SERVER), "the owner's get")
+    assertDenied(tokens(alice).get(Source.SERVER), "the owner's list")
+    newUser()
+    assertDenied(token(alice).get(Source.SERVER), "another user's get")
+    assertDenied(tokens(alice).get(Source.SERVER), "another user's list")
+  }
+
+  @Test
+  fun tokenMustFollowTheSchema() {
+    val alice = newUser()
+    val valid = tokenData()
+
+    assertOnlyValidWriteSucceeds(
+        token(alice),
+        valid,
+        mapOf(
+            "an unknown field" to valid + ("platform" to "android"),
+            "no updatedAt" to emptyMap(),
+            "a client updatedAt" to mapOf("updatedAt" to Timestamp.now()),
+            "an updatedAt that is not a timestamp" to mapOf("updatedAt" to 42),
+        ),
+    )
+  }
+
   // ---- venues ----
 
   @Test
@@ -196,6 +251,27 @@ class FirestoreRulesTest {
     assertDenied(venueOf(venue).update("radiusMeters", 500), "an update that breaks the schema")
     // Optional fields are omitted when null
     assertSucceeds(venueOf(venue).set(valid - listOf("location", "address", "featuredQuestId")))
+  }
+
+  /** The picture's type and length checks are shared with users, so they're tested there. */
+  @Test
+  fun venueSetsAPictureOnlyInItsOwnFolderAndCanStillBeRenamed() {
+    val venue = newUser(Role.VENUE)
+    val other = newUser(Role.VENUE)
+    signInAs(venue)
+    assertSucceeds(venueOf(venue).set(venueData()))
+
+    assertSucceeds(venueOf(venue).update("pictureUrl", "gs://bucket/venue-pictures/${venue.uid}/1"))
+    // The whole document is checked on every write, so a stored picture must not block a rename
+    assertSucceeds(venueOf(venue).update("name", "Café Lumière"))
+    assertDenied(
+        venueOf(venue).update("pictureUrl", "gs://bucket/venue-pictures/${other.uid}/1"),
+        "a picture in another venue's folder",
+    )
+    assertDenied(
+        venueOf(venue).update("pictureUrl", "gs://bucket/user-pictures/${venue.uid}/1"),
+        "a picture outside venue-pictures",
+    )
   }
 
   // ---- quests ----
@@ -295,6 +371,7 @@ class FirestoreRulesTest {
             "a radius over 200 m" to valid + ("radiusMeters" to 201),
             "a radius that is not an integer" to valid + ("radiusMeters" to "50"),
             "a party of 0" to valid + ("minPartySize" to 0),
+            "a party above the maximum" to valid + ("minPartySize" to MAX_PARTY_SIZE + 1),
             "an exactPartySize that is not a boolean" to valid + ("exactPartySize" to "yes"),
             "an unknown proof type" to valid + ("proofType" to "VIDEO"),
             "an unknown status" to valid + ("status" to "LIVE"),
@@ -306,6 +383,7 @@ class FirestoreRulesTest {
         ),
     )
     assertSucceeds(newQuest().set(valid + ("exactPartySize" to true)))
+    assertSucceeds(newQuest().set(valid + ("minPartySize" to MAX_PARTY_SIZE)))
   }
 
   // #430: a quest may have a location of its own, away from its venue
@@ -1061,6 +1139,7 @@ class FirestoreRulesTest {
     val stranger = newUser(Role.EXPLORER)
 
     signInAs(stranger)
+    lookUp(code)
     assertEquals(
         reservation.id,
         assertSucceeds(partyCodeDocument(code).get(Source.SERVER)).getString("reservationId"),
@@ -1091,6 +1170,7 @@ class FirestoreRulesTest {
         ),
         "a second reservation with the same code",
     )
+    lookUp(code)
     assertEquals(
         first.id,
         assertSucceeds(partyCodeDocument(code).get(Source.SERVER)).getString("reservationId"),
@@ -1163,6 +1243,64 @@ class FirestoreRulesTest {
     assertDenied(partyCodeDocument(code).delete(), "a delete")
     signInAs(venue)
     assertDenied(withCode.update("partyCode", newPartyCode()), "the venue changing the code")
+  }
+
+  /** #542: a code is read only once its lookup is counted, so trying codes is limited. */
+  @Test
+  fun aPartyCodeIsReadOnlyByWhoeverCountedItsLookup() {
+    val venue = newUser(Role.VENUE)
+    val quest = questOf(venue)
+    val code = newPartyCode()
+    val reservation = newReservation()
+    assertSucceeds(
+        createWithMembership(
+            reservation,
+            reservation(quest, venue) + ("partyCode" to code),
+            newUser(Role.EXPLORER),
+        )
+    )
+    val stranger = newUser(Role.EXPLORER)
+
+    assertDenied(partyCodeDocument(code).get(Source.SERVER), "no lookup")
+    assertDenied(partyCodeDocument(newPartyCode()).get(Source.SERVER), "an unknown code")
+    lookUp(newPartyCode())
+    assertDenied(partyCodeDocument(code).get(Source.SERVER), "another code looked up")
+    lookUp(code)
+    assertSucceeds(partyCodeDocument(code).get(Source.SERVER))
+    newUser(Role.EXPLORER)
+    assertDenied(partyCodeDocument(code).get(Source.SERVER), "someone else's lookup")
+    assertDenied(partyCodeLookup(stranger.uid).get(Source.SERVER), "reading someone's lookups")
+    assertDenied(partyCodeLookup(stranger.uid).set(firstLookup(code)), "writing someone's lookups")
+  }
+
+  /** #542: each lookup counts one, up to the limit, in an hour started at the server's time. */
+  @Test
+  fun partyCodeLookupsCountOneByOneUpToTheLimit() {
+    val explorer = newUser(Role.EXPLORER)
+    val lookup = partyCodeLookup(explorer.uid)
+    val first = firstLookup(newPartyCode())
+
+    assertOnlyValidWriteSucceeds(
+        lookup,
+        first,
+        mapOf(
+            "a first lookup counting 2" to first + ("count" to 2),
+            "an hour started earlier" to first + ("windowStart" to minutesAgo(MINUTES_PER_HOUR)),
+            "not a party code" to first + ("code" to "7kqm42"),
+            "an unknown field" to first + ("reservationId" to "any"),
+        ),
+    )
+    for (count in 2..MAX_PARTY_CODE_LOOKUPS) {
+      assertDenied(lookup.update("code", newPartyCode()), "a lookup not counted")
+      assertSucceeds(lookup.update(mapOf("code" to newPartyCode(), "count" to count)))
+    }
+    assertDenied(
+        lookup.update(mapOf("code" to newPartyCode(), "count" to MAX_PARTY_CODE_LOOKUPS + 1)),
+        "a lookup over the limit",
+    )
+    assertDenied(lookup.set(firstLookup(newPartyCode())), "a new hour before this one is over")
+    assertDenied(lookup.update("count", 1), "counting down")
+    assertDenied(lookup.delete(), "a delete")
   }
 
   // ---- completions ----
@@ -1596,6 +1734,14 @@ class FirestoreRulesTest {
 
   private fun user(user: TestUser) = db.collection("users").document(user.uid)
 
+  private fun tokens(user: TestUser) = user(user).collection("tokens")
+
+  /** The document of [user]'s phone token [TOKEN]. */
+  private fun token(user: TestUser) = tokens(user).document(TOKEN)
+
+  /** A token document as the app saves it. */
+  private fun tokenData() = mapOf("updatedAt" to FieldValue.serverTimestamp())
+
   private fun venueOf(user: TestUser) = db.collection("venues").document(user.uid)
 
   private fun newQuest() = db.collection("quests").document(UUID.randomUUID().toString())
@@ -1623,10 +1769,18 @@ class FirestoreRulesTest {
             mapOf(
                 "status" to status,
                 "proofType" to proofType,
-                "minPartySize" to minPartySize,
+                "minPartySize" to minPartySize.coerceAtMost(MAX_PARTY_SIZE),
             ) +
             listOfNotNull(exactPartySize?.let { "exactPartySize" to it })
     assertSucceeds(quest.set(data))
+    // The rules refuse a size above the cap, which only quests written before #541 have.
+    if (minPartySize > MAX_PARTY_SIZE) {
+      writeBypassingRules(
+          "quests/${quest.id}",
+          mapOf("minPartySize" to minPartySize),
+          db.app.options.projectId!!,
+      )
+    }
     return quest.id
   }
 
@@ -1843,6 +1997,22 @@ class FirestoreRulesTest {
 
   private fun partyCodeDocument(code: String) = db.collection("party_codes").document(code)
 
+  private fun partyCodeLookup(uid: String) = db.collection("party_code_lookups").document(uid)
+
+  /** The first lookup of an hour, of [code], as the app writes it. */
+  private fun firstLookup(code: String) =
+      mapOf("code" to code, "count" to 1, "windowStart" to FieldValue.serverTimestamp())
+
+  /** Counts [code] as one more lookup of the signed-in user, as the app does before reading it. */
+  private fun lookUp(code: String) {
+    val lookup = partyCodeLookup(auth.currentUser!!.uid)
+    val count = assertSucceeds(lookup.get(Source.SERVER)).getLong("count")
+    assertSucceeds(
+        if (count == null) lookup.set(firstLookup(code))
+        else lookup.update(mapOf("code" to code, "count" to count + 1))
+    )
+  }
+
   /** A party code no other test uses. */
   private fun newPartyCode() =
       List(PARTY_CODE_LENGTH) { PARTY_CODE_ALPHABET.random() }.joinToString("")
@@ -1897,10 +2067,12 @@ class FirestoreRulesTest {
     const val PASSWORD = "password123"
     const val DISPLAY_NAME = "Test"
     const val PHOTO_URL = "https://example.test/proof.jpg"
+    const val TOKEN = "fcm-token-1"
     const val TIMEOUT_S = 10L
 
     /** The characters of a party code: no 0, 1, I, L or O, which are easy to mistake. */
     const val PARTY_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
     const val PARTY_CODE_LENGTH = 6
+    const val MINUTES_PER_HOUR = 60
   }
 }

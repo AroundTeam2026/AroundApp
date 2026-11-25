@@ -27,7 +27,7 @@ These actions need a connection. They stop working the moment the phone disconne
 - Explorers can't accept a quest from the map, a venue's page or a quest's details, cancel a reservation, leave a party or save their profile. Joining a party with a code says the phone is offline.
 - Venues can't approve or decline a reservation, or approve or reject a proof.
 
-A reservation the server hasn't confirmed yet, because the connection dropped right after the explorer accepted the quest, isn't shown as waiting for the venue. The Quests tab says "Waiting to send" with a cloud icon, and the venue page's accept button says the same, with "Saved on this device. We'll send it when you're back online." It can't be cancelled, and its party code isn't shown, until the server has it. Firestore keeps the write across restarts and sends it once the device is back online: it then becomes "Waiting for the venue", or is dropped if the server refuses it.
+A reservation the server hasn't confirmed yet, because the connection dropped right after the explorer accepted the quest, isn't shown as waiting for the venue. The Quests tab says "Waiting to send" with a cloud icon, and the venue page's accept button says the same, with "Saved on this device. We'll send it when you're back online." It can't be cancelled, and its party code isn't shown, until the server has it. Firestore keeps the write across restarts and sends it once the device is back online: it then becomes "Waiting for the venue", or is dropped if the server refuses it, in which case the quest shows "try again" on the map and the venue page, also if the app was closed in between, until it is accepted again, and the map says once, in a snackbar, that a reservation wasn't accepted. The phone forgets these refusals after two weeks, or when the explorer signs out.
 Joining a party works the same way: if the connection drops right after the code was found, the Join a party screen stays open and says "Waiting to send", instead of closing as joined, and closes once the server has the join.
 The venue's quest list marks a quest change the server hasn't confirmed as "Waiting to send"; a change the server refuses disappears from the list without a message (#648).
 
@@ -101,6 +101,34 @@ firebase emulators:start --only auth,firestore,storage --project demo-project
 ```
 
 `--project demo-project` matters: the tests connect to `demo-project`, and `storage.rules` reads Firestore, so both emulators must run on that same project. Without it, the emulators take `around-67942` from `.firebaserc`.
+
+### Cloud Functions
+
+`functions/` holds the Cloud Functions, in TypeScript, that send the notifications: each one runs when a reservation or a proof changes and calls `sendToUser` (`functions/src/notify.ts`). They need Node 22. From `functions/`:
+
+```sh
+npm ci                  # install the dependencies, as locked in package-lock.json
+npm run build           # compile to lib/, as the deploy does
+npm run test:emulator   # start the Firestore emulator, run the tests, stop it
+```
+
+`npm test` runs the tests alone, against Firestore emulators you already started (port 8080, `demo-project`). The tests never reach the real project. The CI's `functions` job runs all three.
+
+To add a function, write it in its own file under `functions/src/`, export it from `functions/src/index.ts`, and test it in `functions/test/` with [firebase-functions-test](https://firebase.google.com/docs/functions/unit-testing). Mock `../src/notify` with `jest.mock` and check what the function passes to `sendToUser`.
+
+`sendToUser` sends a data-only message (title, body, kind, route and reservation id all in FCM's `data`) to every token saved at `users/{uid}/tokens/{token}`, so the app builds the notification itself, even in the background. A token FCM refuses is logged and skipped.
+
+Production only gets the functions when someone deploys them (the project is on the Blaze plan, which Cloud Functions need):
+
+```sh
+firebase login
+npm --prefix functions ci   # the build before the deploy needs the functions' dependencies
+firebase deploy --only functions --project around-67942
+```
+
+- **Who:** a team member with the Owner or Editor role on the `around-67942` Firebase project.
+- **When:** right after a PR that changes `functions/` is merged, from an up-to-date `main`. Announce it in the team channel, then check the Functions page and its logs in the Firebase console.
+- **First deploy:** the CLI asks how many days to keep the built container images; 1 is enough and avoids Artifact Registry storage costs. The first deploy of Firestore-triggered functions can fail once while Google sets up Eventarc's permissions: retry after a few minutes.
 
 ### Security rules
 

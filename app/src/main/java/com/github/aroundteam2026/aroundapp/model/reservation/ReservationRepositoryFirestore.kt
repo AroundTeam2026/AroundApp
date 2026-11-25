@@ -5,16 +5,20 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 import android.util.Log
 import com.github.aroundteam2026.aroundapp.model.party.EVERY_PARTY_CODE_TAKEN
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_LOOKUPS
 import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyUserFirestore
+import com.github.aroundteam2026.aroundapp.model.party.TooManyPartyCodeLookupsException
 import com.github.aroundteam2026.aroundapp.model.party.newPartyCode
 import com.github.aroundteam2026.aroundapp.model.party.normalizePartyCode
 import com.github.aroundteam2026.aroundapp.model.party.partyMemberId
 import com.github.aroundteam2026.aroundapp.model.required
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.MetadataChanges
@@ -35,7 +39,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * [ReservationRepository] backed by the Firestore `reservations` collection, with each party in the
- * `party_user` collection and each party code in the `party_codes` collection.
+ * `party_user` collection and each party code in the `party_codes` collection. Each user's party
+ * code lookups are counted in `party_code_lookups`, which the rules limit.
  *
  * Documents that cannot be mapped back to a [Reservation] are logged and skipped: the `observe*`
  * flows leave them out, and [updateStatus] treats them as missing.
@@ -97,6 +102,10 @@ class ReservationRepositoryFirestore(
   /**
    * Writes the new reservation with the party code [code] like [create], but returns null instead
    * of throwing when the rules refused it because another reservation already has [code].
+   *
+   * The rules don't say why they refused it, so any refusal checks whether [code] is taken, which
+   * costs one of the creator's lookups. Past [MAX_PARTY_CODE_LOOKUPS], it can't check, and throws
+   * the refusal itself rather than [TooManyPartyCodeLookupsException].
    */
   private suspend fun createUnlessTaken(
       reservation: Reservation,
@@ -107,9 +116,19 @@ class ReservationRepositoryFirestore(
       try {
         create(reservation, creatorUid, time, code)
       } catch (e: FirebaseFirestoreException) {
-        if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED || !isTaken(code)) throw e
+        if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED || !isTakenIfKnown(code)) {
+          throw e
+        }
         Log.i(TAG, "Party code $code is taken, drawing another")
         null
+      }
+
+  /** Whether [code] is taken, as [isTaken]; false once the creator has no lookups left. */
+  private suspend fun isTakenIfKnown(code: String): Boolean =
+      try {
+        isTaken(code)
+      } catch (_: TooManyPartyCodeLookupsException) {
+        false
       }
 
   /**
@@ -140,30 +159,74 @@ class ReservationRepositoryFirestore(
     return document.id
   }
 
-  /** Whether another reservation already has the party code [code], asking the server. */
-  private suspend fun isTaken(code: String): Boolean =
-      partyCodes.document(code).get(Source.SERVER).await().exists()
+  /**
+   * Whether another reservation already has the party code [code], asking the server. Reading it
+   * counts as one of the signed-in user's lookups, like [findReservationIdByCode].
+   */
+  private suspend fun isTaken(code: String): Boolean = readCode(code).exists()
 
   /**
    * Normalizes [code] and reads its `party_codes` document from the server. A code that is not one,
-   * or whose document is missing or has no reservation id, is a [PartyCodeNotFoundException]; a
-   * read that fails, e.g. offline, is the Firestore exception.
+   * or whose document is missing or has no reservation id, is a [PartyCodeNotFoundException]. A
+   * lookup after the signed-in user's [MAX_PARTY_CODE_LOOKUPS] in a window less than an hour old is
+   * a [TooManyPartyCodeLookupsException]; a read that fails, e.g. offline, is the Firestore
+   * exception.
    */
   override suspend fun findReservationIdByCode(code: String): Result<String> =
       try {
         val normalized = normalizePartyCode(code) ?: throw PartyCodeNotFoundException(code)
         val id =
-            partyCodes
-                .document(normalized)
-                .get(Source.SERVER)
-                .await()
-                .getString(CODE_RESERVATION_ID) ?: throw PartyCodeNotFoundException(normalized)
+            readCode(normalized).getString(CODE_RESERVATION_ID)
+                ?: throw PartyCodeNotFoundException(normalized)
         Result.success(id)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
         Result.failure(e)
       }
+
+  /**
+   * Counts [code] as a lookup of the signed-in user, which the rules ask for first, then reads its
+   * `party_codes` document from the server.
+   */
+  private suspend fun readCode(code: String): DocumentSnapshot {
+    countLookup(code)
+    return partyCodes.document(code).get(Source.SERVER).await()
+  }
+
+  /**
+   * Writes [code] to the signed-in user's `party_code_lookups` document with one more lookup, in a
+   * transaction, so lookups at the same time all count. After [MAX_PARTY_CODE_LOOKUPS] of them it
+   * starts a new window, which the rules refuse until an hour has passed since the current one
+   * began: that refusal is a [TooManyPartyCodeLookupsException]. Fails without a signed-in user or
+   * a connection.
+   */
+  private suspend fun countLookup(code: String) {
+    val uid =
+        FirebaseAuth.getInstance(db.app).currentUser?.uid
+            ?: throw IllegalStateException("Looking up a party code needs a signed-in user")
+    val document = db.collection(PARTY_CODE_LOOKUPS).document(uid)
+    var full = false
+    try {
+      db.runTransaction { transaction ->
+            val count = transaction.get(document).getLong(LOOKUP_COUNT)
+            full = count != null && count >= MAX_PARTY_CODE_LOOKUPS
+            if (count != null && !full) {
+              transaction.update(document, mapOf(LOOKUP_CODE to code, LOOKUP_COUNT to count + 1))
+            } else {
+              val start =
+                  mapOf(LOOKUP_COUNT to 1, LOOKUP_WINDOW_START to FieldValue.serverTimestamp())
+              transaction.set(document, start + (LOOKUP_CODE to code))
+            }
+          }
+          .await()
+    } catch (e: FirebaseFirestoreException) {
+      if (full && e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+        throw TooManyPartyCodeLookupsException()
+      }
+      throw e
+    }
+  }
 
   /**
    * Reads the reservation's document from the server, with the `joinedCount` it stores. A missing
@@ -349,6 +412,12 @@ class ReservationRepositoryFirestore(
 
     /** The field of a `party_codes` document holding the id of the code's reservation. */
     const val CODE_RESERVATION_ID = "reservationId"
+
+    /** Each user's party code lookups, under their uid; see `party_code_lookups` in the rules. */
+    const val PARTY_CODE_LOOKUPS = "party_code_lookups"
+    const val LOOKUP_CODE = "code"
+    const val LOOKUP_COUNT = "count"
+    const val LOOKUP_WINDOW_START = "windowStart"
 
     const val QUEST_ID = "questId"
     const val VENUE_ID = "venueId"

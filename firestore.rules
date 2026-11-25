@@ -40,28 +40,34 @@ service cloud.firestore {
       return value is int && value >= 20 && value <= 200;
     }
 
+    // [data] has no picture, or one that [uid] uploaded to its own folder in Cloud Storage's
+    // [folder], as storage.rules lays them out.
+    function hasOwnPicture(data, folder, uid) {
+      return !('pictureUrl' in data)
+          || (isText(data.pictureUrl, 2000)
+              && data.pictureUrl.matches('gs://[^/]+/' + folder + '/' + uid + '/[^/]+'));
+    }
+
     function isValidUser(data, uid) {
       return data.keys().hasAll(['displayName', 'createdAt'])
           && data.keys().hasOnly(['displayName', 'pictureUrl', 'role', 'createdAt'])
           && isText(data.displayName, 100)
-          && (!('pictureUrl' in data)
-              || (isText(data.pictureUrl, 2000)
-                  && data.pictureUrl.matches(
-                      'gs://[^/]+/user-pictures/' + uid + '/[^/]+')))
+          && hasOwnPicture(data, 'user-pictures', uid)
           && data.get('role', null) in [null, 'EXPLORER', 'VENUE']
           && data.createdAt is timestamp;
     }
 
-    function isValidVenue(data) {
+    function isValidVenue(data, ownerUid) {
       return data.keys().hasAll(['name', 'radiusMeters', 'createdAt'])
-          && data.keys().hasOnly(
-              ['name', 'location', 'radiusMeters', 'address', 'createdAt', 'featuredQuestId'])
+          && data.keys().hasOnly(['name', 'location', 'radiusMeters', 'address', 'createdAt',
+              'featuredQuestId', 'pictureUrl'])
           && isText(data.name, 100)
           && (!('location' in data) || data.location is latlng)
           && isRadius(data.radiusMeters)
           && (!('address' in data) || data.address is string)
           && data.createdAt is timestamp
-          && (!('featuredQuestId' in data) || data.featuredQuestId is string);
+          && (!('featuredQuestId' in data) || data.featuredQuestId is string)
+          && hasOwnPicture(data, 'venue-pictures', ownerUid);
     }
 
     // A quest without a location takes place at its venue's location.
@@ -79,6 +85,7 @@ service cloud.firestore {
           && data.proofType in ['PHOTO', 'TEXT']
           && data.minPartySize is int
           && data.minPartySize >= 1
+          && data.minPartySize <= maxPartySize()
           && (!('exactPartySize' in data) || data.exactPartySize is bool)
           && (!('reward' in data) || isValidReward(data.reward))
           && data.status in ['DRAFT', 'ACTIVE', 'ARCHIVED']
@@ -242,6 +249,32 @@ service cloud.firestore {
       return /databases/$(database)/documents/party_codes/$(code);
     }
 
+    // How many party codes a user may look up in one window: MAX_PARTY_CODE_LOOKUPS in the app.
+    function maxPartyCodeLookups() {
+      return 10;
+    }
+
+    function partyCodeLookup(uid) {
+      return /databases/$(database)/documents/party_code_lookups/$(uid);
+    }
+
+    // [data] starts a new hour of lookups with the party code it names.
+    function startsPartyCodeLookups(data) {
+      return data.keys().hasOnly(['code', 'count', 'windowStart'])
+          && isPartyCode(data.code)
+          && data.count == 1
+          && data.windowStart == request.time;
+    }
+
+    // [after] counts one more lookup than [before], within its hour and the limit.
+    function countsPartyCodeLookup(before, after) {
+      return after.keys().hasOnly(['code', 'count', 'windowStart'])
+          && isPartyCode(after.code)
+          && after.windowStart == before.windowStart
+          && after.count == before.count + 1
+          && after.count <= maxPartyCodeLookups();
+    }
+
     // The reservation [data], created as [reservationId], has a party code written in the same
     // batch that leads back to it. Reservations created before party codes have none.
     function hasOwnPartyCode(data, reservationId) {
@@ -367,12 +400,23 @@ service cloud.firestore {
               || request.resource.data.get('role', null) == resource.data.role);
     }
 
+    // A phone's FCM token is the document id, so Cloud Functions know where to notify the user.
+    // Only the user saves and deletes their own; nobody reads them from the app, since the
+    // functions use the admin SDK. updatedAt is the server's time of the last save.
+    match /users/{uid}/tokens/{token} {
+      allow create, update: if isUser(uid)
+          && request.resource.data.keys().hasAll(['updatedAt'])
+          && request.resource.data.keys().hasOnly(['updatedAt'])
+          && request.resource.data.updatedAt == request.time;
+      allow delete: if isUser(uid);
+    }
+
     // One venue per account: the document id is the owner's uid, and the owner is a venue account.
     match /venues/{ownerUid} {
       allow read: if signedIn();
       allow create, update: if isUser(ownerUid)
           && hasRole('VENUE')
-          && isValidVenue(request.resource.data);
+          && isValidVenue(request.resource.data, ownerUid);
       allow delete: if isUser(ownerUid) && hasRole('VENUE');
     }
 
@@ -481,12 +525,14 @@ service cloud.firestore {
     }
 
     // A party code, under its id, leads to its reservation, so an explorer who was given the code
-    // can find the reservation to join. Anyone signed in may get a code they know, but nobody
-    // lists them. It is created only in one batch with its reservation, by the reservation's
-    // creator, and never changes: writing a code that is taken is an update, which is refused, so
-    // codes stay unique.
+    // can find the reservation to join. Anyone signed in may get a code they counted in their
+    // party_code_lookups document first, so nobody finds parties by trying codes; nobody lists
+    // them. It is created only in one batch with its reservation, by the reservation's creator, and
+    // never changes: writing a code that is taken is an update, which is refused, so codes stay
+    // unique.
     match /party_codes/{code} {
-      allow get: if signedIn();
+      // A missing lookups document makes get() fail, which denies
+      allow get: if signedIn() && get(partyCodeLookup(request.auth.uid)).data.code == code;
       allow create: if signedIn()
           && isPartyCode(code)
           && request.resource.data.keys().hasOnly(['reservationId'])
@@ -494,6 +540,21 @@ service cloud.firestore {
           && !exists(reservation(request.resource.data.reservationId))
           && getAfter(reservation(request.resource.data.reservationId)).data.get('partyCode', null)
               == code;
+    }
+
+    // The party codes a user looked up, under their uid: the last one, which party_codes lets
+    // them get, and how many they looked up in the window that began at windowStart, at most
+    // maxPartyCodeLookups (#542). Each new code counts one more; once an hour has passed since
+    // windowStart, a lookup may start a new window at the server's time. That is about 10 an hour
+    // on average, and up to 20 within an hour around a new window. Only its user reads and writes
+    // it; never deleted, so deleting it can't reset the count.
+    match /party_code_lookups/{uid} {
+      allow get: if isUser(uid);
+      allow create: if isUser(uid) && startsPartyCodeLookups(request.resource.data);
+      allow update: if isUser(uid)
+          && (countsPartyCodeLookup(resource.data, request.resource.data)
+              || (request.time >= resource.data.windowStart + duration.value(1, 'h')
+                  && startsPartyCodeLookups(request.resource.data)));
     }
 
     // One completion per reservation, under the reservation's id: one proof for the whole party.

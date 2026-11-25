@@ -1,4 +1,6 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import androidx.activity.compose.BackHandler
@@ -40,6 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -153,9 +156,11 @@ private fun CodeField(
     onCodeChange: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
+  // The label is a separate Text, so TalkBack gets it as the field's name
+  val label = stringResource(R.string.join_party_code_label)
   Column(verticalArrangement = Arrangement.spacedBy(AroundSpacing.Small)) {
     Text(
-        stringResource(R.string.join_party_code_label),
+        label,
         style = AroundTextStyles.FieldLabel,
         color = MaterialTheme.colorScheme.onBackground,
     )
@@ -163,7 +168,10 @@ private fun CodeField(
         value = state.code,
         onValueChange = onCodeChange,
         modifier =
-            Modifier.fillMaxWidth().heightIn(min = FIELD_MIN_HEIGHT).testTag(C.Tag.JOIN_PARTY_CODE),
+            Modifier.fillMaxWidth()
+                .heightIn(min = FIELD_MIN_HEIGHT)
+                .testTag(C.Tag.JOIN_PARTY_CODE)
+                .semantics { contentDescription = label },
         enabled = state.join == JoinPartyUiState.Join.IDLE,
         isError = state.lookup is JoinPartyUiState.Lookup.Refused,
         singleLine = true,
@@ -236,6 +244,7 @@ private fun ErrorLine(error: JoinPartyUiState.Error) {
         JoinPartyUiState.Error.Closed -> stringResource(R.string.join_party_closed)
         JoinPartyUiState.Error.AlreadyJoined -> stringResource(R.string.join_party_already_joined)
         JoinPartyUiState.Error.Left -> stringResource(R.string.join_party_left)
+        JoinPartyUiState.Error.TooManyTries -> stringResource(R.string.join_party_too_many_tries)
         JoinPartyUiState.Error.Offline -> stringResource(R.string.join_party_offline)
         JoinPartyUiState.Error.Failed -> stringResource(R.string.join_party_failed)
       }

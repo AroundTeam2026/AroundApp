@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchReposi
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.common.boundsWithin
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -407,9 +408,9 @@ class CreateQuestViewModelTest {
   }
 
   @Test
-  fun partySizeHasNoUpperLimit() {
-    repeat(20) { viewModel.incrementPartySize() }
-    assertEquals(QuestLimits.MIN_PARTY_SIZE + 20, state.minPartySize)
+  fun partySizeStopsAtMaxPartySize() {
+    repeat(MAX_PARTY_SIZE + 1) { viewModel.incrementPartySize() }
+    assertEquals(MAX_PARTY_SIZE, state.minPartySize)
   }
 
   @Test

@@ -42,9 +42,8 @@ class FakeCompletionRepository(private val now: () -> Long = System::currentTime
    * returns [WriteConfirmation.CONFIRMED], as a server that answers at once would. To test a submit
    * the server hasn't confirmed, wrap this fake in a [CompletionRepository] whose `submit` maps the
    * result to [WriteConfirmation.QUEUED]. A pending or rejected one already stored there is
-   * replaced, as a new proof.
-   * Returns [forcedFailure] instead, storing nothing, if it is set, and an [IllegalStateException],
-   * changing nothing, if the one stored there is approved.
+   * replaced, as a new proof. Returns [forcedFailure] instead, storing nothing, if it is set, and
+   * an [IllegalStateException], changing nothing, if the one stored there is approved.
    */
   override suspend fun submit(
       reservationId: String,

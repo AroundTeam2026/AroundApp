@@ -126,4 +126,7 @@ private class OnlyObserveVenue(private val venues: FakeVenueRepository) : VenueR
   ) = venues.setArea(venueId, location, radiusMeters, address)
 
   override suspend fun setName(venueId: String, name: String) = venues.setName(venueId, name)
+
+  override suspend fun setPicture(venueId: String, pictureUrl: String?) =
+      venues.setPicture(venueId, pictureUrl)
 }

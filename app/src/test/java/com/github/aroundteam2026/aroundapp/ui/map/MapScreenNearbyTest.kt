@@ -10,14 +10,20 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeWithVelocity
@@ -29,7 +35,12 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.location.FakeLocationRepository
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeRefusedWritesStore
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.RecordedWrite
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
+import com.github.aroundteam2026.aroundapp.model.reservation.WriteState
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -161,7 +172,7 @@ class MapScreenNearbyTest {
     node(C.Tag.NEARBY_BUTTON).assertDoesNotExist()
     // The map's nearby quests: without the location, every valid quest, by venue name
     node(C.Tag.NEARBY_COUNTER)
-        .assertTextEquals(context.getString(R.string.map_nearby_by_name, 1, 2))
+        .assertTextEquals(nearbyHeader(context, 2, context.getString(R.string.map_nearby_by_name)))
     node(C.Tag.NEARBY_LOCATION_HINT).assertIsDisplayed()
   }
 
@@ -182,7 +193,9 @@ class MapScreenNearbyTest {
     openNearby()
 
     node(C.Tag.NEARBY_COUNTER)
-        .assertTextEquals(context.getString(R.string.map_nearby_closest_first, 1, 2))
+        .assertTextEquals(
+            nearbyHeader(context, 2, context.getString(R.string.map_nearby_closest_first))
+        )
     node(C.Tag.NEARBY_LOCATION_HINT).assertDoesNotExist()
   }
 
@@ -191,21 +204,21 @@ class MapScreenNearbyTest {
     show()
     openNearby()
 
-    node(C.Tag.NEARBY_SHOW_ON_MAP).performClick()
+    // Without the location the quests go by venue name, so the first card is the bar's
+    composeTestRule.inQuest("bar-1", C.Tag.NEARBY_SHOW_ON_MAP).performClick()
     composeTestRule.waitForIdle()
 
     assertOverlayClosed()
-    // Without the location the quests go by venue name, so the first page is the bar's
     assertEquals("bar", viewModel.uiState.value.selectedPinKey)
   }
 
   @Test
-  fun tappingAPageOpensItsQuestsDetailsAndKeepsTheOverlay() {
+  fun tappingACardOpensItsQuestsDetailsAndKeepsTheOverlay() {
     val opened = mutableListOf<Pair<String, String>>()
     show(onOpenQuest = { venueId, questId -> opened += venueId to questId })
     openNearby()
 
-    node(C.Tag.NEARBY_PAGE).performClick()
+    composeTestRule.inQuest("bar-1", C.Tag.NEARBY_CARD).performClick()
     composeTestRule.waitForIdle()
 
     assertEquals(listOf("bar" to "bar-1"), opened)
@@ -214,7 +227,7 @@ class MapScreenNearbyTest {
   }
 
   @Test
-  fun withoutAnAcceptViewModelThePagesOfferNoAccept() {
+  fun withoutAnAcceptViewModelTheCardsOfferNoAccept() {
     show()
     openNearby()
 
@@ -222,7 +235,7 @@ class MapScreenNearbyTest {
   }
 
   @Test
-  fun acceptOnAPageBooksItsQuestAndSaysItIsAccepted() {
+  fun acceptOnACardBooksItsQuestAndSaysItIsAccepted() {
     val reservations = FakeReservationRepository({ 0L })
     val accept =
         NearbyAcceptViewModel(
@@ -230,19 +243,105 @@ class MapScreenNearbyTest {
             testUsers(EXPLORER),
             EXPLORER,
             FakeConnectivityRepository(),
+            refusedWrites = fakeRefusedWrites(),
         )
     show(acceptViewModel = accept)
     openNearby()
 
-    composeTestRule.onNodeWithTag(C.Tag.NEARBY_ACCEPT).performClick()
+    composeTestRule.inQuest("bar-1", C.Tag.NEARBY_ACCEPT).performClick()
     composeTestRule.waitUntil { accept.uiState.value.statusOf("bar-1") == AcceptStatus.ACCEPTED }
 
-    // Without the location the quests go by venue name, so the first page is the bar's
     composeTestRule
-        .onNodeWithTag(C.Tag.NEARBY_ACCEPT)
+        .inQuest("bar-1", C.Tag.NEARBY_ACCEPT)
         .assertTextEquals(context.getString(R.string.accept_quest_accepted_short))
     // The quests stay open, so the explorer can go on to the next one
     node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+  }
+
+  // The write was queued, the app was killed, and the server refused it once it was back online
+  @Test
+  fun aRefusalFromBeforeARestartIsToldOnceOnTheMap() {
+    val remembered =
+        FakeRefusedWritesStore().apply { put(RecordedWrite("r1", "bar-1", WriteState.REFUSED)) }
+    val accept =
+        NearbyAcceptViewModel(
+            FakeReservationRepository({ 0L }),
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+            refusedWrites = RefusedWrites(remembered),
+        )
+
+    show(acceptViewModel = accept)
+
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
+        .assertIsDisplayed()
+    // Kept while it shows, and cleared once it is gone, so a recreated map doesn't say it again
+    assertTrue(accept.uiState.value.refusalNotice)
+    composeTestRule.mainClock.advanceTimeBy(SNACKBAR_LONG_ENOUGH_MS)
+    composeTestRule.waitForIdle()
+    assertFalse(accept.uiState.value.refusalNotice)
+    assertFalse(RefusedWrites(remembered).hasUnreportedRefusal)
+  }
+
+  // Rotating the phone or leaving the map cancels the snackbar: the explorer must still be told
+  @Test
+  fun aRefusalIsNotMarkedToldIfTheMapLeavesBeforeItWasShownThrough() {
+    val remembered =
+        FakeRefusedWritesStore().apply { put(RecordedWrite("r1", "bar-1", WriteState.REFUSED)) }
+    val accept =
+        NearbyAcceptViewModel(
+            FakeReservationRepository({ 0L }),
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+            refusedWrites = RefusedWrites(remembered),
+        )
+    val dialog =
+        PermissionDialog(mapOf(ACCESS_FINE_LOCATION to false, ACCESS_COARSE_LOCATION to false))
+    var onMap by mutableStateOf(true)
+    composeTestRule.setContent {
+      CompositionLocalProvider(LocalActivityResultRegistryOwner provides dialog) {
+        if (onMap) {
+          MapScreen(
+              viewModel,
+              onFocusQuest = { _, _ -> },
+              onOpenQuest = { _, _ -> },
+              acceptViewModel = accept,
+              showOfflineBanner = false,
+          )
+        }
+      }
+    }
+    composeTestRule.waitForIdle()
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
+        .assertIsDisplayed()
+
+    onMap = false
+    composeTestRule.waitForIdle()
+
+    assertTrue(accept.uiState.value.refusalNotice)
+    assertTrue(RefusedWrites(remembered).hasUnreportedRefusal)
+  }
+
+  @Test
+  fun withoutARefusalTheMapSaysNothing() {
+    val accept =
+        NearbyAcceptViewModel(
+            FakeReservationRepository({ 0L }),
+            testUsers(EXPLORER),
+            EXPLORER,
+            FakeConnectivityRepository(),
+            refusedWrites = fakeRefusedWrites(),
+        )
+
+    show(acceptViewModel = accept)
+
+    composeTestRule
+        .onNodeWithText(context.getString(R.string.accept_quest_refused_notice))
+        .assertDoesNotExist()
   }
 
   @Test
@@ -331,6 +430,117 @@ class MapScreenNearbyTest {
   }
 
   @Test
+  fun aSlowDragDownOnTheListAtItsTopClosesTheOverlay() {
+    show()
+    openNearby()
+    val overlay = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot()
+
+    // The list has nothing above to scroll to, so the overlay takes the drag as from the grabber
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeDown(
+          startY = top + 10.dp.toPx(),
+          endY = top + 10.dp.toPx() + ((overlay.bottom - overlay.top) / 2).toPx(),
+          durationMillis = 1_000,
+      )
+    }
+    composeTestRule.waitForIdle()
+
+    assertOverlayClosed()
+  }
+
+  @Test
+  fun aShortFastFlingDownOnTheListClosesTheOverlay() {
+    show()
+    openNearby()
+
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeWithVelocity(
+          start = center,
+          end = center.copy(y = centerY + 40.dp.toPx()),
+          endVelocity = 1_500.dp.toPx(),
+      )
+    }
+    composeTestRule.waitForIdle()
+
+    assertOverlayClosed()
+  }
+
+  @Test
+  fun aShortDragDownOnTheListLeavesTheOverlayOpen() {
+    show()
+    openNearby()
+    val top = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeDown(startY = centerY, endY = centerY + 20.dp.toPx(), durationMillis = 1_000)
+    }
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+  }
+
+  @Test
+  fun aDragDownOnAScrolledListScrollsItBackBeforeMovingTheOverlay() {
+    // Enough quests that the list has far more than the drag to scroll back
+    quests.value = (1..5).map { testQuest(id = "cafe-$it", venueId = "cafe") }
+    show()
+    openNearby()
+    val top = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    node(C.Tag.NEARBY_LIST).performScrollToIndex(4)
+
+    // Checked with the finger still down, before a short drag would spring back
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      down(center)
+      moveBy(Offset(0f, 30.dp.toPx()))
+    }
+    composeTestRule.waitForIdle()
+
+    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    node(C.Tag.NEARBY_LIST).performTouchInput { up() }
+  }
+
+  @Test
+  fun aDragBackUpOnTheListReturnsTheOverlayFirst() {
+    show()
+    openNearby()
+    val top = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      down(center)
+      moveBy(Offset(0f, 60.dp.toPx()))
+      moveBy(Offset(0f, -60.dp.toPx()))
+    }
+    composeTestRule.waitForIdle()
+
+    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    node(C.Tag.NEARBY_LIST).performTouchInput { up() }
+  }
+
+  @Test
+  fun aFlingThatScrollsTheListBackToItsTopLeavesTheOverlayOpen() {
+    quests.value = (1..5).map { testQuest(id = "cafe-$it", venueId = "cafe") }
+    show()
+    openNearby()
+    val overlayTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    node(C.Tag.NEARBY_LIST).performScrollToIndex(4)
+
+    // The finger stops short of the top and the fling carries the list past it, but only a
+    // finger drags the overlay
+    node(C.Tag.NEARBY_LIST).performTouchInput {
+      swipeWithVelocity(
+          start = center.copy(y = top + 10.dp.toPx()),
+          end = center.copy(y = top + 130.dp.toPx()),
+          endVelocity = 2_500.dp.toPx(),
+      )
+    }
+    composeTestRule.waitForIdle()
+
+    node(C.Tag.NEARBY_OVERLAY).assertIsDisplayed()
+    assertDpEquals("overlay top", overlayTop, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+  }
+
+  @Test
   fun theMapHasNoZoomButtonsForThePillToCover() {
     // They sit in the pill's corner; pinching and double-tapping still zoom, as in Figma
     assertFalse(mapUiSettings(showsUserLocation = true).zoomControlsEnabled)
@@ -383,5 +593,8 @@ class MapScreenNearbyTest {
 
   private companion object {
     const val EXPLORER = "explorer"
+
+    /** Longer than a snackbar stays up. */
+    const val SNACKBAR_LONG_ENOUGH_MS = 10_000L
   }
 }

@@ -30,8 +30,27 @@ interface ProofUploadQueue {
 
   /**
    * The ids of the reservations whose photo proof is waiting to upload: the current ones on
-   * collection, then each change. A reservation leaves once its proof is submitted, or once its
-   * upload stops for good.
+   * collection, then each change. A reservation leaves once its proof is submitted, once its upload
+   * stops for good, or once it is [cancel]led.
    */
   val waiting: Flow<Set<String>>
+
+  /**
+   * Cancels [reservationId]'s waiting proof, if any, and deletes its copy, for a reservation
+   * cancelled or whose party the explorer left, since the rules would refuse its upload (#625).
+   *
+   * @param reservationId id of the reservation whose proof to cancel.
+   * @return success once no proof of [reservationId] is waiting, including when none was, or the
+   *   failure that kept it from being cancelled.
+   */
+  suspend fun cancel(reservationId: String): Result<Unit>
+
+  /**
+   * Cancels every waiting proof and deletes their copies, e.g. at sign-out: each keeps the uid of
+   * the explorer who queued it, so after a sign-out the rules would refuse its upload (#626).
+   *
+   * @return success once no proof is waiting, including when none was, or the failure that kept
+   *   them from being cancelled.
+   */
+  suspend fun cancelAll(): Result<Unit>
 }

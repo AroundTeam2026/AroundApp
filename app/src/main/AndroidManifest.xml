@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- The connectivity repository reads the default network. Granted at install, never asked. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Notifications (#629). Android 13 and later ask for it after sign-in (#635); older versions
+         grant it at install. Without it declared, Android never shows its dialog. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Phones without a camera can still install the app and pick a proof from the gallery -->
     <uses-feature
         android:name="android.hardware.camera"

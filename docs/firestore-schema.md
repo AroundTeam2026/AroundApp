@@ -10,7 +10,7 @@ This doc describes what the code on `main` does. A change to a collection update
 - Domain models use our own `Location(lat: Double, lng: Double)`, never `GeoPoint` or `LatLng`. In Firestore a location is stored as a `GeoPoint`; the conversion happens inside the Firestore repository implementations.
 - Times are `Long` epoch milliseconds in the Kotlin models and `Timestamp` in Firestore (`createdAt`, `updatedAt`, `slotStart`, `submittedAt`, `reward.expiresAt`). The conversion happens inside the Firestore implementations.
 - Enum values are stored as their upper-case names (`EXPLORER`, `PENDING`, ...).
-- A document's id is not stored as a field. For `users` it is the uid, for `venues` the owner's uid and for `party_user` `{reservationId}_{uid}`, whose parts are also stored as fields so queries can filter on them, and for `party_codes` the code itself; for the other collections it is a Firestore auto id.
+- A document's id is not stored as a field. For `users` it is the uid, for `venues` the owner's uid and for `party_user` `{reservationId}_{uid}`, whose parts are also stored as fields so queries can filter on them, for `party_codes` the code itself, for `party_code_lookups` the uid, and for `users/{uid}/tokens` the FCM token; for the other collections it is a Firestore auto id.
 - Fields marked `?` are optional: they are omitted when null.
 
 ## Collections
@@ -26,6 +26,16 @@ This doc describes what the code on `main` does. A change to a collection update
 
 No email: Firebase Auth already has it. Signed-in users can get a profile by uid to display its name and picture, but cannot list the users collection; only the owner can write a profile.
 
+### `users/{uid}/tokens/{token}`
+
+One document per phone the user `uid` is signed in on, so Cloud Functions know where to send their notifications (#633). The document id is the phone's Firebase Cloud Messaging token, which `sendToUser` in `functions/src/notify.ts` reads with the admin SDK; it deletes the documents of tokens FCM reports gone.
+
+| Field | Type | Notes |
+|---|---|---|
+| `updatedAt` | timestamp | The server's time of the last save (`FieldValue.serverTimestamp()`), so stale tokens can be found. |
+
+The app saves its token again whenever it gets one, which only moves `updatedAt`, and deletes it at sign-out. Only the user saves and deletes their own tokens; nobody reads them from the app.
+
 ### `venues/{ownerUid}`
 
 | Field | Type | Notes |
@@ -36,6 +46,7 @@ No email: Firebase Auth already has it. Signed-in users can get a profile by uid
 | `address` | string? | |
 | `createdAt` | timestamp | |
 | `featuredQuestId` | string? | Quest the venue wants shown first. Not checked against the venue's quests. |
+| `pictureUrl` | string? | Cloud Storage location (`gs://...`) under this venue's `venue-pictures/{venueId}/`; omitted until set. At most 2,000 characters. |
 
 One venue per account in v1, so the document id is the owner's uid.
 
@@ -108,7 +119,21 @@ A short code that leads to one reservation, so its creator can give it to friend
 
 A code is created in one batch with its reservation and never changes. Writing a code that is already taken is refused, so codes stay unique. When the server refuses a new reservation and its code's document exists, the repository draws another code and writes the batch again under a new id, at most 5 codes in all (`MAX_PARTY_CODE_ATTEMPTS`). A reservation created offline can't be retried: if its code turns out to be taken once it is sent, the server refuses it and it is lost, which with about 887 million codes is rare.
 
-The app finds a reservation by its code (`findReservationIdByCode`) in capitals and without spaces, so `7kq m42` finds `7KQM42`, and only from the server: offline, the lookup fails rather than reporting an unknown code. Before joining, the app reads the reservation by that id (`getPartyPreview`), also only from the server, with its `joinedCount`: an explorer outside the party can't read the memberships.
+The app finds a reservation by its code (`findReservationIdByCode`) in capitals and without spaces, so `7kq m42` finds `7KQM42`, and only from the server: offline, the lookup fails rather than reporting an unknown code. Each lookup is counted first in the explorer's [`party_code_lookups`](#party_code_lookupsuid) document, which the rules require to read the code, so nobody looks up more than 10 codes in a window of at least an hour; past that, the lookup fails with `TooManyPartyCodeLookupsException` and the Join a party screen says to try again in an hour. Before joining, the app reads the reservation by that id (`getPartyPreview`), also only from the server, with its `joinedCount`: an explorer outside the party can't read the memberships.
+
+### `party_code_lookups/{uid}`
+
+How many party codes the user `uid` looked up, so nobody can find parties by trying codes (#542). The rules let a user get a party code only while it is the `code` of their own lookups document.
+
+| Field | Type | Notes |
+|---|---|---|
+| `code` | string | The party code looked up last. |
+| `count` | number | How many codes were looked up in the window that began at `windowStart`, from 1 to 10 (`MAX_PARTY_CODE_LOOKUPS`). |
+| `windowStart` | timestamp | The server's time of the window's first lookup (`FieldValue.serverTimestamp()`). |
+
+Each lookup writes its code with `count` one higher, in a transaction so lookups at the same time all count. After 10, the next lookup starts a new window at `count` 1, which the rules refuse until an hour has passed since `windowStart`. The window is fixed, not sliding: that is about 10 lookups an hour on average, but up to 20 within an hour around a new window, e.g. 9 at 12:59 in a window that began at 12:00 and 10 more from 13:00. A user reads and writes only their own document, and never deletes it, so the count can't be reset.
+
+Creating a reservation counts a lookup too whenever the rules refuse it: they don't say why, so the repository reads its code to check whether it was taken. A refusal for another reason, e.g. a quest that is no longer `ACTIVE`, costs one lookup that way. A creator with no lookups left gets the refusal itself, not `TooManyPartyCodeLookupsException`.
 
 ### `completions/{reservationId}`
 
@@ -165,14 +190,16 @@ Every create and update must match its collection's table above: only the listed
 | Collection | Read | Write |
 |---|---|---|
 | `users` | Only the owner | The owner creates and updates it; `role` must be null, `EXPLORER` or `VENUE`, and can't change once set. No delete. |
+| `users/{uid}/tokens` | Nobody, from the app: the functions read them with the admin SDK. | Only the user `uid` saves and deletes them, with `updatedAt` the server's time. |
 | `venues` | Any signed-in user | Only the owner (document id is their uid), whose `users` document has role `VENUE`. |
 | `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
 | `reservations` | An explorer may get a reservation whose id they know, so one given a party code can see its quest, status and `joinedCount` before joining. The app also listens to a reservation it just created before the server has it. A venue gets its own reservations, and only it lists them. Anyone signed in may read an id that has no reservation. | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one in the same batch as their own `JOINED` membership, joined at its `createdAt`, and the `party_codes` document of its `partyCode`, carrying their profile's `displayName` as `explorerName`, with a `joinedCount` of 1, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards `status` changes along an allowed transition: the venue makes any of them from `PENDING`, approving only a party of the [size](#party-size) its quest asks for, and its creator, the member joined at its `createdAt`, can only cancel, until the party sends its proof, whatever its status; the other members withdraw from the party instead (#536). `joinedCount` changes alone, by 1, in the same batch as the user's own membership joining or withdrawing. No delete. |
 | `party_user` | The party's members, `WITHDRAWN` ones too, so a member who withdrew still sees who else was in the party, and the reservation's venue. Anyone signed in may list the party of a reservation that doesn't exist, which is empty, for the same reason. | An explorer, whose `users` document has role `EXPLORER`, creates their own `JOINED` membership, under the id `{reservationId}_{uid}`, for a `PENDING` reservation whose party is below its [capacity](#party-size), joined at another time than the reservation's `createdAt`, adding 1 to its `joinedCount` in the same batch. Afterwards only the member changes it, from `JOINED` to `WITHDRAWN`, along with `updatedAt`, taking 1 off `joinedCount` in the same batch, while the reservation is `PENDING` or `APPROVED`, before the party sends its proof, and never the creator. No delete. |
-| `party_codes` | Anyone signed in may get a code they know; nobody lists them. | Created only in the same batch as the reservation whose `partyCode` it is, with `reservationId` alone. Never updated or deleted. |
+| `party_codes` | Anyone signed in may get the code their `party_code_lookups` document names; nobody lists them. | Created only in the same batch as the reservation whose `partyCode` it is, with `reservationId` alone. Never updated or deleted. |
+| `party_code_lookups` | Only its user. | Only its user: created with `count` 1 and `windowStart` the server's time, then each update counts one more with any party code, up to 10, or once an hour has passed since `windowStart` starts a new window at 1. No delete. |
 | `completions` | The explorer who submitted it, the party's `JOINED` members and its venue. Anyone signed in may read an id that has no completion, so an answer to an unknown id can report it. | Any `JOINED` member of an `APPROVED` reservation creates the party's, as themselves in `explorerUid`, `PENDING` and without a `rejectReason`, under the reservation's id, repeating the reservation's `venueId`, with the proof its quest's `proofType` asks for. A `JOINED` member of the reservation can replace a `PENDING` or `REJECTED` one with a new proof of the same shape: `PENDING`, without a `rejectReason`, as themselves in `explorerUid`, for the same reservation and venue and the proof its quest asks for; an `APPROVED` one can't be replaced. Apart from that only the venue changes it: a `PENDING` one to `REJECTED`, changing only `status` and `rejectReason`, and a `PENDING` or `REJECTED` one to `APPROVED`, changing only `status` and removing any `rejectReason`. `APPROVED` is final. No delete. |
 
-Joining a party needs only its reservation's id, and a `JOINED` membership lets the explorer read the reservation. So an explorer who learns the id of someone else's `PENDING` reservation can join that party, though not cancel it: only its creator cancels (#536). Ids are random and only shown to the party and the venue, so this rests on them staying private. A party code leads to its reservation's id, and is much shorter and easier to guess than an id, so it weakens this: anyone signed in who guesses a code can join that party. An invite check, e.g. when parties get companions, would close it. Any explorer can also read a reservation they know the id of, so its `explorerName`, `status` and `joinedCount` are no more private than the id or the party code that leads to it. Other venues can't.
+Joining a party needs only its reservation's id, and a `JOINED` membership lets the explorer read the reservation. So an explorer who learns the id of someone else's `PENDING` reservation can join that party, though not cancel it: only its creator cancels (#536). Ids are random and only shown to the party and the venue, so this rests on them staying private. A party code leads to its reservation's id, and is much shorter and easier to guess than an id, so each user may look up 10 codes per window of at least an hour, about 10 an hour on average (see [`party_code_lookups`](#party_code_lookupsuid)): with about 887 million codes and a thousand pending parties, one account trying codes finds a party about once in 10 years, though many accounts find one sooner. Anyone given a code can still join its party; an invite check, e.g. when parties get companions, would close that. Any explorer can also read a reservation they know the id of, so its `explorerName`, `status` and `joinedCount` are no more private than the id or the party code that leads to it. Other venues can't.
 
 ## Cloud Storage
 
@@ -182,8 +209,74 @@ From `storage.rules`. Anything not listed is denied, including listing, overwrit
 |---|---|---|
 | `proofs/{reservationId}/{photoId}` | The reservation's party's `JOINED` members and its venue | A `JOINED` member of the reservation creates it while the reservation is `APPROVED`: an image (`image/*`) under 5 MB. Each photo gets a new `photoId`, so a retake never replaces an earlier one. |
 | `user-pictures/{uid}/{photoId}` | Signed-in users | Only `uid` creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
+| `venue-pictures/{venueId}/{photoId}` | Signed-in users | Only the venue's owner (`venueId` is their uid), once the venue exists, creates an image under 5 MB. Each change creates a new photo; nobody overwrites or deletes one. |
 
 The rules read the reservation and the membership from Firestore, so a proof follows the same party as `reservations`. A completion's `photoUrl` points to its photo here.
+
+## Planned: party and venue chat (E42)
+
+Not built yet: this section is the plan from #645, following the designs of #644. The chat's model, repository and rules update the tables above when they land, and this section goes.
+
+A reservation's party and its venue get one chat, to say they're running late or to ask a question before the visit. A chat only inside the party comes later.
+
+### `chats/{reservationId}/messages/{messageId}`
+
+One document per message, under an auto id. Messages are never edited or deleted.
+
+| Field | Type | Notes |
+|---|---|---|
+| `senderUid` | string | The sender: a member of the party or the venue owner. |
+| `senderRole` | `EXPLORER` or `VENUE` | `VENUE` exactly when `senderUid` is the reservation's `venueId`. The app shows a "Venue" tag on those messages. |
+| `text` | string | Not blank, at most 1000 characters. |
+| `sentAt` | timestamp | The server's time when it was written (`request.time`), so every phone sees the same order. |
+
+No sender name is copied here: the app reads a member's name and picture from `users/{uid}` and the venue's name from `venues/{venueId}`, so they never go stale (see the venue fields in [Decided changes](#decided-changes)).
+
+### `chats/{reservationId}`
+
+A summary of the chat, for the venue's list of chats and the last message shown in it. The id is the reservation's. Only a Cloud Function writes it, each time a message is created and when the reservation is cancelled; the app only reads it. Until that function is deployed (see the README), no summary is written and the venue's list stays empty.
+
+| Field | Type | Notes |
+|---|---|---|
+| `venueId` | string | The reservation's `venueId`, so a venue can list its chats. |
+| `lastMessageText` | string | The latest message's `text`. |
+| `lastSenderUid` | string | The latest message's `senderUid`. |
+| `lastMessageAt` | timestamp | The latest message's `sentAt`. The venue's list shows the newest first. |
+| `closesAt` | timestamp | When the chat [closes](#when-the-chat-closes). When the reservation is cancelled, the function sets it to the time of the cancellation, so the chat leaves the venue's list at once. |
+
+A chat without messages has no summary yet.
+
+### `chats/{reservationId}/reads/{uid}`
+
+When each person last read the chat, for the unread counts on the Quests tab, the Messages tab and the venue's Dashboard.
+
+| Field | Type | Notes |
+|---|---|---|
+| `lastReadAt` | timestamp | The server's time (`request.time`) when the user last had the chat open. |
+
+The unread count is the number of messages whose `sentAt` is after `lastReadAt`, or all of them without a `reads` document. The app counts them with a listener on that query, limited to 100 and shown as "99+" above 99, not with a count query: a count query needs the server and doesn't update live, while a listener updates as messages arrive and offline counts the cached messages. Sending a message also moves the sender's `lastReadAt` to now, in the same batch, so their own messages never count as unread.
+
+### Who can read and write
+
+| Path | Read | Write |
+|---|---|---|
+| `chats/{reservationId}/messages` | The reservation's `JOINED` members and its venue. A member who withdrew left the party and its chat. | The same people create a message as themselves (`senderUid`, and `senderRole` matching it) while the chat is open. No update or delete. |
+| `chats/{reservationId}` | The same people; a venue lists its open chats with `venueId == uid` and `closesAt` after now, ordered by `closesAt` (Firestore needs the first ordering on the range field), and the app sorts them by `lastMessageAt`. | Nobody: only the Cloud Function writes it. |
+| `chats/{reservationId}/reads/{uid}` | Only `uid` | Only `uid`, while they can read the chat, with `lastReadAt` set to `request.time`. |
+
+Checking a new message reads the reservation and, for an explorer, their `party_user` membership: at most 2 document reads.
+
+### When the chat closes
+
+The chat is open while the reservation is `APPROVED` and until its closing time. It never opens for a `PENDING` reservation, so the app shows no Messages tab before the venue approves.
+
+Once the reservation is cancelled or the closing time has passed, the chat is read-only: its messages stay readable in Quest details, and the venue's list only shows open chats (`closesAt` after now). A time limit closes the chat of a party that never comes, which waiting for its proof wouldn't, and the rules check it from the reservation they already read.
+
+**To decide before the chat is built: the closing time.** The plan was 1 day after `slotStart`, but explorers don't pick a slot yet: `slotStart` is the time they tapped accept, so the chat could close before the venue even approves. The options:
+
+- 7 days after the venue approves, from a new `approvedAt` on the reservation set on approval. Doesn't depend on slots; needs a rules change.
+- 7 days after `createdAt`. No new field, but a venue that approves late leaves the party less time.
+- 1 day after `slotStart`, once explorers pick a slot.
 
 ## Decided changes
 

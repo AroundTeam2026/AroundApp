@@ -11,13 +11,18 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundApp
 import com.github.aroundteam2026.aroundapp.ui.navigation.RoleNavigation
 import com.github.aroundteam2026.aroundapp.ui.navigation.VenueEntry
+import com.github.aroundteam2026.aroundapp.ui.notification.NotificationPermissionGate
 import com.github.aroundteam2026.aroundapp.ui.profile.ExplorerProfileSetupGate
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileScreen
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
@@ -30,28 +35,47 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     setContent {
       val auth = AuthRepositoryProvider.repository
-      val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(auth))
+      val proofUploadQueue = remember { ProofUploadQueueProvider.queue(applicationContext) }
+      val profile: ProfileViewModel =
+          viewModel(factory = ProfileViewModel.factory(auth, proofUploadQueue))
       val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
       val users = UserRepositoryProvider.repository
       val pictures = remember { UserPictureRepositoryProvider.repository(applicationContext) }
+      val venuePictures = remember {
+        UserPictureRepositoryProvider.venueRepository(applicationContext)
+      }
       val connectivity = remember { ConnectivityRepositoryProvider.repository(applicationContext) }
+      val notificationPrompt = remember { NotificationPromptStoreSharedPrefs(applicationContext) }
       AroundAppTheme {
         RoleNavigation(
             authRepository = auth,
             userRepository = users,
             pendingRoleStore = pendingRole,
             explorerScreen = { uid ->
-              ExplorerProfileSetupGate(uid, users, pictures, connectivity, profile::signOut) { setup
-                ->
-                AroundApp(
-                    explorerUid = uid,
-                    onSignOut = profile::signOut,
-                    profileScreen = { ProfileScreen(profile::signOut, setup, pictures) },
-                )
+              val signOut = {
+                RefusedWritesProvider.forget(applicationContext, uid)
+                profile.signOut()
+              }
+              ExplorerProfileSetupGate(uid, users, pictures, connectivity, signOut) { setup ->
+                NotificationPermissionGate(Role.EXPLORER, notificationPrompt) {
+                  AroundApp(
+                      explorerUid = uid,
+                      onSignOut = signOut,
+                      profileScreen = { ProfileScreen(signOut, setup, pictures) },
+                  )
+                }
               }
             },
             venueScreen = { uid ->
-              VenueEntry(uid, auth, VenueRepositoryProvider.repository, profile::signOut)
+              NotificationPermissionGate(Role.VENUE, notificationPrompt) {
+                VenueEntry(
+                    uid,
+                    auth,
+                    VenueRepositoryProvider.repository,
+                    profile::signOut,
+                    venuePictures,
+                )
+              }
             },
         )
       }

@@ -1,22 +1,14 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,6 +16,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardViewModel
@@ -40,6 +33,7 @@ import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
  * @param authRepository the session, used by the business-name step and the home's sign-out.
  * @param venueRepository where the venue is read and saved.
  * @param onSignOut signs the venue out when its venue can't be read.
+ * @param venuePictures stores the venue's picture.
  * @param viewModel chooses where the venue starts.
  * @param navController the venue's NavHost controller; tests pass their own to read it.
  * @param areaStep draws the area step; [defaultVenueAreaStep] unless replaced, e.g. by tests.
@@ -54,6 +48,7 @@ fun VenueEntry(
     authRepository: AuthRepository,
     venueRepository: VenueRepository,
     onSignOut: () -> Unit,
+    venuePictures: UserPictureRepository,
     viewModel: VenueEntryViewModel =
         viewModel(key = userId, factory = VenueEntryViewModel.factory(userId, venueRepository)),
     navController: NavHostController = rememberNavController(),
@@ -71,11 +66,18 @@ fun VenueEntry(
         ) {
           CircularProgressIndicator()
         }
-    VenueEntryUiState.Failed -> Failed(viewModel::onRetry, onSignOut)
+    VenueEntryUiState.Failed ->
+        RetryOrSignOut(
+            stringResource(R.string.venue_entry_failed),
+            viewModel::onRetry,
+            onSignOut,
+            Modifier.testTag(C.Tag.VENUE_ENTRY_FAILED),
+        )
     is VenueEntryUiState.Ready -> {
       VenueEntryNavigation(
           authRepository,
           venueRepository,
+          venuePictures,
           locationScreen = areaStep,
           createQuestFactory = createQuestFactory,
           venueQuestsFactory = venueQuestsFactory,
@@ -84,24 +86,6 @@ fun VenueEntry(
           start = state.start,
           navController = navController,
       )
-    }
-  }
-}
-
-/** The venue couldn't be read: try again, or sign out. */
-@Composable
-private fun Failed(onRetry: () -> Unit, onSignOut: () -> Unit) {
-  Column(
-      Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp).testTag(C.Tag.VENUE_ENTRY_FAILED),
-      verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-      horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    Text(stringResource(R.string.venue_entry_failed))
-    Button(onClick = onRetry, modifier = Modifier.testTag(C.Tag.VENUE_ENTRY_RETRY)) {
-      Text(stringResource(R.string.role_profile_retry))
-    }
-    TextButton(onClick = onSignOut, modifier = Modifier.testTag(C.Tag.VENUE_ENTRY_SIGN_OUT)) {
-      Text(stringResource(R.string.auth_sign_out))
     }
   }
 }

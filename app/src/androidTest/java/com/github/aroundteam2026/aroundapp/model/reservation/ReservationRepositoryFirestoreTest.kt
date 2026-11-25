@@ -4,8 +4,10 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_LOOKUPS
 import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepositoryFirestore
+import com.github.aroundteam2026.aroundapp.model.party.TooManyPartyCodeLookupsException
 import com.github.aroundteam2026.aroundapp.model.party.isPartyCode
 import com.github.aroundteam2026.aroundapp.model.party.newPartyCode
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -22,6 +24,7 @@ import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
 import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
@@ -343,6 +346,26 @@ class ReservationRepositoryFirestoreTest {
         assertTrue(venueRepository.observeForVenue(venueId).first().isEmpty())
       }
 
+  /**
+   * Bug (#542, review): a creator with no lookups left whose reservation the rules refuse for
+   * another reason than its code gets too many tries instead of the refusal.
+   */
+  @Test
+  fun createReservation_refusedWithNoLookupsLeft_returnsPermissionDenied() = withTimeoutBlocking {
+    writeBypassingRules(
+        "$PARTY_CODE_LOOKUPS/$explorerUid",
+        mapOf(
+            "code" to newPartyCode(),
+            "count" to MAX_PARTY_CODE_LOOKUPS,
+            "windowStart" to Timestamp.now(),
+        ),
+    )
+
+    assertPermissionDenied(
+        explorerRepository.createReservation(reservation().copy(questId = "missing"), explorerUid)
+    )
+  }
+
   /** Bug: a reservation for a quest that doesn't exist is reported as created. */
   @Test
   fun createReservation_forAMissingQuest_returnsPermissionDenied() = withTimeoutBlocking {
@@ -442,6 +465,82 @@ class ReservationRepositoryFirestoreTest {
           assertTrue("$typed: $error", error is PartyCodeNotFoundException)
           assertEquals(code, (error as PartyCodeNotFoundException).code)
         }
+      }
+
+  /**
+   * #542: past the limit within the hour, a code that exists is reported as too many tries, not
+   * found nor unknown, so trying codes can't find parties.
+   */
+  @Test
+  fun findReservationIdByCode_pastTheLimitWithinAnHour_failsWithTooManyLookups() =
+      withTimeoutBlocking {
+        val code = fetchAsVenue(createAndSync()).partyCode!!
+        repeat(MAX_PARTY_CODE_LOOKUPS) {
+          val error = explorerRepository.findReservationIdByCode(newPartyCode()).exceptionOrNull()
+          assertTrue("Lookup ${it + 1}: $error", error is PartyCodeNotFoundException)
+        }
+
+        val error = explorerRepository.findReservationIdByCode(code).exceptionOrNull()
+
+        assertTrue(
+            "Expected too many lookups but got $error",
+            error is TooManyPartyCodeLookupsException,
+        )
+      }
+
+  /**
+   * Bug (#542): an explorer at the limit stays locked out once the hour is over, instead of their
+   * next lookup starting a new hour.
+   */
+  @Test
+  fun findReservationIdByCode_atTheLimitOnceTheHourIsOver_startsANewHour() = withTimeoutBlocking {
+    val id = createAndSync()
+    val code = fetchAsVenue(id).partyCode!!
+    val twoHoursAgo = Timestamp(Timestamp.now().seconds - 2 * SECONDS_PER_HOUR, 0)
+    writeBypassingRules(
+        "$PARTY_CODE_LOOKUPS/$explorerUid",
+        mapOf(
+            "code" to newPartyCode(),
+            "count" to MAX_PARTY_CODE_LOOKUPS,
+            "windowStart" to twoHoursAgo,
+        ),
+    )
+
+    assertEquals(id, explorerRepository.findReservationIdByCode(code).getOrThrow())
+    val lookups = explorerDb.document("$PARTY_CODE_LOOKUPS/$explorerUid").get(Source.SERVER).await()
+    assertEquals(1L, lookups.getLong("count"))
+    assertTrue(lookups.getTimestamp("windowStart")!! > twoHoursAgo)
+  }
+
+  /** Bug: a lookup while signed out crashes, or reads the code without counting it. */
+  @Test
+  fun findReservationIdByCode_whileSignedOut_failsWithIllegalState() = withTimeoutBlocking {
+    val code = fetchAsVenue(createAndSync()).partyCode!!
+    val signedOut = emulatorClient(FRIEND_APP)
+    FirebaseAuth.getInstance(signedOut.app).signOut()
+
+    val error = ReservationRepositoryFirestore(signedOut).findReservationIdByCode(code)
+
+    assertTrue("${error.exceptionOrNull()}", error.exceptionOrNull() is IllegalStateException)
+  }
+
+  /**
+   * Bug (#542): a lookup the rules refuse for another reason than the limit, here checking whether
+   * a drawn code that isn't one is taken, is reported as too many tries instead of the refusal.
+   */
+  @Test
+  fun createReservation_whenTheLookupOfItsCodeIsRefused_failsWithTheRefusal() =
+      withTimeoutBlocking {
+        val error =
+            repositoryDrawing(NOT_A_PARTY_CODE)
+                .createReservation(reservation(), explorerUid)
+                .exceptionOrNull()
+
+        assertEquals(
+            "$error",
+            FirebaseFirestoreException.Code.PERMISSION_DENIED,
+            (error as? FirebaseFirestoreException)?.code,
+        )
       }
 
   /** Bug: offline, a code is reported as unknown, or found in the cache rather than the server. */
@@ -986,14 +1085,12 @@ class ReservationRepositoryFirestoreTest {
     return ReservationRepositoryFirestore(explorerDb, newCode = next::next) { FIXED_NOW }
   }
 
-  /** The reservation id the server stores for the party code [code], read as the venue. */
-  private suspend fun storedCodeTarget(code: String): String? =
-      venueDb
-          .collection(PARTY_CODES)
-          .document(code)
-          .get(Source.SERVER)
-          .await()
-          .getString("reservationId")
+  /**
+   * The reservation id the server stores for the party code [code], looked up by the venue, which
+   * counts the lookup as the rules ask before reading a code.
+   */
+  private suspend fun storedCodeTarget(code: String): String =
+      venueRepository.findReservationIdByCode(code).getOrThrow()
 
   /**
    * Reads the reservation with [id] through the venue's client, once [until] accepts it. The venue
@@ -1028,9 +1125,6 @@ class ReservationRepositoryFirestoreTest {
      * The Firestore collection the repository stores reservations in; some tests use it directly.
      */
     const val RESERVATIONS = "reservations"
-
-    /** The Firestore collection of party codes, which some tests read directly. */
-    const val PARTY_CODES = "party_codes"
 
     /** How many characters an explorer types before a space when typing a party code. */
     const val TYPED_GROUP_SIZE = 3
@@ -1070,6 +1164,11 @@ class ReservationRepositoryFirestoreTest {
 
     /** The time the test clock returns, in epoch ms; the non-zero ms catch precision loss. */
     const val FIXED_NOW = 1_700_000_000_123L
+
+    /** Each user's party code lookups, which the rules limit (#542). */
+    const val PARTY_CODE_LOOKUPS = "party_code_lookups"
+
+    const val SECONDS_PER_HOUR = 3_600L
 
     /** The size of a quest for more than one explorer, so its creator alone can't be approved. */
     const val GROUP_SIZE = 2

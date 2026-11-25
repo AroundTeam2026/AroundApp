@@ -3,9 +3,11 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_ATTEMPTS
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_LOOKUPS
 import com.github.aroundteam2026.aroundapp.model.party.PartyCodeNotFoundException
 import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
+import com.github.aroundteam2026.aroundapp.model.party.TooManyPartyCodeLookupsException
 import com.github.aroundteam2026.aroundapp.model.party.meetsPartySize
 import kotlinx.coroutines.flow.Flow
 
@@ -33,13 +35,16 @@ interface ReservationRepository {
 
   /**
    * Finds the reservation whose party code an explorer typed, in any case and with spaces, so `7kq
-   * m42` finds `7KQM42`. Asks the backend, never a cache, so a code is found only online.
+   * m42` finds `7KQM42`. Asks the backend, never a cache, so a code is found only online. The
+   * backend lets each explorer look up [MAX_PARTY_CODE_LOOKUPS] codes in a window of at least an
+   * hour.
    *
    * @param code the party code as typed.
    * @return the reservation's id, or a [PartyCodeNotFoundException] if no reservation has that code
-   *   or it is not a party code, or another failure if the backend couldn't be asked, e.g. offline.
-   *   [PartyCodeNotFoundException] is a [NoSuchElementException], which [updateStatus] also returns
-   *   for a missing reservation, so check for it first.
+   *   or it is not a party code, a [TooManyPartyCodeLookupsException] after too many lookups, or
+   *   another failure if the backend couldn't be asked, e.g. offline. [PartyCodeNotFoundException]
+   *   is a [NoSuchElementException], which [updateStatus] also returns for a missing reservation,
+   *   so check for it first.
    */
   suspend fun findReservationIdByCode(code: String): Result<String>
 

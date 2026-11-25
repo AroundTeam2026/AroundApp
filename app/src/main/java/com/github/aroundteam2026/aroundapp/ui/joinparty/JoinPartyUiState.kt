@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.joinparty
 
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewRow
@@ -56,6 +57,9 @@ data class JoinPartyUiState(
 
     /** The explorer left the party, which the rules don't let them join again. */
     data object Left : Error
+
+    /** The explorer tried too many codes in the last hour, which the backend limits. */
+    data object TooManyTries : Error
 
     /** The device is offline. */
     data object Offline : Error

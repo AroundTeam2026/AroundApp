@@ -125,10 +125,10 @@ suspend fun signInNewUser(appName: String, role: Role? = null): String {
  * Values may be strings, whole numbers, timestamps, and lists or maps of those.
  *
  * It uses the emulator's REST API, which skips the rules for the `owner` token. No client sees the
- * write until it reads from the server.
+ * write until it reads from the server. [projectId] is the project of the clients that read it.
  */
-fun writeBypassingRules(path: String, fields: Map<String, Any>) {
-  val database = "projects/$PROJECT_ID/databases/(default)"
+fun writeBypassingRules(path: String, fields: Map<String, Any>, projectId: String = PROJECT_ID) {
+  val database = "projects/$projectId/databases/(default)"
   val update =
       JSONObject().put("name", "$database/documents/$path").put("fields", restFields(fields))
   val write =
@@ -151,6 +151,33 @@ fun writeBypassingRules(path: String, fields: Map<String, Any>) {
     check(connection.responseCode == HttpURLConnection.HTTP_OK) {
       "The emulator refused the write: ${connection.errorStream?.bufferedReader()?.readText()}"
     }
+  } finally {
+    connection.disconnect()
+  }
+}
+
+/**
+ * Reads the document at [path], such as `users/abc/tokens/xyz`, on the Firestore emulator without
+ * checking firestore.rules, for tests of documents the rules let nobody read from the app.
+ *
+ * @return the document's fields in the REST API's format, e.g. `{"updatedAt": {"timestampValue":
+ *   ...}}`, or null if there is no document at [path].
+ */
+fun readBypassingRules(path: String, projectId: String = PROJECT_ID): JSONObject? {
+  val url =
+      "http://${FirebaseEmulator.HOST}:${FirebaseEmulator.FIRESTORE_PORT}" +
+          "/v1/projects/$projectId/databases/(default)/documents/$path"
+  val connection = URL(url).openConnection() as HttpURLConnection
+  try {
+    connection.setRequestProperty("Authorization", "Bearer owner")
+    connection.connectTimeout = TIMEOUT_MS.toInt()
+    connection.readTimeout = TIMEOUT_MS.toInt()
+    if (connection.responseCode == HttpURLConnection.HTTP_NOT_FOUND) return null
+    check(connection.responseCode == HttpURLConnection.HTTP_OK) {
+      "The emulator refused the read: ${connection.errorStream?.bufferedReader()?.readText()}"
+    }
+    val document = JSONObject(connection.inputStream.bufferedReader().readText())
+    return document.optJSONObject("fields") ?: JSONObject()
   } finally {
     connection.disconnect()
   }

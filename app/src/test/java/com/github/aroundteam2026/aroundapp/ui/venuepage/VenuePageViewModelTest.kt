@@ -8,7 +8,9 @@ import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.rewardExpiringAt
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testUsers
@@ -69,10 +71,12 @@ class VenuePageViewModelTest {
         party,
         FakeCompletionRepository(),
         FakeConnectivityRepository(),
+        FakeProofUploadQueue(),
         "explorer",
         clock,
         arrival,
         focus,
+        refusedWrites = fakeRefusedWrites(),
     )
   }
 
@@ -532,4 +536,6 @@ private class ScriptedVenueRepository(private val venue: Flow<Venue?>) : VenueRe
   ) = Result.success(Unit)
 
   override suspend fun setName(venueId: String, name: String) = Result.success(Unit)
+
+  override suspend fun setPicture(venueId: String, pictureUrl: String?) = Result.success(Unit)
 }

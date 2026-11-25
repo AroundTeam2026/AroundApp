@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -15,6 +16,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
@@ -114,6 +117,19 @@ class RejectProofSheetTest {
 
   private fun writeNote(note: String) {
     compose.onNodeWithTag(C.Tag.REJECT_PROOF_NOTE).performTextInput(note)
+  }
+
+  // The label is a separate Text, so TalkBack only reads it if the field carries it as its name
+  @Test
+  fun theNoteFieldIsNamedAfterItsLabel() {
+    show()
+
+    compose
+        .onNode(
+            hasContentDescription(string(R.string.reject_proof_note_label)) and hasSetTextAction()
+        )
+        .assertIsDisplayed()
+        .assert(hasTestTag(C.Tag.REJECT_PROOF_NOTE))
   }
 
   @Test
