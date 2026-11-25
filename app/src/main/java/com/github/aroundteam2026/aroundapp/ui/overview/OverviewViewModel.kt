@@ -224,9 +224,8 @@ class OverviewViewModel(
                     completions ->
                   proofSenders.observe(completions).map { completions to it }
                 },
-                proofUploadQueue.waiting,
-                proofUploadQueue.failed,
-            ) { venues, parties, (completions, senders), waiting, failed ->
+                combine(proofUploadQueue.waiting, proofUploadQueue.failed, ::QueuedProofs),
+            ) { venues, parties, (completions, senders), queued ->
               val partySizes = parties.mapValues { (_, members) -> members.count { it.isJoined } }
               val leaves = leavesPartiesOf(reservations, parties, explorerUid)
               overviewRows(
@@ -236,8 +235,7 @@ class OverviewViewModel(
                   proofsOf(completions),
                   senders,
                   leaves,
-                  waiting,
-                  failed,
+                  queued,
               )
             }
           }
@@ -321,13 +319,23 @@ internal fun proofsOf(completions: List<Completion>): Map<String, Completion> =
     }
 
 /**
+ * The photo proofs in the [ProofUploadQueue], by reservation id: those [waiting] to upload, and
+ * those that [failed] for good, with why (#624).
+ */
+internal data class QueuedProofs(
+    val waiting: Set<String> = emptySet(),
+    val failed: Map<String, UploadFailure> = emptyMap(),
+)
+
+/**
  * The rows for the [booked] reservations and their quests, in their order, with the number of
  * joined members of each party from [partySizes], where the party's proof stands from [proofs], and
  * who sent it from [senders] when another member did, all keyed by reservation id. A reservation
  * whose venue isn't among [venues], because it no longer exists, has no row. A party missing from
  * [partySizes] counts as just the explorer, who is in every party they see here. Each row's
  * [OverviewRow.leave] comes from [leaves] ([leavesPartiesOf]); a reservation missing from it has a
- * null one. A reservation among [waiting] has its photo proof waiting to upload.
+ * null one. A reservation among [queued]'s waiting ones has its photo proof waiting to upload, and
+ * one among its failed ones has a proof that wasn't sent.
  */
 internal fun overviewRows(
     booked: List<Pair<Reservation, Quest>>,
@@ -336,21 +344,22 @@ internal fun overviewRows(
     proofs: Map<String, Completion>,
     senders: Map<String, ProofSender> = emptyMap(),
     leaves: Map<String, Boolean> = emptyMap(),
-    waiting: Set<String> = emptySet(),
-    failed: Map<String, UploadFailure> = emptyMap(),
+    queued: QueuedProofs = QueuedProofs(),
 ): List<OverviewRow> {
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
     venuesById[reservation.venueId]?.let { venue ->
       // A safety net only: observeParties gives every party it is asked for
       val partySize = partySizes[reservation.id] ?: 1
-      val status = rowStatus(reservation, proofs, waiting, failed)
+      val status = rowStatus(reservation, proofs, queued)
       overviewRow(reservation, quest, venue, partySize, status)
           .copy(
               proofSender = senders[reservation.id],
               leave = leaves[reservation.id],
               proofFailure =
-                  failed[reservation.id].takeIf { status == OverviewRowStatus.PROOF_NOT_SENT },
+                  queued.failed[reservation.id].takeIf {
+                    status == OverviewRowStatus.PROOF_NOT_SENT
+                  },
           )
     }
   }
@@ -365,17 +374,16 @@ internal fun overviewRows(
 private fun rowStatus(
     reservation: Reservation,
     proofs: Map<String, Completion>,
-    waiting: Set<String>,
-    failed: Map<String, UploadFailure>,
+    queued: QueuedProofs,
 ): OverviewRowStatus {
   val proof = proofs[reservation.id]
   return when {
     reservation.pendingWrite -> OverviewRowStatus.SENDING
     reservation.status != ReservationStatus.APPROVED -> OverviewRowStatus.WAITING
-    reservation.id in waiting && proof?.status != CompletionStatus.APPROVED ->
+    reservation.id in queued.waiting && proof?.status != CompletionStatus.APPROVED ->
         OverviewRowStatus.UPLOAD_WAITING
     // Like a waiting one, a failed proof is newer than any the venue has, unless it approved one
-    reservation.id in failed && proof?.status != CompletionStatus.APPROVED ->
+    reservation.id in queued.failed && proof?.status != CompletionStatus.APPROVED ->
         OverviewRowStatus.PROOF_NOT_SENT
     proof?.pendingWrite == true -> OverviewRowStatus.SENDING
     else ->
