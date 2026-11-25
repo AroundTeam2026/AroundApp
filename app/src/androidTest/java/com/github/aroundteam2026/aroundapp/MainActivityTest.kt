@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp
 
+import android.app.NotificationManager
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -12,11 +13,17 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import com.github.aroundteam2026.aroundapp.e2e.E2E_PASSWORD
 import com.github.aroundteam2026.aroundapp.e2e.E2eRule
 import com.github.aroundteam2026.aroundapp.e2e.createAccount
 import com.github.aroundteam2026.aroundapp.e2e.signOut
 import com.github.aroundteam2026.aroundapp.e2e.submitAuthForm
+import com.github.aroundteam2026.aroundapp.model.notification.AroundNotification
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationChannelKind
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationPoster
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.screen.MainScreen
 import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
@@ -78,6 +85,57 @@ class MainActivityTest : TestCase() {
     }
     composeTestRule.onNodeWithTag(C.Tag.QUESTS_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertDoesNotExist()
+  }
+
+  @Test
+  fun tappingANotificationOpensTheQuestsTab() = run {
+    composeTestRule.createAccount()
+    step("Leave the Quests tab for Profile") {
+      ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) {
+        profileTab { performClick() }
+        profileScreen { assertIsDisplayed() }
+      }
+    }
+    val launched = composeTestRule.activity
+    val manager = launched.getSystemService(NotificationManager::class.java)
+    try {
+      step("Tap a notification about the explorer's reservation") {
+        manager.cancelAll()
+        NotificationPoster(launched)
+            .post(
+                AroundNotification(
+                    "Café Lumière approved your reservation",
+                    "Latte art · Head over and send your proof once you're there.",
+                    "r1",
+                    NotificationChannelKind.RESERVATIONS,
+                )
+            )
+        // What the shade runs when the notification is tapped
+        manager.activeNotifications.single().notification.contentIntent.send()
+      }
+      step("The app opens again, on the Quests tab") {
+        composeTestRule.waitUntil(SETUP_TIMEOUT_MS) {
+          composeTestRule
+              .onAllNodes(hasTestTag(C.Tag.QUESTS_SCREEN))
+              .fetchSemanticsNodes()
+              .isNotEmpty()
+        }
+        ComposeScreen.onComposeScreen<MainScreen>(composeTestRule) {
+          questsTab { assertIsSelected() }
+          questsScreen { assertIsDisplayed() }
+        }
+      }
+    } finally {
+      manager.cancelAll()
+      // The tap started a new MainActivity the rule doesn't know about: close it, so the next test
+      // doesn't find two apps on screen
+      InstrumentationRegistry.getInstrumentation().runOnMainSync {
+        ActivityLifecycleMonitorRegistry.getInstance()
+            .getActivitiesInStage(Stage.RESUMED)
+            .filter { it !== launched }
+            .forEach { it.finish() }
+      }
+    }
   }
 
   @Test
