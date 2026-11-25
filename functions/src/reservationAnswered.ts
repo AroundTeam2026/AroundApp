@@ -5,6 +5,7 @@ import { DocumentData, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { APPROVED, NotificationMessage, PENDING, REJECTED, sendToUser } from "./notify";
+import { joinedMembers } from "./party";
 
 /**
  * The notification for a reservation [approved] or declined, with the venue's name and the
@@ -54,23 +55,11 @@ export async function sendReservationAnswer(
   if (before?.status !== PENDING) return;
   if (after?.status !== APPROVED && after?.status !== REJECTED) return;
 
-  const db = getFirestore();
-  const [members, venueName, questTitle] = await Promise.all([
-    db
-      .collection("party_user")
-      .where("reservationId", "==", reservationId)
-      .where("status", "==", "JOINED")
-      .get(),
+  const [uids, venueName, questTitle] = await Promise.all([
+    joinedMembers(reservationId),
     typeof after.venueId === "string" ? textOf(`venues/${after.venueId}`, "name") : undefined,
     typeof after.questId === "string" ? textOf(`quests/${after.questId}`, "title") : undefined,
   ]);
-  const uids = [
-    ...new Set(
-      members.docs
-        .map((doc) => doc.get("uid"))
-        .filter((uid): uid is string => typeof uid === "string" && uid.length > 0),
-    ),
-  ];
   const message: NotificationMessage = {
     ...answerText(after.status === APPROVED, venueName, questTitle),
     data: { kind: "reservation", route: "quests", reservationId },

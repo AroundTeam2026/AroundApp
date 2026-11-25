@@ -2,11 +2,11 @@
 
 import { DocumentData, getFirestore } from "firebase-admin/firestore";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { NotificationMessage, readQuest, sendToUser } from "./notify";
+import { APPROVED, NotificationMessage, readQuest, REJECTED, sendToUser } from "./notify";
 import { joinedMembers } from "./party";
 
 /** The completion statuses that are the venue's answer to a proof. */
-const ANSWERS: ReadonlySet<string> = new Set(["APPROVED", "REJECTED"]);
+const ANSWERS: ReadonlySet<string> = new Set([APPROVED, REJECTED]);
 
 /**
  * Whether the update [before] → [after] of a completion is the venue answering its proof: a
@@ -91,7 +91,7 @@ export async function proofAnswerMessage(
   const data = { kind: "proof", route: "quests", reservationId } as const;
   const venueName = (await read("venues", after.venueId)).name;
 
-  if (after.status === "REJECTED") {
+  if (after.status === REJECTED) {
     return {
       title: `${venueName} rejected your proof`,
       body: `“${after.rejectReason}” You can send a new one from the Quests tab.`,
