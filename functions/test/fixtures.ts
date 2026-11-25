@@ -26,10 +26,16 @@ export function initTestApp(): void {
   if (getApps().length === 0) initializeApp({ projectId: process.env.GCLOUD_PROJECT });
 }
 
-/** Stores a quest titled [title] and returns its id. */
-export async function seedQuest(title: string = QUEST_TITLE): Promise<string> {
+/**
+ * Stores a quest titled [QUEST_TITLE], with any other [fields], such as its party size, and
+ * returns its id.
+ */
+export async function seedQuest(fields: Record<string, unknown> = {}): Promise<string> {
   const questId = randomUUID();
-  await getFirestore().collection("quests").doc(questId).set({ title });
+  await getFirestore()
+    .collection("quests")
+    .doc(questId)
+    .set({ title: QUEST_TITLE, ...fields });
   return questId;
 }
 

@@ -87,12 +87,15 @@ describe("notifyVenueProof", () => {
   it.each([
     [PARTY, `${UNNAMED_PARTY} sent a photo.`],
     [SOLO, `${UNNAMED_LEADER} sent a photo.`],
-  ])("without a leader's name, a party of %s reads as in the venue's other texts", async (size, body) => {
-    const ref = await completionOf(size, BLANK_NAME);
-    await writeAndNotify(ref, proof({ photoUrl: PHOTO }));
+  ])(
+    "without a leader's name, a party of %s reads as in the venue's other texts",
+    async (size, body) => {
+      const ref = await completionOf(size, BLANK_NAME);
+      await writeAndNotify(ref, proof({ photoUrl: PHOTO }));
 
-    expectMessage(body, ref.id);
-  });
+      expectMessage(body, ref.id);
+    },
+  );
 
   it("notifies for a replacement, a resend of the same proof, and a resend after a rejection", async () => {
     const ref = await completionOf(PARTY);
