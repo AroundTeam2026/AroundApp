@@ -74,10 +74,10 @@ class FakeReservationRepository(
   private var nextId = 1
 
   /**
-   * Draws a party code no stored reservation has, drawing again while [newCode] returns a taken one,
-   * at most [MAX_PARTY_CODE_ATTEMPTS] codes in all. Then joins [creatorUid] to the party of a new id
-   * in [party], stores a copy of [reservation] with that id, the code, [now] as its creation time
-   * and [ReservationStatus.PENDING] as its status, and returns the id. Returns [forcedFailure]
+   * Draws a party code no stored reservation has, drawing again while [newCode] returns a taken
+   * one, at most [MAX_PARTY_CODE_ATTEMPTS] codes in all. Then joins [creatorUid] to the party of a
+   * new id in [party], stores a copy of [reservation] with that id, the code, [now] as its creation
+   * time and [ReservationStatus.PENDING] as its status, and returns the id. Returns [forcedFailure]
    * instead, storing nothing, if it is set, an [IllegalStateException] if every code drawn was
    * taken, and the failure of [party] if joining fails, without storing the reservation.
    */
@@ -133,7 +133,9 @@ class FakeReservationRepository(
     }
     val reservation =
         reservations.value[reservationId]
-            ?: return Result.failure(NoSuchElementException("No reservation with id $reservationId"))
+            ?: return Result.failure(
+                NoSuchElementException("No reservation with id $reservationId")
+            )
     return Result.success(PartyPreview(reservation, joinedCount(reservationId)))
   }
 
@@ -174,8 +176,9 @@ class FakeReservationRepository(
   /**
    * Changes the status of the reservation with [id], keeping every other field. Returns a failure,
    * changing nothing, if there is no such reservation, if [canTransition] forbids the change, if
-   * [forcedFailure] is set, or, given [quests], when approving a party that doesn't have the size its
-   * quest asks for ([IllegalStateException]) or whose quest is missing ([NoSuchElementException]).
+   * [forcedFailure] is set, or, given [quests], when approving a party that doesn't have the size
+   * its quest asks for ([IllegalStateException]) or whose quest is missing
+   * ([NoSuchElementException]).
    */
   override suspend fun updateStatus(id: String, status: ReservationStatus): Result<Unit> {
     forcedFailure?.let {

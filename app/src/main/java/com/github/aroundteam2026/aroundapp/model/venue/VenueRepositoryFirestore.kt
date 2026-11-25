@@ -91,33 +91,41 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
       location: Location,
       radiusMeters: Int,
       address: String?,
-  ): Result<Unit> = transaction {
-    val document = venues.document(venueId)
-    if (!it.get(document).exists()) {
-      IllegalArgumentException("No venue with id $venueId")
-    } else {
-      it.update(
-          document,
+  ): Result<Unit> =
+      updateExisting(
+          venueId,
           mapOf(
               LOCATION to location.toGeoPoint(),
               RADIUS_METERS to radiusMeters,
               ADDRESS to (address ?: FieldValue.delete()),
           ),
       )
-      null
-    }
-  }
 
   /** Writes only `name`. Needs a connection: a transaction fails while the device is offline. */
-  override suspend fun setName(venueId: String, name: String): Result<Unit> = transaction {
-    val document = venues.document(venueId)
-    if (!it.get(document).exists()) {
-      IllegalArgumentException("No venue with id $venueId")
-    } else {
-      it.update(document, NAME, name)
-      null
-    }
-  }
+  override suspend fun setName(venueId: String, name: String): Result<Unit> =
+      updateExisting(venueId, mapOf(NAME to name))
+
+  /**
+   * Writes only `pictureUrl`, deleting it when [pictureUrl] is null. Needs a connection: a
+   * transaction fails while the device is offline.
+   */
+  override suspend fun setPicture(venueId: String, pictureUrl: String?): Result<Unit> =
+      updateExisting(venueId, mapOf(PICTURE_URL to (pictureUrl ?: FieldValue.delete())))
+
+  /**
+   * Writes [fields] to the venue [venueId] in a transaction, failing with
+   * [IllegalArgumentException] instead of creating it when it doesn't exist.
+   */
+  private suspend fun updateExisting(venueId: String, fields: Map<String, Any>): Result<Unit> =
+      transaction {
+        val document = venues.document(venueId)
+        if (!it.get(document).exists()) {
+          IllegalArgumentException("No venue with id $venueId")
+        } else {
+          it.update(document, fields)
+          null
+        }
+      }
 
   /**
    * Runs [block] in a transaction. [block] returns the reason for refusing instead of throwing it,
@@ -166,6 +174,7 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
     address?.let { put(ADDRESS, it) }
     put(CREATED_AT, Timestamp(Date(createdAt)))
     featuredQuestId?.let { put(FEATURED_QUEST_ID, it) }
+    pictureUrl?.let { put(PICTURE_URL, it) }
   }
 
   /** Maps this document to a [Venue], or returns null if it is missing or malformed. */
@@ -180,6 +189,7 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
           address = getString(ADDRESS),
           createdAt = required(CREATED_AT) { getTimestamp(it) }.toDate().time,
           featuredQuestId = getString(FEATURED_QUEST_ID),
+          pictureUrl = getString(PICTURE_URL),
       )
     } catch (e: Exception) {
       Log.w(TAG, "Skipping malformed venue document $id", e)
@@ -198,5 +208,6 @@ class VenueRepositoryFirestore(private val db: FirebaseFirestore) : VenueReposit
     const val ADDRESS = "address"
     const val CREATED_AT = "createdAt"
     const val FEATURED_QUEST_ID = "featuredQuestId"
+    const val PICTURE_URL = "pictureUrl"
   }
 }

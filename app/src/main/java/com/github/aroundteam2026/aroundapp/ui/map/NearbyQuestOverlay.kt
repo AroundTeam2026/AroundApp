@@ -27,16 +27,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -96,17 +102,18 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * so the map stays usable around it.
  *
  * The explorer closes it with the pager's close button, or by dragging it down past a third of its
- * height or flinging it down; a shorter drag springs it back.
+ * height or flinging it down, from the grabber, the header or the list once it is scrolled to the
+ * top; a shorter drag springs it back.
  *
- * @param quests The quests to page through, already ordered.
+ * @param quests The quests to list, already ordered.
  * @param locationOn Whether the explorer's location is on, so [quests] are closest first.
- * @param onOpenQuest Called with a page's quest when the explorer taps the page.
- * @param onShowOnMap Called with a page's quest when the explorer taps its pin.
+ * @param onOpenQuest Called with a card's quest when the explorer taps the card.
+ * @param onShowOnMap Called with a card's quest when the explorer taps its pin.
  * @param onClose Called when the explorer closes the overlay.
  * @param filters The filters [quests] already passed.
  * @param onFiltersChange Called with the filters the explorer picks in the pager.
  * @param acceptState Where accepting each quest stands; "Accept quest" shows only when given.
- * @param onAccept Called with a page's quest when the explorer taps its "Accept quest".
+ * @param onAccept Called with a card's quest when the explorer taps its "Accept quest".
  * @param modifier Places the overlay; the map puts it along its bottom edge, and the overlay keeps
  *   its own margin inside it.
  */
@@ -128,6 +135,16 @@ fun NearbyQuestOverlay(
   var height by remember { mutableIntStateOf(0) }
   // How far down the explorer has dragged it; it never goes above its place
   var dragged by remember { mutableFloatStateOf(0f) }
+  val close by rememberUpdatedState(onClose)
+  // Closes it once let go far or fast enough, or springs it back
+  val settle: suspend (velocity: Float) -> Unit = { velocity ->
+    if (dragged > height / 3f || velocity > closingFling) {
+      close()
+    } else {
+      animate(dragged, 0f) { value, _ -> dragged = value }
+    }
+  }
+  val listDrag = remember { ListDrag({ dragged }, { dragged = it }, { settle(it) }) }
   Column(
       modifier
           .padding(AroundSpacing.Large)
@@ -138,14 +155,9 @@ fun NearbyQuestOverlay(
           .draggable(
               rememberDraggableState { delta -> dragged = (dragged + delta).coerceAtLeast(0f) },
               Orientation.Vertical,
-              onDragStopped = { velocity ->
-                if (dragged > height / 3f || velocity > closingFling) {
-                  onClose()
-                } else {
-                  animate(dragged, 0f) { value, _ -> dragged = value }
-                }
-              },
+              onDragStopped = { settle(it) },
           )
+          .nestedScroll(listDrag)
           .offset { IntOffset(0, dragged.roundToInt()) }
           .testTag(C.Tag.NEARBY_OVERLAY)
           .shadow(
@@ -181,5 +193,45 @@ fun NearbyQuestOverlay(
         acceptState = acceptState,
         onAccept = onAccept,
     )
+  }
+}
+
+/**
+ * Lets a drag on the list move the overlay as a drag on its grabber does, once the list has nothing
+ * left to scroll: a drag down past its top pulls the overlay down, and a drag back up returns the
+ * overlay to its place before the list scrolls again.
+ *
+ * @param dragged How far down the overlay is dragged now.
+ * @param drag Moves the overlay to this far down.
+ * @param settle Closes the overlay or springs it back once let go, given the fling's speed.
+ */
+private class ListDrag(
+    private val dragged: () -> Float,
+    private val drag: (Float) -> Unit,
+    private val settle: suspend (velocity: Float) -> Unit,
+) : NestedScrollConnection {
+  override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+    // Up while the overlay is pulled down: the overlay goes back first
+    if (available.y >= 0f || dragged() == 0f) return Offset.Zero
+    val back = available.y.coerceAtLeast(-dragged())
+    drag(dragged() + back)
+    return Offset(0f, back)
+  }
+
+  override fun onPostScroll(
+      consumed: Offset,
+      available: Offset,
+      source: NestedScrollSource,
+  ): Offset {
+    // Down past the list's top, by the finger rather than a fling
+    if (available.y <= 0f || source != NestedScrollSource.UserInput) return Offset.Zero
+    drag(dragged() + available.y)
+    return Offset(0f, available.y)
+  }
+
+  override suspend fun onPreFling(available: Velocity): Velocity {
+    if (dragged() == 0f) return Velocity.Zero
+    settle(available.y)
+    return available
   }
 }

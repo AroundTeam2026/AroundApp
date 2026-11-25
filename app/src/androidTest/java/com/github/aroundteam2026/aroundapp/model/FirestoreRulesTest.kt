@@ -9,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_CODE_LOOKUPS
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.testing.FirebaseEmulator
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
@@ -141,6 +142,59 @@ class FirestoreRulesTest {
     )
   }
 
+  // ---- notification tokens ----
+
+  @Test
+  fun userSavesSavesAgainAndDeletesTheirOwnToken() {
+    val alice = newUser()
+
+    assertSucceeds(token(alice).set(tokenData()))
+    assertSucceeds(token(alice).set(tokenData()))
+    assertSucceeds(token(alice).delete())
+  }
+
+  @Test
+  fun nobodyWritesOrDeletesAnotherUsersToken() {
+    val alice = newUser()
+    assertSucceeds(token(alice).set(tokenData()))
+    newUser()
+
+    assertDenied(token(alice).set(tokenData()), "another user's save")
+    assertDenied(token(alice).delete(), "another user's delete")
+    signOut()
+    assertDenied(token(alice).set(tokenData()), "a signed-out save")
+    assertDenied(token(alice).delete(), "a signed-out delete")
+  }
+
+  @Test
+  fun nobodyReadsTokensFromTheApp() {
+    val alice = newUser()
+    assertSucceeds(token(alice).set(tokenData()))
+
+    assertDenied(token(alice).get(Source.SERVER), "the owner's get")
+    assertDenied(tokens(alice).get(Source.SERVER), "the owner's list")
+    newUser()
+    assertDenied(token(alice).get(Source.SERVER), "another user's get")
+    assertDenied(tokens(alice).get(Source.SERVER), "another user's list")
+  }
+
+  @Test
+  fun tokenMustFollowTheSchema() {
+    val alice = newUser()
+    val valid = tokenData()
+
+    assertOnlyValidWriteSucceeds(
+        token(alice),
+        valid,
+        mapOf(
+            "an unknown field" to valid + ("platform" to "android"),
+            "no updatedAt" to emptyMap(),
+            "a client updatedAt" to mapOf("updatedAt" to Timestamp.now()),
+            "an updatedAt that is not a timestamp" to mapOf("updatedAt" to 42),
+        ),
+    )
+  }
+
   // ---- venues ----
 
   @Test
@@ -197,6 +251,27 @@ class FirestoreRulesTest {
     assertDenied(venueOf(venue).update("radiusMeters", 500), "an update that breaks the schema")
     // Optional fields are omitted when null
     assertSucceeds(venueOf(venue).set(valid - listOf("location", "address", "featuredQuestId")))
+  }
+
+  /** The picture's type and length checks are shared with users, so they're tested there. */
+  @Test
+  fun venueSetsAPictureOnlyInItsOwnFolderAndCanStillBeRenamed() {
+    val venue = newUser(Role.VENUE)
+    val other = newUser(Role.VENUE)
+    signInAs(venue)
+    assertSucceeds(venueOf(venue).set(venueData()))
+
+    assertSucceeds(venueOf(venue).update("pictureUrl", "gs://bucket/venue-pictures/${venue.uid}/1"))
+    // The whole document is checked on every write, so a stored picture must not block a rename
+    assertSucceeds(venueOf(venue).update("name", "Café Lumière"))
+    assertDenied(
+        venueOf(venue).update("pictureUrl", "gs://bucket/venue-pictures/${other.uid}/1"),
+        "a picture in another venue's folder",
+    )
+    assertDenied(
+        venueOf(venue).update("pictureUrl", "gs://bucket/user-pictures/${venue.uid}/1"),
+        "a picture outside venue-pictures",
+    )
   }
 
   // ---- quests ----
@@ -296,6 +371,7 @@ class FirestoreRulesTest {
             "a radius over 200 m" to valid + ("radiusMeters" to 201),
             "a radius that is not an integer" to valid + ("radiusMeters" to "50"),
             "a party of 0" to valid + ("minPartySize" to 0),
+            "a party above the maximum" to valid + ("minPartySize" to MAX_PARTY_SIZE + 1),
             "an exactPartySize that is not a boolean" to valid + ("exactPartySize" to "yes"),
             "an unknown proof type" to valid + ("proofType" to "VIDEO"),
             "an unknown status" to valid + ("status" to "LIVE"),
@@ -307,6 +383,7 @@ class FirestoreRulesTest {
         ),
     )
     assertSucceeds(newQuest().set(valid + ("exactPartySize" to true)))
+    assertSucceeds(newQuest().set(valid + ("minPartySize" to MAX_PARTY_SIZE)))
   }
 
   // #430: a quest may have a location of its own, away from its venue
@@ -1657,6 +1734,14 @@ class FirestoreRulesTest {
 
   private fun user(user: TestUser) = db.collection("users").document(user.uid)
 
+  private fun tokens(user: TestUser) = user(user).collection("tokens")
+
+  /** The document of [user]'s phone token [TOKEN]. */
+  private fun token(user: TestUser) = tokens(user).document(TOKEN)
+
+  /** A token document as the app saves it. */
+  private fun tokenData() = mapOf("updatedAt" to FieldValue.serverTimestamp())
+
   private fun venueOf(user: TestUser) = db.collection("venues").document(user.uid)
 
   private fun newQuest() = db.collection("quests").document(UUID.randomUUID().toString())
@@ -1684,10 +1769,18 @@ class FirestoreRulesTest {
             mapOf(
                 "status" to status,
                 "proofType" to proofType,
-                "minPartySize" to minPartySize,
+                "minPartySize" to minPartySize.coerceAtMost(MAX_PARTY_SIZE),
             ) +
             listOfNotNull(exactPartySize?.let { "exactPartySize" to it })
     assertSucceeds(quest.set(data))
+    // The rules refuse a size above the cap, which only quests written before #541 have.
+    if (minPartySize > MAX_PARTY_SIZE) {
+      writeBypassingRules(
+          "quests/${quest.id}",
+          mapOf("minPartySize" to minPartySize),
+          db.app.options.projectId!!,
+      )
+    }
     return quest.id
   }
 
@@ -1974,6 +2067,7 @@ class FirestoreRulesTest {
     const val PASSWORD = "password123"
     const val DISPLAY_NAME = "Test"
     const val PHOTO_URL = "https://example.test/proof.jpg"
+    const val TOKEN = "fcm-token-1"
     const val TIMEOUT_S = 10L
 
     /** The characters of a party code: no 0, 1, I, L or O, which are easy to mistake. */

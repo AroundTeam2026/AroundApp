@@ -10,6 +10,7 @@ import com.github.aroundteam2026.aroundapp.model.party.PartyMemberStatus
 import com.github.aroundteam2026.aroundapp.model.party.PartyRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
@@ -23,7 +24,9 @@ import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import io.mockk.mockk
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -58,6 +61,8 @@ class VenuePagePartyTest {
   private var time = 0L
   private val party = FakePartyRepository { time }
   private val reservations = FakeReservationRepository(now = { time }, party = party)
+
+  private val uploads = FakeProofUploadQueue()
 
   /** Whether withdrawing fails, as offline. */
   private var withdrawFails = false
@@ -105,6 +110,9 @@ class VenuePagePartyTest {
   private var notAPicture = false
   private var withPictures = true
 
+  /** The picture the venue uploaded, or null without one. */
+  private var venuePicture: String? = null
+
   private val pictures =
       object : UserPictureRepository {
         override suspend fun upload(uid: String, photo: Uri): Result<String> =
@@ -120,13 +128,14 @@ class VenuePagePartyTest {
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE,
-        FakeVenueRepository(listOf(testVenue(id = VENUE))),
+        FakeVenueRepository(listOf(testVenue(id = VENUE).copy(pictureUrl = venuePicture))),
         FakeQuestRepository(initialQuests = listOf(testQuest(id = QUEST, venueId = VENUE))),
         reservations,
         userRepository,
         partyRepository,
         FakeCompletionRepository(),
         FakeConnectivityRepository(),
+        uploads,
         ME,
         clock = { NOW },
         refusedWrites = fakeRefusedWrites(),
@@ -200,6 +209,24 @@ class VenuePagePartyTest {
 
     assertSame(picture, state.members.first().picture)
     assertEquals(listOf(BEA_PICTURE), downloads)
+  }
+
+  @Test
+  fun showsTheVenuesPictureOnceItArrives() = test {
+    venuePicture = VENUE_PICTURE
+    openDetails()
+
+    assertEquals(VenueAvatar.Picture(picture), state.avatar)
+    assertEquals(listOf(VENUE_PICTURE), downloads)
+  }
+
+  @Test
+  fun showsTheVenuesInitialsWhileItsPictureCantBeDownloaded() = test {
+    venuePicture = VENUE_PICTURE
+    downloadFails = true
+    openDetails()
+
+    assertTrue(state.avatar is VenueAvatar.Initials)
   }
 
   @Test
@@ -307,6 +334,19 @@ class VenuePagePartyTest {
     assertNull(state.reservationIds[QUEST])
   }
 
+  // The member's upload would be refused once they left, leaving an unused photo in Storage (#625)
+  @Test
+  fun aMemberWhoLeavesCancelsTheirQueuedProof() = test {
+    val id = reservationBy(FRIEND, ME)
+    uploads.enqueue(id, VENUE, ME, File("proof.jpg")).getOrThrow()
+    openDetails()
+
+    viewModel.cancel()
+    runCurrent()
+
+    assertEquals(listOf(id), uploads.cancelled)
+  }
+
   @Test
   fun aMemberLeavesEvenBeforeTheProfilesArrive() = test {
     slowUid = FRIEND
@@ -377,6 +417,7 @@ class VenuePagePartyTest {
     const val FRIEND = "friend"
     const val OTHER = "other"
     const val BEA_PICTURE = "gs://bucket/user-pictures/friend/1"
+    const val VENUE_PICTURE = "gs://bucket/venue-pictures/venue/1"
     const val NOW = 1_000_000L
   }
 }

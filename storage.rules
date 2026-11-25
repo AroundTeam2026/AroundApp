@@ -2,8 +2,9 @@ rules_version = '2';
 
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
-// Cloud Storage holds the proof photos of quest completions, under proofs/{reservationId}/. The
-// reservation and its party are read from Firestore, where docs/firestore-schema.md describes them.
+// Cloud Storage holds the proof photos of quest completions, under proofs/{reservationId}/, and
+// the profile pictures of users and venues. The reservation and its party are read from Firestore,
+// where docs/firestore-schema.md describes them.
 service firebase.storage {
   match /b/{bucket}/o {
 
@@ -39,15 +40,28 @@ service firebase.storage {
           && request.resource.contentType.matches('image/.*');
     }
 
-    // Profile pictures may be shown to signed-in users, but only their owner may upload one.
-    // A fresh id on each change prevents a cached image from hiding the new picture.
-    match /user-pictures/{uid}/{photoId} {
-      allow get: if request.auth != null;
-      allow create: if request.auth != null
+    // [uid] uploads a new image, which must not replace an existing file.
+    function isNewPictureOf(uid) {
+      return request.auth != null
           && request.auth.uid == uid
           && resource == null
           && request.resource.size < maxPhotoBytes()
           && request.resource.contentType.matches('image/.*');
+    }
+
+    // Profile pictures may be shown to signed-in users, but only their owner may upload one.
+    // A fresh id on each change prevents a cached image from hiding the new picture.
+    match /user-pictures/{uid}/{photoId} {
+      allow get: if request.auth != null;
+      allow create: if isNewPictureOf(uid);
+    }
+
+    // A venue's profile picture, like a user's. A venue's id is its owner's uid, and only an
+    // existing venue uploads one, so an explorer can't store files there that nothing shows.
+    match /venue-pictures/{venueId}/{photoId} {
+      allow get: if request.auth != null;
+      allow create: if isNewPictureOf(venueId)
+          && firestore.exists(/databases/(default)/documents/venues/$(venueId));
     }
   }
 }

@@ -1,3 +1,4 @@
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 package com.github.aroundteam2026.aroundapp.ui.completion
@@ -14,6 +15,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -96,6 +100,22 @@ class CompletionScreenTest {
         )
       }
     }
+  }
+
+  // The label is a separate Text, so TalkBack only reads it if the field carries it as its name
+  @Test
+  fun theAnswerFieldIsNamedAfterItsLabel() {
+    show()
+
+    compose
+        .onNode(
+            hasContentDescription(
+                ApplicationProvider.getApplicationContext<Application>()
+                    .getString(R.string.completion_answer)
+            ) and hasSetTextAction()
+        )
+        .assertIsDisplayed()
+        .assert(hasTestTag(C.Tag.COMPLETION_ANSWER))
   }
 
   @Test

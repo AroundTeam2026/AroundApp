@@ -15,10 +15,12 @@ fun CompletionRepository.withUnsent(unsent: Flow<Set<String>>): CompletionReposi
     override fun observeForReservation(reservationId: String): Flow<List<Completion>> =
         inner.observeForReservation(reservationId).combine(unsent, ::mark)
 
-    override fun observeForReservations(reservationIds: Collection<String>): Flow<List<Completion>> =
-        inner.observeForReservations(reservationIds).combine(unsent, ::mark)
+    override fun observeForReservations(
+        reservationIds: Collection<String>
+    ): Flow<List<Completion>> = inner.observeForReservations(reservationIds).combine(unsent, ::mark)
 
-    private fun mark(completions: List<Completion>, ids: Set<String>) =
-        completions.map { it.copy(pendingWrite = it.reservationId in ids) }
+    private fun mark(completions: List<Completion>, ids: Set<String>) = completions.map {
+      it.copy(pendingWrite = it.reservationId in ids)
+    }
   }
 }

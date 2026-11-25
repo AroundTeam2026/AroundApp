@@ -1,4 +1,5 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
 import com.github.aroundteam2026.aroundapp.model.TEST_EXPLORER_NAME
@@ -379,6 +380,63 @@ class NearbyAcceptViewModelTest {
     assertEquals(emptySet<String>(), state.failedQuestIds)
   }
 
+  // The user hasn't been told yet: the map says so once, and the quest keeps showing "try again"
+  @Test
+  fun aRefusalFromBeforeARestartRaisesTheNoticeUntilItIsShown() = test {
+    remembered.put(RecordedWrite("local-0", "a", WriteState.REFUSED))
+    reservations = local
+    open()
+    assertTrue(state.refusalNotice)
+
+    viewModel.onRefusalNoticeShown()
+
+    assertFalse(state.refusalNotice)
+    val restarted = newViewModel()
+    runCurrent()
+    assertFalse(restarted.uiState.value.refusalNotice)
+    assertEquals(AcceptStatus.FAILED, restarted.uiState.value.statusOf("a"))
+  }
+
+  @Test
+  fun aRefusalTheUserWasToldAboutRaisesNoNotice() = test {
+    remembered.put(RecordedWrite("local-0", "a", WriteState.REPORTED))
+    reservations = local
+    open()
+
+    assertFalse(state.refusalNotice)
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+  }
+
+  @Test
+  fun aBookingRefusedWhileTheMapIsOpenRaisesTheNotice() = test {
+    reservations = local
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+    assertFalse(state.refusalNotice)
+
+    local.refuse("local-1")
+    runCurrent()
+
+    assertTrue(state.refusalNotice)
+  }
+
+  // The explorer saw this one fail on the spot
+  @Test
+  fun aBookingThatFailedAtOnceRaisesNoNotice() = test {
+    reservations = local
+    local.failure = IOException("refused")
+    open()
+
+    viewModel.accept(quest("a"))
+    runCurrent()
+    local.refuse("local-1")
+    runCurrent()
+
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+    assertFalse(state.refusalNotice)
+  }
+
   @Test
   fun aReservationCancelledElsewhereFreesTheQuestWithoutTryAgain() = test {
     reservations = local
@@ -448,6 +506,69 @@ class NearbyAcceptViewModelTest {
 
     assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
   }
+
+  // The server hasn't confirmed the reservation yet, as when the connection dropped meanwhile
+  @Test
+  fun aReservationTheServerHasntConfirmedWaitsToSend() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a"))
+    open()
+
+    assertEquals(AcceptStatus.SENDING, state.statusOf("a"))
+    assertEquals(AcceptStatus.NONE, state.statusOf("b"))
+  }
+
+  @Test
+  fun aQueuedReservationTheServerConfirmsIsAccepted() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a"))
+    open()
+
+    local.listed.value = local.listed.value.map { it.copy(pendingWrite = false) }
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
+  @Test
+  fun aQueuedReservationIsNotBookedAgain() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a"))
+    open()
+
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    assertEquals(1, local.listed.value.size)
+    assertEquals(AcceptStatus.SENDING, state.statusOf("a"))
+  }
+
+  @Test
+  fun aQuestBeingAcceptedIsNotWaitingToSendYet() = test {
+    reservations = local
+    local.gate = CompletableDeferred()
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+
+    local.listed.value = local.listed.value.map { it.copy(pendingWrite = true) }
+    runCurrent()
+
+    assertEquals(AcceptStatus.ACCEPTING, state.statusOf("a"))
+  }
+
+  @Test
+  fun aQueuedCancellationDoesntWaitToSendTheQuest() = test {
+    reservations = local
+    local.listed.value = listOf(queued("a").copy(status = ReservationStatus.CANCELLED))
+    open()
+
+    assertEquals(AcceptStatus.NONE, state.statusOf("a"))
+  }
+
+  private fun queued(questId: String) =
+      newPendingReservation(questId, VENUE_ID, "Ada", NOW)
+          .copy(id = "queued-$questId", pendingWrite = true)
 
   private fun quest(id: String) =
       NearbyQuest(

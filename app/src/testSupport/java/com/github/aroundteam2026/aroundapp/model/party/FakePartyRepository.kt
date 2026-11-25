@@ -97,7 +97,9 @@ class FakePartyRepository(
     return Result.success(Unit)
   }
 
-  /** Why the rules would refuse [uid]'s withdrawal from [reservationId], or null if they allow it. */
+  /**
+   * Why the rules would refuse [uid]'s withdrawal from [reservationId], or null if they allow it.
+   */
   private fun refusalToWithdraw(reservationId: String, uid: String): String? {
     val status = statusOf(reservationId)
     return when {

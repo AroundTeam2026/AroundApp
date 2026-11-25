@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.resources.C
@@ -378,7 +379,7 @@ private fun PartyCard(state: CreateQuestUiState, actions: QuestCompletionActions
               description = stringResource(R.string.create_quest_party_increment),
               filled = true,
               onClick = actions.onIncrementPartySize,
-              enabled = enabled,
+              enabled = enabled && size < MAX_PARTY_SIZE,
               tag = C.Tag.CREATE_QUEST_PARTY_INCREMENT,
           )
         }

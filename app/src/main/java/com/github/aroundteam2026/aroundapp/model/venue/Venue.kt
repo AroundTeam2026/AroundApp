@@ -21,6 +21,8 @@ import com.github.aroundteam2026.aroundapp.model.common.Location
  * @property createdAt Creation time, in epoch milliseconds, set by the caller.
  * @property featuredQuestId Id of the quest the venue wants shown first, or null for no preference.
  *   Nothing checks that it names one of the venue's quests, or one that is still valid.
+ * @property pictureUrl The Cloud Storage location of the venue's profile picture, or null for none.
+ *   The app changes it only through [VenueRepository.setPicture].
  */
 data class Venue(
     val id: String,
@@ -30,4 +32,5 @@ data class Venue(
     val address: String?,
     val createdAt: Long,
     val featuredQuestId: String? = null,
+    val pictureUrl: String? = null,
 )

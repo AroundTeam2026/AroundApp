@@ -80,12 +80,14 @@ class VenueRepositoryFirestoreTest {
   /**
    * Bug: a field is dropped or mis-mapped on write or read (e.g. lat and lng swapped, createdAt
    * losing its milliseconds, the id not taken from the document id), or a venue without a location,
-   * address or featured quest, as onboarding creates it, cannot be read back.
+   * address, featured quest or picture, as onboarding may create it, cannot be read back.
    */
   @Test
   fun createVenue_thenGetVenue_roundTripsFullAndMinimalVenues() = withTimeoutBlocking {
     val full = venue(ownerUid)
-    val minimal = venue(readerUid).copy(location = null, address = null, featuredQuestId = null)
+    val minimal =
+        venue(readerUid)
+            .copy(location = null, address = null, featuredQuestId = null, pictureUrl = null)
 
     ownerRepository.createVenue(full).getOrThrow()
     readerRepository.createVenue(minimal).getOrThrow()
@@ -103,14 +105,25 @@ class VenueRepositoryFirestoreTest {
   fun createVenue_storesSchemaTypes() = withTimeoutBlocking {
     ownerRepository.createVenue(venue(ownerUid)).getOrThrow()
     readerRepository
-        .createVenue(venue(readerUid).copy(location = null, address = null, featuredQuestId = null))
+        .createVenue(
+            venue(readerUid)
+                .copy(location = null, address = null, featuredQuestId = null, pictureUrl = null)
+        )
         .getOrThrow()
 
     val full = storedVenue(ownerUid)
     val minimal = storedVenue(readerUid)
 
     assertEquals(
-        setOf("name", "location", "radiusMeters", "address", "createdAt", "featuredQuestId"),
+        setOf(
+            "name",
+            "location",
+            "radiusMeters",
+            "address",
+            "createdAt",
+            "featuredQuestId",
+            "pictureUrl",
+        ),
         full.data!!.keys,
     )
     assertTrue(full.get("location") is GeoPoint)
@@ -334,6 +347,23 @@ class VenueRepositoryFirestoreTest {
     assertEquals(original, readerRepository.getVenue(ownerUid))
   }
 
+  /**
+   * Bug: setPicture writes fields other than the picture, the picture isn't mapped on write or
+   * read, or a null picture is kept instead of being removed.
+   */
+  @Test
+  fun setPicture_replacesOnlyThePictureAndNullRemovesIt() = withTimeoutBlocking {
+    val original = venue(ownerUid)
+    ownerRepository.createVenue(original).getOrThrow()
+    val picture = "gs://bucket/venue-pictures/$ownerUid/new"
+
+    ownerRepository.setPicture(ownerUid, picture).getOrThrow()
+    assertEquals(original.copy(pictureUrl = picture), readerRepository.getVenue(ownerUid))
+
+    ownerRepository.setPicture(ownerUid, null).getOrThrow()
+    assertEquals(original.copy(pictureUrl = null), readerRepository.getVenue(ownerUid))
+  }
+
   /** The venue document [id] as the server stores it, read by the reader. */
   private suspend fun storedVenue(id: String) =
       readerDb.collection(VENUES).document(id).get(Source.SERVER).await()
@@ -358,6 +388,7 @@ class VenueRepositoryFirestoreTest {
           address = "Rue de Bourg 1, Lausanne",
           createdAt = CREATED_AT,
           featuredQuestId = "quest-1",
+          pictureUrl = "gs://bucket/venue-pictures/$id/photo",
       )
 
   private companion object {

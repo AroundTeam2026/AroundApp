@@ -3,6 +3,6 @@
 <!-- Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> -->
 <resources>
     <string name="role_profile_error">Could not load your profile.</string>
-    <string name="role_profile_retry">Retry</string>
+    <string name="retry_or_sign_out_retry">Retry</string>
     <string name="venue_entry_failed">Could not load your venue. Check your connection and try again.</string>
 </resources>

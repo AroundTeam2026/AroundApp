@@ -27,6 +27,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueue
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
@@ -52,6 +54,8 @@ import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
+import com.github.aroundteam2026.aroundapp.ui.quest.ReservationCanceller
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -86,7 +90,8 @@ import kotlinx.coroutines.launch
  *
  * It also shows who is in each party, downloading their pictures through [pictureRepository];
  * without one, members show their initials. While [VenuePageUiState.offline] says the device is
- * offline, which it follows from [connectivityRepository], the explorer can't [cancel].
+ * offline, which it follows from [connectivityRepository], the explorer can't [cancel]. Cancelling
+ * also cancels the reservation's proof waiting in [proofUploadQueue], if any.
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -97,6 +102,7 @@ class VenuePageViewModel(
     private val partyRepository: PartyRepository,
     private val completionRepository: CompletionRepository,
     connectivityRepository: ConnectivityRepository,
+    proofUploadQueue: ProofUploadQueue,
     private val explorerUid: String,
     private val clock: () -> Long = System::currentTimeMillis,
     arrivalQuestId: String? = null,
@@ -115,6 +121,9 @@ class VenuePageViewModel(
 
   /** Who sent the proofs; the page doesn't wait for their profiles to show the proofs. */
   private val proofSenders = ProofSenders(userRepository, explorerUid)
+
+  private val canceller =
+      ReservationCanceller(reservationRepository, partyRepository, proofUploadQueue)
 
   /**
    * The quest whose details the page opens the first time it shows the venue; null afterwards. Kept
@@ -270,7 +279,9 @@ class VenuePageViewModel(
    * without such a reservation, or when which of the two it is isn't known, or while it is being
    * cancelled, so a double tap cancels once, or while the device is offline, since cancelling needs
    * a connection. It shows as cancelling until the reservations no longer list it. A failure, such
-   * as being offline, shows [CancelStatus.FAILED]; calling this again retries.
+   * as being offline, shows [CancelStatus.FAILED]; calling this again retries. Once it succeeds,
+   * the reservation's proof waiting in the [ProofUploadQueue], if any, is cancelled too, since the
+   * rules would refuse it.
    */
   fun cancel() {
     val current = mutableUiState.value
@@ -285,13 +296,7 @@ class VenuePageViewModel(
       )
     }
     viewModelScope.launch {
-      // Only its creator cancels the reservation; anyone else who joined withdraws instead
-      val result =
-          if (leaving) partyRepository.withdraw(reservationId, explorerUid)
-          else reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
-      result.onFailure {
-        val what = if (leaving) "Leaving the party of" else "Cancelling"
-        Log.w(TAG, "$what reservation $reservationId failed", it)
+      canceller.cancel(reservationId, explorerUid, leaving).onFailure {
         mutableUiState.update { state ->
           // A reservation that left meanwhile, e.g. rejected by the venue, has nothing to mark
           val shown = reservationId in state.reservationIds.values
@@ -463,7 +468,11 @@ class VenuePageViewModel(
     // All the refused quests, not only the newly refused: the map may have heard the refusal first
     booked?.reservations?.let(hearing::refusedIn)
     val refused = refusedWrites.refusedQuests
-    mutableUiState.update { it.showing(venue, quests, view, refused, proofs) }
+    // The venue's picture downloads like the members' ones; its initials show until it arrives
+    val pictureUrl = venue?.pictureUrl
+    pictureUrl?.let { pictures.load(listOf(it)) }
+    val picture = pictureUrl?.let(pictures.pictures.value::get)
+    mutableUiState.update { it.showing(venue, picture, quests, view, refused, proofs) }
     arriving?.let { questId ->
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
@@ -498,6 +507,9 @@ class VenuePageViewModel(
             PartyRepositoryProvider.repository,
             CompletionRepositoryProvider.repository,
             ConnectivityRepositoryProvider.repository(
+                this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+            ),
+            ProofUploadQueueProvider.queue(
                 this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
             ),
             explorerUid,
@@ -629,15 +641,17 @@ private data class Proofs(
 )
 
 /**
- * This page showing [venue], its valid [quests] and what [booked] says about the explorer's
- * reservations, with the parties' [proofs], or "not found" when [venue] is null. A quest being
- * accepted that is now accepted is done accepting, a reservation no longer listed is done
- * cancelling, and a quest in [refused] failed. A null [booked] means the reservations can't be
- * read: the page keeps what it knew and stops offering to accept, cancel, complete or share a code.
- * Null [proofs] likewise mean the proofs can't be read, so it stops offering to complete.
+ * This page showing [venue], with its [picture] once downloaded, its valid [quests] and what
+ * [booked] says about the explorer's reservations, with the parties' [proofs], or "not found" when
+ * [venue] is null. A quest being accepted that is now accepted is done accepting, a reservation no
+ * longer listed is done cancelling, and a quest in [refused] failed. A null [booked] means the
+ * reservations can't be read: the page keeps what it knew and stops offering to accept, cancel,
+ * complete or share a code. Null [proofs] likewise mean the proofs can't be read, so it stops
+ * offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
+    picture: ImageBitmap?,
     quests: List<VenuePageQuest>,
     booked: BookedView?,
     refused: Set<String>,
@@ -649,7 +663,7 @@ private fun VenuePageUiState.showing(
       copy(
               status = VenuePageStatus.LOADED,
               venueName = venue.name,
-              avatar = INITIALS_AVATAR(venue, venue.name),
+              avatar = picture?.let(VenueAvatar::Picture) ?: INITIALS_AVATAR(venue, venue.name),
               address = venue.address,
               venueLocation = venue.location,
               acceptedParties = booked?.accepted ?: acceptedParties,

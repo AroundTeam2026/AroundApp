@@ -1,5 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+import com.ncorti.ktfmt.gradle.tasks.KtfmtBaseTask
 import java.util.Properties
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -14,6 +15,9 @@ plugins {
   alias(libs.plugins.gms)
   id("jacoco")
 }
+
+/** The fakes unit and device tests share; compiled with both, and checked by ktfmt (#543). */
+val testSupportDir = "src/testSupport/java"
 
 // One JaCoCo version for both the agent AGP attaches to the tests and the jacocoTestReport task,
 // which otherwise falls back to Gradle's default and reads data written by a different version.
@@ -89,8 +93,8 @@ android {
   // Code both unit and device tests use: the fakes they share, which must stay out of what ships
   // (see checkNoFakesInMain), and the registration page-object steps device journeys reuse.
   sourceSets {
-    getByName("test").kotlin.directories.add("src/testSupport/java")
-    getByName("androidTest").kotlin.directories.add("src/testSupport/java")
+    getByName("test").kotlin.directories.add(testSupportDir)
+    getByName("androidTest").kotlin.directories.add(testSupportDir)
   }
 
   compileOptions {
@@ -141,6 +145,16 @@ sonar {
         "sonar.coverage.jacoco.xmlReportPaths",
         "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml",
     )
+  }
+}
+
+// ktfmt reads each source set's srcDirs, not the kotlin.directories added above, so it would skip
+// the shared fakes (#543). Its `test` tasks, which ktfmtCheck and ktfmtFormat run, check and
+// format them too. `named` fails the build if a later ktfmt renames them, rather than skipping the
+// fakes silently; afterEvaluate, as the plugin registers them once the Android source sets exist.
+afterEvaluate {
+  listOf("ktfmtCheckTest", "ktfmtFormatTest").forEach { task ->
+    tasks.named<KtfmtBaseTask>(task) { source(testSupportDir) }
   }
 }
 
@@ -283,7 +297,7 @@ val checkNoFakesInMain =
         val found = fakes.files.map { it.relativeTo(root).invariantSeparatorsPath }.sorted()
         if (found.isNotEmpty()) {
           throw GradleException(
-              "Fakes belong in src/testSupport/java (shared with device tests) or src/test, not " +
+              "Fakes belong in $testSupportDir (shared with device tests) or src/test, not " +
                   "in a source set that ships, such as src/main or src/debug: " +
                   found.joinToString()
           )

@@ -11,6 +11,9 @@ enum class WriteState {
 
   /** The server refused it; the quest shows "try again" until it is booked again. */
   REFUSED,
+
+  /** Refused, and the explorer was told; the quest still shows "try again". */
+  REPORTED,
 }
 
 /** A reservation of the quest [questId] that this device wrote, and where it [state] stands. */
@@ -30,4 +33,7 @@ interface RefusedWritesStore {
 
   /** Forgets the write of the reservation [reservationId]. */
   fun remove(reservationId: String)
+
+  /** Forgets every write, also one that can't be read any more. */
+  fun clear()
 }

@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +52,7 @@ class OverviewLeaveTest {
   private var time = START
   private val party = FakePartyRepository { time }
   private val reservations = FakeReservationRepository(now = { time }, party = party)
+  private val uploads = FakeProofUploadQueue()
 
   /** A party repository whose parties never list [uid]'s membership, though it is stored. */
   private fun hiding(uid: String): PartyRepository =
@@ -69,7 +71,7 @@ class OverviewLeaveTest {
           FakeCompletionRepository(),
           FakeUserRepository(),
           FakeConnectivityRepository(),
-          FakeProofUploadQueue(),
+          uploads,
       )
 
   @Before fun setUp() = Dispatchers.setMain(dispatcher)
@@ -112,6 +114,21 @@ class OverviewLeaveTest {
     assertTrue(joined(id, CREATOR))
     assertEquals(ReservationStatus.PENDING, stored(id))
     assertEquals(OverviewUiState(status = OverviewStatus.LOADED), overview.uiState.value)
+  }
+
+  // The member's upload would be refused once they left, as for a cancelled reservation (#625)
+  @Test
+  fun aMemberWhoLeavesCancelsTheirQueuedProof() = test {
+    val id = sharedReservation()
+    reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+    uploads.enqueue(id, CAFE, MEMBER, File("proof.jpg")).getOrThrow()
+    val overview = open(MEMBER)
+
+    overview.cancel(id)
+    runCurrent()
+
+    assertFalse(joined(id, MEMBER))
+    assertEquals(listOf(id), uploads.cancelled)
   }
 
   @Test

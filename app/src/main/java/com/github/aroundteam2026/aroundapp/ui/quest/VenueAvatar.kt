@@ -17,11 +17,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.ProfilePhoto
 import java.util.Locale
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+// NOSONAR below: Sonar's S6517 asks for a fun interface, but a lambda avatar has no meaningful
+// equals, so the map would redraw its marker every time
 /**
  * What a venue's pin, card and nearby page show for it. Each kind draws itself, so adding one, such
  * as an image the venue uploads, needs no change to them.
@@ -30,9 +33,13 @@ import kotlinx.coroutines.withContext
  * its avatar stops being equal.
  */
 @Stable
-interface VenueAvatar {
+interface VenueAvatar { // NOSONAR
   /** Draws the avatar to fill [modifier]; [tint] is the colour for single-colour avatars. */
   @Composable fun Content(tint: Color, modifier: Modifier)
+
+  /** Whether the avatar fills its whole circle, with no padding around it, as a photo does. */
+  val fillsCircle: Boolean
+    get() = false
 
   /**
    * A venue's [initials] in the current text style, as the card and the pager show until venues
@@ -47,7 +54,18 @@ interface VenueAvatar {
     }
   }
 
-  /** The quest flag, shown until venues can choose their own image. */
+  /** The [picture] the venue uploaded, cropped to its circle. */
+  data class Picture(val picture: ImageBitmap) : VenueAvatar {
+    override val fillsCircle: Boolean
+      get() = true
+
+    @Composable
+    override fun Content(tint: Color, modifier: Modifier) {
+      ProfilePhoto(picture, modifier.testTag(C.Tag.VENUE_PICTURE_AVATAR))
+    }
+  }
+
+  /** The quest flag, shown when a venue has no picture of its own. */
   data object QuestFlag : VenueAvatar {
     @Composable
     override fun Content(tint: Color, modifier: Modifier) {
