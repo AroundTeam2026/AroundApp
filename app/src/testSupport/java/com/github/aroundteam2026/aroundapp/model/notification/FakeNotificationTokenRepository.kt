@@ -14,6 +14,10 @@ class FakeNotificationTokenRepository : NotificationTokenRepository {
   /** The tokens saved for [uid], in no particular order. */
   fun tokensOf(uid: String): Set<String> = saved[uid].orEmpty().toSet()
 
+  /** The users with at least one token saved, so a test can check no user got one. */
+  val usersWithTokens: Set<String>
+    get() = saved.filterValues { it.isNotEmpty() }.keys.toSet()
+
   override suspend fun save(uid: String, token: String): Result<Unit> =
       attempt(uid, token) { saved.getOrPut(uid) { mutableSetOf() } += token }
 

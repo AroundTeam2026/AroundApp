@@ -41,6 +41,16 @@ class FakeNotificationTokenRepositoryTest {
   }
 
   @Test
+  fun usersWithTokensLeavesOutAUserWhoseTokensWereAllDeleted() = runTest {
+    repository.save(UID, TOKEN).getOrThrow()
+    repository.save(OTHER_UID, TOKEN).getOrThrow()
+
+    repository.delete(OTHER_UID, TOKEN).getOrThrow()
+
+    assertEquals(setOf(UID), repository.usersWithTokens)
+  }
+
+  @Test
   fun deletingATokenThatIsNotSavedSucceeds() = runTest {
     assertTrue(repository.delete(UID, TOKEN).isSuccess)
     assertEquals(emptySet<String>(), repository.tokensOf(UID))

@@ -191,6 +191,8 @@ dependencies {
   // Proof photos (#328). Firebase only registers what the app's own manifest lists, so instrumented
   // tests that use Storage, like the storage.rules tests, need it here too.
   implementation(libs.firebase.storage)
+  // Push notifications (#629): the phone's token (#634), then showing them (#637)
+  implementation(libs.firebase.messaging)
   implementation(libs.compose.ui)
   implementation(libs.compose.ui.graphics)
   implementation(libs.compose.material3)
