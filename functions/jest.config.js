@@ -9,9 +9,10 @@ module.exports = {
   setupFiles: ["<rootDir>/test/emulator-env.ts"],
   // firebase-admin 14 loads jose 6 (through jwks-rsa), which is ES modules only. Node 22 loads it
   // in production, but jest's require doesn't, so ts-jest compiles jose to CommonJS for the tests.
+  // Unlike transformIgnorePatterns, transform keys see the OS's path separator, so either is matched.
   transform: {
     "^.+\\.ts$": "ts-jest",
-    "^.+/node_modules/jose/.+\\.js$": ["ts-jest", { tsconfig: { allowJs: true } }],
+    "^.+[/\\\\]node_modules[/\\\\]jose[/\\\\].+\\.js$": ["ts-jest", { tsconfig: { allowJs: true } }],
   },
   transformIgnorePatterns: ["/node_modules/(?!jose/)"],
 };
