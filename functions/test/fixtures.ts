@@ -13,6 +13,8 @@ import { getFirestore } from "firebase-admin/firestore";
  */
 
 export const VENUE = "venue-1";
+/** The venue's name, as its notifications to explorers show it; [VENUE] is its id. */
+export const VENUE_NAME = "Café Lumen";
 export const QUEST_TITLE = "Find the hidden fox";
 /** The explorer who reserved, as `explorerName` stores them. */
 export const LEADER = "Yusuf S.";
@@ -54,4 +56,23 @@ export async function seedReservation(
     .doc(reservationId)
     .set({ questId, venueId: VENUE, explorerName, joinedCount });
   return reservationId;
+}
+
+/** Stores a venue named [VENUE_NAME] and returns its id. */
+export async function seedVenue(): Promise<string> {
+  const venueId = randomUUID();
+  await getFirestore().collection("venues").doc(venueId).set({ name: VENUE_NAME });
+  return venueId;
+}
+
+/** Stores [uid]'s membership of [reservationId]'s party, e.g. JOINED or WITHDRAWN. */
+export async function membership(
+  reservationId: string,
+  uid: string,
+  status: string,
+): Promise<void> {
+  await getFirestore()
+    .collection("party_user")
+    .doc(`${reservationId}_${uid}`)
+    .set({ reservationId, uid, status, joinedAt: new Date(), updatedAt: new Date() });
 }
