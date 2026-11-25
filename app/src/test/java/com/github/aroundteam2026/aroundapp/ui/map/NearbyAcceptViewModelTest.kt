@@ -131,11 +131,16 @@ class NearbyAcceptViewModelTest {
 
   // As the offline banner: a disconnect counts once it lasts, a reconnection at once
   @Test
-  fun acceptingCantBeTappedWhileOfflineAndCanAgainBackOnline() = test {
+  fun acceptingTurnsOffWithTheOfflineBannerAndBackOnAtOnce() = test {
     open()
 
     connectivity.online.value = false
-    advanceTimeBy(OFFLINE_HINT_DELAY_MS)
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
+    runCurrent()
+    // The banner isn't shown yet: the button stays on, and accept()'s guard covers a tap
+    assertTrue(state.canAccept)
+
+    advanceTimeBy(1)
     runCurrent()
     assertTrue(state.offline)
     assertFalse(state.canAccept)
