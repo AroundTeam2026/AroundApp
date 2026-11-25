@@ -6,12 +6,13 @@ import com.google.firebase.firestore.firestore
 
 /**
  * Builds the app's [NotificationTokenRepository], so ViewModels never depend on an implementation.
+ *
+ * Tokens live in Firestore, where Cloud Functions read them to notify the user. Every caller shares
+ * the one repository.
  */
 object NotificationTokenRepositoryProvider {
-  /**
-   * The repository to use, saving tokens in Firestore where Cloud Functions read them. It keeps no
-   * state of its own, so each caller may get a new one.
-   */
-  fun repository(): NotificationTokenRepository =
-      NotificationTokenRepositoryFirestore(Firebase.firestore)
+  /** The phone's notification tokens, saved in Firestore. */
+  val repository: NotificationTokenRepository by lazy {
+    NotificationTokenRepositoryFirestore(Firebase.firestore)
+  }
 }

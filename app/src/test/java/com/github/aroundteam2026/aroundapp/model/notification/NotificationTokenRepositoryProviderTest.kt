@@ -23,7 +23,7 @@ class NotificationTokenRepositoryProviderTest {
   @Test
   fun servesTheFirestoreRepository() {
     assertTrue(
-        NotificationTokenRepositoryProvider.repository() is NotificationTokenRepositoryFirestore
+        NotificationTokenRepositoryProvider.repository is NotificationTokenRepositoryFirestore
     )
   }
 }
