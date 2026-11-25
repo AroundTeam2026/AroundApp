@@ -513,8 +513,13 @@ class MapScreenNearbyTest {
     }
     composeTestRule.waitForIdle()
 
-    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    // Back at its place, or above it once the finger passes where it started; the list never
+    // scrolled
+    val overlayTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    val listScrolled = node(C.Tag.NEARBY_LIST).scrolled()
     node(C.Tag.NEARBY_LIST).performTouchInput { up() }
+    assertTrue("the overlay is at $overlayTop, under its place $top", overlayTop <= top)
+    assertEquals(0f, listScrolled)
   }
 
   @Test

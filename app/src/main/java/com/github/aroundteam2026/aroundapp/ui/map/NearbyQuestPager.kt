@@ -86,6 +86,8 @@ private val LIST_MAX_HEIGHT = 302.dp
  *   and closes the filters under the header, shows only when given.
  * @param acceptState Where accepting each quest stands. "Accept quest" shows only when given.
  * @param onAccept Called with a card's quest when the explorer taps its "Accept quest".
+ * @param listExtraHeight How much taller than [LIST_MAX_HEIGHT] the list may grow, e.g. while the
+ *   overlay is pulled up.
  */
 @Composable
 fun NearbyQuestPager(
@@ -100,6 +102,7 @@ fun NearbyQuestPager(
     onFiltersChange: ((NearbyFilters) -> Unit)? = null,
     acceptState: NearbyAcceptUiState? = null,
     onAccept: (NearbyQuest) -> Unit = {},
+    listExtraHeight: Dp = 0.dp,
 ) {
   // Saved, so the filters stay open over rotation; they close with the pager
   var filtersOpen by rememberSaveable { mutableStateOf(false) }
@@ -125,7 +128,7 @@ fun NearbyQuestPager(
           style = AroundTextStyles.BodyMedium,
       )
     } else {
-      QuestList(quests, locationOn, summary, header) { quest ->
+      QuestList(quests, locationOn, summary, listExtraHeight, header) { quest ->
         QuestCard(
             quest,
             style,
@@ -227,12 +230,14 @@ private fun Header(
  * after an empty list start again from the top.
  *
  * @param summary The filters in words, which the header names in place of the order, or null.
+ * @param extraHeight How much taller than [LIST_MAX_HEIGHT] the list may grow.
  */
 @Composable
 private fun QuestList(
     quests: List<NearbyQuest>,
     locationOn: Boolean,
     summary: String?,
+    extraHeight: Dp,
     header: @Composable (counter: String) -> Unit,
     card: @Composable (NearbyQuest) -> Unit,
 ) {
@@ -241,7 +246,9 @@ private fun QuestList(
   header(stringResource(R.string.map_nearby_pair, count, summary ?: stringResource(order)))
   LocationHint(locationOn)
   LazyColumn(
-      Modifier.testTag(C.Tag.NEARBY_LIST).fillMaxWidth().heightIn(max = LIST_MAX_HEIGHT),
+      Modifier.testTag(C.Tag.NEARBY_LIST)
+          .fillMaxWidth()
+          .heightIn(max = LIST_MAX_HEIGHT + extraHeight),
       verticalArrangement = Arrangement.spacedBy(AroundSpacing.ExtraLarge),
   ) {
     // Keyed by quest, so the cards in view keep their place when others come and go

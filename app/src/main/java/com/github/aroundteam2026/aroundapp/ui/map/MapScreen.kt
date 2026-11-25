@@ -157,7 +157,6 @@ fun MapScreen(
           onClose = viewModel::onNearbyClose,
           filters = state.filters,
           onFiltersChange = viewModel::onFiltersChange,
-          modifier = Modifier.align(Alignment.BottomCenter),
           acceptState = acceptState,
           onAccept = { acceptViewModel?.accept(it) },
       )
