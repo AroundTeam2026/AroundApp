@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.reservation.UploadFailure
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.navigation.AroundHeader
 import com.github.aroundteam2026.aroundapp.ui.navigation.LocalShowOfflineBanner
@@ -100,6 +101,7 @@ fun OverviewScreen(
       onSendNewProof,
       modifier,
       showOfflineBanner = showOfflineBanner,
+      onRetryProof = viewModel::retryProof,
   )
 }
 
@@ -116,6 +118,8 @@ fun OverviewScreen(
  * @param onSendNewProof Called with the reservation's id and its venue's name when the explorer
  *   taps "Send new proof" on a card whose proof the venue hasn't approved.
  * @param clock Tells which day is today, and the time zone the slots are written in.
+ * @param onRetryProof Called with the reservation's id when the explorer taps "Try again" on a card
+ *   whose proof wasn't sent.
  */
 @Composable
 fun OverviewContent(
@@ -128,6 +132,7 @@ fun OverviewContent(
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
     showOfflineBanner: Boolean = false,
+    onRetryProof: (reservationId: String) -> Unit = {},
 ) {
   Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     AroundHeader()
@@ -146,7 +151,7 @@ fun OverviewContent(
       OverviewStatus.FAILED -> Centered { Failed(onRetry) }
       OverviewStatus.LOADED ->
           if (state.rows.isEmpty()) Centered { Empty() }
-          else Rows(state, onOpenQuest, onCancel, onSendNewProof, clock)
+          else Rows(state, onOpenQuest, onCancel, onSendNewProof, onRetryProof, clock)
     }
   }
 }
@@ -230,6 +235,7 @@ private fun Rows(
     onOpenQuest: (venueId: String, questId: String) -> Unit,
     onCancel: (reservationId: String) -> Unit,
     onSendNewProof: (reservationId: String, venueName: String) -> Unit,
+    onRetryProof: (reservationId: String) -> Unit,
     clock: Clock,
 ) {
   LazyColumn(
@@ -258,6 +264,11 @@ private fun Rows(
           onSendNewProof =
               if (row.status.proofReplaceable)
                   ({ onSendNewProof(row.reservationId, row.venueName) })
+              else null,
+          proofRetry = state.proofRetryOf(row.reservationId),
+          // Only a proof that failed on the way, e.g. on a weak connection, can pass on a retry
+          onRetryProof =
+              if (row.proofFailure == UploadFailure.RETRYABLE) ({ onRetryProof(row.reservationId) })
               else null,
       )
     }

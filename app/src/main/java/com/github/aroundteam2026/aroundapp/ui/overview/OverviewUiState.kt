@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.overview
 
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
+import com.github.aroundteam2026.aroundapp.model.reservation.UploadFailure
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
@@ -24,7 +25,19 @@ data class OverviewUiState(
     val cancellingIds: Set<String> = emptySet(),
     val failedCancelIds: Set<String> = emptySet(),
     val offline: Boolean = false,
+    /** The reservations whose unsent proof is being tried again. */
+    val retryingProofIds: Set<String> = emptySet(),
+    /** The reservations whose unsent proof couldn't be tried again, e.g. as its photo is gone. */
+    val failedProofRetryIds: Set<String> = emptySet(),
 ) {
+  /** How trying the unsent proof of the reservation [reservationId] again stands, for its card. */
+  fun proofRetryOf(reservationId: String): ProofRetryStatus =
+      when (reservationId) {
+        in retryingProofIds -> ProofRetryStatus.RETRYING
+        in failedProofRetryIds -> ProofRetryStatus.FAILED
+        else -> ProofRetryStatus.NONE
+      }
+
   /** How cancelling the reservation [reservationId] stands, for its card. */
   fun cancelStatusOf(reservationId: String): CancelStatus =
       when (reservationId) {
@@ -68,6 +81,8 @@ data class OverviewRow(
     val status: OverviewRowStatus,
     val proofSender: ProofSender? = null,
     val leave: Boolean? = false,
+    /** Why its queued proof wasn't sent, while [status] is [OverviewRowStatus.PROOF_NOT_SENT]. */
+    val proofFailure: UploadFailure? = null,
 )
 
 /** Where the overview stands. */
@@ -110,4 +125,18 @@ enum class OverviewRowStatus(val cancellable: Boolean, val proofReplaceable: Boo
   COMPLETED(cancellable = false),
   /** The venue rejected the proof. */
   PROOF_REJECTED(cancellable = false, proofReplaceable = true),
+  /**
+   * The photo proof queued offline failed for good and wasn't sent (#624). The party has no proof
+   * the venue sees, so it can be cancelled, as [UPLOAD_WAITING]; a new proof can replace it, and a
+   * [UploadFailure.RETRYABLE] one can be tried again.
+   */
+  PROOF_NOT_SENT(cancellable = true, proofReplaceable = true),
+}
+
+/** Where trying a row's unsent proof again stands (#624). */
+enum class ProofRetryStatus {
+  NONE,
+  RETRYING,
+  /** The queue couldn't take it again, e.g. as its photo is no longer kept. */
+  FAILED,
 }

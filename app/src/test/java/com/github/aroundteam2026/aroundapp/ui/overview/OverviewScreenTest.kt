@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.UploadFailure
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -62,6 +63,7 @@ class OverviewScreenTest {
   private var joinParty = 0
   private val cancelled = mutableListOf<String>()
   private val newProofs = mutableListOf<Pair<String, String>>()
+  private val retriedProofs = mutableListOf<String>()
 
   private fun show(state: OverviewUiState, showOfflineBanner: Boolean = false) {
     compose.setContent {
@@ -77,6 +79,7 @@ class OverviewScreenTest {
             },
             clock = CLOCK,
             showOfflineBanner = showOfflineBanner,
+            onRetryProof = { retriedProofs += it },
         )
       }
     }
@@ -192,8 +195,10 @@ class OverviewScreenTest {
     )
 
     // A queued proof isn't sent yet, so its card can still be cancelled
-    listOf("approved", "queued").forEach { cancelButtonOf(it).assertExists() }
-    listOf("sent", "completed", "rejected").forEach { cancelButtonOf(it).assertDoesNotExist() }
+    listOf("approved", "queued").forEach { buttonOf(C.Tag.CANCEL_RESERVATION, it).assertExists() }
+    listOf("sent", "completed", "rejected").forEach {
+      buttonOf(C.Tag.CANCEL_RESERVATION, it).assertDoesNotExist()
+    }
   }
 
   // Without the explorer's membership, neither cancelling nor leaving is known to be safe
@@ -201,8 +206,8 @@ class OverviewScreenTest {
   fun aCardWhoseLeaveIsUnknownCannotBeCancelled() {
     show(loaded(row(id = "known"), row(id = "unknown").copy(leave = null)))
 
-    cancelButtonOf("known").assertExists()
-    cancelButtonOf("unknown").assertDoesNotExist()
+    buttonOf(C.Tag.CANCEL_RESERVATION, "known").assertExists()
+    buttonOf(C.Tag.CANCEL_RESERVATION, "unknown").assertDoesNotExist()
   }
 
   // Until the venue approves a proof, the party can send a new one, as in the Figma frame
@@ -216,8 +221,10 @@ class OverviewScreenTest {
         )
     )
 
-    listOf("sent", "rejected").forEach { newProofButtonOf(it).assertExists() }
-    newProofButtonOf("completed").assertDoesNotExist()
+    listOf("sent", "rejected").forEach {
+      buttonOf(C.Tag.OVERVIEW_SEND_NEW_PROOF, it).assertExists()
+    }
+    buttonOf(C.Tag.OVERVIEW_SEND_NEW_PROOF, "completed").assertDoesNotExist()
   }
 
   @Test
@@ -230,7 +237,9 @@ class OverviewScreenTest {
         )
     )
 
-    listOf("waiting", "approved", "queued").forEach { newProofButtonOf(it).assertDoesNotExist() }
+    listOf("waiting", "approved", "queued").forEach {
+      buttonOf(C.Tag.OVERVIEW_SEND_NEW_PROOF, it).assertDoesNotExist()
+    }
   }
 
   @Test
@@ -242,10 +251,35 @@ class OverviewScreenTest {
         )
     )
 
-    newProofButtonOf("rejected").performClick()
-    newProofButtonOf("sent").performClick()
+    buttonOf(C.Tag.OVERVIEW_SEND_NEW_PROOF, "rejected").performClick()
+    buttonOf(C.Tag.OVERVIEW_SEND_NEW_PROOF, "sent").performClick()
 
     assertEquals(listOf("rejected" to "Café Lumen", "sent" to "Café Lumen"), newProofs)
+    assertEquals(emptyList<Pair<String, String>>(), opened)
+  }
+
+  // #624: only a failure a retry can get past offers "Try again"; every unsent proof can be
+  // replaced
+  @Test
+  fun aProofNotSentIsTriedAgainOnlyIfItCanPass() {
+    show(
+        loaded(
+            row(id = "weak", status = OverviewRowStatus.PROOF_NOT_SENT)
+                .copy(proofFailure = UploadFailure.RETRYABLE),
+            row(id = "gone", status = OverviewRowStatus.PROOF_NOT_SENT)
+                .copy(proofFailure = UploadFailure.PHOTO_MISSING),
+        )
+    )
+
+    // Not sent, the proof is newer than any the venue has, so the card can be cancelled
+    listOf("weak", "gone").forEach {
+      buttonOf(C.Tag.OVERVIEW_SEND_NEW_PROOF, it).assertExists()
+      buttonOf(C.Tag.CANCEL_RESERVATION, it).assertExists()
+    }
+    buttonOf(C.Tag.OVERVIEW_RETRY_PROOF, "gone").assertDoesNotExist()
+    buttonOf(C.Tag.OVERVIEW_RETRY_PROOF, "weak").performClick()
+
+    assertEquals(listOf("weak"), retriedProofs)
     assertEquals(emptyList<Pair<String, String>>(), opened)
   }
 
@@ -253,7 +287,7 @@ class OverviewScreenTest {
   fun confirmingACancelCancelsThatCardsReservation() {
     show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
 
-    cancelButtonOf("reservation-2").performClick()
+    buttonOf(C.Tag.CANCEL_RESERVATION, "reservation-2").performClick()
     compose.onNodeWithTag(C.Tag.CANCEL_RESERVATION_CONFIRM).performClick()
 
     assertEquals(listOf("reservation-2"), cancelled)
@@ -271,15 +305,15 @@ class OverviewScreenTest {
             useUnmergedTree = true,
         )
         .assertIsDisplayed()
-    cancelButtonOf(ID).assertIsNotEnabled()
+    buttonOf(C.Tag.CANCEL_RESERVATION, ID).assertIsNotEnabled()
   }
 
   @Test
   fun aCardBeingCancelledHasItsButtonDisabled() {
     show(loaded(row(), row(id = "reservation-2")).copy(cancellingIds = setOf("reservation-2")))
 
-    cancelButtonOf("reservation-2").assertIsNotEnabled()
-    cancelButtonOf(ID).assertIsEnabled()
+    buttonOf(C.Tag.CANCEL_RESERVATION, "reservation-2").assertIsNotEnabled()
+    buttonOf(C.Tag.CANCEL_RESERVATION, ID).assertIsEnabled()
   }
 
   @Test
@@ -361,18 +395,13 @@ class OverviewScreenTest {
   }
 
   /** The cancel button is a clickable of its own, so the card's merged node leaves it out. */
-  private fun cancelButtonOf(reservationId: String) =
+  /**
+   * The button tagged [tag] on the card of [reservationId]. Each is a clickable of its own, so the
+   * card's merged node leaves it out.
+   */
+  private fun buttonOf(tag: String, reservationId: String) =
       compose.onNode(
-          hasTestTag(C.Tag.CANCEL_RESERVATION) and
-              hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
-          useUnmergedTree = true,
-      )
-
-  /** The new proof button is a clickable of its own, so the card's merged node leaves it out. */
-  private fun newProofButtonOf(reservationId: String) =
-      compose.onNode(
-          hasTestTag(C.Tag.OVERVIEW_SEND_NEW_PROOF) and
-              hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
+          hasTestTag(tag) and hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
           useUnmergedTree = true,
       )
 

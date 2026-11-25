@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -96,6 +97,8 @@ fun OverviewQuestRow(
     onCancel: (() -> Unit)? = null,
     offline: Boolean = false,
     onSendNewProof: (() -> Unit)? = null,
+    proofRetry: ProofRetryStatus = ProofRetryStatus.NONE,
+    onRetryProof: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
   Column(
@@ -170,6 +173,8 @@ fun OverviewQuestRow(
           tint = colors.onSurfaceVariant,
       )
     }
+    if (onRetryProof != null) RetryProofButton(proofRetry, onRetryProof)
+    if (proofRetry == ProofRetryStatus.FAILED) RetryProofFailed()
     if (onSendNewProof != null) NewProofButton(onSendNewProof)
     if (onCancel != null) {
       CancelReservationAction(
@@ -183,22 +188,75 @@ fun OverviewQuestRow(
   }
 }
 
+/**
+ * The filled "Try again" pill of a card whose proof wasn't sent (#624); it reads "Trying again…"
+ * and is disabled while the retry starts.
+ */
+@Composable
+private fun RetryProofButton(status: ProofRetryStatus, onClick: () -> Unit) {
+  val retrying = status == ProofRetryStatus.RETRYING
+  ProofPill(
+      stringResource(
+          if (retrying) R.string.overview_retrying_proof else R.string.overview_retry_proof
+      ),
+      C.Tag.OVERVIEW_RETRY_PROOF,
+      onClick,
+      // A double tap tries once; the ViewModel ignores it too
+      enabled = !retrying,
+  )
+}
+
+/** Says the proof couldn't be tried again, e.g. as its photo is gone, so a new one is needed. */
+@Composable
+private fun RetryProofFailed() {
+  Text(
+      stringResource(R.string.overview_retry_proof_failed),
+      Modifier.testTag(C.Tag.OVERVIEW_RETRY_PROOF_FAILED),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.error,
+  )
+}
+
 /** The outlined pill at the foot of a card whose proof the party can still replace. */
 @Composable
 private fun NewProofButton(onClick: () -> Unit) {
-  OutlinedButton(
+  ProofPill(
+      stringResource(R.string.send_new_proof),
+      C.Tag.OVERVIEW_SEND_NEW_PROOF,
       onClick,
-      Modifier.fillMaxWidth()
-          .heightIn(min = NEW_PROOF_MIN_HEIGHT)
-          .testTag(C.Tag.OVERVIEW_SEND_NEW_PROOF),
-      shape = AroundPillShape,
-      border = BorderStroke(NEW_PROOF_BORDER, MaterialTheme.colorScheme.onPrimaryContainer),
-  ) {
-    Text(
-        stringResource(R.string.send_new_proof),
-        style = AroundTextStyles.Button,
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
-    )
+      outlined = true,
+  )
+}
+
+/**
+ * A full-width pill at the foot of a card, for its proof: filled, or [outlined] in the
+ * on-primary-container colour. The card's proof buttons all go through it, so they keep one size
+ * and shape.
+ */
+@Composable
+private fun ProofPill(
+    text: String,
+    tag: String,
+    onClick: () -> Unit,
+    outlined: Boolean = false,
+    enabled: Boolean = true,
+) {
+  val modifier = Modifier.fillMaxWidth().heightIn(min = PROOF_BUTTON_MIN_HEIGHT).testTag(tag)
+  if (outlined) {
+    val color = MaterialTheme.colorScheme.onPrimaryContainer
+    OutlinedButton(
+        onClick,
+        modifier,
+        enabled = enabled,
+        shape = AroundPillShape,
+        border = BorderStroke(PROOF_BUTTON_BORDER, color),
+    ) {
+      Text(text, style = AroundTextStyles.Button, color = color)
+    }
+  } else {
+    Button(onClick, modifier, enabled = enabled, shape = AroundPillShape) {
+      Text(text, style = AroundTextStyles.Button)
+    }
   }
 }
 
@@ -250,6 +308,10 @@ private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Mo
           OverviewRowStatus.PROOF_REJECTED -> {
             Dot(colors.error)
             stringResource(R.string.overview_status_proof_rejected) to colors.error
+          }
+          OverviewRowStatus.PROOF_NOT_SENT -> {
+            Dot(colors.error)
+            stringResource(R.string.overview_status_proof_not_sent) to colors.error
           }
         }
     Text(
@@ -384,8 +446,8 @@ private val CHECK_SIZE = 12.dp
 private val SLOT_VERTICAL_PADDING = 6.dp
 private val SLOT_ICON_SIZE = 14.dp
 private val DETAIL_ICON_SIZE = 13.dp
-private val NEW_PROOF_MIN_HEIGHT = 52.dp
-private val NEW_PROOF_BORDER = 1.dp
+private val PROOF_BUTTON_MIN_HEIGHT = 52.dp
+private val PROOF_BUTTON_BORDER = 1.dp
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)

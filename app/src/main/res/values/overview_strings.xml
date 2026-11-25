@@ -26,6 +26,11 @@
     <string name="overview_status_proof_sent_by">Proof sent by %1$s</string>
     <string name="overview_status_completed">Completed</string>
     <string name="overview_status_proof_rejected">Proof rejected</string>
+    <!-- A photo proof queued offline that failed for good, so the venue never got it (#624) -->
+    <string name="overview_status_proof_not_sent">Proof not sent</string>
+    <string name="overview_retry_proof">Try again</string>
+    <string name="overview_retrying_proof">Trying again…</string>
+    <string name="overview_retry_proof_failed">Couldn\'t try again. Send a new proof instead.</string>
     <!-- A reservation's slot: the day, e.g. "Today" or "Sun 2 Nov", then the time -->
     <string name="overview_slot">%1$s · %2$s</string>
     <string name="overview_slot_today">Today</string>

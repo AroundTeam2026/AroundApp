@@ -22,6 +22,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.UploadFailure
 import com.github.aroundteam2026.aroundapp.model.reservation.completionId
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.reservation.withUnsent
@@ -814,6 +815,115 @@ class OverviewViewModelTest {
     runCurrent()
 
     assertEquals(OverviewRowStatus.COMPLETED, state.rows.single().status)
+  }
+
+  // #624: a queued photo that failed for good says so, instead of going back to "Approved"
+  @Test
+  fun aProofThatFailedForGoodIsNotSent() = test {
+    val id = approvedReservation()
+    queue(id)
+    viewModel
+    runCurrent()
+
+    uploads.fail(id)
+    runCurrent()
+
+    val row = state.rows.single()
+    assertEquals(OverviewRowStatus.PROOF_NOT_SENT, row.status)
+    assertEquals(UploadFailure.RETRYABLE, row.proofFailure)
+    assertTrue(row.status.cancellable)
+    assertTrue(row.status.proofReplaceable)
+  }
+
+  // As a waiting one, a failed proof is newer than the one the venue rejected
+  @Test
+  fun aProofThatFailedAfterARejectionIsNotSent() = test {
+    val id = approvedReservation()
+    completions.reject(sendProof(id), "The fox isn't in the photo").getOrThrow()
+    queue(id)
+    uploads.fail(id, UploadFailure.PHOTO_MISSING)
+    viewModel
+    runCurrent()
+
+    val row = state.rows.single()
+    assertEquals(OverviewRowStatus.PROOF_NOT_SENT, row.status)
+    assertEquals(UploadFailure.PHOTO_MISSING, row.proofFailure)
+  }
+
+  @Test
+  fun anApprovedProofStaysCompletedWhileAnotherFailed() = test {
+    val id = approvedReservation()
+    completions.approve(sendProof(id)).getOrThrow()
+    queue(id)
+    uploads.fail(id)
+    viewModel
+    runCurrent()
+
+    val row = state.rows.single()
+    assertEquals(OverviewRowStatus.COMPLETED, row.status)
+    assertNull(row.proofFailure)
+  }
+
+  @Test
+  fun tryingAgainQueuesTheSameProofOnceAndTheRowWaitsToUpload() = test {
+    val id = approvedReservation()
+    queue(id)
+    uploads.fail(id)
+    viewModel
+    runCurrent()
+
+    viewModel.retryProof(id)
+    // A double tap while the first is under way tries once
+    viewModel.retryProof(id)
+    assertEquals(ProofRetryStatus.RETRYING, state.proofRetryOf(id))
+    runCurrent()
+
+    assertEquals(2, uploads.queued.size)
+    assertEquals(uploads.queued.first(), uploads.queued.last())
+    assertEquals(OverviewRowStatus.UPLOAD_WAITING, state.rows.single().status)
+    assertEquals(ProofRetryStatus.NONE, state.proofRetryOf(id))
+  }
+
+  @Test
+  fun aRetryTheQueueRefusesSaysToSendANewProof() = test {
+    val id = approvedReservation()
+    queue(id)
+    uploads.fail(id)
+    viewModel
+    runCurrent()
+    uploads.forcedFailure = IOException("The photo is gone")
+
+    viewModel.retryProof(id)
+    runCurrent()
+
+    assertEquals(OverviewRowStatus.PROOF_NOT_SENT, state.rows.single().status)
+    assertEquals(ProofRetryStatus.FAILED, state.proofRetryOf(id))
+
+    // A new proof clears it
+    uploads.forcedFailure = null
+    queue(id)
+    runCurrent()
+    assertEquals(OverviewRowStatus.UPLOAD_WAITING, state.rows.single().status)
+    assertEquals(ProofRetryStatus.NONE, state.proofRetryOf(id))
+  }
+
+  @Test
+  fun onlyARetryableFailureIsTriedAgain() = test {
+    val id = approvedReservation()
+    queue(id)
+    uploads.fail(id, UploadFailure.REFUSED)
+    val other = approvedReservation("cake")
+    viewModel
+    runCurrent()
+
+    viewModel.retryProof(id)
+    // Nor a row whose proof wasn't queued
+    viewModel.retryProof(other)
+    runCurrent()
+
+    assertEquals(1, uploads.queued.size)
+    assertEquals(ProofRetryStatus.NONE, state.proofRetryOf(id))
+    assertEquals(ProofRetryStatus.NONE, state.proofRetryOf(other))
   }
 
   // A proof only changes the row of its own reservation

@@ -11,9 +11,11 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -133,6 +135,59 @@ class OverviewQuestRowTest {
 
     status(app.getString(R.string.overview_status_upload_waiting).uppercase()).assertIsDisplayed()
     status("APPROVED").assertDoesNotExist()
+  }
+
+  // #624: a proof that failed on the way can be tried again or replaced
+  @Test
+  fun aProofNotSentOffersToTryAgain() {
+    var retries = 0
+    var retry by mutableStateOf(ProofRetryStatus.NONE)
+    compose.setContent {
+      AroundAppTheme {
+        OverviewQuestRow(
+            row(status = OverviewRowStatus.PROOF_NOT_SENT),
+            onClick = {},
+            clock = CLOCK,
+            onSendNewProof = {},
+            proofRetry = retry,
+            onRetryProof = { retries++ },
+        )
+      }
+    }
+
+    status(app.getString(R.string.overview_status_proof_not_sent).uppercase()).assertIsDisplayed()
+    part(C.Tag.OVERVIEW_SEND_NEW_PROOF).assertIsDisplayed()
+    part(C.Tag.OVERVIEW_RETRY_PROOF)
+        .assert(hasAnyDescendant(hasText(app.getString(R.string.overview_retry_proof))))
+        .performClick()
+    assertEquals(1, retries)
+    part(C.Tag.OVERVIEW_RETRY_PROOF_FAILED).assertDoesNotExist()
+
+    retry = ProofRetryStatus.RETRYING
+    part(C.Tag.OVERVIEW_RETRY_PROOF)
+        .assert(hasAnyDescendant(hasText(app.getString(R.string.overview_retrying_proof))))
+        .assertIsNotEnabled()
+
+    retry = ProofRetryStatus.FAILED
+    part(C.Tag.OVERVIEW_RETRY_PROOF).assertIsEnabled()
+    part(C.Tag.OVERVIEW_RETRY_PROOF_FAILED).assertIsDisplayed()
+  }
+
+  @Test
+  fun withoutARetryOnlyANewProofIsOffered() {
+    compose.setContent {
+      AroundAppTheme {
+        OverviewQuestRow(
+            row(status = OverviewRowStatus.PROOF_NOT_SENT),
+            onClick = {},
+            clock = CLOCK,
+            onSendNewProof = {},
+        )
+      }
+    }
+
+    part(C.Tag.OVERVIEW_SEND_NEW_PROOF).assertIsDisplayed()
+    part(C.Tag.OVERVIEW_RETRY_PROOF).assertDoesNotExist()
   }
 
   // The Figma frame "Quests tab · Send new proof": "Proof sent by Lea"; unnamed, it stays "Proof
