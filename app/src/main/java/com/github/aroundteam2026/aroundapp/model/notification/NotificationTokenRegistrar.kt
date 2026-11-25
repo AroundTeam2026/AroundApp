@@ -6,57 +6,61 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 /**
- * Saves this phone's FCM token for whoever is signed in: when FCM gives a new token, and each time
- * someone signs in. Signed out, it saves nothing.
+ * Saves the ID FCM registers this phone under (its Firebase Installation ID) for whoever is signed
+ * in, as a token of [NotificationTokenRepository]. Signed out, it saves nothing.
  *
- * Failures aren't retried, only logged without the token: Firestore keeps the write while offline,
- * and FCM calls [onNewToken] again whenever the token changes.
+ * Each sign-in, including a session restored at launch, asks FCM to
+ * [NotificationRegistration.register] the phone, and FCM answers through [onRegistered], which
+ * saves the ID for whoever is signed in by then. So a user who signs out before FCM answers gets
+ * nothing saved.
+ *
+ * Failures aren't retried, only logged without the ID: Firestore keeps the write while offline, and
+ * the next sign-in registers again.
  *
  * @param auth tells who is signed in.
- * @param tokens where the token is saved.
- * @param source gives the phone's current token at sign-in.
- * @param scope runs the saves; it should outlive any one screen, since FCM can give a new token
- *   while no activity is open.
+ * @param tokens where the ID is saved.
+ * @param registration asks FCM for the ID at each sign-in.
+ * @param scope runs the registrations and saves; it should outlive any one screen, since FCM can
+ *   answer while no activity is open.
  */
 class NotificationTokenRegistrar(
     private val auth: AuthRepository,
     private val tokens: NotificationTokenRepository,
-    private val source: NotificationTokenSource,
+    private val registration: NotificationRegistration,
     private val scope: CoroutineScope,
 ) {
   private val started = AtomicBoolean(false)
 
   /**
-   * Starts saving the token at each sign-in, including a session restored at launch. Only the first
-   * call counts, so an activity recreated on rotation doesn't save again.
+   * Starts registering the phone at each sign-in. Only the first call counts, so an activity
+   * recreated on rotation doesn't register again.
    */
   fun start() {
     if (!started.compareAndSet(false, true)) return
     scope.launch {
-      // No distinctUntilChanged: once nulls are dropped, it would merge a sign-out and a sign-in
-      // back as the same user into one sign-in, though the sign-out deleted the token (#636)
-      auth.currentUserId.filterNotNull().collectLatest { uid ->
-        source
-            .currentToken()
-            .onSuccess { save(uid, it) }
-            .onFailure { Log.w(TAG, "Couldn't get the notification token", it) }
+      // The sign-out (null) reaches collectLatest too, so it cancels a registration still running
+      // for the user who left
+      auth.currentUserId.collectLatest { uid ->
+        if (uid == null) return@collectLatest
+        registration.register().onFailure {
+          Log.w(TAG, "Couldn't register the phone for notifications", it)
+        }
       }
     }
   }
 
-  /** Saves [token], FCM's new token for this phone, for the signed-in user; signed out, nothing. */
-  fun onNewToken(token: String) {
+  /**
+   * Saves [id], the ID FCM registered this phone under, for the signed-in user; signed out,
+   * nothing.
+   */
+  fun onRegistered(id: String) {
     val uid = auth.currentUserId.value ?: return
-    scope.launch { save(uid, token) }
-  }
-
-  /** Saves [token] for [uid], logging a failure without the token itself. */
-  private suspend fun save(uid: String, token: String) {
-    tokens.save(uid, token).onFailure { Log.w(TAG, "Couldn't save the notification token", it) }
+    scope.launch {
+      tokens.save(uid, id).onFailure { Log.w(TAG, "Couldn't save the phone's notification ID", it) }
+    }
   }
 
   private companion object {

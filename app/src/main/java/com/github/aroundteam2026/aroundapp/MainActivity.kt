@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
-    // Saves the phone's token at each sign-in; only the first call starts it, not a recreation
+    // Registers the phone for notifications at each sign-in; only the first call starts it
     NotificationTokenRegistrarProvider.registrar.start()
     setContent {
       val auth = AuthRepositoryProvider.repository
