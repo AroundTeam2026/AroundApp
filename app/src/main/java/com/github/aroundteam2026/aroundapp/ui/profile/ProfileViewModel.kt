@@ -24,14 +24,18 @@ class ProfileViewModel(
 ) : ViewModel() {
   /**
    * Cancels every queued proof, then ends the shared auth session; the session observer returns
-   * navigation to auth. A failure to cancel them is logged and doesn't keep the explorer signed in.
+   * navigation to auth. A failure to cancel them is logged and doesn't keep the explorer signed in,
+   * and neither does this ViewModel being cleared while it waits for the queue.
    */
   fun signOut() {
     viewModelScope.launch {
-      proofUploadQueue?.cancelAll()?.onFailure {
-        Log.w(TAG, "Cancelling the queued proofs at sign-out failed", it)
+      try {
+        proofUploadQueue?.cancelAll()?.onFailure {
+          Log.w(TAG, "Cancelling the queued proofs at sign-out failed", it)
+        }
+      } finally {
+        repository.signOut()
       }
-      repository.signOut()
     }
   }
 
@@ -40,11 +44,11 @@ class ProfileViewModel(
 
     /**
      * Supplies the repository and queue interfaces when Compose creates this ViewModel; a venue
-     * passes no queue.
+     * passes null for the queue.
      */
     fun factory(
         repository: AuthRepository,
-        proofUploadQueue: ProofUploadQueue? = null,
+        proofUploadQueue: ProofUploadQueue?,
     ): ViewModelProvider.Factory = viewModelFactory {
       initializer { ProfileViewModel(repository, proofUploadQueue) }
     }

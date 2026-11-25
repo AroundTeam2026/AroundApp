@@ -10,6 +10,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueue
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -73,6 +74,19 @@ class ProfileViewModelTest {
     queue.cancelFailure = IllegalStateException(UNAVAILABLE)
 
     viewModel().signOut()
+
+    assertNull(repository.currentUserId.value)
+  }
+
+  @Test
+  fun signOut_whenClearedWhileCancellingTheQueue_stillSignsOut() {
+    val stuck =
+        object : ProofUploadQueue by queue {
+          override suspend fun cancelAll(): Result<Unit> = awaitCancellation()
+        }
+    viewModel(stuck).signOut()
+
+    store.clear()
 
     assertNull(repository.currentUserId.value)
   }
