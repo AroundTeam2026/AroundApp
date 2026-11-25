@@ -30,7 +30,7 @@ data class OverviewUiState(
     /** The reservations whose unsent proof couldn't be tried again, e.g. as its photo is gone. */
     val failedProofRetryIds: Set<String> = emptySet(),
 ) {
-  /** How cancelling the reservation [reservationId] stands, for its card. */
+  /** How trying the unsent proof of the reservation [reservationId] again stands, for its card. */
   fun proofRetryOf(reservationId: String): ProofRetryStatus =
       when (reservationId) {
         in retryingProofIds -> ProofRetryStatus.RETRYING
@@ -38,6 +38,7 @@ data class OverviewUiState(
         else -> ProofRetryStatus.NONE
       }
 
+  /** How cancelling the reservation [reservationId] stands, for its card. */
   fun cancelStatusOf(reservationId: String): CancelStatus =
       when (reservationId) {
         in cancellingIds -> CancelStatus.CANCELLING

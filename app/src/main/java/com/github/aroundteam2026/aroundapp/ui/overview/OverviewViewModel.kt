@@ -112,16 +112,6 @@ class OverviewViewModel(
   }
 
   /**
-   * Called when the explorer cancels the reservation [reservationId], or, on an [OverviewRow.leave]
-   * row, leaves its party, which keeps the reservation for the others. Does nothing unless it is
-   * one of the rows and still [OverviewRowStatus.cancellable], nor when its [OverviewRow.leave] is
-   * unknown, or while it is being cancelled, so a double tap cancels once, or while the device is
-   * offline, since the cancel needs a connection. The row shows as cancelling until the listener
-   * drops it. A failure, such as being offline, keeps the row and marks it failed, unless the row
-   * left meanwhile; calling this again retries. Once it succeeds, the reservation's proof waiting
-   * in the [ProofUploadQueue], if any, is cancelled too, since the rules would refuse it.
-   */
-  /**
    * Queues [reservationId]'s unsent proof again (#624), when its failure is
    * [UploadFailure.RETRYABLE]. Does nothing while that retry is under way, so a double tap retries
    * once. A failure, e.g. as the photo is no longer kept, marks the row so it says to send a new
@@ -156,6 +146,16 @@ class OverviewViewModel(
     }
   }
 
+  /**
+   * Called when the explorer cancels the reservation [reservationId], or, on an [OverviewRow.leave]
+   * row, leaves its party, which keeps the reservation for the others. Does nothing unless it is
+   * one of the rows and still [OverviewRowStatus.cancellable], nor when its [OverviewRow.leave] is
+   * unknown, or while it is being cancelled, so a double tap cancels once, or while the device is
+   * offline, since the cancel needs a connection. The row shows as cancelling until the listener
+   * drops it. A failure, such as being offline, keeps the row and marks it failed, unless the row
+   * left meanwhile; calling this again retries. Once it succeeds, the reservation's proof waiting
+   * in the [ProofUploadQueue], if any, is cancelled too, since the rules would refuse it.
+   */
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
     val row =
