@@ -20,6 +20,7 @@ class FakeNotificationRegistrationTest {
     registration.register().getOrThrow()
     registration.register().getOrThrow()
 
+    assertEquals(2, registration.started)
     assertEquals(2, registration.registrations)
   }
 
@@ -29,6 +30,7 @@ class FakeNotificationRegistrationTest {
     registration.failure = failure
 
     assertSame(failure, registration.register().exceptionOrNull())
+    assertEquals(1, registration.started)
     assertEquals(0, registration.registrations)
   }
 
@@ -40,6 +42,7 @@ class FakeNotificationRegistrationTest {
     val call = async { registration.register() }
     runCurrent()
     assertFalse(call.isCompleted)
+    assertEquals(1, registration.started)
 
     gate.complete(Unit)
     assertTrue(call.await().isSuccess)

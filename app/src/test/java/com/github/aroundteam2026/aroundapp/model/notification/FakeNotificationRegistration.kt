@@ -4,12 +4,16 @@ package com.github.aroundteam2026.aroundapp.model.notification
 import kotlinx.coroutines.CompletableDeferred
 
 /**
- * [NotificationRegistration] for tests without FCM. It counts the [registrations] that succeeded,
- * fails with [failure] when it is set, and holds every call until [gate] completes when it is set,
- * so a test can act while a registration is still running. Like FCM's answer, the ID is handed to
- * the registrar by the test itself, through `onRegistered`.
+ * [NotificationRegistration] for tests without FCM. It counts the calls it [started] and the
+ * [registrations] that succeeded, fails with [failure] when it is set, and holds every call until
+ * [gate] completes when it is set, so a test can act while a registration is still running. Like
+ * FCM's answer, the ID is handed to the registrar by the test itself, through `onRegistered`.
  */
 class FakeNotificationRegistration : NotificationRegistration {
+  /** How many calls to [register] started, finished or not. */
+  var started = 0
+    private set
+
   /** How many calls to [register] succeeded. */
   var registrations = 0
     private set
@@ -21,6 +25,7 @@ class FakeNotificationRegistration : NotificationRegistration {
   var gate: CompletableDeferred<Unit>? = null
 
   override suspend fun register(): Result<Unit> {
+    started++
     gate?.await()
     failure?.let {
       return Result.failure(it)

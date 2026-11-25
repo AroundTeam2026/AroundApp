@@ -41,8 +41,9 @@ class NotificationTokenRegistrar(
   fun start() {
     if (!started.compareAndSet(false, true)) return
     scope.launch {
-      // The sign-out (null) reaches collectLatest too, so it cancels a registration still running
-      // for the user who left
+      // A sign-out (null) reaches collectLatest too, so it stops waiting on a registration
+      // started for the user who left, and doesn't log its failure. FCM still finishes it and
+      // calls onRegistered, which is what keeps the ID from being saved for them.
       auth.currentUserId.collectLatest { uid ->
         if (uid == null) return@collectLatest
         registration.register().onFailure {

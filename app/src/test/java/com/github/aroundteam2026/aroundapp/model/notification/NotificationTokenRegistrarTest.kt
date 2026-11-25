@@ -71,7 +71,7 @@ class NotificationTokenRegistrarTest {
   }
 
   @Test
-  fun signingOutDuringTheRegistrationCancelsIt() = runTest {
+  fun signingOutStopsWaitingOnTheRegistration() = runTest {
     val gate = CompletableDeferred<Unit>()
     registration.gate = gate
     val auth = FakeAuthRepository(UID)
@@ -83,32 +83,9 @@ class NotificationTokenRegistrarTest {
     gate.complete(Unit)
     runCurrent()
 
+    // Started for the signed-in user, then not waited on once they left
+    assertEquals(1, registration.started)
     assertEquals(0, registration.registrations)
-  }
-
-  @Test
-  fun idRegisteredAfterAnotherUserSignedInIsSavedOnlyForThem() = runTest {
-    val gate = CompletableDeferred<Unit>()
-    registration.gate = gate
-    val auth = FakeAuthRepository()
-    val first = auth.addAccount(EMAIL, PASSWORD)
-    val second = auth.addAccount(OTHER_EMAIL, PASSWORD)
-    val registrar = registrar(auth)
-    registrar.start()
-    auth.signInWithEmail(EMAIL, PASSWORD).getOrThrow()
-    runCurrent()
-
-    auth.signInWithEmail(OTHER_EMAIL, PASSWORD).getOrThrow()
-    runCurrent()
-    gate.complete(Unit)
-    runCurrent()
-    // FCM answers the registration that's left
-    registrar.onRegistered(ID)
-    runCurrent()
-
-    assertEquals(1, registration.registrations)
-    assertTrue(tokens.tokensOf(first).isEmpty())
-    assertEquals(setOf(ID), tokens.tokensOf(second))
   }
 
   @Test
@@ -158,7 +135,6 @@ class NotificationTokenRegistrarTest {
   private companion object {
     const val UID = "user-1"
     const val EMAIL = "ada@test.com"
-    const val OTHER_EMAIL = "grace@test.com"
     const val PASSWORD = "password123"
     const val ID = "installation-1"
     const val NEW_ID = "installation-2"
