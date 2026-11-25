@@ -15,14 +15,18 @@ import androidx.work.WorkerParameters
 import androidx.work.await
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import androidx.work.workDataOf
 import com.github.aroundteam2026.aroundapp.worker.ProofUploadWorker
 import io.mockk.every
 import io.mockk.mockk
 import java.io.File
 import java.io.FileNotFoundException
+import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -30,12 +34,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
 /**
  * Runs [ProofUploadQueueWorkManager] on a test WorkManager, whose [ProofUploadWorker]s upload to
- * fakes, to check that a reservation is [ProofUploadQueue.waiting] until its upload ends.
+ * fakes, to check that a reservation is [ProofUploadQueue.waiting] until its upload ends, and
+ * [ProofUploadQueue.failed] if it failed for good.
  */
 @RunWith(AndroidJUnit4::class)
 class ProofUploadQueueWorkManagerTest {
@@ -44,6 +51,9 @@ class ProofUploadQueueWorkManagerTest {
   private lateinit var completions: FakeCompletionRepository
   private lateinit var queue: ProofUploadQueueWorkManager
   private val discarded = mutableListOf<Uri>()
+
+  /** Holds the photos [ProofUploadQueue.retry] needs to still be kept. */
+  @get:Rule val folder = TemporaryFolder()
 
   /** Builds every worker on the fakes, as the app's factory would on the real repositories. */
   private val factory =
@@ -79,7 +89,10 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun startsWithNothingWaiting() = runWithTimeout { assertTrue(queue.waiting.first().isEmpty()) }
+  fun startsWithNothingWaitingOrFailed() = runWithTimeout {
+    assertTrue(queue.waiting.first().isEmpty())
+    assertTrue(queue.failed.first().isEmpty())
+  }
 
   @Test
   fun enqueue_listsTheReservationAsWaitingWhileOffline() = runWithTimeout {
@@ -98,34 +111,158 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun succeededUpload_leavesWaitingAndSendsTheQueuedPhoto() = runWithTimeout {
+  fun succeededUpload_leavesWaitingWithoutFailingAndSendsTheQueuedPhoto() = runWithTimeout {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     runOnline(RESERVATION_ID)
 
     assertTrue(RESERVATION_ID !in queue.waiting.first())
+    assertTrue(queue.failed.first().isEmpty())
     assertEquals(listOf(Uri.fromFile(PHOTO)), photos.uploads.values.toList())
     assertEquals(1, completions.observeForReservation(RESERVATION_ID).first().size)
   }
 
   @Test
-  fun stoppedUpload_leavesWaiting() = runWithTimeout {
-    photos.forcedFailure = FileNotFoundException(GONE)
-    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
-
-    runOnline(RESERVATION_ID)
+  fun stoppedUpload_leavesWaitingForFailed() = runWithTimeout {
+    failUpload(PHOTO)
 
     assertTrue(RESERVATION_ID !in queue.waiting.first())
+    assertEquals(mapOf(RESERVATION_ID to UploadFailure.PHOTO_MISSING), queue.failed.first())
     assertTrue(completions.observeForReservation(RESERVATION_ID).first().isEmpty())
   }
 
   @Test
-  fun cancelledUpload_leavesWaiting() = runWithTimeout {
+  fun stoppedUpload_ofAnApprovedCompletion_isNotListedAsFailed() = runWithTimeout {
+    completions.submit(RESERVATION_ID, VENUE_ID, EXPLORER_UID, Proof.Photo(LOCATION))
+    completions.approve(completions.observeForReservation(RESERVATION_ID).first().single().id)
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+
+    runOnline(RESERVATION_ID)
+
+    assertTrue(queue.waiting.first().isEmpty())
+    assertTrue(queue.failed.first().isEmpty())
+  }
+
+  @Test
+  fun cancelledUpload_leavesWaitingWithoutFailing() = runWithTimeout {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
 
     workManager.cancelUniqueWork(ProofUploadWorker.uniqueWorkName(RESERVATION_ID)).await()
 
     assertTrue(queue.waiting.first().isEmpty())
+    assertTrue(queue.failed.first().isEmpty())
+  }
+
+  @Test
+  fun retry_queuesTheFailedProofAgainWithTheSamePhoto() = runWithTimeout {
+    val photo = folder.newFile()
+    failUpload(photo)
+    photos.forcedFailure = null
+
+    assertTrue(queue.retry(RESERVATION_ID).isSuccess)
+
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+    assertTrue(queue.failed.first().isEmpty())
+    runOnline(RESERVATION_ID)
+    assertEquals(listOf(Uri.fromFile(photo)), photos.uploads.values.toList())
+    val completion = completions.observeForReservation(RESERVATION_ID).first().single()
+    assertEquals(VENUE_ID, completion.venueId)
+    assertEquals(EXPLORER_UID, completion.explorerUid)
+  }
+
+  @Test
+  fun retry_withoutAKeptFailedProof_failsAndChangesNothing() = runWithTimeout {
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, folder.newFile())
+    val photo = folder.newFile()
+    failUpload(photo)
+    photo.delete()
+
+    assertTrue(queue.retry(RESERVATION_ID).exceptionOrNull() is FileNotFoundException)
+    assertTrue(queue.retry(OTHER_RESERVATION_ID).exceptionOrNull() is NoSuchElementException)
+    assertEquals(setOf(RESERVATION_ID), queue.failed.first().keys)
+    assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
+  fun retry_whenWorkManagerFails_returnsTheFailure() = runWithTimeout {
+    val failure = IllegalStateException(UNAVAILABLE)
+
+    val result =
+        ProofUploadQueueWorkManager(brokenWorkManager(failure, works = flow { throw failure })) {
+              true
+            }
+            .retry(RESERVATION_ID)
+
+    assertEquals(failure, result.exceptionOrNull())
+  }
+
+  @Test
+  fun retry_whenQueuingFails_returnsTheFailure() = runWithTimeout {
+    val failure = IllegalStateException(UNAVAILABLE)
+    val works = flowOf(listOf(failedWork(ProofUploadWorker.ERROR_UPLOAD, folder.newFile())))
+
+    val result =
+        ProofUploadQueueWorkManager(brokenWorkManager(failure, works)) { true }
+            .retry(RESERVATION_ID)
+
+    assertEquals(failure, result.exceptionOrNull())
+  }
+
+  @Test
+  fun retry_ofAProofThatCantBeRebuilt_fails() = runWithTimeout {
+    val approved = failedWork(ProofUploadWorker.ERROR_ALREADY_APPROVED, folder.newFile())
+    // Queued before uploads were tagged with their venue and sender
+    val untagged =
+        WorkInfo(
+            UUID.randomUUID(),
+            WorkInfo.State.FAILED,
+            setOf(ProofUploadWorker.TAG, ProofUploadWorker.uniqueWorkName(OTHER_RESERVATION_ID)),
+            workDataOf(ProofUploadWorker.KEY_ERROR to ProofUploadWorker.ERROR_UPLOAD),
+        )
+    // Not an IllegalStateException, so the untagged work can't pass by reaching enqueueUniqueWork
+    val unavailable = UnsupportedOperationException(UNAVAILABLE)
+    suspend fun retry(work: WorkInfo, reservationId: String) =
+        ProofUploadQueueWorkManager(brokenWorkManager(unavailable, flowOf(listOf(work)))) { true }
+            .retry(reservationId)
+
+    assertTrue(retry(approved, RESERVATION_ID).exceptionOrNull() is NoSuchElementException)
+    assertTrue(retry(untagged, OTHER_RESERVATION_ID).exceptionOrNull() is IllegalStateException)
+  }
+
+  @Test
+  fun retry_afterARetakeWasQueued_failsAndKeepsTheRetake() = runWithTimeout {
+    failUpload(PHOTO)
+    photos.forcedFailure = null
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    val result = queue.retry(RESERVATION_ID)
+
+    assertTrue(result.exceptionOrNull() is NoSuchElementException)
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+    assertTrue(Uri.fromFile(RETAKE) !in discarded)
+    runOnline(RESERVATION_ID)
+    assertEquals(listOf(Uri.fromFile(RETAKE)), photos.uploads.values.toList())
+  }
+
+  @Test
+  fun failed_tellsWhyEachProofFailed() = runWithTimeout {
+    val reasons =
+        mapOf(
+            ProofUploadWorker.ERROR_UPLOAD to UploadFailure.RETRYABLE,
+            ProofUploadWorker.ERROR_SUBMIT to UploadFailure.RETRYABLE,
+            ProofUploadWorker.ERROR_REFUSED to UploadFailure.REFUSED,
+            ProofUploadWorker.ERROR_INVALID to UploadFailure.REFUSED,
+            ProofUploadWorker.ERROR_BAD_INPUT to UploadFailure.REFUSED,
+            ProofUploadWorker.ERROR_PHOTO_MISSING to UploadFailure.PHOTO_MISSING,
+        )
+    // Each work is named after its error code, so the map says which reason each one got
+    val works = reasons.keys.map { failedWork(it, PHOTO, reservationId = it) }
+    val manager =
+        mockk<WorkManager>(relaxed = true) {
+          every { getWorkInfosByTagFlow(ProofUploadWorker.TAG) } returns flowOf(works)
+        }
+
+    assertEquals(reasons, ProofUploadQueueWorkManager(manager) { true }.failed.first())
   }
 
   @Test
@@ -140,15 +277,15 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun enqueue_afterTheUploadEnded_queuesTheNewProof() = runWithTimeout {
-    photos.forcedFailure = FileNotFoundException(GONE)
-    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
-    runOnline(RESERVATION_ID)
+  fun enqueue_afterAFailure_leavesFailedAndDeletesTheFailedCopy() = runWithTimeout {
+    failUpload(PHOTO)
     photos.forcedFailure = null
 
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
 
     assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+    assertTrue(queue.failed.first().isEmpty())
+    assertEquals(listOf(Uri.fromFile(PHOTO)), discarded)
   }
 
   @Test
@@ -189,6 +326,18 @@ class ProofUploadQueueWorkManagerTest {
     assertEquals(listOf(WorkInfo.State.CANCELLED), works.first().map { it.state })
     assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
     assertEquals(listOf(Uri.fromFile(PHOTO)), discarded)
+  }
+
+  @Test
+  fun cancel_afterAFailure_leavesFailedAndDeletesTheCopy() = runWithTimeout {
+    val photo = folder.newFile()
+    failUpload(photo)
+
+    assertTrue(queue.cancel(RESERVATION_ID).isSuccess)
+
+    assertTrue(queue.failed.first().isEmpty())
+    assertEquals(listOf(Uri.fromFile(photo)), discarded)
+    assertTrue(queue.retry(RESERVATION_ID).exceptionOrNull() is NoSuchElementException)
   }
 
   @Test
@@ -238,8 +387,7 @@ class ProofUploadQueueWorkManagerTest {
 
     assertTrue(queue.cancelAll().isSuccess)
 
-    val works = workManager.getWorkInfosByTagFlow(ProofUploadWorker.TAG).first()
-    assertEquals(listOf(WorkInfo.State.CANCELLED, WorkInfo.State.CANCELLED), works.map { it.state })
+    assertTrue(workManager.getWorkInfosByTagFlow(ProofUploadWorker.TAG).first().isEmpty())
     assertTrue(queue.waiting.first().isEmpty())
     assertEquals(setOf(Uri.fromFile(PHOTO), Uri.fromFile(RETAKE)), discarded.toSet())
   }
@@ -253,6 +401,16 @@ class ProofUploadQueueWorkManagerTest {
     assertTrue(queue.cancelAll().isSuccess)
 
     assertEquals(listOf(Uri.fromFile(RETAKE)), discarded)
+  }
+
+  @Test
+  fun cancelAll_afterAFailure_emptiesFailedAndDeletesTheCopy() = runWithTimeout {
+    failUpload(PHOTO)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    assertTrue(queue.failed.first().isEmpty())
+    assertEquals(listOf(Uri.fromFile(PHOTO)), discarded)
   }
 
   @Test
@@ -270,6 +428,13 @@ class ProofUploadQueueWorkManagerTest {
     assertTrue(discarded.isEmpty())
   }
 
+  /** Queues [photo] as [RESERVATION_ID]'s proof, and runs its upload until it stops for good. */
+  private suspend fun failUpload(photo: File) {
+    photos.forcedFailure = FileNotFoundException(GONE)
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, photo)
+    runOnline(RESERVATION_ID)
+  }
+
   /**
    * Brings the network back for [reservationId]'s upload and waits until its work has finished, so
    * the test itself checks what [ProofUploadQueue.waiting] says then.
@@ -285,6 +450,16 @@ class ProofUploadQueueWorkManagerTest {
     }
   }
 
+  /** A work of [reservationId]'s proof [photo] that failed for good with the error [code]. */
+  private fun failedWork(code: String, photo: File, reservationId: String = RESERVATION_ID) =
+      WorkInfo(
+          UUID.randomUUID(),
+          WorkInfo.State.FAILED,
+          ProofUploadWorker.buildRequest(reservationId, VENUE_ID, EXPLORER_UID, Uri.fromFile(photo))
+              .tags,
+          workDataOf(ProofUploadWorker.KEY_ERROR to code),
+      )
+
   /** Runs [body] as a test that fails, instead of hanging, if a flow stops emitting. */
   private fun runWithTimeout(body: suspend CoroutineScope.() -> Unit) = runBlocking {
     withTimeout(TIMEOUT_MS, body)
@@ -292,11 +467,15 @@ class ProofUploadQueueWorkManagerTest {
 
   /**
    * A WorkManager whose every [WorkManager.enqueueUniqueWork], [WorkManager.cancelUniqueWork] and
-   * [WorkManager.cancelAllWorkByTag] throws [error].
+   * [WorkManager.cancelAllWorkByTag] throws [error], and whose
+   * [WorkManager.getWorkInfosForUniqueWorkFlow] is [works].
    */
-  private fun brokenWorkManager(error: Throwable): WorkManager =
+  private fun brokenWorkManager(
+      error: Throwable,
+      works: Flow<List<WorkInfo>> = flowOf(emptyList()),
+  ): WorkManager =
       mockk<WorkManager>(relaxed = true) {
-        every { getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList())
+        every { getWorkInfosForUniqueWorkFlow(any()) } returns works
         every { enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws error
         every { getWorkInfosByTagFlow(any()) } returns flowOf(emptyList())
         every { cancelUniqueWork(any()) } throws error
@@ -311,6 +490,7 @@ class ProofUploadQueueWorkManagerTest {
     const val GONE = "gone"
     const val UNAVAILABLE = "WorkManager unavailable"
     const val CANCELLED = "screen closed"
+    const val LOCATION = "gs://proofs/reservation-1.jpg"
     const val TIMEOUT_MS = 5_000L
     val PHOTO = File("/data/user/0/app/files/proofs/proof-1.jpg")
     val RETAKE = File("/data/user/0/app/files/proofs/proof-2.jpg")
