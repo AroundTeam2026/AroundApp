@@ -17,3 +17,7 @@ class FakeRefusedQuestWritesStore : RefusedQuestWritesStore {
     writes.remove(questId)
   }
 }
+
+/** What a ViewModel under test remembers of the venue [venueId]'s writes, and forgets with it. */
+@Suppress("UNUSED_PARAMETER")
+fun fakeRefusedQuestWrites(venueId: String) = RefusedQuestWrites(FakeRefusedQuestWritesStore())

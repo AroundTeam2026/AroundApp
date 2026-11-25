@@ -20,6 +20,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.address.FakeAddressSearchRepository
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.fakeRefusedQuestWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -66,7 +67,11 @@ class VenueDestinationsTest {
             tabFactories =
                 VenueTabFactories(
                     quests =
-                        viewModelFactory { initializer { VenueQuestsViewModel(auth, quests) } },
+                        viewModelFactory {
+                          initializer {
+                            VenueQuestsViewModel(auth, quests, ::fakeRefusedQuestWrites)
+                          }
+                        },
                     dashboard = venueDashboardFactoryOnFakes(VENUE_ID),
                     profile = venueProfileFactoryOnFakes(VENUE_ID),
                 ),

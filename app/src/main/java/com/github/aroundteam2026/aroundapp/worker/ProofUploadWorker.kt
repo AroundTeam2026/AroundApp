@@ -165,6 +165,12 @@ class ProofUploadWorker(
     /** Starts the tag naming an upload's photo, which [photoOf] reads back. */
     private const val PHOTO_TAG_PREFIX = "$TAG-photo:"
 
+    /** Starts the tag naming an upload's venue, which [venueIdOf] reads back. */
+    private const val VENUE_TAG_PREFIX = "$TAG-venue:"
+
+    /** Starts the tag naming an upload's sender, which [explorerUidOf] reads back. */
+    private const val EXPLORER_TAG_PREFIX = "$TAG-explorer:"
+
     /** How many runs a failure that can pass gets before the work fails. */
     const val MAX_ATTEMPTS = 5
 
@@ -178,20 +184,36 @@ class ProofUploadWorker(
      * The id of the reservation whose upload [tag] names, or null if it names none. [buildRequest]
      * tags each upload with its [uniqueWorkName], since WorkManager doesn't report a work's input.
      */
-    fun reservationIdOf(tag: String): String? =
-        tag.removePrefix(UNIQUE_NAME_PREFIX).takeIf { it != tag && it.isNotEmpty() }
+    fun reservationIdOf(tag: String): String? = valueOf(tag, UNIQUE_NAME_PREFIX)
 
     /**
      * The photo whose upload [tag] names, or null if it names none, so a replaced upload's copy can
      * be deleted.
      */
-    fun photoOf(tag: String): Uri? =
-        tag.removePrefix(PHOTO_TAG_PREFIX).takeIf { it != tag && it.isNotEmpty() }?.toUri()
+    fun photoOf(tag: String): Uri? = valueOf(tag, PHOTO_TAG_PREFIX)?.toUri()
+
+    /**
+     * The id of the venue whose upload [tag] names, or null if it names none, so a failed upload
+     * can be queued again.
+     */
+    fun venueIdOf(tag: String): String? = valueOf(tag, VENUE_TAG_PREFIX)
+
+    /**
+     * The uid of the explorer whose upload [tag] names, or null if it names none, so a failed
+     * upload can be queued again.
+     */
+    fun explorerUidOf(tag: String): String? = valueOf(tag, EXPLORER_TAG_PREFIX)
+
+    /**
+     * What follows [prefix] in [tag], or null if [tag] doesn't start with it or holds nothing more.
+     */
+    private fun valueOf(tag: String, prefix: String): String? =
+        tag.removePrefix(prefix).takeIf { it != tag && it.isNotEmpty() }
 
     /**
      * The work that sends [photo], a copy [ProofPhotos] keeps, as the proof of the reservation
      * [reservationId]. It waits for a network connection and retries with exponential backoff, and
-     * is tagged with [TAG], its [uniqueWorkName] and its photo.
+     * is tagged with [TAG], its [uniqueWorkName], its photo, its venue and its sender.
      */
     fun buildRequest(
         reservationId: String,
@@ -219,6 +241,8 @@ class ProofUploadWorker(
             .addTag(TAG)
             .addTag(uniqueWorkName(reservationId))
             .addTag("$PHOTO_TAG_PREFIX$photo")
+            .addTag("$VENUE_TAG_PREFIX$venueId")
+            .addTag("$EXPLORER_TAG_PREFIX$explorerUid")
             .build()
   }
 }

@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.e2e.E2E_PASSWORD
 import com.github.aroundteam2026.aroundapp.e2e.E2eRule
 import com.github.aroundteam2026.aroundapp.e2e.createAccount
+import com.github.aroundteam2026.aroundapp.e2e.signOut
 import com.github.aroundteam2026.aroundapp.e2e.submitAuthForm
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.screen.MainScreen
@@ -64,8 +65,8 @@ class MainActivityTest : TestCase() {
   fun profileSignOutAllowsSigningInAgain() {
     val email = "navigation-${UUID.randomUUID()}@around.test"
     composeTestRule.createAccount(email)
-    composeTestRule.onNodeWithTag(C.Tag.PROFILE_TAB).performClick()
-    composeTestRule.onNodeWithTag(C.Tag.PROFILE_SIGN_OUT).performClick()
+    // Waits for the auth screen: sign-out first cancels the queued proofs, which Compose can't see
+    composeTestRule.signOut()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_SCREEN).assertIsDisplayed()
     composeTestRule.onNodeWithTag(C.Tag.NAV_BAR).assertDoesNotExist()
     composeTestRule.onNodeWithTag(C.Tag.AUTH_WELCOME_SIGN_IN).performClick()

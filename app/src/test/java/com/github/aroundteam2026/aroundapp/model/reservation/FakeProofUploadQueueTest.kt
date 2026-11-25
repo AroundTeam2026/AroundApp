@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue.QueuedProof
 import java.io.File
+import java.io.FileNotFoundException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,8 +24,9 @@ class FakeProofUploadQueueTest {
   }
 
   @Test
-  fun startsWithNothingWaiting() = runTest {
+  fun startsWithNothingWaitingOrFailed() = runTest {
     assertTrue(queue.waiting.first().isEmpty())
+    assertTrue(queue.failed.first().isEmpty())
     assertTrue(queue.queued.isEmpty())
   }
 
@@ -93,6 +95,62 @@ class FakeProofUploadQueueTest {
   }
 
   @Test
+  fun fail_movesTheReservationFromWaitingToFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    queue.fail(RESERVATION_ID, UploadFailure.REFUSED)
+
+    assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+    assertEquals(mapOf(RESERVATION_ID to UploadFailure.REFUSED), queue.failed.first())
+  }
+
+  @Test
+  fun enqueue_afterAFailure_removesTheReservationFromFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.failed.first().isEmpty())
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
+  fun retry_queuesTheFailedProofAgainWithTheSameArguments() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+
+    assertTrue(queue.retry(RESERVATION_ID).isSuccess)
+
+    val proof = QueuedProof(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    assertEquals(listOf(proof, proof), queue.queued)
+    assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
+    assertTrue(queue.failed.first().isEmpty())
+  }
+
+  @Test
+  fun retry_afterAMissingPhoto_failsAndStaysFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID, UploadFailure.PHOTO_MISSING)
+
+    assertTrue(queue.retry(RESERVATION_ID).exceptionOrNull() is FileNotFoundException)
+
+    assertEquals(1, queue.queued.size)
+    assertEquals(mapOf(RESERVATION_ID to UploadFailure.PHOTO_MISSING), queue.failed.first())
+  }
+
+  @Test
+  fun retry_whileTheProofIsWaiting_failsAndQueuesNothing() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+
+    val result = queue.retry(RESERVATION_ID)
+
+    assertTrue(result.exceptionOrNull() is NoSuchElementException)
+    assertEquals(1, queue.queued.size)
+  }
+
+  @Test
   fun cancel_recordsItAndRemovesOnlyThatReservationFromWaiting() = runTest {
     queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
     queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
@@ -101,6 +159,27 @@ class FakeProofUploadQueueTest {
 
     assertEquals(listOf(RESERVATION_ID), queue.cancelled)
     assertEquals(setOf(OTHER_RESERVATION_ID), queue.waiting.first())
+  }
+
+  @Test
+  fun cancel_afterAFailure_removesTheReservationFromFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+
+    assertTrue(queue.cancel(RESERVATION_ID).isSuccess)
+
+    assertTrue(queue.failed.first().isEmpty())
+    assertTrue(queue.retry(RESERVATION_ID).exceptionOrNull() is NoSuchElementException)
+  }
+
+  @Test
+  fun cancelAll_afterAFailure_emptiesFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    assertTrue(queue.failed.first().isEmpty())
   }
 
   @Test

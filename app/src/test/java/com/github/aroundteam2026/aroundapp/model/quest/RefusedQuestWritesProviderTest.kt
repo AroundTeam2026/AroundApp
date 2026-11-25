@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Before
@@ -31,6 +32,24 @@ class RefusedQuestWritesProviderTest {
     val cafe = RefusedQuestWritesProvider.refusedWrites(context, "cafe")
 
     assertNotSame(cafe, RefusedQuestWritesProvider.refusedWrites(context, "bar"))
+  }
+
+  // After signing out, what the venue's writes held must be gone, in memory as on the phone
+  @Test
+  fun forgettingAVenueDropsWhatItKnewAndStartsItOver() {
+    val pending = testQuest(id = "q1", updatedAt = 2_000L).copy(pendingWrite = true)
+    val before = RefusedQuestWritesProvider.refusedWrites(context, "cafe")
+    before.hear(listOf(pending))
+    before.hear(emptyList())
+
+    RefusedQuestWritesProvider.forget(context, "cafe")
+
+    assertEquals(
+        emptyList<RecordedQuestWrite>(),
+        RefusedQuestWritesStoreSharedPrefs(context, "cafe").all(),
+    )
+    assertNotSame(before, RefusedQuestWritesProvider.refusedWrites(context, "cafe"))
+    assertFalse(RefusedQuestWritesProvider.refusedWrites(context, "cafe").hasUnreportedRefusal)
   }
 
   // What it learns is kept on the phone, under the venue, for the next time the app opens

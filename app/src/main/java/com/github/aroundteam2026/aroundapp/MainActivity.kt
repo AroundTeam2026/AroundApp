@@ -3,6 +3,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +14,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationTokenRegistrarProvider
+import com.github.aroundteam2026.aroundapp.model.quest.RefusedQuestWritesProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
@@ -75,8 +77,8 @@ class MainActivity : ComponentActivity() {
                     uid,
                     auth,
                     VenueRepositoryProvider.repository,
-                    profile::signOut,
-                    venuePictures,
+                    onSignOut = { venueSignOut(applicationContext, uid, profile::signOut) },
+                    venuePictures = venuePictures,
                 )
               }
             },
@@ -84,4 +86,14 @@ class MainActivity : ComponentActivity() {
       }
     }
   }
+}
+
+/**
+ * Signs the venue [venueUid] out with [signOut], after forgetting the quest writes this phone
+ * remembers of it, so a second venue signing in on the same phone isn't told about a write that
+ * wasn't theirs.
+ */
+internal fun venueSignOut(context: Context, venueUid: String, signOut: () -> Unit) {
+  RefusedQuestWritesProvider.forget(context, venueUid)
+  signOut()
 }
