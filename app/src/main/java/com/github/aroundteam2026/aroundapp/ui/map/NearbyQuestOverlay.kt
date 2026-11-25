@@ -2,6 +2,7 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.map
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -52,6 +54,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.collapse
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.expand
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -128,7 +134,9 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * sits on the bottom edge and stops [PULLED_UP_TOP] under the top, as in Figma; only then does the
  * list scroll. The map behind it dims as it grows, and a tap there takes it back to rest. Let go
  * partway, it settles where a fling heads to, or else at rest or pulled up, whichever is nearer.
- * How far it is pulled up survives recreation.
+ * Pulled up, Back takes it back to rest too, and it never grows past its stop, even if its content
+ * does. TalkBack pulls it up and back with the grabber's expand and collapse actions. How far it is
+ * pulled up survives recreation.
  *
  * Dragged down, the list scrolls back to its top first, then the sheet shrinks back to rest. From
  * rest, the explorer closes it by dragging it down past a third of its height or flinging it down;
@@ -170,6 +178,9 @@ fun NearbyQuestOverlay(
   }
   val listDrag = remember { ListDrag(motion) { settle(it) } }
   val scrimAlpha = if (AroundTheme.isDark) SCRIM_ALPHA_DARK else SCRIM_ALPHA_LIGHT
+  val grabberLabel = stringResource(R.string.map_nearby_grabber)
+  // Nested inside the map's own Back, which closes the overlay, so this one is asked first
+  BackHandler(enabled = motion.pulled > 0f) { scope.launch { motion.lower() } }
   BoxWithConstraints(modifier.fillMaxSize()) {
     val large = with(density) { AroundSpacing.Large.toPx() }
     // How far the sheet's top travels from rest, a margin above the bottom, to pulled up
@@ -192,6 +203,9 @@ fun NearbyQuestOverlay(
         else AroundCorners.Overlay.copy(bottomStart = ZeroCornerSize, bottomEnd = ZeroCornerSize)
     Column(
         Modifier.align(Alignment.BottomCenter)
+            // The list's extra height is worked out from the height at rest, so content that grows
+            // while it is pulled up, such as the filters, would otherwise push it past its stop
+            .heightIn(max = maxHeight - PULLED_UP_TOP)
             .padding(start = margin, end = margin, bottom = margin)
             .fillMaxWidth()
             .onSizeChanged { if (motion.pulled == 0f) motion.restHeight = it.height }
@@ -225,6 +239,20 @@ fun NearbyQuestOverlay(
     ) {
       Box(
           Modifier.testTag(C.Tag.NEARBY_GRABBER)
+              .semantics {
+                contentDescription = grabberLabel
+                if (motion.pulled < 1f) {
+                  expand {
+                    scope.launch { motion.raise() }
+                    true
+                  }
+                } else {
+                  collapse {
+                    scope.launch { motion.lower() }
+                    true
+                  }
+                }
+              }
               .size(GRABBER_WIDTH, GRABBER_HEIGHT)
               .background(colors.outline, AroundPillShape)
       )
@@ -253,7 +281,7 @@ fun NearbyQuestOverlay(
  * @param restHeight Its height at rest, in pixels, as last measured.
  */
 @Stable
-private class SheetMotion(pulled: Float = 0f, restHeight: Int = 0) {
+internal class SheetMotion(pulled: Float = 0f, restHeight: Int = 0) {
   /** How far it is pulled up: 0 at rest, 1 pulled up. */
   var pulled by mutableFloatStateOf(pulled)
 
@@ -276,11 +304,14 @@ private class SheetMotion(pulled: Float = 0f, restHeight: Int = 0) {
       val back = delta.coerceAtLeast(-dragged)
       dragged += back
       val up = (back - delta).coerceAtMost((1f - pulled) * reach)
-      if (up > 0f) pulled = (pulled + up / reach).coerceAtMost(1f)
+      // Snapped at the end, as rounding could leave it a hair short
+      if (up > 0f) pulled = if (up >= (1f - pulled) * reach) 1f else pulled + up / reach
       return back - up
     }
     val down = delta.coerceAtMost(pulled * reach)
-    if (down > 0f) pulled = (pulled - down / reach).coerceAtLeast(0f)
+    // Snapped at rest: a hair above it would keep the invisible dim over the map, taking its
+    // touches
+    if (down > 0f) pulled = if (down >= pulled * reach) 0f else pulled - down / reach
     dragged += delta - down
     return delta
   }
@@ -309,6 +340,9 @@ private class SheetMotion(pulled: Float = 0f, restHeight: Int = 0) {
 
   /** Takes it back to rest from pulled up. */
   suspend fun lower() = animate(pulled, 0f) { value, _ -> pulled = value }
+
+  /** Pulls it all the way up from rest. */
+  suspend fun raise() = animate(pulled, 1f) { value, _ -> pulled = value }
 
   companion object {
     /** Keeps how far it is pulled up, and its height at rest, over recreation. */

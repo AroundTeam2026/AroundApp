@@ -57,6 +57,7 @@
     <!-- The pin under a quest's card, which shows the quest on the map -->
     <string name="map_nearby_show_on_map">Show on the map</string>
     <string name="map_nearby_close">Close nearby quests</string>
+    <string name="map_nearby_grabber">Drag handle</string>
     <string name="map_nearby_filters">Filter nearby quests</string>
     <!-- Two parts of a line: the count and the order or filters, or the distance and the reward -->
     <string name="map_nearby_pair">%1$s · %2$s</string>

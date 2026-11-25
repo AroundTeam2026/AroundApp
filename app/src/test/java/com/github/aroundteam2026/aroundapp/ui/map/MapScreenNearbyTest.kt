@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeWithVelocity
 import androidx.compose.ui.unit.dp
@@ -365,6 +366,26 @@ class MapScreenNearbyTest {
 
     assertOverlayClosed()
     composeTestRule.activityRule.scenario.onActivity { assertFalse(it.isFinishing) }
+  }
+
+  @Test
+  fun backTakesAPulledUpOverlayBackToRestBeforeClosingIt() {
+    show()
+    openNearby()
+    val restTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    node(C.Tag.NEARBY_GRABBER).performTouchInput {
+      swipe(center, center - Offset(0f, 600.dp.toPx()), durationMillis = 1_000L)
+    }
+    composeTestRule.waitForIdle()
+
+    composeTestRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+    composeTestRule.waitForIdle()
+    assertDpEquals("overlay top", restTop, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    node(C.Tag.NEARBY_SCRIM).assertDoesNotExist()
+
+    composeTestRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+    composeTestRule.waitForIdle()
+    assertOverlayClosed()
   }
 
   @Test
