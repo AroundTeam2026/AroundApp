@@ -2,26 +2,20 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
 import { randomUUID } from "node:crypto";
-import { getApps, initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { sendToUser } from "../src/notify";
 import { notifyReservationAnswered, sendReservationAnswer } from "../src/reservationAnswered";
+import { initTestApp, membership, QUEST_TITLE, seedQuest, seedVenue, VENUE_NAME } from "./fixtures";
 
-jest.mock("../src/notify", () => ({ sendToUser: jest.fn() }));
+// The sending itself is sendToUser's, tested in notify.test.ts; the shared helpers stay real
+jest.mock("../src/notify", () => ({
+  ...jest.requireActual("../src/notify"),
+  sendToUser: jest.fn(),
+}));
 
 const sender = jest.mocked(sendToUser);
 
-async function membership(reservationId: string, uid: string, status: string): Promise<void> {
-  await getFirestore()
-    .collection("party_user")
-    .doc(`${reservationId}_${uid}`)
-    .set({ reservationId, uid, status, joinedAt: new Date(), updatedAt: new Date() });
-}
-
-beforeAll(() => {
-  if (getApps().length === 0) initializeApp({ projectId: process.env.GCLOUD_PROJECT });
-});
+beforeAll(initTestApp);
 
 beforeEach(() => {
   sender.mockReset();
@@ -32,12 +26,7 @@ afterEach(() => jest.restoreAllMocks());
 
 /** A venue and a quest of their own, so the notification can name them. */
 async function venueAndQuest(): Promise<{ venueId: string; questId: string }> {
-  const venueId = randomUUID();
-  const questId = randomUUID();
-  await Promise.all([
-    getFirestore().collection("venues").doc(venueId).set({ name: "Café Lumen" }),
-    getFirestore().collection("quests").doc(questId).set({ title: "Find the hidden fox" }),
-  ]);
+  const [venueId, questId] = await Promise.all([seedVenue(), seedQuest()]);
   return { venueId, questId };
 }
 
@@ -136,31 +125,34 @@ describe("sendReservationAnswer", () => {
   it.each([
     [
       "APPROVED",
-      "Café Lumen approved your reservation",
-      "Find the hidden fox · Head over and send your proof once you're there.",
+      `${VENUE_NAME} approved your reservation`,
+      `${QUEST_TITLE} · Head over and send your proof once you're there.`,
     ],
     [
       "REJECTED",
-      "Café Lumen declined your reservation",
-      "Find the hidden fox · Have a look at other quests nearby.",
+      `${VENUE_NAME} declined your reservation`,
+      `${QUEST_TITLE} · Have a look at other quests nearby.`,
     ],
-  ])("names the venue and the quest when the reservation becomes %s", async (status, title, body) => {
-    const reservationId = randomUUID();
-    const { venueId, questId } = await venueAndQuest();
-    await membership(reservationId, "creator", "JOINED");
+  ])(
+    "names the venue and the quest when the reservation becomes %s",
+    async (status, title, body) => {
+      const reservationId = randomUUID();
+      const { venueId, questId } = await venueAndQuest();
+      await membership(reservationId, "creator", "JOINED");
 
-    await sendReservationAnswer(
-      { status: "PENDING" },
-      { status, venueId, questId },
-      reservationId,
-    );
+      await sendReservationAnswer(
+        { status: "PENDING" },
+        { status, venueId, questId },
+        reservationId,
+      );
 
-    expect(sender).toHaveBeenCalledWith("creator", {
-      title,
-      body,
-      data: { kind: "reservation", route: "quests", reservationId },
-    });
-  });
+      expect(sender).toHaveBeenCalledWith("creator", {
+        title,
+        body,
+        data: { kind: "reservation", route: "quests", reservationId },
+      });
+    },
+  );
 
   // The rules let a venue delete a quest, then decline its pending reservations
   it("still tells every member when a declined reservation's quest was deleted", async () => {
