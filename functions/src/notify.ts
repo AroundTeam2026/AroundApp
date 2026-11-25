@@ -1,6 +1,6 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
-import { getFirestore } from "firebase-admin/firestore";
+import { DocumentSnapshot, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 
@@ -31,6 +31,36 @@ export const GONE_TOKEN_ERRORS: ReadonlySet<string> = new Set([
   "messaging/registration-token-not-registered",
   "messaging/invalid-registration-token",
 ]);
+
+/**
+ * The status of a reservation, or of a proof, waiting for the venue's answer: the only one a
+ * reservation is created with, and the one a proof has when it is sent.
+ */
+export const PENDING = "PENDING";
+
+/**
+ * What the venue's notifications call the explorer who reserved when [storedName] finds no name,
+ * so every notification shows a nameless leader the same way.
+ */
+export const UNNAMED_LEADER = "An explorer";
+
+/**
+ * The reservation's stored explorerName, or null when it names nobody: missing on reservations
+ * made before names were stored, or blank, as the rules only check a name's length.
+ */
+export function storedName(explorerName: unknown): string | null {
+  return typeof explorerName === "string" && explorerName.trim() ? explorerName : null;
+}
+
+/**
+ * Reads the quest [questId] a reservation is for. A missing quest throws, so Cloud Functions logs
+ * the failure rather than a notification going out without the quest's title.
+ */
+export async function readQuest(questId: string): Promise<DocumentSnapshot> {
+  const quest = await getFirestore().collection("quests").doc(questId).get();
+  if (!quest.exists) throw new Error(`Missing quest ${questId}`);
+  return quest;
+}
 
 /** What every notification function sends: the text shown, and where a tap leads. */
 export interface NotificationMessage {
