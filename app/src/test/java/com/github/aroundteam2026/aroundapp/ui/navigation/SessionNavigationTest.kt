@@ -39,6 +39,7 @@ import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.overview.OverviewOnFakes
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
+import com.github.aroundteam2026.aroundapp.ui.profile.profileFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
@@ -200,8 +201,7 @@ class SessionNavigationTest {
         SessionNavigation(
             repo,
             mainScreen = { userId ->
-              val profile: ProfileViewModel =
-                  viewModel(factory = ProfileViewModel.factory(repo, proofUploadQueue = null))
+              val profile: ProfileViewModel = viewModel(factory = profileFactoryOnFakes(repo))
               AroundApp(
                   explorerUid = userId,
                   onSignOut = profile::signOut,

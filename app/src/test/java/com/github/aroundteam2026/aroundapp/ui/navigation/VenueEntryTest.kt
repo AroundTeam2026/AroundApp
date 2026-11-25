@@ -36,6 +36,7 @@ import com.github.aroundteam2026.aroundapp.model.venue.FlakyVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
+import com.github.aroundteam2026.aroundapp.ui.profile.profileFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.venue.venueProfileFactoryOnFakes
@@ -108,6 +109,7 @@ class VenueEntryTest {
         venueQuestsFactory = venueQuestsFactoryOnFakes(),
         dashboardFactory = venueDashboardFactoryOnFakes(),
         venueProfileFactory = venueProfileFactoryOnFakes(),
+        signOutFactory = profileFactoryOnFakes(auth),
     )
   }
 
