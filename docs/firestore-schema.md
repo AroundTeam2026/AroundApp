@@ -10,7 +10,7 @@ This doc describes what the code on `main` does. A change to a collection update
 - Domain models use our own `Location(lat: Double, lng: Double)`, never `GeoPoint` or `LatLng`. In Firestore a location is stored as a `GeoPoint`; the conversion happens inside the Firestore repository implementations.
 - Times are `Long` epoch milliseconds in the Kotlin models and `Timestamp` in Firestore (`createdAt`, `updatedAt`, `slotStart`, `submittedAt`, `reward.expiresAt`). The conversion happens inside the Firestore implementations.
 - Enum values are stored as their upper-case names (`EXPLORER`, `PENDING`, ...).
-- A document's id is not stored as a field. For `users` it is the uid, for `venues` the owner's uid and for `party_user` `{reservationId}_{uid}`, whose parts are also stored as fields so queries can filter on them, for `party_codes` the code itself, and for `party_code_lookups` the uid; for the other collections it is a Firestore auto id.
+- A document's id is not stored as a field. For `users` it is the uid, for `venues` the owner's uid and for `party_user` `{reservationId}_{uid}`, whose parts are also stored as fields so queries can filter on them, for `party_codes` the code itself, for `party_code_lookups` the uid, and for `users/{uid}/tokens` the FCM token; for the other collections it is a Firestore auto id.
 - Fields marked `?` are optional: they are omitted when null.
 
 ## Collections
@@ -25,6 +25,16 @@ This doc describes what the code on `main` does. A change to a collection update
 | `createdAt` | timestamp | |
 
 No email: Firebase Auth already has it. Signed-in users can get a profile by uid to display its name and picture, but cannot list the users collection; only the owner can write a profile.
+
+### `users/{uid}/tokens/{token}`
+
+One document per phone the user `uid` is signed in on, so Cloud Functions know where to send their notifications (#633). The document id is the phone's Firebase Cloud Messaging token, which `sendToUser` in `functions/src/notify.ts` reads with the admin SDK; it deletes the documents of tokens FCM reports gone.
+
+| Field | Type | Notes |
+|---|---|---|
+| `updatedAt` | timestamp | The server's time of the last save (`FieldValue.serverTimestamp()`), so stale tokens can be found. |
+
+The app saves its token again whenever it gets one, which only moves `updatedAt`, and deletes it at sign-out. Only the user saves and deletes their own tokens; nobody reads them from the app.
 
 ### `venues/{ownerUid}`
 
@@ -180,6 +190,7 @@ Every create and update must match its collection's table above: only the listed
 | Collection | Read | Write |
 |---|---|---|
 | `users` | Only the owner | The owner creates and updates it; `role` must be null, `EXPLORER` or `VENUE`, and can't change once set. No delete. |
+| `users/{uid}/tokens` | Nobody, from the app: the functions read them with the admin SDK. | Only the user `uid` saves and deletes them, with `updatedAt` the server's time. |
 | `venues` | Any signed-in user | Only the owner (document id is their uid), whose `users` document has role `VENUE`. |
 | `quests` | Any signed-in user | Only the owning venue (`venueId` is their uid), whose `users` document has role `VENUE`; `venueId` can't change. |
 | `reservations` | An explorer may get a reservation whose id they know, so one given a party code can see its quest, status and `joinedCount` before joining. The app also listens to a reservation it just created before the server has it. A venue gets its own reservations, and only it lists them. Anyone signed in may read an id that has no reservation. | An explorer, whose `users` document has role `EXPLORER`, creates a `PENDING` one in the same batch as their own `JOINED` membership, joined at its `createdAt`, and the `party_codes` document of its `partyCode`, carrying their profile's `displayName` as `explorerName`, with a `joinedCount` of 1, for an `ACTIVE` quest whose `venueId` it repeats. Afterwards `status` changes along an allowed transition: the venue makes any of them from `PENDING`, approving only a party of the [size](#party-size) its quest asks for, and its creator, the member joined at its `createdAt`, can only cancel, until the party sends its proof, whatever its status; the other members withdraw from the party instead (#536). `joinedCount` changes alone, by 1, in the same batch as the user's own membership joining or withdrawing. No delete. |

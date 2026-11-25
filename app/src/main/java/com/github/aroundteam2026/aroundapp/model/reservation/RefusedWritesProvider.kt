@@ -12,7 +12,7 @@ import com.github.aroundteam2026.aroundapp.model.PerUser
  */
 object RefusedWritesProvider {
   private val perExplorer = PerUser { context, explorerUid ->
-    RefusedWrites(RefusedWritesStoreSharedPrefs(context, explorerUid))
+    RefusedWrites(storeOf(context, explorerUid))
   }
 
   /**
@@ -21,6 +21,22 @@ object RefusedWritesProvider {
    */
   fun refusedWrites(context: Context, explorerUid: String): RefusedWrites =
       perExplorer.get(context, explorerUid)
+
+  /**
+   * Forgets everything the phone remembers of the explorer [explorerUid], as when they sign out:
+   * whoever signs in next, them again included, starts clean.
+   */
+  fun forget(context: Context, explorerUid: String) {
+    storeOf(context, explorerUid).clear()
+    perExplorer.forget(explorerUid)
+  }
+
+  private fun storeOf(context: Context, explorerUid: String) =
+      RefusedWritesStoreSharedPrefs(
+          context.applicationContext,
+          explorerUid,
+          System::currentTimeMillis,
+      )
 
   /** Forgets the explorer's [RefusedWrites], as a new app process starts with none. */
   @VisibleForTesting

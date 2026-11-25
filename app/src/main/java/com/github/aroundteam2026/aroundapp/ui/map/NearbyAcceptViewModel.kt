@@ -38,6 +38,9 @@ import kotlinx.coroutines.launch
  *   when it was booked just as the connection dropped: they show as [AcceptStatus.SENDING].
  * @property acceptingQuestIds Quests being booked right now.
  * @property failedQuestIds Quests whose last booking failed; accepting again retries.
+ * @property refusalNotice Whether the server refused a booking the explorer hasn't been told about,
+ *   as after the app was closed with it queued: the map says so once, then calls
+ *   [NearbyAcceptViewModel.onRefusalNoticeShown].
  * @property available Whether quests can be accepted: not until the explorer's reservations are
  *   known, nor while they can't be read, so a quest already accepted isn't booked twice.
  */
@@ -46,6 +49,7 @@ data class NearbyAcceptUiState(
     val unsentQuestIds: Set<String> = emptySet(),
     val acceptingQuestIds: Set<String> = emptySet(),
     val failedQuestIds: Set<String> = emptySet(),
+    val refusalNotice: Boolean = false,
     val available: Boolean = false,
 ) {
   /** Where accepting the quest [questId] stands. */
@@ -80,7 +84,12 @@ class NearbyAcceptViewModel(
 ) : ViewModel() {
   private val hearing = refusedWrites.hearing()
   private val _uiState =
-      MutableStateFlow(NearbyAcceptUiState(failedQuestIds = refusedWrites.refusedQuests))
+      MutableStateFlow(
+          NearbyAcceptUiState(
+              failedQuestIds = refusedWrites.refusedQuests,
+              refusalNotice = refusedWrites.hasUnreportedRefusal,
+          )
+      )
   /** Where accepting each nearby quest stands. */
   val uiState: StateFlow<NearbyAcceptUiState> = _uiState.asStateFlow()
 
@@ -142,9 +151,16 @@ class NearbyAcceptViewModel(
           unsentQuestIds = unsent,
           acceptingQuestIds = it.acceptingQuestIds - accepted - refused,
           failedQuestIds = it.failedQuestIds - accepted + refused,
+          refusalNotice = it.refusalNotice || refusedWrites.hasUnreportedRefusal,
           available = true,
       )
     }
+  }
+
+  /** Called once the map has told the explorer about [NearbyAcceptUiState.refusalNotice]. */
+  fun onRefusalNoticeShown() {
+    refusedWrites.markReported()
+    _uiState.update { it.copy(refusalNotice = false) }
   }
 
   /**

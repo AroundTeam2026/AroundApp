@@ -168,8 +168,7 @@ internal fun filterSummary(filters: NearbyFilters): String? {
         RewardFilter.OTHER -> stringResource(R.string.map_nearby_other_rewards)
       }
   return when {
-    distance != null && reward != null ->
-        stringResource(R.string.map_nearby_filter_pair, distance, reward)
+    distance != null && reward != null -> stringResource(R.string.map_nearby_pair, distance, reward)
     else -> distance ?: reward
   }
 }

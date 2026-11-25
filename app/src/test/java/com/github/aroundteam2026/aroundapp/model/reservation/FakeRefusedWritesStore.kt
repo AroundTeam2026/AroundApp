@@ -14,6 +14,10 @@ class FakeRefusedWritesStore : RefusedWritesStore {
   override fun remove(reservationId: String) {
     writes.remove(reservationId)
   }
+
+  override fun clear() {
+    writes.clear()
+  }
 }
 
 /** What a ViewModel under test remembers, and forgets with the test. */

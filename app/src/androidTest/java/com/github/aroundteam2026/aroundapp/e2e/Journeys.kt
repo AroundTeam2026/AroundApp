@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.testing.TIMEOUT_MS
@@ -24,22 +25,28 @@ fun ComposeTestRule.waitFor(matcher: SemanticsMatcher) =
 fun ComposeTestRule.waitUntilGone(tag: String) =
     waitUntil(TIMEOUT_MS) { onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isEmpty() }
 
-/** Opens the map's nearby quests and waits for the quest [questTitle] to be the one shown. */
+/** The card of the quest [questTitle] in the map's nearby quests, merged with its lines. */
+private fun nearbyCard(questTitle: String) = hasTestTag(C.Tag.NEARBY_CARD) and hasText(questTitle)
+
+/** Opens the map's nearby quests and scrolls their list until the quest [questTitle] shows. */
 fun ComposeTestRule.findTheQuestNearby(questTitle: String) {
   onNodeWithTag(C.Tag.MAP_TAB).performClick()
   onNodeWithTag(C.Tag.NEARBY_BUTTON).performClick()
-  // Only the page shown can be tapped, so the quest must be the one shown
-  val nearbyQuest = hasTestTag(C.Tag.NEARBY_QUEST_TITLE) and hasText(questTitle)
-  waitFor(nearbyQuest)
-  onNode(nearbyQuest, useUnmergedTree = true).assertIsDisplayed()
+  waitFor(hasTestTag(C.Tag.NEARBY_LIST))
+  // Other tests' quests can come first, and the quest can take a moment to arrive
+  waitUntil(TIMEOUT_MS) {
+    runCatching { onNodeWithTag(C.Tag.NEARBY_LIST).performScrollToNode(nearbyCard(questTitle)) }
+        .isSuccess
+  }
+  onNode(nearbyCard(questTitle)).assertIsDisplayed()
 }
 
 /**
- * Taps the shown quest in the nearby quests and waits for its details, at [venueName], to show
- * [questTitle].
+ * Taps the quest [questTitle], shown in the nearby quests, and waits for its details, at
+ * [venueName], to show it.
  */
 fun ComposeTestRule.openTheShownQuest(venueName: String, questTitle: String) {
-  onNodeWithTag(C.Tag.NEARBY_PAGE).performClick()
+  onNode(nearbyCard(questTitle)).performClick()
   waitFor(hasTestTag(C.Tag.QUEST_DETAIL_TITLE) and hasText(questTitle))
   waitFor(hasTestTag(C.Tag.QUEST_DETAIL_VENUE_NAME) and hasText(venueName))
 }

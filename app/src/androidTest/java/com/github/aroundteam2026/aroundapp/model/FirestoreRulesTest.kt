@@ -142,6 +142,59 @@ class FirestoreRulesTest {
     )
   }
 
+  // ---- notification tokens ----
+
+  @Test
+  fun userSavesSavesAgainAndDeletesTheirOwnToken() {
+    val alice = newUser()
+
+    assertSucceeds(token(alice).set(tokenData()))
+    assertSucceeds(token(alice).set(tokenData()))
+    assertSucceeds(token(alice).delete())
+  }
+
+  @Test
+  fun nobodyWritesOrDeletesAnotherUsersToken() {
+    val alice = newUser()
+    assertSucceeds(token(alice).set(tokenData()))
+    newUser()
+
+    assertDenied(token(alice).set(tokenData()), "another user's save")
+    assertDenied(token(alice).delete(), "another user's delete")
+    signOut()
+    assertDenied(token(alice).set(tokenData()), "a signed-out save")
+    assertDenied(token(alice).delete(), "a signed-out delete")
+  }
+
+  @Test
+  fun nobodyReadsTokensFromTheApp() {
+    val alice = newUser()
+    assertSucceeds(token(alice).set(tokenData()))
+
+    assertDenied(token(alice).get(Source.SERVER), "the owner's get")
+    assertDenied(tokens(alice).get(Source.SERVER), "the owner's list")
+    newUser()
+    assertDenied(token(alice).get(Source.SERVER), "another user's get")
+    assertDenied(tokens(alice).get(Source.SERVER), "another user's list")
+  }
+
+  @Test
+  fun tokenMustFollowTheSchema() {
+    val alice = newUser()
+    val valid = tokenData()
+
+    assertOnlyValidWriteSucceeds(
+        token(alice),
+        valid,
+        mapOf(
+            "an unknown field" to valid + ("platform" to "android"),
+            "no updatedAt" to emptyMap(),
+            "a client updatedAt" to mapOf("updatedAt" to Timestamp.now()),
+            "an updatedAt that is not a timestamp" to mapOf("updatedAt" to 42),
+        ),
+    )
+  }
+
   // ---- venues ----
 
   @Test
@@ -1681,6 +1734,14 @@ class FirestoreRulesTest {
 
   private fun user(user: TestUser) = db.collection("users").document(user.uid)
 
+  private fun tokens(user: TestUser) = user(user).collection("tokens")
+
+  /** The document of [user]'s phone token [TOKEN]. */
+  private fun token(user: TestUser) = tokens(user).document(TOKEN)
+
+  /** A token document as the app saves it. */
+  private fun tokenData() = mapOf("updatedAt" to FieldValue.serverTimestamp())
+
   private fun venueOf(user: TestUser) = db.collection("venues").document(user.uid)
 
   private fun newQuest() = db.collection("quests").document(UUID.randomUUID().toString())
@@ -2006,6 +2067,7 @@ class FirestoreRulesTest {
     const val PASSWORD = "password123"
     const val DISPLAY_NAME = "Test"
     const val PHOTO_URL = "https://example.test/proof.jpg"
+    const val TOKEN = "fcm-token-1"
     const val TIMEOUT_S = 10L
 
     /** The characters of a party code: no 0, 1, I, L or O, which are easy to mistake. */
