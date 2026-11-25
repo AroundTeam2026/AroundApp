@@ -1,8 +1,10 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 import { sendToUser } from "../src/notify";
 import { notifyReservationAnswered, sendReservationAnswer } from "../src/reservationAnswered";
 
@@ -25,6 +27,19 @@ beforeEach(() => {
   sender.mockReset();
   sender.mockResolvedValue(undefined);
 });
+
+afterEach(() => jest.restoreAllMocks());
+
+/** A venue and a quest of their own, so the notification can name them. */
+async function venueAndQuest(): Promise<{ venueId: string; questId: string }> {
+  const venueId = randomUUID();
+  const questId = randomUUID();
+  await Promise.all([
+    getFirestore().collection("venues").doc(venueId).set({ name: "Café Lumen" }),
+    getFirestore().collection("quests").doc(questId).set({ title: "Find the hidden fox" }),
+  ]);
+  return { venueId, questId };
+}
 
 describe("sendReservationAnswer", () => {
   it("passes the update event's snapshots and reservation id to the sender", async () => {
@@ -97,17 +112,85 @@ describe("sendReservationAnswer", () => {
     expect(sender).not.toHaveBeenCalled();
   });
 
-  it("attempts every joined member even if one send fails", async () => {
+  it("still tells the others when one send fails, and logs whose failed", async () => {
     const reservationId = randomUUID();
     await Promise.all([
       membership(reservationId, "first", "JOINED"),
       membership(reservationId, "second", "JOINED"),
     ]);
-    sender.mockRejectedValueOnce(new Error("FCM unavailable"));
+    const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    sender.mockImplementation(async (uid) => {
+      if (uid === "first") throw new Error("FCM unavailable");
+    });
 
-    await expect(
-      sendReservationAnswer({ status: "PENDING" }, { status: "APPROVED" }, reservationId),
-    ).rejects.toThrow("FCM unavailable");
+    await sendReservationAnswer({ status: "PENDING" }, { status: "APPROVED" }, reservationId);
+
     expect(sender).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ uid: "first", reservationId }),
+    );
+  });
+
+  it.each([
+    [
+      "APPROVED",
+      "Café Lumen approved your reservation",
+      "Find the hidden fox · Head over and send your proof once you're there.",
+    ],
+    [
+      "REJECTED",
+      "Café Lumen declined your reservation",
+      "Find the hidden fox · Have a look at other quests nearby.",
+    ],
+  ])("names the venue and the quest when the reservation becomes %s", async (status, title, body) => {
+    const reservationId = randomUUID();
+    const { venueId, questId } = await venueAndQuest();
+    await membership(reservationId, "creator", "JOINED");
+
+    await sendReservationAnswer(
+      { status: "PENDING" },
+      { status, venueId, questId },
+      reservationId,
+    );
+
+    expect(sender).toHaveBeenCalledWith("creator", {
+      title,
+      body,
+      data: { kind: "reservation", route: "quests", reservationId },
+    });
+  });
+
+  // The rules let a venue delete a quest, then decline its pending reservations
+  it("still tells every member when a declined reservation's quest was deleted", async () => {
+    const reservationId = randomUUID();
+    const { venueId } = await venueAndQuest();
+    await Promise.all([
+      membership(reservationId, "creator", "JOINED"),
+      membership(reservationId, "friend", "JOINED"),
+    ]);
+
+    await sendReservationAnswer(
+      { status: "PENDING" },
+      { status: "REJECTED", venueId, questId: randomUUID() },
+      reservationId,
+    );
+
+    expect(sender.mock.calls.map(([uid]) => uid).sort()).toEqual(["creator", "friend"]);
+    for (const [, message] of sender.mock.calls) {
+      expect(message).toEqual({
+        title: "Reservation declined",
+        body: "Your party's reservation was declined.",
+        data: { kind: "reservation", route: "quests", reservationId },
+      });
+    }
+  });
+
+  it("runs on updated reservations", () => {
+    expect(notifyReservationAnswered.__endpoint.eventTrigger).toMatchObject({
+      eventType: "google.cloud.firestore.document.v1.updated",
+      eventFilterPathPatterns: { document: "reservations/{reservationId}" },
+    });
   });
 });
