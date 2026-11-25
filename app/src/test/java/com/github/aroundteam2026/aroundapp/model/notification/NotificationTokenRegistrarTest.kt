@@ -35,7 +35,8 @@ class NotificationTokenRegistrarTest {
     registrar(auth).onRegistered(ID)
     runCurrent()
 
-    assertTrue(tokens.tokensOf(UID).isEmpty())
+    // No user at all, not only the one who left: a save under any uid would fail this
+    assertTrue(tokens.usersWithTokens.isEmpty())
   }
 
   @Test
