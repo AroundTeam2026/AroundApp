@@ -110,6 +110,8 @@ class MainActivityTest : TestCase() {
                     NotificationChannelKind.RESERVATIONS,
                 )
             )
+        // Android posts it on its own thread, so it reaches the shade a moment after post returns
+        composeTestRule.waitUntil(SETUP_TIMEOUT_MS) { manager.activeNotifications.isNotEmpty() }
         // What the shade runs when the notification is tapped
         manager.activeNotifications.single().notification.contentIntent.send()
       }
