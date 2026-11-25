@@ -3,7 +3,7 @@
 
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { readQuest, sendToUser, storedName, UNNAMED_LEADER } from "./notify";
+import { PENDING, readQuest, sendToUser, storedName, UNNAMED_LEADER } from "./notify";
 
 /** Who sent a party's proof when its leader has no stored name. */
 export const UNNAMED_PARTY = "A party";
@@ -12,13 +12,13 @@ export const UNNAMED_PARTY = "A party";
 export const notifyVenueProof = onDocumentWritten("completions/{reservationId}", async (event) => {
   const before = event.data?.before.data();
   const after = event.data?.after.data();
-  if (!after || after.status !== "PENDING") return;
+  if (!after || after.status !== PENDING) return;
 
   // Every submission, from the app or the upload worker, writes a new submittedAt; the venue's
   // answer only changes status and rejectReason. So a pending proof with the same submittedAt is
   // not a new one.
   const sameProof =
-    before?.status === "PENDING" &&
+    before?.status === PENDING &&
     (before.submittedAt as Timestamp | undefined)?.isEqual(after.submittedAt);
   if (sameProof) return;
 
