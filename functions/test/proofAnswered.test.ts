@@ -3,18 +3,16 @@
 import { randomUUID } from "node:crypto";
 import { DocumentData, DocumentReference, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { Change } from "firebase-functions/v2/firestore";
-import { NotificationMessage, PENDING, sendToUser } from "../src/notify";
+import { APPROVED, NotificationMessage, PENDING, REJECTED, sendToUser } from "../src/notify";
 import { notifyProofAnswered, rewardText, sendProofAnswer } from "../src/proofAnswered";
 import {
-  APPROVED,
   EXPLORER,
   FREE_CROISSANT,
   initTestApp,
   JOINED,
   LEADER,
+  membership,
   QUEST_TITLE,
-  REJECTED,
-  seedMembership,
   seedReservation,
   seedVenue,
   VENUE,
@@ -49,7 +47,7 @@ const JOINED_MEMBERS = [EXPLORER, "friend"].sort();
 
 beforeAll(async () => {
   initTestApp();
-  await seedVenue();
+  await seedVenue(VENUE);
 });
 
 beforeEach(() => {
@@ -76,10 +74,10 @@ async function fixture({ reward = FREE_CROISSANT as unknown, venueExists = true 
     reward ? { reward } : {},
   );
   await Promise.all([
-    ...JOINED_MEMBERS.map((uid) => seedMembership(reservationId, uid, JOINED)),
-    seedMembership(reservationId, "former-member", WITHDRAWN),
-    seedMembership(reservationId, null, JOINED),
-    seedMembership(randomUUID(), "other-party", JOINED),
+    ...JOINED_MEMBERS.map((uid) => membership(reservationId, uid, JOINED)),
+    membership(reservationId, "former-member", WITHDRAWN),
+    membership(reservationId, null, JOINED),
+    membership(randomUUID(), "other-party", JOINED),
   ]);
   const proof = {
     venueId: venueExists ? VENUE : `missing-venue-${randomUUID()}`,

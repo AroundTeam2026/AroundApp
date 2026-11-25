@@ -13,8 +13,8 @@ import { getFirestore } from "firebase-admin/firestore";
  */
 
 export const VENUE = "venue-1";
-/** The name [VENUE] stores, once seedVenue has run. */
-export const VENUE_NAME = "Café Lumière";
+/** The venue's name, as its notifications to explorers show it; [VENUE] is its id. */
+export const VENUE_NAME = "Café Lumen";
 export const QUEST_TITLE = "Find the hidden fox";
 /** A quest's reward, as QuestRepositoryFirestore stores it. */
 export const FREE_CROISSANT = { type: "FREE_ITEM", name: "croissant" };
@@ -22,9 +22,6 @@ export const FREE_CROISSANT = { type: "FREE_ITEM", name: "croissant" };
 export const LEADER = "Yusuf S.";
 /** A party member's uid. */
 export const EXPLORER = "explorer-1";
-/** A reservation's or a proof's status (ReservationStatus, CompletionStatus). */
-export const APPROVED = "APPROVED";
-export const REJECTED = "REJECTED";
 /** A party member's status (PartyMemberStatus in PartyMember.kt). */
 export const JOINED = "JOINED";
 export const WITHDRAWN = "WITHDRAWN";
@@ -49,11 +46,6 @@ export async function seedQuest(fields: Record<string, unknown> = {}): Promise<s
   return questId;
 }
 
-/** Stores [VENUE], named [VENUE_NAME]. */
-export async function seedVenue(): Promise<void> {
-  await getFirestore().collection("venues").doc(VENUE).set({ name: VENUE_NAME });
-}
-
 /**
  * Stores a reservation of [VENUE] for a new quest with any other [questFields], such as its
  * reward, led by [explorerName] with [joinedCount] members, and returns its id.
@@ -72,17 +64,24 @@ export async function seedReservation(
   return reservationId;
 }
 
+/** Stores a venue named [VENUE_NAME] under [venueId], a new one unless given, and returns it. */
+export async function seedVenue(venueId: string = randomUUID()): Promise<string> {
+  await getFirestore().collection("venues").doc(venueId).set({ name: VENUE_NAME });
+  return venueId;
+}
+
 /**
- * Stores the membership of [uid] in the party of [reservationId] with [status], as
+ * Stores [uid]'s membership of [reservationId]'s party, e.g. JOINED or WITHDRAWN, as
  * PartyUserFirestore does; a null [uid] stores a malformed one without it.
  */
-export async function seedMembership(
+export async function membership(
   reservationId: string,
   uid: string | null,
   status: string,
 ): Promise<void> {
+  const now = new Date();
   await getFirestore()
     .collection("party_user")
     .doc(`${reservationId}_${uid ?? randomUUID()}`)
-    .set({ reservationId, ...(uid ? { uid } : {}), status, joinedAt: new Date() });
+    .set({ reservationId, ...(uid ? { uid } : {}), status, joinedAt: now, updatedAt: now });
 }
