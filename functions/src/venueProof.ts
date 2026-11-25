@@ -3,7 +3,10 @@
 
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { sendToUser } from "./notify";
+import { readQuest, sendToUser, storedName, UNNAMED_LEADER } from "./notify";
+
+/** Who sent a party's proof when its leader has no stored name. */
+export const UNNAMED_PARTY = "A party";
 
 /** Tell the venue when a party submits or replaces its proof, not when the venue answers it. */
 export const notifyVenueProof = onDocumentWritten("completions/{reservationId}", async (event) => {
@@ -24,12 +27,12 @@ export const notifyVenueProof = onDocumentWritten("completions/{reservationId}",
   const reservation = await db.collection("reservations").doc(reservationId).get();
   if (!reservation.exists) throw new Error(`Missing reservation ${reservationId}`);
   const { questId, venueId, explorerName, joinedCount } = reservation.data()!;
-  const quest = await db.collection("quests").doc(questId).get();
-  if (!quest.exists) throw new Error(`Missing quest ${questId}`);
+  const quest = await readQuest(questId);
 
-  const sender = typeof explorerName === "string" && explorerName.trim() ? explorerName : null;
+  // The leader is named as in the venue's other notifications (#696)
+  const leader = storedName(explorerName);
   const subject =
-    joinedCount > 1 ? (sender ? `${sender}'s party` : "A party") : sender ?? "An explorer";
+    joinedCount > 1 ? (leader ? `${leader}'s party` : UNNAMED_PARTY) : (leader ?? UNNAMED_LEADER);
   const proof = after.photoUrl ? "a photo" : "a written answer";
   await sendToUser(venueId, {
     title: `Proof to review: ${quest.get("title")}`,

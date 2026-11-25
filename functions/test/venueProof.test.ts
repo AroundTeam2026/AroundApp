@@ -1,43 +1,56 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
-import { randomUUID } from "node:crypto";
-import { getApps, initializeApp } from "firebase-admin/app";
 import { DocumentReference, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { Change } from "firebase-functions/v2/firestore";
-import { NotificationMessage, sendToUser } from "../src/notify";
-import { notifyVenueProof } from "../src/venueProof";
+import { NotificationMessage, sendToUser, UNNAMED_LEADER } from "../src/notify";
+import { notifyVenueProof, UNNAMED_PARTY } from "../src/venueProof";
+import {
+  BLANK_NAME,
+  EXPLORER,
+  initTestApp,
+  LEADER,
+  QUEST_TITLE,
+  seedReservation,
+  VENUE,
+} from "./fixtures";
 
-jest.mock("../src/notify", () => ({ sendToUser: jest.fn() }));
+// The sending itself is sendToUser's, tested in notify.test.ts; the shared helpers stay real
+jest.mock("../src/notify", () => ({
+  ...jest.requireActual("../src/notify"),
+  sendToUser: jest.fn(),
+}));
 
 const sent = jest.mocked(sendToUser);
 
-beforeAll(() => {
-  if (getApps().length === 0) initializeApp({ projectId: process.env.GCLOUD_PROJECT });
-});
+const PHOTO = "gs://proofs/photo-1";
+const OTHER_PHOTO = "gs://proofs/photo-2";
+const ANSWER = "The fox is by the door";
+const SOLO = 1;
+const PARTY = 3;
+
+beforeAll(initTestApp);
 
 beforeEach(() => sent.mockReset());
 
-async function fixture(joinedCount: number, explorerName = "Yusuf S.") {
-  const reservationId = randomUUID();
-  const questId = randomUUID();
-  const db = getFirestore();
-  await Promise.all([
-    db.collection("reservations").doc(reservationId).set({
-      questId,
-      venueId: "venue-1",
-      explorerName,
-      joinedCount,
-    }),
-    db.collection("quests").doc(questId).set({ title: "Find the hidden fox" }),
-  ]);
-  return db.collection("completions").doc(reservationId);
+/** The completion document of a new reservation, led by [leader] with [joinedCount] members. */
+async function completionOf(joinedCount: number, leader: string = LEADER) {
+  const reservationId = await seedReservation(joinedCount, leader);
+  return getFirestore().collection("completions").doc(reservationId);
 }
 
-async function writeAndNotify(
-  ref: DocumentReference,
-  data: Record<string, unknown>,
-) {
+/** A pending proof sent by [EXPLORER], at [submittedAtMs]. */
+function proof(fields: Record<string, unknown>, submittedAtMs = 1000) {
+  return {
+    status: "PENDING",
+    explorerUid: EXPLORER,
+    submittedAt: Timestamp.fromMillis(submittedAtMs),
+    ...fields,
+  };
+}
+
+/** Writes [data] to [ref] and runs the trigger on the change, as Firestore would. */
+async function writeAndNotify(ref: DocumentReference, data: Record<string, unknown>) {
   const before = await ref.get();
   await ref.set(data);
   const after = await ref.get();
@@ -48,82 +61,86 @@ async function writeAndNotify(
 }
 
 function expectMessage(body: string, reservationId: string) {
-  expect(sent).toHaveBeenCalledWith("venue-1", {
-    title: "Proof to review: Find the hidden fox",
+  expect(sent).toHaveBeenCalledTimes(1);
+  expect(sent).toHaveBeenCalledWith(VENUE, {
+    title: `Proof to review: ${QUEST_TITLE}`,
     body,
     data: { kind: "proof", route: "venue_dashboard", reservationId },
   } satisfies NotificationMessage);
 }
 
 describe("notifyVenueProof", () => {
-  it("notifies the venue for a party's new photo", async () => {
-    const ref = await fixture(3);
-    await writeAndNotify(ref, {
-      status: "PENDING",
-      photoUrl: "gs://proofs/photo-1",
-      explorerUid: "explorer-1",
-      submittedAt: Timestamp.now(),
-    });
+  it("names the party and the photo it sent", async () => {
+    const ref = await completionOf(PARTY);
+    await writeAndNotify(ref, proof({ photoUrl: PHOTO }));
 
-    expectMessage("Yusuf S.'s party sent a photo.", ref.id);
-    expect(sent).toHaveBeenCalledTimes(1);
+    expectMessage(`${LEADER}'s party sent a photo.`, ref.id);
   });
 
-  it("describes a solo explorer's written answer", async () => {
-    const ref = await fixture(1);
-    await writeAndNotify(ref, {
-      status: "PENDING",
-      textAnswer: "The fox is by the door",
-      explorerUid: "explorer-1",
-      submittedAt: Timestamp.now(),
-    });
+  it("names a solo explorer and their written answer", async () => {
+    const ref = await completionOf(SOLO);
+    await writeAndNotify(ref, proof({ textAnswer: ANSWER }));
 
-    expectMessage("Yusuf S. sent a written answer.", ref.id);
+    expectMessage(`${LEADER} sent a written answer.`, ref.id);
   });
 
-  it("notifies for a replacement, including a resubmission of the same proof after rejection", async () => {
-    const ref = await fixture(2);
-    const original = {
-      status: "PENDING",
-      photoUrl: "gs://proofs/photo-1",
-      explorerUid: "explorer-1",
-      submittedAt: Timestamp.fromMillis(1000),
-    };
+  it.each([
+    [PARTY, `${UNNAMED_PARTY} sent a photo.`],
+    [SOLO, `${UNNAMED_LEADER} sent a photo.`],
+  ])("without a leader's name, a party of %s reads as in the venue's other texts", async (size, body) => {
+    const ref = await completionOf(size, BLANK_NAME);
+    await writeAndNotify(ref, proof({ photoUrl: PHOTO }));
+
+    expectMessage(body, ref.id);
+  });
+
+  it("notifies for a replacement, a resend of the same proof, and a resend after a rejection", async () => {
+    const ref = await completionOf(PARTY);
+    const original = proof({ photoUrl: PHOTO });
     await ref.set(original);
 
-    // As the app does, a new photo is a new submission, with its own submittedAt
-    await writeAndNotify(ref, {
-      ...original,
-      photoUrl: "gs://proofs/photo-2",
-      submittedAt: Timestamp.fromMillis(1500),
-    });
-    expectMessage("Yusuf S.'s party sent a photo.", ref.id);
+    // As the app does, a new submission has its own submittedAt
+    await writeAndNotify(ref, proof({ photoUrl: OTHER_PHOTO }, 1500));
+    expectMessage(`${LEADER}'s party sent a photo.`, ref.id);
 
     sent.mockClear();
-    await writeAndNotify(ref, { ...original, submittedAt: Timestamp.fromMillis(2000) });
-    expectMessage("Yusuf S.'s party sent a photo.", ref.id);
+    await writeAndNotify(ref, proof({ photoUrl: PHOTO }, 2000));
+    expectMessage(`${LEADER}'s party sent a photo.`, ref.id);
 
     sent.mockClear();
     await ref.set({ ...original, status: "REJECTED", rejectReason: "Try again" });
-    await writeAndNotify(ref, original);
-    expectMessage("Yusuf S.'s party sent a photo.", ref.id);
+    await writeAndNotify(ref, proof({ photoUrl: PHOTO }, 3000));
+    expectMessage(`${LEADER}'s party sent a photo.`, ref.id);
   });
 
-  it("ignores the venue's answer and an unrelated pending update", async () => {
-    const ref = await fixture(2);
-    const proof = {
-      status: "PENDING",
-      textAnswer: "A fox",
-      explorerUid: "explorer-1",
-      submittedAt: Timestamp.now(),
-    };
-    await ref.set(proof);
+  it.each([
+    ["PENDING", "REJECTED"],
+    ["PENDING", "APPROVED"],
+    ["REJECTED", "APPROVED"],
+  ])("notifies nobody for the venue's answer, from %s to %s", async (from, to) => {
+    const ref = await completionOf(PARTY);
+    const sentProof = proof({ textAnswer: ANSWER });
+    await ref.set({ ...sentProof, status: from });
 
-    await writeAndNotify(ref, { ...proof, status: "REJECTED", rejectReason: "Incomplete" });
-    expect(sent).not.toHaveBeenCalled();
+    await writeAndNotify(ref, { ...sentProof, status: to, rejectReason: "Incomplete" });
 
-    await ref.set(proof);
-    await writeAndNotify(ref, { ...proof, metadata: "unrelated" });
     expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("notifies nobody for a pending update that isn't a new submission", async () => {
+    const ref = await completionOf(PARTY);
+    const sentProof = proof({ textAnswer: ANSWER });
+    await ref.set(sentProof);
+
+    await writeAndNotify(ref, { ...sentProof, metadata: "unrelated" });
+
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("runs on every write to a completion", () => {
+    expect(notifyVenueProof.__endpoint.eventTrigger).toMatchObject({
+      eventType: "google.cloud.firestore.document.v1.written",
+      eventFilterPathPatterns: { document: "completions/{reservationId}" },
+    });
   });
 });
