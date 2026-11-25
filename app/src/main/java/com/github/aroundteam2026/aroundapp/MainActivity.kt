@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
 import com.github.aroundteam2026.aroundapp.model.user.Role
@@ -34,7 +35,9 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     setContent {
       val auth = AuthRepositoryProvider.repository
-      val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(auth))
+      val proofUploadQueue = remember { ProofUploadQueueProvider.queue(applicationContext) }
+      val profile: ProfileViewModel =
+          viewModel(factory = ProfileViewModel.factory(auth, proofUploadQueue))
       val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
       val users = UserRepositoryProvider.repository
       val pictures = remember { UserPictureRepositoryProvider.repository(applicationContext) }
