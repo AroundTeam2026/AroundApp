@@ -25,9 +25,13 @@ export type NotificationKind = "reservation" | "proof" | "cancellation";
 
 /**
  * The FCM errors that mean a phone's ID is gone for good: the app was uninstalled or its data
- * cleared. Other errors, e.g. "messaging/internal-error", may pass, so their IDs are kept. The
- * registration-token codes stay: a phone with Play services older than 26.12 still registers with
- * an old-style token, even through FCM's register() (#634).
+ * cleared. Other errors, e.g. "messaging/internal-error", may pass, so their IDs are kept.
+ *
+ * The registration-token codes stay because a phone may still save an old-style token. No FCM doc
+ * says so, but the Android SDK's code does: in firebase-messaging 25.1.2,
+ * GmsRegistrationClient.registerInternal() falls back to the token path when Play services is older
+ * than 261200000 (26.12), even through register() (#634). How FCM answers such a token sent in
+ * `fids` isn't confirmed, so these codes may never come up.
  */
 export const GONE_TOKEN_ERRORS: ReadonlySet<string> = new Set([
   "messaging/installation-id-not-registered",
