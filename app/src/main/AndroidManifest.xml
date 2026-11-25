@@ -55,8 +55,8 @@
         <meta-data
             android:name="firebase_messaging_installation_id_enabled"
             android:value="true" />
-        <!-- Receives the ID FCM registers the phone under (#634) and, later, the notifications
-             (#637). Not exported: only Play services delivers to it. -->
+        <!-- Receives the ID FCM registers the phone under (#634) and the notifications (#637).
+             Not exported: only Play services delivers to it. -->
         <service
             android:name=".model.notification.AroundMessagingService"
             android:exported="false">

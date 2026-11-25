@@ -14,4 +14,11 @@
     <string name="notification_prompt_footnote">You can turn each kind off later in Profile.</string>
     <string name="notification_prompt_allow">Turn on notifications</string>
     <string name="notification_prompt_not_now">Not now</string>
+    <!-- The Android channels, one per kind and role, as in #631's note; Android lists them in the
+         app's notification settings (#643) -->
+    <string name="notification_channel_reservations">Reservations</string>
+    <string name="notification_channel_proofs">Proofs</string>
+    <string name="notification_channel_booking_requests">Booking requests</string>
+    <string name="notification_channel_proofs_to_review">Proofs to review</string>
+    <string name="notification_channel_cancellations">Cancellations</string>
 </resources>
