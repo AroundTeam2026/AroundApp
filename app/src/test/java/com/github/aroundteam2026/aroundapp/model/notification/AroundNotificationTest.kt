@@ -6,27 +6,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AroundNotificationTest {
-  /** A message as sendToUser in functions/src/notify.ts sends it. */
+  /** [PROOF_TO_REVIEW_DATA] with another [kind] or [route]. */
   private fun data(kind: String = "proof", route: String = "venue_dashboard") =
-      mapOf(
-          "title" to "Proof to review: Latte art",
-          "body" to "Sam sent a photo",
-          "kind" to kind,
-          "route" to route,
-          "reservationId" to "r1",
-      )
+      PROOF_TO_REVIEW_DATA + mapOf("kind" to kind, "route" to route)
 
   @Test
   fun readsTheTextAndTheReservation() {
-    assertEquals(
-        AroundNotification(
-            "Proof to review: Latte art",
-            "Sam sent a photo",
-            "r1",
-            NotificationChannelKind.PROOFS_TO_REVIEW,
-        ),
-        AroundNotification.fromData(data()),
-    )
+    assertEquals(PROOF_TO_REVIEW, AroundNotification.fromData(PROOF_TO_REVIEW_DATA))
   }
 
   @Test
