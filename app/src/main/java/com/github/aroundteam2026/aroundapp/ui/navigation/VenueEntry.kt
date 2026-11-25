@@ -16,10 +16,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationRegistrationProvider
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationTokenRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.VenueDashboardViewModel
+import com.github.aroundteam2026.aroundapp.ui.profile.ProfileViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.list.VenueQuestsViewModel
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
@@ -41,6 +44,8 @@ import com.github.aroundteam2026.aroundapp.ui.venue.VenueProfileViewModel
  * @param venueQuestsFactory builds the Quests tab's ViewModel; tests pass one on fakes.
  * @param dashboardFactory builds the Dashboard tab's ViewModel; tests pass one on fakes.
  * @param venueProfileFactory builds the Profile tab's ViewModel; tests pass one on fakes.
+ * @param signOutFactory builds the ViewModel that signs the venue out, from the home or setup;
+ *   tests pass one on fakes.
  */
 @Composable
 fun VenueEntry(
@@ -57,6 +62,13 @@ fun VenueEntry(
     venueQuestsFactory: ViewModelProvider.Factory = VenueQuestsViewModel.factory(),
     dashboardFactory: ViewModelProvider.Factory = VenueDashboardViewModel.factory(),
     venueProfileFactory: ViewModelProvider.Factory = VenueProfileViewModel.factory(),
+    signOutFactory: ViewModelProvider.Factory =
+        ProfileViewModel.factory(
+            authRepository,
+            proofUploadQueue = null,
+            NotificationTokenRepositoryProvider.repository,
+            NotificationRegistrationProvider.registration,
+        ),
 ) {
   when (val state = viewModel.uiState.collectAsStateWithLifecycle().value) {
     VenueEntryUiState.Loading ->
@@ -83,6 +95,7 @@ fun VenueEntry(
           venueQuestsFactory = venueQuestsFactory,
           dashboardFactory = dashboardFactory,
           venueProfileFactory = venueProfileFactory,
+          signOutFactory = signOutFactory,
           start = state.start,
           navController = navController,
       )

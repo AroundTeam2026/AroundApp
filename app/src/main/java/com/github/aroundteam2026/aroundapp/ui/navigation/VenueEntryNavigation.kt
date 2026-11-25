@@ -49,6 +49,8 @@ val defaultVenueAreaStep: VenueAreaStep = { venueId, onSaved, onBack ->
  *   up. A venue resuming on its area starts at business setup with the area opened above it.
  * @param navController the graph's controller; [VenueEntry] and tests pass their own to drive it.
  * @param venuePictures stores the venue's picture, from its business details.
+ * @param signOutFactory builds the [ProfileViewModel] that signs the venue out; tests pass one on
+ *   fakes.
  */
 @Composable
 fun VenueEntryNavigation(
@@ -60,11 +62,11 @@ fun VenueEntryNavigation(
     venueQuestsFactory: ViewModelProvider.Factory,
     dashboardFactory: ViewModelProvider.Factory,
     venueProfileFactory: ViewModelProvider.Factory,
+    signOutFactory: ViewModelProvider.Factory,
     start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {
-  val profile: ProfileViewModel =
-      viewModel(factory = ProfileViewModel.factory(authRepository, proofUploadQueue = null))
+  val profile: ProfileViewModel = viewModel(factory = signOutFactory)
   NavHost(
       navController,
       startDestination =

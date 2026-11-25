@@ -47,4 +47,28 @@ class FakeNotificationRegistrationTest {
     gate.complete(Unit)
     assertTrue(call.await().isSuccess)
   }
+
+  @Test
+  fun givesItsPhoneId() = runTest {
+    registration.phoneId = OTHER_ID
+
+    assertEquals(OTHER_ID, registration.id().getOrThrow())
+  }
+
+  @Test
+  fun givesTheDefaultIdUntilOneIsSet() = runTest {
+    assertEquals(FakeNotificationRegistration.DEFAULT_PHONE_ID, registration.id().getOrThrow())
+  }
+
+  @Test
+  fun failsToGiveAnIdWithItsIdFailure() = runTest {
+    val failure = IOException()
+    registration.idFailure = failure
+
+    assertSame(failure, registration.id().exceptionOrNull())
+  }
+
+  private companion object {
+    const val OTHER_ID = "other-phone"
+  }
 }

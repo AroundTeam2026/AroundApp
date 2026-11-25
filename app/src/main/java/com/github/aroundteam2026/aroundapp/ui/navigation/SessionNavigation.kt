@@ -16,6 +16,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationRegistrationProvider
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationTokenRepositoryProvider
 import com.github.aroundteam2026.aroundapp.ui.auth.AuthScreen
 import com.github.aroundteam2026.aroundapp.ui.auth.AuthViewModel
 import com.github.aroundteam2026.aroundapp.ui.auth.GoogleCredentialSessionEffect
@@ -37,7 +39,15 @@ fun SessionNavigation(
     sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.factory(repository)),
     mainScreen: @Composable (userId: String) -> Unit = { userId ->
       val profileViewModel: ProfileViewModel =
-          viewModel(factory = ProfileViewModel.factory(repository, proofUploadQueue = null))
+          viewModel(
+              factory =
+                  ProfileViewModel.factory(
+                      repository,
+                      proofUploadQueue = null,
+                      NotificationTokenRepositoryProvider.repository,
+                      NotificationRegistrationProvider.registration,
+                  )
+          )
       AroundApp(explorerUid = userId, onSignOut = profileViewModel::signOut)
     },
     authFlow: @Composable () -> Unit = {

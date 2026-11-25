@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.dashboard.venueDashboardFactoryOnFakes
+import com.github.aroundteam2026.aroundapp.ui.profile.profileFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.create.CreateQuestViewModel
 import com.github.aroundteam2026.aroundapp.ui.quest.create.createQuestFactoryOnFakes
 import com.github.aroundteam2026.aroundapp.ui.quest.list.venueQuestsFactoryOnFakes
@@ -81,6 +82,7 @@ class VenueEntryNavigationTest {
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
             dashboardFactory = venueDashboardFactoryOnFakes(),
             venueProfileFactory = venueProfileFactoryOnFakes(),
+            signOutFactory = profileFactoryOnFakes(auth),
             start = start,
         )
       }
@@ -270,6 +272,7 @@ class VenueEntryNavigationTest {
                   venueQuestsFactory = venueQuestsFactoryOnFakes(),
                   dashboardFactory = venueDashboardFactoryOnFakes(),
                   venueProfileFactory = venueProfileFactoryOnFakes(),
+                  signOutFactory = profileFactoryOnFakes(auth),
                   locationScreen = { uid, onSaved, _ ->
                     Button(onClick = onSaved, modifier = Modifier.testTag("location")) { Text(uid) }
                   },
@@ -312,6 +315,7 @@ class VenueEntryNavigationTest {
             venueQuestsFactory = venueQuestsFactoryOnFakes(),
             dashboardFactory = venueDashboardFactoryOnFakes(),
             venueProfileFactory = venueProfileFactoryOnFakes(),
+            signOutFactory = profileFactoryOnFakes(auth),
         )
       }
     }

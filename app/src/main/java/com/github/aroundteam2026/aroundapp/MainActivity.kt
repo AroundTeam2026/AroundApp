@@ -13,7 +13,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationRegistrationProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationTokenRegistrarProvider
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationTokenRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.quest.RefusedQuestWritesProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
@@ -42,7 +44,15 @@ class MainActivity : ComponentActivity() {
       val auth = AuthRepositoryProvider.repository
       val proofUploadQueue = remember { ProofUploadQueueProvider.queue(applicationContext) }
       val profile: ProfileViewModel =
-          viewModel(factory = ProfileViewModel.factory(auth, proofUploadQueue))
+          viewModel(
+              factory =
+                  ProfileViewModel.factory(
+                      auth,
+                      proofUploadQueue,
+                      NotificationTokenRepositoryProvider.repository,
+                      NotificationRegistrationProvider.registration,
+                  )
+          )
       val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
       val users = UserRepositoryProvider.repository
       val pictures = remember { UserPictureRepositoryProvider.repository(applicationContext) }
