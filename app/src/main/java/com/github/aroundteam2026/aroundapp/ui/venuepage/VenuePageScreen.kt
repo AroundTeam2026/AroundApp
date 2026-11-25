@@ -133,6 +133,7 @@ fun VenuePageScreen(
       questRow = questRow,
       bottomBar = bottomBar,
       onSubmitProof = { onSubmitProof(it, state.venueName) },
+      onRetryProofPhoto = viewModel::onRetryProofPhoto,
       snackbarHostState = snackbarHostState,
       showOfflineBanner = showOfflineBanner,
   )
@@ -143,9 +144,10 @@ fun VenuePageScreen(
  * [bottomBar], or by default a [QuestActionBar] whose button calls [onAccept] or, for an approved
  * reservation, [onSubmitProof]. While [VenuePageUiState.detailQuest] is set, a [QuestDetailsScreen]
  * takes the page's place, and [onCancel] cancels the reservation from there, or [onSubmitProof]
- * opens the proof form of an approved one, given its id. [snackbarHostState] shows its messages
- * above the bar. The list scrolls to [VenuePageUiState.focusQuestId], then calls [onFocusShown].
- * With [showOfflineBanner], the offline banner sits under the top bar.
+ * opens the proof form of an approved one, given its id; [onRetryProofPhoto] downloads the photo of
+ * the party's proof again. [snackbarHostState] shows its messages above the bar. The list scrolls
+ * to [VenuePageUiState.focusQuestId], then calls [onFocusShown]. With [showOfflineBanner], the
+ * offline banner sits under the top bar.
  */
 @Composable
 fun VenuePageContent(
@@ -162,6 +164,7 @@ fun VenuePageContent(
     questRow: VenuePageQuestRow = DefaultQuestRow,
     bottomBar: (@Composable (selectedQuest: VenuePageQuest?) -> Unit)? = null,
     onSubmitProof: (reservationId: String) -> Unit = {},
+    onRetryProofPhoto: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     showOfflineBanner: Boolean = false,
 ) {
@@ -177,6 +180,7 @@ fun VenuePageContent(
         onCancel,
         modifier,
         onSubmitProof = onSubmitProof,
+        onRetryProofPhoto = onRetryProofPhoto,
         showOfflineBanner = showOfflineBanner,
     )
     return

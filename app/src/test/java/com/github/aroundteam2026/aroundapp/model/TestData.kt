@@ -64,6 +64,9 @@ fun testVenue(
         featuredQuestId = featuredQuestId,
     )
 
+/** Where a party's proof photo is stored, for tests that show or download it. */
+const val TEST_PROOF_PHOTO = "gs://fake-bucket/proofs/reservation-1/photo-1"
+
 /** Display name of the explorer profile [testUsers] holds by default. */
 const val TEST_EXPLORER_NAME = "Ada"
 
