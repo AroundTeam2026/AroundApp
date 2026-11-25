@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -96,6 +97,8 @@ fun OverviewQuestRow(
     onCancel: (() -> Unit)? = null,
     offline: Boolean = false,
     onSendNewProof: (() -> Unit)? = null,
+    proofRetry: ProofRetryStatus = ProofRetryStatus.NONE,
+    onRetryProof: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
   Column(
@@ -170,6 +173,8 @@ fun OverviewQuestRow(
           tint = colors.onSurfaceVariant,
       )
     }
+    if (onRetryProof != null) RetryProofButton(proofRetry, onRetryProof)
+    if (proofRetry == ProofRetryStatus.FAILED) RetryProofFailed()
     if (onSendNewProof != null) NewProofButton(onSendNewProof)
     if (onCancel != null) {
       CancelReservationAction(
@@ -184,6 +189,38 @@ fun OverviewQuestRow(
 }
 
 /** The outlined pill at the foot of a card whose proof the party can still replace. */
+@Composable
+private fun RetryProofButton(status: ProofRetryStatus, onClick: () -> Unit) {
+  val retrying = status == ProofRetryStatus.RETRYING
+  Button(
+      onClick,
+      Modifier.fillMaxWidth()
+          .heightIn(min = NEW_PROOF_MIN_HEIGHT)
+          .testTag(C.Tag.OVERVIEW_RETRY_PROOF),
+      // A double tap tries once; the ViewModel ignores it too
+      enabled = !retrying,
+      shape = AroundPillShape,
+  ) {
+    Text(
+        stringResource(
+            if (retrying) R.string.overview_retrying_proof else R.string.overview_retry_proof
+        ),
+        style = AroundTextStyles.Button,
+    )
+  }
+}
+
+/** Says the proof couldn't be tried again, e.g. as its photo is gone, so a new one is needed. */
+@Composable
+private fun RetryProofFailed() {
+  Text(
+      stringResource(R.string.overview_retry_proof_failed),
+      Modifier.testTag(C.Tag.OVERVIEW_RETRY_PROOF_FAILED),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.error,
+  )
+}
+
 @Composable
 private fun NewProofButton(onClick: () -> Unit) {
   OutlinedButton(
@@ -250,6 +287,10 @@ private fun Status(status: OverviewRowStatus, sender: ProofSender?, modifier: Mo
           OverviewRowStatus.PROOF_REJECTED -> {
             Dot(colors.error)
             stringResource(R.string.overview_status_proof_rejected) to colors.error
+          }
+          OverviewRowStatus.PROOF_NOT_SENT -> {
+            Dot(colors.error)
+            stringResource(R.string.overview_status_proof_not_sent) to colors.error
           }
         }
     Text(

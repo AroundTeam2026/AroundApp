@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.UploadFailure
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import com.github.aroundteam2026.aroundapp.model.testVenue
@@ -62,6 +63,7 @@ class OverviewScreenTest {
   private var joinParty = 0
   private val cancelled = mutableListOf<String>()
   private val newProofs = mutableListOf<Pair<String, String>>()
+  private val retriedProofs = mutableListOf<String>()
 
   private fun show(state: OverviewUiState, showOfflineBanner: Boolean = false) {
     compose.setContent {
@@ -77,6 +79,7 @@ class OverviewScreenTest {
             },
             clock = CLOCK,
             showOfflineBanner = showOfflineBanner,
+            onRetryProof = { retriedProofs += it },
         )
       }
     }
@@ -249,6 +252,31 @@ class OverviewScreenTest {
     assertEquals(emptyList<Pair<String, String>>(), opened)
   }
 
+  // #624: only a failure a retry can get past offers "Try again"; every unsent proof can be
+  // replaced
+  @Test
+  fun aProofNotSentIsTriedAgainOnlyIfItCanPass() {
+    show(
+        loaded(
+            row(id = "weak", status = OverviewRowStatus.PROOF_NOT_SENT)
+                .copy(proofFailure = UploadFailure.RETRYABLE),
+            row(id = "gone", status = OverviewRowStatus.PROOF_NOT_SENT)
+                .copy(proofFailure = UploadFailure.PHOTO_MISSING),
+        )
+    )
+
+    // Not sent, the proof is newer than any the venue has, so the card can be cancelled
+    listOf("weak", "gone").forEach {
+      newProofButtonOf(it).assertExists()
+      cancelButtonOf(it).assertExists()
+    }
+    retryProofButtonOf("gone").assertDoesNotExist()
+    retryProofButtonOf("weak").performClick()
+
+    assertEquals(listOf("weak"), retriedProofs)
+    assertEquals(emptyList<Pair<String, String>>(), opened)
+  }
+
   @Test
   fun confirmingACancelCancelsThatCardsReservation() {
     show(loaded(row(), row(id = "reservation-2", venueId = "bakery")))
@@ -369,6 +397,13 @@ class OverviewScreenTest {
       )
 
   /** The new proof button is a clickable of its own, so the card's merged node leaves it out. */
+  private fun retryProofButtonOf(reservationId: String) =
+      compose.onNode(
+          hasTestTag(C.Tag.OVERVIEW_RETRY_PROOF) and
+              hasAnyAncestor(hasTestTag("${C.Tag.OVERVIEW_ROW}_$reservationId")),
+          useUnmergedTree = true,
+      )
+
   private fun newProofButtonOf(reservationId: String) =
       compose.onNode(
           hasTestTag(C.Tag.OVERVIEW_SEND_NEW_PROOF) and

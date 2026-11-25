@@ -30,6 +30,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.Reservation
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
+import com.github.aroundteam2026.aroundapp.model.reservation.UploadFailure
 import com.github.aroundteam2026.aroundapp.model.reservation.isActive
 import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.user.UserRepositoryProvider
@@ -64,12 +65,12 @@ import kotlinx.coroutines.launch
  * quest, read once, and its venue and party, which it listens to, as well as their completions,
  * which say where the party's proof stands, whichever member sent it, and the profile of a member
  * other than the explorer who sent one, to name them. A photo proof queued in [proofUploadQueue]
- * shows as waiting to upload until it leaves the queue. Rows follow the reservations, the venues,
- * the parties, the completions, the queue and those profiles as they change. If anything fails,
- * including the reservations' listener after sign-out, the overview shows [OverviewStatus.FAILED]
- * until [retry]. The explorer can [cancel] a reservation, or leave the party of one they joined
- * rather than created, but not while [OverviewUiState.offline] says the device is offline, which it
- * follows from [connectivityRepository].
+ * shows as waiting to upload until it leaves the queue, and as not sent if it failed for good. Rows
+ * follow the reservations, the venues, the parties, the completions, the queue and those profiles
+ * as they change. If anything fails, including the reservations' listener after sign-out, the
+ * overview shows [OverviewStatus.FAILED] until [retry]. The explorer can [cancel] a reservation, or
+ * leave the party of one they joined rather than created, but not while [OverviewUiState.offline]
+ * says the device is offline, which it follows from [connectivityRepository].
  */
 class OverviewViewModel(
     private val explorerUid: String,
@@ -120,6 +121,41 @@ class OverviewViewModel(
    * left meanwhile; calling this again retries. Once it succeeds, the reservation's proof waiting
    * in the [ProofUploadQueue], if any, is cancelled too, since the rules would refuse it.
    */
+  /**
+   * Queues [reservationId]'s unsent proof again (#624), when its failure is
+   * [UploadFailure.RETRYABLE]. Does nothing while that retry is under way, so a double tap retries
+   * once. A failure, e.g. as the photo is no longer kept, marks the row so it says to send a new
+   * proof instead; a retry that works moves the row to waiting to upload, through the queue.
+   */
+  fun retryProof(reservationId: String) {
+    val current = mutableUiState.value
+    val row = current.rows.find { it.reservationId == reservationId }
+    if (
+        row?.status != OverviewRowStatus.PROOF_NOT_SENT ||
+            row.proofFailure != UploadFailure.RETRYABLE ||
+            reservationId in current.retryingProofIds
+    ) {
+      return
+    }
+    mutableUiState.update {
+      it.copy(
+          retryingProofIds = it.retryingProofIds + reservationId,
+          failedProofRetryIds = it.failedProofRetryIds - reservationId,
+      )
+    }
+    viewModelScope.launch {
+      proofUploadQueue.retry(reservationId).onFailure { error ->
+        Log.w(TAG, "Trying the proof of $reservationId again failed", error)
+        mutableUiState.update {
+          it.copy(
+              retryingProofIds = it.retryingProofIds - reservationId,
+              failedProofRetryIds = it.failedProofRetryIds + reservationId,
+          )
+        }
+      }
+    }
+  }
+
   fun cancel(reservationId: String) {
     val current = mutableUiState.value
     val row =
@@ -189,7 +225,8 @@ class OverviewViewModel(
                   proofSenders.observe(completions).map { completions to it }
                 },
                 proofUploadQueue.waiting,
-            ) { venues, parties, (completions, senders), waiting ->
+                proofUploadQueue.failed,
+            ) { venues, parties, (completions, senders), waiting, failed ->
               val partySizes = parties.mapValues { (_, members) -> members.count { it.isJoined } }
               val leaves = leavesPartiesOf(reservations, parties, explorerUid)
               overviewRows(
@@ -200,6 +237,7 @@ class OverviewViewModel(
                   senders,
                   leaves,
                   waiting,
+                  failed,
               )
             }
           }
@@ -212,12 +250,19 @@ class OverviewViewModel(
           .collect { rows ->
             // A reservation that left the rows, e.g. once cancelled, is no longer cancelling
             val ids = rows.map { it.reservationId }.toSet()
+            // A proof tried again leaves "not sent" once the queue lists it as waiting
+            val notSent =
+                rows
+                    .filter { it.status == OverviewRowStatus.PROOF_NOT_SENT }
+                    .map { it.reservationId }
             mutableUiState.update {
               it.copy(
                   status = OverviewStatus.LOADED,
                   rows = rows,
                   cancellingIds = it.cancellingIds intersect ids,
                   failedCancelIds = it.failedCancelIds intersect ids,
+                  retryingProofIds = it.retryingProofIds intersect notSent.toSet(),
+                  failedProofRetryIds = it.failedProofRetryIds intersect notSent.toSet(),
               )
             }
           }
@@ -292,14 +337,21 @@ internal fun overviewRows(
     senders: Map<String, ProofSender> = emptyMap(),
     leaves: Map<String, Boolean> = emptyMap(),
     waiting: Set<String> = emptySet(),
+    failed: Map<String, UploadFailure> = emptyMap(),
 ): List<OverviewRow> {
   val venuesById = venues.associateBy { it.id }
   return booked.mapNotNull { (reservation, quest) ->
     venuesById[reservation.venueId]?.let { venue ->
       // A safety net only: observeParties gives every party it is asked for
       val partySize = partySizes[reservation.id] ?: 1
-      overviewRow(reservation, quest, venue, partySize, rowStatus(reservation, proofs, waiting))
-          .copy(proofSender = senders[reservation.id], leave = leaves[reservation.id])
+      val status = rowStatus(reservation, proofs, waiting, failed)
+      overviewRow(reservation, quest, venue, partySize, status)
+          .copy(
+              proofSender = senders[reservation.id],
+              leave = leaves[reservation.id],
+              proofFailure =
+                  failed[reservation.id].takeIf { status == OverviewRowStatus.PROOF_NOT_SENT },
+          )
     }
   }
 }
@@ -314,6 +366,7 @@ private fun rowStatus(
     reservation: Reservation,
     proofs: Map<String, Completion>,
     waiting: Set<String>,
+    failed: Map<String, UploadFailure>,
 ): OverviewRowStatus {
   val proof = proofs[reservation.id]
   return when {
@@ -321,6 +374,9 @@ private fun rowStatus(
     reservation.status != ReservationStatus.APPROVED -> OverviewRowStatus.WAITING
     reservation.id in waiting && proof?.status != CompletionStatus.APPROVED ->
         OverviewRowStatus.UPLOAD_WAITING
+    // Like a waiting one, a failed proof is newer than any the venue has, unless it approved one
+    reservation.id in failed && proof?.status != CompletionStatus.APPROVED ->
+        OverviewRowStatus.PROOF_NOT_SENT
     proof?.pendingWrite == true -> OverviewRowStatus.SENDING
     else ->
         when (proof?.status) {
