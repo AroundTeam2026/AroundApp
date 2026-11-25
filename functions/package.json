@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:emulator": "firebase emulators:exec --only firestore --project demo-project \"npm test\""
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-project \"npm test\"",
+    "test:coverage": "firebase emulators:exec --only firestore --project demo-project \"npm test -- --coverage\""
   },
   "dependencies": {
     "firebase-admin": "14.5.1",

@@ -8,3 +8,4 @@ initializeApp();
 export { notifyVenueReservation } from "./venueReservation";
 export { notifyVenueProof } from "./venueProof";
 export { notifyReservationAnswered } from "./reservationAnswered";
+export { notifyProofAnswered } from "./proofAnswered";

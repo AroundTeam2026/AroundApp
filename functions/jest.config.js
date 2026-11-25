@@ -15,4 +15,8 @@ module.exports = {
     "^.+[/\\\\]node_modules[/\\\\]jose[/\\\\].+\\.js$": ["ts-jest", { tsconfig: { allowJs: true } }],
   },
   transformIgnorePatterns: ["/node_modules/(?!jose/)"],
+  // With --coverage (npm run test:coverage): every function's file, measured against the team's
+  // 90 % bar. index.ts only wires them up, and the deploy is what runs it.
+  collectCoverageFrom: ["src/**/*.ts", "!src/index.ts"],
+  coverageThreshold: { global: { lines: 90, branches: 90 } },
 };

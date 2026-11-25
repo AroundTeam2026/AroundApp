@@ -75,6 +75,20 @@ export async function readQuest(questId: string): Promise<DocumentSnapshot> {
   return quest;
 }
 
+/** [value] if it is text that isn't blank, else undefined: a name or a title worth showing. */
+export function nonBlank(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+/**
+ * The non-blank text [field] of the document at [path], or undefined if it or the field is
+ * missing, e.g. a quest the venue deleted: a notification then says the same without that name
+ * rather than not going out.
+ */
+export async function textOf(path: string, field: string): Promise<string | undefined> {
+  return nonBlank((await getFirestore().doc(path).get()).get(field));
+}
+
 /** What every notification function sends: the text shown, and where a tap leads. */
 export interface NotificationMessage {
   title: string;
