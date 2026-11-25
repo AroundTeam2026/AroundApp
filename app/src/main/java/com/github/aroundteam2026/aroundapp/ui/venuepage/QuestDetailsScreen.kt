@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,13 +29,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +50,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +75,7 @@ import com.github.aroundteam2026.aroundapp.resources.C
 import com.github.aroundteam2026.aroundapp.ui.OfflineHint
 import com.github.aroundteam2026.aroundapp.ui.navigation.OfflineBanner
 import com.github.aroundteam2026.aroundapp.ui.overview.slotFormat
+import com.github.aroundteam2026.aroundapp.ui.proof.ProofPhotoViewer
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelReservationAction
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
@@ -76,6 +85,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.RadiusMap
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.currentLocale
 import com.github.aroundteam2026.aroundapp.ui.quest.offlineCancelHint
+import com.github.aroundteam2026.aroundapp.ui.review.ProofPhoto
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundCorners
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundPillShape
@@ -83,6 +93,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundShapes
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
+import com.github.aroundteam2026.aroundapp.ui.theme.aroundTextButtonColors
 import java.time.Clock
 import java.util.Date
 
@@ -102,6 +113,7 @@ import java.util.Date
  * @param onCancel Cancels the quest's reservation, or leaves its party, once confirmed.
  * @param clock Tells the time zone the reward's expiry is written in.
  * @param onSubmitProof Opens the proof form of the approved reservation with the given id.
+ * @param onRetryProofPhoto Downloads the photo of the party's proof again, after it failed.
  * @param showOfflineBanner Shows the offline banner under the top bar, as the shell says the device
  *   is offline. Offline with a reservation to cancel, that slot says instead that cancelling, or
  *   leaving the party, needs a connection, so the explorer sees one offline card, not two.
@@ -116,6 +128,7 @@ fun QuestDetailsScreen(
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemDefaultZone(),
     onSubmitProof: (reservationId: String) -> Unit = {},
+    onRetryProofPhoto: () -> Unit = {},
     showOfflineBanner: Boolean = false,
 ) {
   BackHandler(onBack = onBack)
@@ -139,7 +152,10 @@ fun QuestDetailsScreen(
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
       Header(state, quest)
-      state.proof?.let { ProofStatusCard(it, state.venueName, state.proofSender) }
+      state.proof?.let {
+        ProofStatusCard(it, state.venueName, state.proofSender)
+        SentProofCard(it.proof, state.proofPhoto, quest.title, onRetryProofPhoto)
+      }
       if (quest.description.isNotBlank()) {
         Card(R.drawable.ic_info, R.string.quest_detail_about) {
           CardText(quest.description, C.Tag.QUEST_DETAIL_DESCRIPTION)
@@ -342,6 +358,72 @@ private fun ProofStatusCard(proof: Completion, venueName: String, sender: ProofS
       )
       Text(look.text, color = colors.onSurfaceVariant, style = AroundTextStyles.RowDescription)
     }
+  }
+}
+
+/**
+ * What the party sent as its [proof], for every member to see (#555), whether another member or the
+ * explorer sent it: the written answer, or its [photo], with a spinner while it downloads and
+ * [onRetryPhoto] once that failed. The downloaded photo opens full screen under the quest's [title]
+ * when tapped.
+ */
+@Composable
+private fun SentProofCard(
+    proof: Proof,
+    photo: ProofPhoto?,
+    title: String,
+    onRetryPhoto: () -> Unit,
+) {
+  val icon = if (proof is Proof.Photo) R.drawable.ic_proof_photo else R.drawable.ic_proof_text
+  Card(icon, R.string.quest_detail_sent_proof) {
+    when {
+      proof is Proof.Text -> CardText(proof.answer, C.Tag.QUEST_DETAIL_SENT_PROOF_ANSWER)
+      photo is ProofPhoto.Loaded -> SentProofPhoto(photo.image, title)
+      photo == ProofPhoto.Failed -> PhotoFailed(onRetryPhoto)
+      else ->
+          CircularProgressIndicator(
+              Modifier.align(Alignment.CenterHorizontally)
+                  .testTag(C.Tag.QUEST_DETAIL_SENT_PROOF_LOADING),
+              color = AroundTheme.colors.accentText,
+          )
+    }
+  }
+}
+
+/** The party's proof [photo], which opens full screen under the quest's [title] when tapped. */
+@Composable
+private fun SentProofPhoto(photo: ImageBitmap, title: String) {
+  var viewing by rememberSaveable { mutableStateOf(false) }
+  val description = stringResource(R.string.quest_detail_sent_proof_photo)
+  Image(
+      photo,
+      description,
+      Modifier.fillMaxWidth()
+          .clip(AroundCorners.Photo)
+          .clickable(
+              onClickLabel = stringResource(R.string.proof_viewer_open),
+              role = Role.Image,
+          ) {
+            viewing = true
+          }
+          .testTag(C.Tag.QUEST_DETAIL_SENT_PROOF_PHOTO),
+  )
+  if (viewing) ProofPhotoViewer(photo, description, title, subtitle = null) { viewing = false }
+}
+
+/** Says the proof photo couldn't be shown, and offers to [onRetry] its download. */
+@Composable
+private fun ColumnScope.PhotoFailed(onRetry: () -> Unit) {
+  CardText(
+      stringResource(R.string.quest_detail_sent_proof_photo_failed),
+      C.Tag.QUEST_DETAIL_SENT_PROOF_FAILED,
+  )
+  TextButton(
+      onClick = onRetry,
+      modifier = Modifier.align(Alignment.Start).testTag(C.Tag.QUEST_DETAIL_SENT_PROOF_RETRY),
+      colors = aroundTextButtonColors(),
+  ) {
+    Text(stringResource(R.string.quest_detail_sent_proof_photo_retry))
   }
 }
 
@@ -826,6 +908,8 @@ private val PARTY_CODE_SHARE_ICON_SIZE = 18.dp
 private const val PARTY_CODE_HALF = PARTY_CODE_LENGTH / 2
 private const val SAMPLE_QUEST_ID = "quest"
 private const val SAMPLE_RESERVATION_ID = "reservation"
+private const val SAMPLE_PHOTO_WIDTH = 400
+private const val SAMPLE_PHOTO_HEIGHT = 300
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -891,6 +975,9 @@ internal fun QuestDetailsSentByMemberPreview() {
           ),
       acceptedParties = mapOf(SAMPLE_QUEST_ID to 3),
       proofSenders = mapOf(SAMPLE_RESERVATION_ID to ProofSender("Lea")),
+      // A blank photo, so the preview shows where the party's photo sits (#555)
+      proofPhotos =
+          mapOf("gs://proofs/fox.jpg" to ImageBitmap(SAMPLE_PHOTO_WIDTH, SAMPLE_PHOTO_HEIGHT)),
   )
 }
 
@@ -901,6 +988,7 @@ private fun QuestDetailsSample(
     acceptedParties: Map<String, Int> = emptyMap(),
     partyCodes: Map<String, String> = emptyMap(),
     proofSenders: Map<String, ProofSender> = emptyMap(),
+    proofPhotos: Map<String, ImageBitmap> = emptyMap(),
 ) {
   val quest =
       VenuePageQuest(
@@ -928,6 +1016,7 @@ private fun QuestDetailsSample(
             acceptedParties = acceptedParties,
             partyCodes = partyCodes,
             proofSenders = proofSenders,
+            proofPhotos = proofPhotos,
         ),
         quest,
         onBack = {},

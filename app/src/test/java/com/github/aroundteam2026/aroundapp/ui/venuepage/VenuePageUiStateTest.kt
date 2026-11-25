@@ -2,11 +2,15 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import androidx.compose.ui.graphics.ImageBitmap
+import com.github.aroundteam2026.aroundapp.model.TEST_PROOF_PHOTO
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
+import com.github.aroundteam2026.aroundapp.ui.review.ProofPhoto
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,7 +25,7 @@ class VenuePageUiStateTest {
           reservationId = reservationId,
           venueId = "venue",
           explorerUid = "explorer",
-          proof = Proof.Photo("gs://proofs/fox"),
+          proof = Proof.Photo(TEST_PROOF_PHOTO),
           status = CompletionStatus.PENDING,
           rejectReason = null,
           submittedAt = 0L,
@@ -219,6 +223,38 @@ class VenuePageUiStateTest {
     assertNull(
         booked.copy(approvedIds = setOf("r"), selectedQuestId = "b").completableReservationId
     )
+  }
+
+  // #555: the photo of the picked quest's proof, as the details show it
+  @Test
+  fun theProofPhotoIsLoadingThenLoadedOrFailed() {
+    val sent =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            completions = mapOf("r" to completion("r")),
+        )
+    val photo = mockk<ImageBitmap>()
+
+    assertEquals(ProofPhoto.Loading, sent.proofPhoto)
+    val loadedPhoto = sent.copy(proofPhotos = mapOf(TEST_PROOF_PHOTO to photo)).proofPhoto
+    assertSame(photo, (loadedPhoto as ProofPhoto.Loaded).image)
+    val failed = sent.copy(failedProofPhotos = setOf(TEST_PROOF_PHOTO))
+    assertEquals(ProofPhoto.Failed, failed.proofPhoto)
+    assertNull(sent.copy(selectedQuestId = "b").proofPhoto)
+  }
+
+  @Test
+  fun aWrittenProofHasNoPhoto() {
+    val written = completion("r").copy(proof = Proof.Text("Behind the till"))
+    val sent =
+        loaded.copy(
+            reservationIds = mapOf("a" to "r"),
+            selectedQuestId = "a",
+            completions = mapOf("r" to written),
+        )
+
+    assertNull(sent.proofPhoto)
   }
 
   @Test
