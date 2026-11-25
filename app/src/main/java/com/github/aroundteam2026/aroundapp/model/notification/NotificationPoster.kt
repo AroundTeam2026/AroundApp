@@ -52,12 +52,14 @@ class NotificationPoster(private val context: Context) {
     manager.notify(notification.reservationId, channel.ordinal, shown)
   }
 
-  // ponytail: a tap restarts the app at home, which is the screen a route names for its role: the
-  // Quests tab for an explorer, the Dashboard for a venue. Should a route ever name another screen,
-  // pass it in this intent and navigate to it from MainActivity.onNewIntent.
   /**
    * Opens the app as if from the launcher, but on a cleared task, so it starts at home even when it
-   * was open on another screen.
+   * was open on another screen. Home is the screen a route names for its role: the Quests tab for
+   * an explorer, the Dashboard for a venue.
+   *
+   * The cleared task also drops a screen left open, such as a half-filled quest form. Should a
+   * route ever name another screen, put it in this intent: MainActivity is recreated, so it would
+   * read it in onCreate.
    */
   private fun openApp(): PendingIntent? {
     val intent =
