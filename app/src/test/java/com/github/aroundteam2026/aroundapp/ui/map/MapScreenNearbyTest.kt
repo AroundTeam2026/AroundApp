@@ -372,6 +372,22 @@ class MapScreenNearbyTest {
   fun backTakesAPulledUpOverlayBackToRestBeforeClosingIt() {
     show()
     openNearby()
+    assertBackLowersThePulledUpOverlayThenClosesIt()
+  }
+
+  // As when coming back from a quest's details, or after a rotation: the map and the overlay enter
+  // the composition together, and the overlay's Back must still be asked before the map's
+  @Test
+  fun backTakesAPulledUpOverlayBackToRestWhenTheMapOpensWithItOpen() {
+    viewModel.onNearbyOpen()
+    show()
+    assertBackLowersThePulledUpOverlayThenClosesIt()
+  }
+
+  /**
+   * Pulls the open overlay up, then checks a first Back takes it to rest and a second closes it.
+   */
+  private fun assertBackLowersThePulledUpOverlayThenClosesIt() {
     val restTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
     node(C.Tag.NEARBY_GRABBER).performTouchInput {
       swipe(center, center - Offset(0f, 600.dp.toPx()), durationMillis = 1_000L)
