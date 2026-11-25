@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeWithVelocity
 import androidx.compose.ui.unit.dp
@@ -368,6 +369,42 @@ class MapScreenNearbyTest {
   }
 
   @Test
+  fun backTakesAPulledUpOverlayBackToRestBeforeClosingIt() {
+    show()
+    openNearby()
+    assertBackLowersThePulledUpOverlayThenClosesIt()
+  }
+
+  // As when coming back from a quest's details, or after a rotation: the map and the overlay enter
+  // the composition together, and the overlay's Back must still be asked before the map's
+  @Test
+  fun backTakesAPulledUpOverlayBackToRestWhenTheMapOpensWithItOpen() {
+    viewModel.onNearbyOpen()
+    show()
+    assertBackLowersThePulledUpOverlayThenClosesIt()
+  }
+
+  /**
+   * Pulls the open overlay up, then checks a first Back takes it to rest and a second closes it.
+   */
+  private fun assertBackLowersThePulledUpOverlayThenClosesIt() {
+    val restTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    node(C.Tag.NEARBY_GRABBER).performTouchInput {
+      swipe(center, center - Offset(0f, 600.dp.toPx()), durationMillis = 1_000L)
+    }
+    composeTestRule.waitForIdle()
+
+    composeTestRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+    composeTestRule.waitForIdle()
+    assertDpEquals("overlay top", restTop, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    node(C.Tag.NEARBY_SCRIM).assertDoesNotExist()
+
+    composeTestRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+    composeTestRule.waitForIdle()
+    assertOverlayClosed()
+  }
+
+  @Test
   fun withTheOverlayClosedBackLeavesTheMap() {
     show()
 
@@ -513,8 +550,13 @@ class MapScreenNearbyTest {
     }
     composeTestRule.waitForIdle()
 
-    assertDpEquals("overlay top", top, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+    // Back at its place, or above it once the finger passes where it started; the list never
+    // scrolled
+    val overlayTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    val listScrolled = node(C.Tag.NEARBY_LIST).scrolled()
     node(C.Tag.NEARBY_LIST).performTouchInput { up() }
+    assertTrue("the overlay is at $overlayTop, under its place $top", overlayTop <= top)
+    assertEquals(0f, listScrolled)
   }
 
   @Test

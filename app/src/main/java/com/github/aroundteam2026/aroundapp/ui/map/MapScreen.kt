@@ -72,6 +72,9 @@ fun MapScreen(
     showOfflineBanner: Boolean = LocalShowOfflineBanner.current,
 ) {
   val state by viewModel.uiState.collectAsState()
+  // First, so the overlay's own Back, which lowers a pulled-up sheet, is registered after it and
+  // asked first, even when the two enter the composition together
+  BackHandler(enabled = state.showsNearby, onBack = viewModel::onNearbyClose)
   val acceptState = acceptViewModel?.uiState?.collectAsState()?.value
   val snackbarHostState = remember { SnackbarHostState() }
   val refusedNotice = stringResource(R.string.accept_quest_refused_notice)
@@ -157,7 +160,6 @@ fun MapScreen(
           onClose = viewModel::onNearbyClose,
           filters = state.filters,
           onFiltersChange = viewModel::onFiltersChange,
-          modifier = Modifier.align(Alignment.BottomCenter),
           acceptState = acceptState,
           onAccept = { acceptViewModel?.accept(it) },
       )
@@ -179,7 +181,6 @@ fun MapScreen(
       SnackbarHost(snackbarHostState)
     }
   }
-  BackHandler(enabled = state.showsNearby, onBack = viewModel::onNearbyClose)
 }
 
 /**
