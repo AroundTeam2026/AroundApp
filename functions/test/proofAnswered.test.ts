@@ -63,6 +63,9 @@ beforeEach(() => {
   sent.mockResolvedValue(undefined);
 });
 
+// Restores the logger.warn spy even when a test fails midway, as reservationAnswered.test.ts does
+afterEach(() => jest.restoreAllMocks());
+
 interface Fixture {
   ref: DocumentReference;
   /** The party's pending proof, as stored before each test's update. */
@@ -253,7 +256,6 @@ describe("notifyProofAnswered", () => {
       expect.any(String),
       expect.objectContaining({ uid: EXPLORER, reservationId: ref.id }),
     );
-    warn.mockRestore();
   });
 
   it("ignores a missing snapshot", async () => {
