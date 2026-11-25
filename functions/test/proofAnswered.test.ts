@@ -1,11 +1,26 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
 import { randomUUID } from "node:crypto";
-import { getApps, initializeApp } from "firebase-admin/app";
 import { DocumentData, DocumentReference, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { Change } from "firebase-functions/v2/firestore";
-import { NotificationMessage, sendToUser } from "../src/notify";
+import { NotificationMessage, PENDING, sendToUser } from "../src/notify";
 import { notifyProofAnswered, rewardText, sendProofAnswer } from "../src/proofAnswered";
+import {
+  APPROVED,
+  EXPLORER,
+  FREE_CROISSANT,
+  initTestApp,
+  JOINED,
+  LEADER,
+  QUEST_TITLE,
+  REJECTED,
+  seedMembership,
+  seedReservation,
+  seedVenue,
+  VENUE,
+  VENUE_NAME,
+  WITHDRAWN,
+} from "./fixtures";
 
 // The sending itself is sendToUser's, tested in notify.test.ts; readQuest is the real one
 jest.mock("../src/notify", () => ({
@@ -15,40 +30,32 @@ jest.mock("../src/notify", () => ({
 
 const sent = jest.mocked(sendToUser);
 
-const QUEST = "Find the hidden fox";
-const VENUE = "Café Lumière";
-const FREE_CROISSANT = { type: "FREE_ITEM", name: "croissant" };
 const REASON = "The fox isn't in it";
 
 /**
- * The texts of #631's Figma for the fixture's quest, venue and reward: the one place the tests
- * spell them out. Change them here, with the Figma frames, when the wording changes.
+ * The texts of #631's Figma for the shared quest, venue and reward: the one place the tests spell
+ * them out. Change them here, with the Figma frames, when the wording changes.
  */
 const FIGMA = {
-  approvedTitle: `Quest completed: ${QUEST}`,
-  approvedBody: `${VENUE} approved your proof. Your reward: a free croissant.`,
-  approvedBodyWithoutReward: `${VENUE} approved your proof.`,
-  rejectedTitle: `${VENUE} rejected your proof`,
+  approvedTitle: `Quest completed: ${QUEST_TITLE}`,
+  approvedBody: `${VENUE_NAME} approved your proof. Your reward: a free croissant.`,
+  approvedBodyWithoutReward: `${VENUE_NAME} approved your proof.`,
+  rejectedTitle: `${VENUE_NAME} rejected your proof`,
   rejectedBody: `“${REASON}” You can send a new one from the Quests tab.`,
 };
 
-const JOINED = ["creator", "friend"];
+/** The party's joined members: the shared explorer and a friend. */
+const JOINED_MEMBERS = [EXPLORER, "friend"].sort();
 
-beforeAll(() => {
-  if (getApps().length === 0) initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+beforeAll(async () => {
+  initTestApp();
+  await seedVenue();
 });
 
 beforeEach(() => {
   sent.mockReset();
   sent.mockResolvedValue(undefined);
 });
-
-async function membership(reservationId: string, uid: string | null, status: string) {
-  await getFirestore()
-    .collection("party_user")
-    .doc(`${reservationId}_${uid ?? randomUUID()}`)
-    .set({ reservationId, ...(uid ? { uid } : {}), status, joinedAt: new Date() });
-}
 
 interface Fixture {
   ref: DocumentReference;
@@ -57,38 +64,31 @@ interface Fixture {
 }
 
 /**
- * A reservation and a venue of their own per test, for [QUEST] at [VENUE], with a pending proof.
- * Its party has [JOINED] joined, "former-member" withdrawn and a membership without a uid; another
+ * A reservation of its own per test, of the shared quest (with [reward]) at [VENUE] or, when
+ * [venueExists] is false, at a venue that isn't stored, with a pending proof. Its party has
+ * [JOINED_MEMBERS] joined, "former-member" withdrawn and a membership without a uid; another
  * party's member is joined elsewhere.
  */
 async function fixture({ reward = FREE_CROISSANT as unknown, venueExists = true } = {}) {
-  const reservationId = randomUUID();
-  const questId = randomUUID();
-  const venueId = `venue-${randomUUID()}`;
-  const db = getFirestore();
+  const reservationId = await seedReservation(
+    JOINED_MEMBERS.length,
+    LEADER,
+    reward ? { reward } : {},
+  );
   await Promise.all([
-    venueExists ? db.collection("venues").doc(venueId).set({ name: VENUE }) : null,
-    db
-      .collection("quests")
-      .doc(questId)
-      .set({ venueId, title: QUEST, ...(reward ? { reward } : {}) }),
-    db
-      .collection("reservations")
-      .doc(reservationId)
-      .set({ questId, venueId, status: "APPROVED", joinedCount: JOINED.length }),
-    ...JOINED.map((uid) => membership(reservationId, uid, "JOINED")),
-    membership(reservationId, "former-member", "WITHDRAWN"),
-    membership(reservationId, null, "JOINED"),
-    membership(randomUUID(), "other-party", "JOINED"),
+    ...JOINED_MEMBERS.map((uid) => seedMembership(reservationId, uid, JOINED)),
+    seedMembership(reservationId, "former-member", WITHDRAWN),
+    seedMembership(reservationId, null, JOINED),
+    seedMembership(randomUUID(), "other-party", JOINED),
   ]);
   const proof = {
-    venueId,
-    explorerUid: "creator",
-    status: "PENDING",
+    venueId: venueExists ? VENUE : `missing-venue-${randomUUID()}`,
+    explorerUid: EXPLORER,
+    status: PENDING,
     photoUrl: "gs://proofs/photo-1",
     submittedAt: Timestamp.fromMillis(1000),
   };
-  const ref = db.collection("completions").doc(reservationId);
+  const ref = getFirestore().collection("completions").doc(reservationId);
   await ref.set(proof);
   return { ref, proof } satisfies Fixture;
 }
@@ -120,9 +120,9 @@ describe("notifyProofAnswered", () => {
   it("tells every joined member, in Figma's words, when the venue approves the proof", async () => {
     const { ref, proof } = await fixture();
 
-    await updateAndNotify(ref, { ...proof, status: "APPROVED" });
+    await updateAndNotify(ref, { ...proof, status: APPROVED });
 
-    expect(recipients()).toEqual(JOINED);
+    expect(recipients()).toEqual(JOINED_MEMBERS);
     expect(theMessage()).toEqual({
       title: FIGMA.approvedTitle,
       body: FIGMA.approvedBody,
@@ -133,9 +133,9 @@ describe("notifyProofAnswered", () => {
   it("tells every joined member, in Figma's words, when the venue rejects the proof", async () => {
     const { ref, proof } = await fixture();
 
-    await updateAndNotify(ref, { ...proof, status: "REJECTED", rejectReason: REASON });
+    await updateAndNotify(ref, { ...proof, status: REJECTED, rejectReason: REASON });
 
-    expect(recipients()).toEqual(JOINED);
+    expect(recipients()).toEqual(JOINED_MEMBERS);
     expect(theMessage()).toEqual({
       title: FIGMA.rejectedTitle,
       body: FIGMA.rejectedBody,
@@ -145,18 +145,18 @@ describe("notifyProofAnswered", () => {
 
   it("sends the approval when the venue approves a proof it had rejected", async () => {
     const { ref, proof } = await fixture();
-    await ref.set({ ...proof, status: "REJECTED", rejectReason: REASON });
+    await ref.set({ ...proof, status: REJECTED, rejectReason: REASON });
 
-    await updateAndNotify(ref, { ...proof, status: "APPROVED" });
+    await updateAndNotify(ref, { ...proof, status: APPROVED });
 
-    expect(recipients()).toEqual(JOINED);
+    expect(recipients()).toEqual(JOINED_MEMBERS);
     expect(theMessage()).toMatchObject({ title: FIGMA.approvedTitle, body: FIGMA.approvedBody });
   });
 
   it("leaves the reward out of the approval of a quest without one", async () => {
     const { ref, proof } = await fixture({ reward: null });
 
-    await updateAndNotify(ref, { ...proof, status: "APPROVED" });
+    await updateAndNotify(ref, { ...proof, status: APPROVED });
 
     expect(theMessage().body).toBe(FIGMA.approvedBodyWithoutReward);
   });
@@ -165,7 +165,7 @@ describe("notifyProofAnswered", () => {
     const reward = { type: "OTHER", description: "A tour of the kitchen." };
     const { ref, proof } = await fixture({ reward });
 
-    await updateAndNotify(ref, { ...proof, status: "APPROVED" });
+    await updateAndNotify(ref, { ...proof, status: APPROVED });
 
     expect(theMessage().body.endsWith(` ${rewardText(reward)}`)).toBe(true);
   });
@@ -175,7 +175,7 @@ describe("notifyProofAnswered", () => {
 
     // A new proof replacing a pending one, then one sent after a rejection
     await updateAndNotify(ref, { ...proof, submittedAt: Timestamp.fromMillis(2000) });
-    await ref.set({ ...proof, status: "REJECTED", rejectReason: REASON });
+    await ref.set({ ...proof, status: REJECTED, rejectReason: REASON });
     await updateAndNotify(ref, { ...proof, submittedAt: Timestamp.fromMillis(3000) });
 
     expect(sent).not.toHaveBeenCalled();
@@ -187,9 +187,9 @@ describe("notifyProofAnswered", () => {
       .collection("party_user")
       .where("reservationId", "==", ref.id)
       .get();
-    await Promise.all(party.docs.map((doc) => doc.ref.update({ status: "WITHDRAWN" })));
+    await Promise.all(party.docs.map((doc) => doc.ref.update({ status: WITHDRAWN })));
 
-    await updateAndNotify(ref, { ...proof, status: "APPROVED" });
+    await updateAndNotify(ref, { ...proof, status: APPROVED });
 
     expect(sent).not.toHaveBeenCalled();
   });
@@ -197,7 +197,7 @@ describe("notifyProofAnswered", () => {
   it("fails, sending nothing, when the venue is missing", async () => {
     const { ref, proof } = await fixture({ venueExists: false });
 
-    await expect(updateAndNotify(ref, { ...proof, status: "APPROVED" })).rejects.toThrow(
+    await expect(updateAndNotify(ref, { ...proof, status: APPROVED })).rejects.toThrow(
       `Missing venues/${proof.venueId}`,
     );
     expect(sent).not.toHaveBeenCalled();
@@ -207,18 +207,18 @@ describe("notifyProofAnswered", () => {
     const { ref, proof } = await fixture();
     sent.mockRejectedValueOnce(new Error("FCM unavailable"));
 
-    await expect(updateAndNotify(ref, { ...proof, status: "APPROVED" })).rejects.toThrow(
+    await expect(updateAndNotify(ref, { ...proof, status: APPROVED })).rejects.toThrow(
       "FCM unavailable",
     );
-    expect(recipients()).toEqual(JOINED);
+    expect(recipients()).toEqual(JOINED_MEMBERS);
   });
 
   it("ignores a missing snapshot", async () => {
     const { ref, proof } = await fixture();
 
     // A completion created or deleted: there is no before, or no after, to compare
-    await sendProofAnswer(undefined, { ...proof, status: "APPROVED" }, ref.id);
-    await sendProofAnswer({ ...proof, status: "APPROVED" }, undefined, ref.id);
+    await sendProofAnswer(undefined, { ...proof, status: APPROVED }, ref.id);
+    await sendProofAnswer({ ...proof, status: APPROVED }, undefined, ref.id);
 
     expect(sent).not.toHaveBeenCalled();
   });

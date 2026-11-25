@@ -4,7 +4,15 @@ import { randomUUID } from "node:crypto";
 import { getFirestore } from "firebase-admin/firestore";
 import { NotificationMessage, PENDING, sendToUser, UNNAMED_LEADER } from "../src/notify";
 import { notifyVenueReservation, SOLO_PARTY_SIZE } from "../src/venueReservation";
-import { BLANK_NAME, initTestApp, LEADER, QUEST_TITLE, seedQuest, VENUE } from "./fixtures";
+import {
+  APPROVED,
+  BLANK_NAME,
+  initTestApp,
+  LEADER,
+  QUEST_TITLE,
+  seedQuest,
+  VENUE,
+} from "./fixtures";
 
 // The sending itself is sendToUser's, tested in notify.test.ts; the shared helpers stay real
 jest.mock("../src/notify", () => ({
@@ -14,7 +22,6 @@ jest.mock("../src/notify", () => ({
 
 const sent = jest.mocked(sendToUser);
 
-const APPROVED = "APPROVED";
 const MISSING_QUEST = "missing-quest";
 /** The joinedCount of every new reservation: its creator alone. */
 const CREATOR_ONLY = 1;
