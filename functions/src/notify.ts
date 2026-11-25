@@ -51,6 +51,9 @@ export const APPROVED = "APPROVED";
 /** The venue's no to a reservation, or to a proof. */
 export const REJECTED = "REJECTED";
 
+/** A reservation withdrawn by its party or its venue. Final. */
+export const CANCELLED = "CANCELLED";
+
 /**
  * What the venue's notifications call the explorer who reserved when [storedName] finds no name,
  * so every notification shows a nameless leader the same way.
