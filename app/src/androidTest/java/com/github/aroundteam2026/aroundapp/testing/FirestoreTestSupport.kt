@@ -157,6 +157,33 @@ fun writeBypassingRules(path: String, fields: Map<String, Any>, projectId: Strin
 }
 
 /**
+ * Reads the document at [path], such as `users/abc/tokens/xyz`, on the Firestore emulator without
+ * checking firestore.rules, for tests of documents the rules let nobody read from the app.
+ *
+ * @return the document's fields in the REST API's format, e.g. `{"updatedAt": {"timestampValue":
+ *   ...}}`, or null if there is no document at [path].
+ */
+fun readBypassingRules(path: String, projectId: String = PROJECT_ID): JSONObject? {
+  val url =
+      "http://${FirebaseEmulator.HOST}:${FirebaseEmulator.FIRESTORE_PORT}" +
+          "/v1/projects/$projectId/databases/(default)/documents/$path"
+  val connection = URL(url).openConnection() as HttpURLConnection
+  try {
+    connection.setRequestProperty("Authorization", "Bearer owner")
+    connection.connectTimeout = TIMEOUT_MS.toInt()
+    connection.readTimeout = TIMEOUT_MS.toInt()
+    if (connection.responseCode == HttpURLConnection.HTTP_NOT_FOUND) return null
+    check(connection.responseCode == HttpURLConnection.HTTP_OK) {
+      "The emulator refused the read: ${connection.errorStream?.bufferedReader()?.readText()}"
+    }
+    val document = JSONObject(connection.inputStream.bufferedReader().readText())
+    return document.optJSONObject("fields") ?: JSONObject()
+  } finally {
+    connection.disconnect()
+  }
+}
+
+/**
  * Deletes every document of the project [projectId] on the Firestore emulator, so a test starts
  * from an empty database whatever earlier tests and runs left there. Clients drop what they cached
  * once they next hear from the server.

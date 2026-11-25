@@ -361,6 +361,63 @@ class NearbyAcceptViewModelTest {
     assertEquals(emptySet<String>(), state.failedQuestIds)
   }
 
+  // The user hasn't been told yet: the map says so once, and the quest keeps showing "try again"
+  @Test
+  fun aRefusalFromBeforeARestartRaisesTheNoticeUntilItIsShown() = test {
+    remembered.put(RecordedWrite("local-0", "a", WriteState.REFUSED))
+    reservations = local
+    open()
+    assertTrue(state.refusalNotice)
+
+    viewModel.onRefusalNoticeShown()
+
+    assertFalse(state.refusalNotice)
+    val restarted = newViewModel()
+    runCurrent()
+    assertFalse(restarted.uiState.value.refusalNotice)
+    assertEquals(AcceptStatus.FAILED, restarted.uiState.value.statusOf("a"))
+  }
+
+  @Test
+  fun aRefusalTheUserWasToldAboutRaisesNoNotice() = test {
+    remembered.put(RecordedWrite("local-0", "a", WriteState.REPORTED))
+    reservations = local
+    open()
+
+    assertFalse(state.refusalNotice)
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+  }
+
+  @Test
+  fun aBookingRefusedWhileTheMapIsOpenRaisesTheNotice() = test {
+    reservations = local
+    open()
+    viewModel.accept(quest("a"))
+    runCurrent()
+    assertFalse(state.refusalNotice)
+
+    local.refuse("local-1")
+    runCurrent()
+
+    assertTrue(state.refusalNotice)
+  }
+
+  // The explorer saw this one fail on the spot
+  @Test
+  fun aBookingThatFailedAtOnceRaisesNoNotice() = test {
+    reservations = local
+    local.failure = IOException("refused")
+    open()
+
+    viewModel.accept(quest("a"))
+    runCurrent()
+    local.refuse("local-1")
+    runCurrent()
+
+    assertEquals(AcceptStatus.FAILED, state.statusOf("a"))
+    assertFalse(state.refusalNotice)
+  }
+
   @Test
   fun aReservationCancelledElsewhereFreesTheQuestWithoutTryAgain() = test {
     reservations = local

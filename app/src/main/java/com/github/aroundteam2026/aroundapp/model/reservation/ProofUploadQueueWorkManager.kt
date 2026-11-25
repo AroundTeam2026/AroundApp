@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 
 import android.net.Uri
 import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.await
 import com.github.aroundteam2026.aroundapp.worker.ProofUploadWorker
@@ -57,11 +58,32 @@ class ProofUploadQueueWorkManager(
         Result.failure(e)
       }
 
-  override suspend fun cancel(reservationId: String): Result<Unit> =
+  override suspend fun cancel(reservationId: String): Result<Unit> {
+    val name = ProofUploadWorker.uniqueWorkName(reservationId)
+    return cancelAndDiscard(workManager.getWorkInfosForUniqueWorkFlow(name)) {
+      workManager.cancelUniqueWork(name).await()
+    }
+  }
+
+  override suspend fun cancelAll(): Result<Unit> =
+      cancelAndDiscard(workManager.getWorkInfosByTagFlow(ProofUploadWorker.TAG)) {
+        workManager.cancelAllWorkByTag(ProofUploadWorker.TAG).await()
+      }
+
+  /**
+   * Runs [cancelWorks] on the proofs in [works], then deletes the copies of those that were still
+   * waiting, since their cancelled work never runs to delete them.
+   *
+   * @return success once they are cancelled, or the failure that kept them from being, in which
+   *   case no copy is deleted.
+   */
+  private suspend fun cancelAndDiscard(
+      works: Flow<List<WorkInfo>>,
+      cancelWorks: suspend () -> Unit,
+  ): Result<Unit> =
       try {
-        val name = ProofUploadWorker.uniqueWorkName(reservationId)
-        val cancelled = waitingPhotos(name)
-        workManager.cancelUniqueWork(name).await()
+        val cancelled = waitingPhotos(works)
+        cancelWorks()
         cancelled.forEach { discard(it) }
         Result.success(Unit)
       } catch (e: CancellationException) {
@@ -72,8 +94,11 @@ class ProofUploadQueueWorkManager(
 
   /** The photos of the unique work [name] that hasn't finished yet. */
   private suspend fun waitingPhotos(name: String): List<Uri> =
-      workManager
-          .getWorkInfosForUniqueWorkFlow(name)
+      waitingPhotos(workManager.getWorkInfosForUniqueWorkFlow(name))
+
+  /** The photos of the [works] that haven't finished yet, as they are now. */
+  private suspend fun waitingPhotos(works: Flow<List<WorkInfo>>): List<Uri> =
+      works
           .first()
           .filterNot { it.state.isFinished }
           .flatMap { work -> work.tags.mapNotNull(ProofUploadWorker::photoOf) }

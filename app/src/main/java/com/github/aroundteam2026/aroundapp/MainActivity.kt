@@ -13,6 +13,8 @@ import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
 import com.github.aroundteam2026.aroundapp.model.quest.RefusedQuestWritesProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
 import com.github.aroundteam2026.aroundapp.model.user.Role
 import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepositoryProvider
@@ -34,7 +36,9 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     setContent {
       val auth = AuthRepositoryProvider.repository
-      val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(auth))
+      val proofUploadQueue = remember { ProofUploadQueueProvider.queue(applicationContext) }
+      val profile: ProfileViewModel =
+          viewModel(factory = ProfileViewModel.factory(auth, proofUploadQueue))
       val pendingRole = remember { PendingRoleStoreSharedPrefs(applicationContext) }
       val users = UserRepositoryProvider.repository
       val pictures = remember { UserPictureRepositoryProvider.repository(applicationContext) }
@@ -49,13 +53,16 @@ class MainActivity : ComponentActivity() {
             userRepository = users,
             pendingRoleStore = pendingRole,
             explorerScreen = { uid ->
-              ExplorerProfileSetupGate(uid, users, pictures, connectivity, profile::signOut) { setup
-                ->
+              val signOut = {
+                RefusedWritesProvider.forget(applicationContext, uid)
+                profile.signOut()
+              }
+              ExplorerProfileSetupGate(uid, users, pictures, connectivity, signOut) { setup ->
                 NotificationPermissionGate(Role.EXPLORER, notificationPrompt) {
                   AroundApp(
                       explorerUid = uid,
-                      onSignOut = profile::signOut,
-                      profileScreen = { ProfileScreen(profile::signOut, setup, pictures) },
+                      onSignOut = signOut,
+                      profileScreen = { ProfileScreen(signOut, setup, pictures) },
                   )
                 }
               }

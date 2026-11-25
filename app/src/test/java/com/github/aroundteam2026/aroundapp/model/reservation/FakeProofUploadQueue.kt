@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.update
 /**
  * In-memory [ProofUploadQueue] for unit tests. Each queued proof is recorded in [queued] and its
  * reservation listed in [waiting] until a test calls [finish], as if its upload ended, or until it
- * is [cancel]led. Nothing is uploaded. Not thread-safe; use one instance per test.
+ * is [cancel]led, or all are by [cancelAll]. Nothing is uploaded. Not thread-safe; use one instance
+ * per test.
  */
 class FakeProofUploadQueue : ProofUploadQueue {
   /**
@@ -21,7 +22,8 @@ class FakeProofUploadQueue : ProofUploadQueue {
 
   /**
    * Simulates a proof that can't be cancelled. While non-null, [cancel] returns
-   * `Result.failure(cancelFailure)` and cancels nothing. Set it back to null to make it succeed.
+   * `Result.failure(cancelFailure)`, as does [cancelAll], and cancels nothing. Set it back to null
+   * to make it succeed.
    */
   var cancelFailure: Throwable? = null
 
@@ -30,6 +32,10 @@ class FakeProofUploadQueue : ProofUploadQueue {
     get() = cancelledIds.toList()
 
   private val cancelledIds = mutableListOf<String>()
+
+  /** How many times [cancelAll] cancelled every waiting proof. */
+  var cancelAllCount: Int = 0
+    private set
 
   /** Every proof queued, in order, including the ones a later proof replaced. */
   val queued: List<QueuedProof>
@@ -70,6 +76,19 @@ class FakeProofUploadQueue : ProofUploadQueue {
     }
     cancelledIds += reservationId
     waitingIds.update { it - reservationId }
+    return Result.success(Unit)
+  }
+
+  /**
+   * Counts the call in [cancelAllCount] and empties [waiting]. Fails with [cancelFailure] if it is
+   * set.
+   */
+  override suspend fun cancelAll(): Result<Unit> {
+    cancelFailure?.let {
+      return Result.failure(it)
+    }
+    cancelAllCount++
+    waitingIds.value = emptySet()
     return Result.success(Unit)
   }
 

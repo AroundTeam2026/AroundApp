@@ -63,7 +63,8 @@ fun VenueEntryNavigation(
     start: VenueEntryStart = VenueEntryStart.Initialization,
     navController: NavHostController = rememberNavController(),
 ) {
-  val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(authRepository))
+  val profile: ProfileViewModel =
+      viewModel(factory = ProfileViewModel.factory(authRepository, proofUploadQueue = null))
   NavHost(
       navController,
       startDestination =
