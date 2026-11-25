@@ -13,17 +13,22 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.user.FakeUserRepository
@@ -57,6 +62,31 @@ class ProfileSetupScreenTest {
   private val connectivity = FakeConnectivityRepository()
   private val users = FakeUserRepository()
 
+  // The label is a separate Text, so TalkBack only reads it if the field carries it as its name
+  @Test
+  fun theNameFieldIsNamedAfterItsLabel() {
+    runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
+    compose.setContent {
+      AroundAppTheme {
+        ExplorerProfileSetupGate(
+            "explorer",
+            users,
+            FakeUserPictureRepository(),
+            connectivity = connectivity,
+            onSignOut = {},
+        ) {}
+      }
+    }
+
+    compose
+        .onNode(
+            hasContentDescription(compose.activity.getString(R.string.profile_setup_name)) and
+                hasSetTextAction()
+        )
+        .assertIsDisplayed()
+        .assert(hasTestTag(C.Tag.PROFILE_SETUP_NAME))
+  }
+
   @Test
   fun firstTimeExplorerSeesSetupThenHomeOnlyAfterSaving() {
     runBlocking { users.createUser(User("explorer", "", Role.EXPLORER, 1L)).getOrThrow() }
@@ -74,7 +104,7 @@ class ProfileSetupScreenTest {
       }
     }
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_SCREEN).assertIsDisplayed()
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).assertIsDisplayed()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).assertIsDisplayed()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_CONTINUE).performClick()
     compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ERROR).assertTextEquals("Enter a display name.")
     compose.onNodeWithTag(C.Tag.APP).assertDoesNotExist()
@@ -229,13 +259,13 @@ class ProfileSetupScreenTest {
         pictures = pictures,
         results = FakeActivityResults(gallery = galleryPhoto(android.graphics.Color.RED)),
     )
-    val avatar = compose.onNodeWithTag(C.Tag.PROFILE_SETUP_AVATAR)
+    val avatar = compose.onNodeWithTag(C.Tag.PICTURE_AVATAR)
     // The shrinking runs off the main thread, so wait for its preview
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).performClick()
     compose.waitUntil(5_000) { avatar.showsRed() && preparedCopies().size == 1 }
     val first = preparedCopies().single()
     // A second pick makes a new copy and discards the first, so only the new one is left
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).performClick()
     compose.waitUntil(5_000) { preparedCopies().let { it.size == 1 && it.single() != first } }
     compose.waitUntil(5_000) { avatar.showsRed() }
 
@@ -260,7 +290,7 @@ class ProfileSetupScreenTest {
           writeText("not an image")
         }
     showSetup(results = FakeActivityResults(gallery = Uri.fromFile(notAnImage)))
-    compose.onNodeWithTag(C.Tag.PROFILE_SETUP_ADD_PHOTO).performClick()
+    compose.onNodeWithTag(C.Tag.PICTURE_PICK).performClick()
     compose.waitUntil(5_000) {
       compose.onAllNodesWithTag(C.Tag.PROFILE_SETUP_ERROR).fetchSemanticsNodes().isNotEmpty()
     }

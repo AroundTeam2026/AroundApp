@@ -209,38 +209,24 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   @Test
-  fun retry_ofAnApprovedCompletion_findsNoFailedProof() = runWithTimeout {
-    val works =
-        flowOf(listOf(failedWork(ProofUploadWorker.ERROR_ALREADY_APPROVED, folder.newFile())))
-
-    val result =
-        ProofUploadQueueWorkManager(brokenWorkManager(IllegalStateException(UNAVAILABLE), works)) {
-              true
-            }
-            .retry(RESERVATION_ID)
-
-    assertTrue(result.exceptionOrNull() is NoSuchElementException)
-  }
-
-  @Test
-  fun retry_ofAWorkQueuedBeforeItsVenueWasTagged_failsAsNotRebuildable() = runWithTimeout {
+  fun retry_ofAProofThatCantBeRebuilt_fails() = runWithTimeout {
+    val approved = failedWork(ProofUploadWorker.ERROR_ALREADY_APPROVED, folder.newFile())
+    // Queued before uploads were tagged with their venue and sender
     val untagged =
         WorkInfo(
             UUID.randomUUID(),
             WorkInfo.State.FAILED,
-            setOf(ProofUploadWorker.TAG, ProofUploadWorker.uniqueWorkName(RESERVATION_ID)),
+            setOf(ProofUploadWorker.TAG, ProofUploadWorker.uniqueWorkName(OTHER_RESERVATION_ID)),
             workDataOf(ProofUploadWorker.KEY_ERROR to ProofUploadWorker.ERROR_UPLOAD),
         )
+    // Not an IllegalStateException, so the untagged work can't pass by reaching enqueueUniqueWork
+    val unavailable = UnsupportedOperationException(UNAVAILABLE)
+    suspend fun retry(work: WorkInfo, reservationId: String) =
+        ProofUploadQueueWorkManager(brokenWorkManager(unavailable, flowOf(listOf(work)))) { true }
+            .retry(reservationId)
 
-    val result =
-        ProofUploadQueueWorkManager(
-                brokenWorkManager(IllegalStateException(UNAVAILABLE), flowOf(listOf(untagged)))
-            ) {
-              true
-            }
-            .retry(RESERVATION_ID)
-
-    assertTrue(result.exceptionOrNull() is IllegalStateException)
+    assertTrue(retry(approved, RESERVATION_ID).exceptionOrNull() is NoSuchElementException)
+    assertTrue(retry(untagged, OTHER_RESERVATION_ID).exceptionOrNull() is IllegalStateException)
   }
 
   @Test
@@ -394,6 +380,54 @@ class ProofUploadQueueWorkManagerTest {
     assertEquals(CANCELLED, thrown.message)
   }
 
+  @Test
+  fun cancelAll_stopsEveryWaitingUploadAndDeletesTheirCopies() = runWithTimeout {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    assertTrue(workManager.getWorkInfosByTagFlow(ProofUploadWorker.TAG).first().isEmpty())
+    assertTrue(queue.waiting.first().isEmpty())
+    assertEquals(setOf(Uri.fromFile(PHOTO), Uri.fromFile(RETAKE)), discarded.toSet())
+  }
+
+  @Test
+  fun cancelAll_deletesOnlyTheCopiesOfProofsStillWaiting() = runWithTimeout {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    runOnline(RESERVATION_ID)
+    queue.enqueue(OTHER_RESERVATION_ID, VENUE_ID, EXPLORER_UID, RETAKE)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    assertEquals(listOf(Uri.fromFile(RETAKE)), discarded)
+  }
+
+  @Test
+  fun cancelAll_afterAFailure_emptiesFailedAndDeletesTheCopy() = runWithTimeout {
+    failUpload(PHOTO)
+
+    assertTrue(queue.cancelAll().isSuccess)
+
+    assertTrue(queue.failed.first().isEmpty())
+    assertEquals(listOf(Uri.fromFile(PHOTO)), discarded)
+  }
+
+  @Test
+  fun cancelAll_whenWorkManagerFails_returnsTheFailureAndDeletesNothing() = runWithTimeout {
+    val failure = IllegalStateException(UNAVAILABLE)
+
+    val result =
+        ProofUploadQueueWorkManager(brokenWorkManager(failure)) {
+              discarded += it
+              true
+            }
+            .cancelAll()
+
+    assertEquals(failure, result.exceptionOrNull())
+    assertTrue(discarded.isEmpty())
+  }
+
   /** Queues [photo] as [RESERVATION_ID]'s proof, and runs its upload until it stops for good. */
   private suspend fun failUpload(photo: File) {
     photos.forcedFailure = FileNotFoundException(GONE)
@@ -432,8 +466,9 @@ class ProofUploadQueueWorkManagerTest {
   }
 
   /**
-   * A WorkManager whose every [WorkManager.enqueueUniqueWork] and [cancelUniqueWork] throws
-   * [error], and whose [WorkManager.getWorkInfosForUniqueWorkFlow] is [works].
+   * A WorkManager whose every [WorkManager.enqueueUniqueWork], [WorkManager.cancelUniqueWork] and
+   * [WorkManager.cancelAllWorkByTag] throws [error], and whose
+   * [WorkManager.getWorkInfosForUniqueWorkFlow] is [works].
    */
   private fun brokenWorkManager(
       error: Throwable,
@@ -442,7 +477,9 @@ class ProofUploadQueueWorkManagerTest {
       mockk<WorkManager>(relaxed = true) {
         every { getWorkInfosForUniqueWorkFlow(any()) } returns works
         every { enqueueUniqueWork(any<String>(), any(), any<OneTimeWorkRequest>()) } throws error
+        every { getWorkInfosByTagFlow(any()) } returns flowOf(emptyList())
         every { cancelUniqueWork(any()) } throws error
+        every { cancelAllWorkByTag(any()) } throws error
       }
 
   private companion object {

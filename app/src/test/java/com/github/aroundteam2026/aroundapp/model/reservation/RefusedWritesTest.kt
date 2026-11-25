@@ -3,6 +3,8 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Telling a refused write apart with [RefusedWrites], also after the app was killed. */
@@ -111,6 +113,59 @@ class RefusedWritesTest {
     hearing.refusedIn(listed(ReservationStatus.CANCELLED, id = "old"))
 
     assertEquals(setOf("quest"), writes.refusedQuests)
+  }
+
+  @Test
+  fun aRefusalIsUnreportedUntilItIsReported() {
+    hearing.refusedIn(listed())
+    assertFalse(writes.hasUnreportedRefusal)
+
+    hearing.refusedIn(emptyList())
+    assertTrue(writes.hasUnreportedRefusal)
+
+    writes.markReported()
+    assertFalse(writes.hasUnreportedRefusal)
+    assertEquals(setOf("quest"), writes.refusedQuests)
+  }
+
+  @Test
+  fun whetherARefusalWasReportedIsRememberedAcrossRestarts() {
+    hearing.refusedIn(listed())
+    hearing.refusedIn(emptyList())
+    assertTrue(afterARestart().hasUnreportedRefusal)
+
+    writes.markReported()
+
+    val restarted = afterARestart()
+    assertFalse(restarted.hasUnreportedRefusal)
+    assertEquals(setOf("quest"), restarted.refusedQuests)
+  }
+
+  @Test
+  fun aRefusalAfterAReportedOneIsUnreported() {
+    hearing.refusedIn(listed())
+    hearing.refusedIn(emptyList())
+    writes.markReported()
+    writes.record("r2", "other")
+    val other = newPendingReservation("other", "venue", "Ada", 0L).copy(id = "r2")
+    hearing.refusedIn(listOf(other))
+
+    hearing.refusedIn(emptyList())
+
+    assertTrue(writes.hasUnreportedRefusal)
+    assertEquals(setOf("quest", "other"), writes.refusedQuests)
+  }
+
+  @Test
+  fun aReportedRefusalEndsWhenTheQuestIsBookedAgain() {
+    hearing.refusedIn(listed())
+    hearing.refusedIn(emptyList())
+    writes.markReported()
+
+    writes.record("r2", "quest")
+
+    assertEquals(emptySet<String>(), writes.refusedQuests)
+    assertEquals(emptySet<String>(), afterARestart().refusedQuests)
   }
 
   @Test

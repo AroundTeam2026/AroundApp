@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 
 /** A venue's avatar on its background, in the initials' text style. */
 @Composable
@@ -23,7 +24,8 @@ internal fun QuestAvatar(
     style: QuestAvatarStyle,
     modifier: Modifier = Modifier,
 ) {
-  Box(modifier.size(style.size).background(style.background, style.shape).padding(style.padding)) {
+  val padding = if (avatar.fillsCircle) 0.dp else style.padding
+  Box(modifier.size(style.size).background(style.background, style.shape).padding(padding)) {
     CompositionLocalProvider(LocalTextStyle provides style.textStyle) {
       avatar.Content(tint = style.content, modifier = Modifier.fillMaxSize())
     }

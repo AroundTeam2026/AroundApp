@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.model.user
 
 import android.net.Uri
@@ -8,6 +9,7 @@ import com.github.aroundteam2026.aroundapp.testing.SETUP_TIMEOUT_MS
 import com.github.aroundteam2026.aroundapp.testing.emulatorStorage
 import com.github.aroundteam2026.aroundapp.testing.signInNewUser
 import com.github.aroundteam2026.aroundapp.testing.withTimeoutBlocking
+import com.github.aroundteam2026.aroundapp.testing.writeBypassingRules
 import com.google.firebase.storage.FirebaseStorage
 import java.io.File
 import java.util.UUID
@@ -43,6 +45,24 @@ class UserPictureRepositoryStorageTest {
     assertTrue(first.startsWith("gs://${storage.reference.bucket}/user-pictures/$uid/"))
     assertArrayEquals(byteArrayOf(1, 2, 3), repository.download(first).getOrThrow())
     assertArrayEquals(byteArrayOf(4, 5, 6), repository.download(second).getOrThrow())
+  }
+
+  /** Bug: the folder is ignored, so a venue's picture lands among users' ones. */
+  @Test
+  fun venuePicturesAreStoredInTheirOwnFolder() = withTimeoutBlocking {
+    val venues =
+        UserPictureRepositoryStorage(
+            context,
+            storage,
+            folder = UserPictureRepositoryStorage.VENUE_PICTURES,
+        )
+    // storage.rules lets only an existing venue upload its picture
+    writeBypassingRules("venues/$uid", mapOf("name" to "Café"))
+
+    val location = venues.upload(uid, photo(byteArrayOf(7))).getOrThrow()
+
+    assertTrue(location.startsWith("gs://${storage.reference.bucket}/venue-pictures/$uid/"))
+    assertArrayEquals(byteArrayOf(7), venues.download(location).getOrThrow())
   }
 
   /** Invalid ids fail locally, before a Storage write can start. */

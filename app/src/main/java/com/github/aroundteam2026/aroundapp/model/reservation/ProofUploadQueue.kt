@@ -37,11 +37,9 @@ interface ProofUploadQueue {
   val waiting: Flow<Set<String>>
 
   /**
-   * The reservations whose photo proof failed for good and wasn't sent, each with why, so the
-   * explorer is offered a retry only where one can work: the current ones on collection, then each
-   * change. A reservation whose completion the venue already approved isn't listed, since its proof
-   * is no longer needed. A reservation leaves once its proof is queued again, once it is
-   * [cancel]led, or once the queue forgets the failure, which may happen after about a day.
+   * The reservations whose photo proof failed for good, each with why: the current ones on
+   * collection, then each change. One whose completion is already approved isn't listed. A
+   * reservation leaves once its proof is queued again or [cancel]led, or after about a day.
    */
   val failed: Flow<Map<String, UploadFailure>>
 
@@ -68,4 +66,14 @@ interface ProofUploadQueue {
    *   or the failure that kept it from being cancelled.
    */
   suspend fun cancel(reservationId: String): Result<Unit>
+
+  /**
+   * Cancels every waiting or failed proof and deletes their copies, e.g. at sign-out: each keeps
+   * the uid of the explorer who queued it, so after a sign-out the rules would refuse its upload
+   * (#626). [waiting] and [failed] are then empty.
+   *
+   * @return success once no proof is waiting or failed, including when none was, or the failure
+   *   that kept them from being cancelled.
+   */
+  suspend fun cancelAll(): Result<Unit>
 }

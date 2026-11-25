@@ -1,13 +1,16 @@
 // Co-authored-by: OpenAI Codex
-// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> (KDoc reformatting)
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venue
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
+import com.github.aroundteam2026.aroundapp.ui.PictureUpload
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +34,12 @@ data class VenueInitializationUiState(
     val hasVenue: Boolean = false,
     /** Whether an existing venue is editing its details, rather than setting it up. */
     val editing: Boolean = false,
+    /** The picture picked to upload on the next save, or null for none. */
+    val photo: Uri? = null,
+    /** Whether the saved picture is to be removed on the next save. */
+    val removePhoto: Boolean = false,
+    /** Where the venue's saved picture is stored, or null without one. */
+    val savedPicture: String? = null,
 ) {
   val canContinue: Boolean
     get() = !isLoading && !isSaving && venueId == null
@@ -43,10 +52,14 @@ data class VenueInitializationUiState(
  * Creates the signed-in venue's profile once, before its location is configured. With [editing],
  * the venue edits its details from its profile instead: the name stays editable and is saved with
  * [VenueRepository.setName] before moving on to the location.
+ *
+ * Either way, the venue can pick a picture, uploaded through [pictures] on save, or remove its own;
+ * the picture is then saved with [VenueRepository.setPicture], once the venue exists.
  */
 class VenueInitializationViewModel(
     private val authRepository: AuthRepository,
     private val venueRepository: VenueRepository,
+    pictures: UserPictureRepository,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
     editing: Boolean = false,
 ) : ViewModel() {
@@ -55,6 +68,7 @@ class VenueInitializationViewModel(
 
   /** The name as loaded, so editing skips the write when it's unchanged. */
   private var loadedName: String? = null
+  private val upload = PictureUpload(pictures)
   val uiState = mutableUiState.asStateFlow()
 
   init {
@@ -64,7 +78,12 @@ class VenueInitializationViewModel(
         val venue = if (uid.isNullOrBlank()) null else venueRepository.getVenue(uid)
         if (venue != null) {
           loadedName = venue.name
-          mutableUiState.value = uiState.value.copy(businessName = venue.name, hasVenue = true)
+          mutableUiState.value =
+              uiState.value.copy(
+                  businessName = venue.name,
+                  hasVenue = true,
+                  savedPicture = venue.pictureUrl,
+              )
         }
       } catch (cancelled: CancellationException) {
         throw cancelled
@@ -85,6 +104,18 @@ class VenueInitializationViewModel(
   fun updateBusinessName(name: String) {
     if (!uiState.value.canEditName) return
     mutableUiState.value = uiState.value.copy(businessName = name, error = null)
+  }
+
+  /** Picks a new picture to upload on the next save; ignored while the form is locked. */
+  fun setPhoto(photo: Uri) {
+    if (!uiState.value.canContinue) return
+    mutableUiState.value = uiState.value.copy(photo = photo, removePhoto = false, error = null)
+  }
+
+  /** Marks the picture for removal on the next save; ignored while the form is locked. */
+  fun removePhoto() {
+    if (!uiState.value.canContinue) return
+    mutableUiState.value = uiState.value.copy(photo = null, removePhoto = true, error = null)
   }
 
   /**
@@ -111,12 +142,16 @@ class VenueInitializationViewModel(
     viewModelScope.launch {
       try {
         val savedName = save(uid, name, state.editing)
+        val savedPicture = savePicture(uid, state)
         mutableUiState.value =
             uiState.value.copy(
                 isSaving = false,
                 venueId = uid,
                 businessName = savedName,
                 hasVenue = true,
+                photo = null,
+                removePhoto = false,
+                savedPicture = savedPicture,
             )
       } catch (cancelled: CancellationException) {
         mutableUiState.value = uiState.value.copy(isSaving = false)
@@ -143,6 +178,17 @@ class VenueInitializationViewModel(
     if (!editing) return getOrCreateVenue(uid, name).name
     if (name != loadedName) venueRepository.setName(uid, name).getOrThrow()
     return name
+  }
+
+  /**
+   * Saves the picture [state] asks for and returns where the saved one is. Writes nothing when the
+   * picture is unchanged, and uploads a picked one only once, even when the save is retried.
+   */
+  private suspend fun savePicture(uid: String, state: VenueInitializationUiState): String? {
+    val saved = state.savedPicture
+    val location = upload.locationOf(uid, state.photo, state.removePhoto, saved)
+    if (location != saved) venueRepository.setPicture(uid, location).getOrThrow()
+    return location
   }
 
   private suspend fun getOrCreateVenue(uid: String, name: String): Venue {

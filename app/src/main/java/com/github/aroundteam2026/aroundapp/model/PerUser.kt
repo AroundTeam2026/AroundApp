@@ -23,6 +23,12 @@ class PerUser<T : Any>(private val build: (context: Context, uid: String) -> T) 
     return build(context.applicationContext, uid).also { current = uid to it }
   }
 
+  /** Drops the held one if it is the user [uid]'s, as when they sign out. */
+  @Synchronized
+  fun forget(uid: String) {
+    if (current?.first == uid) current = null
+  }
+
   /** Forgets the held one, as a new app process starts with none. */
   @Synchronized
   @VisibleForTesting

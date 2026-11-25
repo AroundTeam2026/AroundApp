@@ -55,6 +55,7 @@ import com.github.aroundteam2026.aroundapp.ui.proof.ProofSenders
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
 import com.github.aroundteam2026.aroundapp.ui.quest.ReservationCanceller
+import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -467,7 +468,11 @@ class VenuePageViewModel(
     // All the refused quests, not only the newly refused: the map may have heard the refusal first
     booked?.reservations?.let(hearing::refusedIn)
     val refused = refusedWrites.refusedQuests
-    mutableUiState.update { it.showing(venue, quests, view, refused, proofs) }
+    // The venue's picture downloads like the members' ones; its initials show until it arrives
+    val pictureUrl = venue?.pictureUrl
+    pictureUrl?.let { pictures.load(listOf(it)) }
+    val picture = pictureUrl?.let(pictures.pictures.value::get)
+    mutableUiState.update { it.showing(venue, picture, quests, view, refused, proofs) }
     arriving?.let { questId ->
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
@@ -636,15 +641,17 @@ private data class Proofs(
 )
 
 /**
- * This page showing [venue], its valid [quests] and what [booked] says about the explorer's
- * reservations, with the parties' [proofs], or "not found" when [venue] is null. A quest being
- * accepted that is now accepted is done accepting, a reservation no longer listed is done
- * cancelling, and a quest in [refused] failed. A null [booked] means the reservations can't be
- * read: the page keeps what it knew and stops offering to accept, cancel, complete or share a code.
- * Null [proofs] likewise mean the proofs can't be read, so it stops offering to complete.
+ * This page showing [venue], with its [picture] once downloaded, its valid [quests] and what
+ * [booked] says about the explorer's reservations, with the parties' [proofs], or "not found" when
+ * [venue] is null. A quest being accepted that is now accepted is done accepting, a reservation no
+ * longer listed is done cancelling, and a quest in [refused] failed. A null [booked] means the
+ * reservations can't be read: the page keeps what it knew and stops offering to accept, cancel,
+ * complete or share a code. Null [proofs] likewise mean the proofs can't be read, so it stops
+ * offering to complete.
  */
 private fun VenuePageUiState.showing(
     venue: Venue?,
+    picture: ImageBitmap?,
     quests: List<VenuePageQuest>,
     booked: BookedView?,
     refused: Set<String>,
@@ -656,7 +663,7 @@ private fun VenuePageUiState.showing(
       copy(
               status = VenuePageStatus.LOADED,
               venueName = venue.name,
-              avatar = INITIALS_AVATAR(venue, venue.name),
+              avatar = picture?.let(VenueAvatar::Picture) ?: INITIALS_AVATAR(venue, venue.name),
               address = venue.address,
               venueLocation = venue.location,
               acceptedParties = booked?.accepted ?: acceptedParties,

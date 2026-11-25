@@ -200,7 +200,8 @@ class SessionNavigationTest {
         SessionNavigation(
             repo,
             mainScreen = { userId ->
-              val profile: ProfileViewModel = viewModel(factory = ProfileViewModel.factory(repo))
+              val profile: ProfileViewModel =
+                  viewModel(factory = ProfileViewModel.factory(repo, proofUploadQueue = null))
               AroundApp(
                   explorerUid = userId,
                   onSignOut = profile::signOut,

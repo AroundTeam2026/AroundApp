@@ -4,6 +4,7 @@ package com.github.aroundteam2026.aroundapp.ui.venue
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.common.Location
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.model.venue.Venue
 import com.github.aroundteam2026.aroundapp.model.venue.VenueLimits
@@ -26,6 +27,7 @@ class VenueInitializationViewModelTest {
   private val dispatcher = StandardTestDispatcher()
   private val authRepository = FakeAuthRepository("owner-1")
   private val repository = RecordingVenueRepository()
+  private val pictures = FakeUserPictureRepository()
 
   @Before
   fun setUp() {
@@ -41,6 +43,7 @@ class VenueInitializationViewModelTest {
       VenueInitializationViewModel(
               authRepository,
               repository,
+              pictures,
               currentTimeMillis = { 123_456L },
               editing = editing,
           )
@@ -343,7 +346,7 @@ class VenueInitializationViewModelTest {
   @Test
   fun loadingDisablesFormUntilExistingVenueIsChecked() =
       runTest(dispatcher) {
-        val viewModel = VenueInitializationViewModel(authRepository, repository)
+        val viewModel = VenueInitializationViewModel(authRepository, repository, pictures)
         assertTrue(viewModel.uiState.value.isLoading)
         assertFalse(viewModel.uiState.value.canContinue)
         assertFalse(viewModel.uiState.value.canEditName)
@@ -393,6 +396,9 @@ class VenueInitializationViewModelTest {
 
     override suspend fun setName(venueId: String, name: String): Result<Unit> =
         renameFailure?.let { Result.failure(it) } ?: delegate.setName(venueId, name)
+
+    override suspend fun setPicture(venueId: String, pictureUrl: String?) =
+        delegate.setPicture(venueId, pictureUrl)
 
     override suspend fun getVenue(venueId: String): Venue? {
       reads++

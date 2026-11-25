@@ -1,4 +1,5 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
+// Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.navigation
 
@@ -19,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.FakeUserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.resources.C
 import kotlinx.coroutines.runBlocking
@@ -51,7 +53,12 @@ class VenueOnboardingNavigationTest {
             Text("Continue")
           }
         }
-        venueOnboardingDestinations(navController, authRepository, repository) { venueId, onBack ->
+        venueOnboardingDestinations(
+            navController,
+            authRepository,
+            repository,
+            FakeUserPictureRepository(),
+        ) { venueId, onBack ->
           Button(onClick = onBack, modifier = Modifier.testTag("location")) { Text(venueId) }
         }
       }

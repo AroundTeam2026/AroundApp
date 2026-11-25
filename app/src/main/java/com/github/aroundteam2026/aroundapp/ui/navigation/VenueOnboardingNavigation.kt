@@ -10,6 +10,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepository
+import com.github.aroundteam2026.aroundapp.model.user.UserPictureRepository
 import com.github.aroundteam2026.aroundapp.model.venue.VenueRepository
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueInitializationScreen
 import com.github.aroundteam2026.aroundapp.ui.venue.VenueInitializationViewModel
@@ -45,11 +46,13 @@ fun NavHostController.navigateToVenueInitialization() {
  * location. Returning to it does not immediately navigate forward again. Pass null for
  * [initializationOnBack] when initialization is the graph root, so system Back leaves the flow.
  * With [editing], the same steps edit an existing venue from its profile, on their own routes.
+ * [pictures] stores the venue's picture.
  */
 fun NavGraphBuilder.venueOnboardingDestinations(
     navController: NavHostController,
     authRepository: AuthRepository,
     venueRepository: VenueRepository,
+    pictures: UserPictureRepository,
     initializationOnBack: (() -> Unit)? = { navController.popBackStack() },
     editing: Boolean = false,
     locationScreen: @Composable (venueId: String, onBack: () -> Unit) -> Unit,
@@ -60,10 +63,11 @@ fun NavGraphBuilder.venueOnboardingDestinations(
   composable(start) { entry ->
     val initializationViewModel =
         viewModel<VenueInitializationViewModel>(viewModelStoreOwner = entry) {
-          VenueInitializationViewModel(authRepository, venueRepository, editing = editing)
+          VenueInitializationViewModel(authRepository, venueRepository, pictures, editing = editing)
         }
     VenueInitializationScreen(
         viewModel = initializationViewModel,
+        pictures = pictures,
         onBack = initializationOnBack,
         onContinueToLocation = { venueId ->
           navController.navigate(location.replace("{venueId}", android.net.Uri.encode(venueId))) {
