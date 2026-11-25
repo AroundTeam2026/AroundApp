@@ -2,6 +2,7 @@
 package com.github.aroundteam2026.aroundapp.model.reservation
 
 import java.io.File
+import java.io.FileNotFoundException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -74,10 +75,14 @@ class FakeProofUploadQueue : ProofUploadQueue {
 
   /**
    * Queues [reservationId]'s failed proof again, recording it in [queued] with the same arguments,
-   * as [enqueue] does. Fails with a [NoSuchElementException] if [reservationId] isn't [failed], or
-   * with [forcedFailure] if it is set, changing nothing.
+   * as [enqueue] does. Fails with a [NoSuchElementException] if [reservationId] isn't [failed], a
+   * [FileNotFoundException] if it failed with [UploadFailure.PHOTO_MISSING], or [forcedFailure] if
+   * it is set, changing nothing.
    */
   override suspend fun retry(reservationId: String): Result<Unit> {
+    if (failures.value[reservationId] == UploadFailure.PHOTO_MISSING) {
+      return Result.failure(FileNotFoundException("The photo of $reservationId is gone"))
+    }
     val proof =
         recorded
             .lastOrNull { it.reservationId == reservationId }

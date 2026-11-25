@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.model.reservation
 
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue.QueuedProof
 import java.io.File
+import java.io.FileNotFoundException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -126,6 +127,17 @@ class FakeProofUploadQueueTest {
     assertEquals(listOf(proof, proof), queue.queued)
     assertEquals(setOf(RESERVATION_ID), queue.waiting.first())
     assertTrue(queue.failed.first().isEmpty())
+  }
+
+  @Test
+  fun retry_afterAMissingPhoto_failsAndStaysFailed() = runTest {
+    queue.enqueue(RESERVATION_ID, VENUE_ID, EXPLORER_UID, PHOTO)
+    queue.fail(RESERVATION_ID, UploadFailure.PHOTO_MISSING)
+
+    assertTrue(queue.retry(RESERVATION_ID).exceptionOrNull() is FileNotFoundException)
+
+    assertEquals(1, queue.queued.size)
+    assertEquals(mapOf(RESERVATION_ID to UploadFailure.PHOTO_MISSING), queue.failed.first())
   }
 
   @Test
