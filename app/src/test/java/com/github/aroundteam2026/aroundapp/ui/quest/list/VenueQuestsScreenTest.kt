@@ -3,6 +3,9 @@
 package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -16,8 +19,10 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeRefusedQuestWritesStore
 import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.quest.RefusedQuestWrites
 import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.fakeRefusedQuestWrites
 import com.github.aroundteam2026.aroundapp.model.testQuest
@@ -26,6 +31,7 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundAppTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -221,7 +227,39 @@ class VenueQuestsScreenTest {
     compose.waitForIdle()
 
     compose.onNodeWithText(string(R.string.venue_quests_write_refused)).assertIsDisplayed()
+    // Kept while it shows, and cleared once it is gone, so a recreated screen doesn't say it again
+    assertTrue(viewModel.refusalNotice.value)
+    compose.mainClock.advanceTimeBy(SNACKBAR_LONG_ENOUGH_MS)
+    compose.waitForIdle()
     assertFalse(viewModel.refusalNotice.value)
+  }
+
+  // Rotating the phone or leaving the tab cancels the snackbar: the venue must still be told
+  @Test
+  fun aRefusalIsNotMarkedToldIfTheTabLeavesBeforeItWasShownThrough() {
+    val remembered = FakeRefusedQuestWritesStore()
+    val listed = MutableStateFlow<List<Quest>>(emptyList())
+    val viewModel =
+        VenueQuestsViewModel(
+            FakeAuthRepository(VENUE_ID),
+            ScriptedQuestRepository(questsByVenue = { listed }),
+            { RefusedQuestWrites(remembered) },
+        )
+    var onTab by mutableStateOf(true)
+    compose.setContent {
+      AroundAppTheme { if (onTab) VenueQuestsScreen(viewModel, onCreateQuest = {}) }
+    }
+    listed.value = listOf(testQuest(id = "fox", venueId = VENUE_ID).copy(pendingWrite = true))
+    compose.waitForIdle()
+    listed.value = emptyList()
+    compose.waitForIdle()
+    compose.onNodeWithText(string(R.string.venue_quests_write_refused)).assertIsDisplayed()
+
+    onTab = false
+    compose.waitForIdle()
+
+    assertTrue(viewModel.refusalNotice.value)
+    assertTrue(RefusedQuestWrites(remembered).hasUnreportedRefusal)
   }
 
   @Test
@@ -232,5 +270,8 @@ class VenueQuestsScreenTest {
 
   private companion object {
     const val VENUE_ID = "venue-1"
+
+    /** Longer than a snackbar stays, so one that is shown has gone by then. */
+    const val SNACKBAR_LONG_ENOUGH_MS = 10_000L
   }
 }

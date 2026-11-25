@@ -38,7 +38,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,7 +60,6 @@ import com.github.aroundteam2026.aroundapp.ui.theme.AroundSpacing
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextButton
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTextStyles
 import com.github.aroundteam2026.aroundapp.ui.theme.AroundTheme
-import kotlinx.coroutines.launch
 
 /**
  * The venue's Quests tab: its quests under a "My quests" heading, newest first, each with its
@@ -80,14 +78,12 @@ fun VenueQuestsScreen(
   val state by viewModel.uiState.collectAsStateWithLifecycle()
   val refused by viewModel.refusalNotice.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
-  val scope = rememberCoroutineScope()
   val refusedMessage = stringResource(R.string.venue_quests_write_refused)
   LaunchedEffect(refused) {
     if (refused) {
-      // Launched in the screen's scope, not in this effect: clearing the notice changes the
-      // effect's key, which would cancel a snackbar shown from inside it
-      scope.launch { snackbarHostState.showSnackbar(refusedMessage) }
-      // Cleared at once, so the snackbar doesn't show again when the screen is recreated
+      snackbarHostState.showSnackbar(refusedMessage)
+      // Only once it was shown through: leaving the tab or rotating the phone cancels this effect
+      // before, and the venue is then told when the tab is back
       viewModel.onRefusalNoticeShown()
     }
   }
