@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationTokenRegistrarProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
@@ -33,6 +34,8 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+    // Saves the phone's token at each sign-in; only the first call starts it, not a recreation
+    NotificationTokenRegistrarProvider.registrar.start()
     setContent {
       val auth = AuthRepositoryProvider.repository
       val proofUploadQueue = remember { ProofUploadQueueProvider.queue(applicationContext) }
