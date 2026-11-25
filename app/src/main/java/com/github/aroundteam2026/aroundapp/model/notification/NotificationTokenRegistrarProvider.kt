@@ -2,8 +2,6 @@
 package com.github.aroundteam2026.aroundapp.model.notification
 
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
-import com.google.firebase.Firebase
-import com.google.firebase.messaging.messaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,7 +16,7 @@ object NotificationTokenRegistrarProvider {
     NotificationTokenRegistrar(
         AuthRepositoryProvider.repository,
         NotificationTokenRepositoryProvider.repository,
-        NotificationRegistrationFirebase(Firebase.messaging),
+        NotificationRegistrationProvider.registration,
         CoroutineScope(SupervisorJob() + Dispatchers.IO),
     )
   }
