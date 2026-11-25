@@ -3,7 +3,7 @@
 
 import { randomUUID } from "node:crypto";
 import { logger } from "firebase-functions";
-import { sendToUser } from "../src/notify";
+import { APPROVED, PENDING, REJECTED, sendToUser } from "../src/notify";
 import { notifyReservationAnswered, sendReservationAnswer } from "../src/reservationAnswered";
 import { initTestApp, membership, QUEST_TITLE, seedQuest, seedVenue, VENUE_NAME } from "./fixtures";
 
@@ -37,8 +37,8 @@ describe("sendReservationAnswer", () => {
 
     await notifyReservationAnswered.run({
       data: {
-        before: { data: () => ({ status: "PENDING" }) },
-        after: { data: () => ({ status: "APPROVED" }) },
+        before: { data: () => ({ status: PENDING }) },
+        after: { data: () => ({ status: APPROVED }) },
       },
       params: { reservationId },
     } as never);
@@ -51,8 +51,8 @@ describe("sendReservationAnswer", () => {
   });
 
   it.each([
-    ["APPROVED", "Reservation approved", "Your party's reservation was approved."],
-    ["REJECTED", "Reservation declined", "Your party's reservation was declined."],
+    [APPROVED, "Reservation approved", "Your party's reservation was approved."],
+    [REJECTED, "Reservation declined", "Your party's reservation was declined."],
   ])("notifies every joined member when a reservation becomes %s", async (status, title, body) => {
     const reservationId = randomUUID();
     await Promise.all([
@@ -62,7 +62,7 @@ describe("sendReservationAnswer", () => {
       membership(randomUUID(), "other-party", "JOINED"),
     ]);
 
-    await sendReservationAnswer({ status: "PENDING" }, { status }, reservationId);
+    await sendReservationAnswer({ status: PENDING }, { status }, reservationId);
 
     expect(sender).toHaveBeenCalledTimes(2);
     expect(sender.mock.calls.map(([uid]) => uid).sort()).toEqual(["creator", "friend"]);
@@ -76,19 +76,19 @@ describe("sendReservationAnswer", () => {
   });
 
   it.each([
-    ["PENDING", "PENDING"],
-    ["APPROVED", "APPROVED"],
-    ["APPROVED", "CANCELLED"],
-    ["REJECTED", "REJECTED"],
-    ["PENDING", "CANCELLED"],
+    [PENDING, PENDING],
+    [APPROVED, APPROVED],
+    [APPROVED, "CANCELLED"],
+    [REJECTED, REJECTED],
+    [PENDING, "CANCELLED"],
   ])("ignores a change from %s to %s", async (before, after) => {
     await sendReservationAnswer({ status: before }, { status: after }, randomUUID());
     expect(sender).not.toHaveBeenCalled();
   });
 
   it("ignores a missing snapshot", async () => {
-    await sendReservationAnswer(undefined, { status: "APPROVED" }, randomUUID());
-    await sendReservationAnswer({ status: "PENDING" }, undefined, randomUUID());
+    await sendReservationAnswer(undefined, { status: APPROVED }, randomUUID());
+    await sendReservationAnswer({ status: PENDING }, undefined, randomUUID());
     expect(sender).not.toHaveBeenCalled();
   });
 
@@ -96,7 +96,7 @@ describe("sendReservationAnswer", () => {
     const reservationId = randomUUID();
     await membership(reservationId, "former-member", "WITHDRAWN");
 
-    await sendReservationAnswer({ status: "PENDING" }, { status: "APPROVED" }, reservationId);
+    await sendReservationAnswer({ status: PENDING }, { status: APPROVED }, reservationId);
 
     expect(sender).not.toHaveBeenCalled();
   });
@@ -112,7 +112,7 @@ describe("sendReservationAnswer", () => {
       if (uid === "first") throw new Error("FCM unavailable");
     });
 
-    await sendReservationAnswer({ status: "PENDING" }, { status: "APPROVED" }, reservationId);
+    await sendReservationAnswer({ status: PENDING }, { status: APPROVED }, reservationId);
 
     expect(sender).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledTimes(1);
@@ -124,12 +124,12 @@ describe("sendReservationAnswer", () => {
 
   it.each([
     [
-      "APPROVED",
+      APPROVED,
       `${VENUE_NAME} approved your reservation`,
       `${QUEST_TITLE} · Head over and send your proof once you're there.`,
     ],
     [
-      "REJECTED",
+      REJECTED,
       `${VENUE_NAME} declined your reservation`,
       `${QUEST_TITLE} · Have a look at other quests nearby.`,
     ],
@@ -140,11 +140,7 @@ describe("sendReservationAnswer", () => {
       const { venueId, questId } = await venueAndQuest();
       await membership(reservationId, "creator", "JOINED");
 
-      await sendReservationAnswer(
-        { status: "PENDING" },
-        { status, venueId, questId },
-        reservationId,
-      );
+      await sendReservationAnswer({ status: PENDING }, { status, venueId, questId }, reservationId);
 
       expect(sender).toHaveBeenCalledWith("creator", {
         title,
@@ -164,8 +160,8 @@ describe("sendReservationAnswer", () => {
     ]);
 
     await sendReservationAnswer(
-      { status: "PENDING" },
-      { status: "REJECTED", venueId, questId: randomUUID() },
+      { status: PENDING },
+      { status: REJECTED, venueId, questId: randomUUID() },
       reservationId,
     );
 

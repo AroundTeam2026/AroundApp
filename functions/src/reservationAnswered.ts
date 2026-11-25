@@ -4,7 +4,7 @@
 import { DocumentData, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { NotificationMessage, PENDING, sendToUser } from "./notify";
+import { APPROVED, NotificationMessage, PENDING, REJECTED, sendToUser } from "./notify";
 
 /**
  * The notification for a reservation [approved] or declined, with the venue's name and the
@@ -52,7 +52,7 @@ export async function sendReservationAnswer(
   reservationId: string,
 ): Promise<void> {
   if (before?.status !== PENDING) return;
-  if (after?.status !== "APPROVED" && after?.status !== "REJECTED") return;
+  if (after?.status !== APPROVED && after?.status !== REJECTED) return;
 
   const db = getFirestore();
   const [members, venueName, questTitle] = await Promise.all([
@@ -72,7 +72,7 @@ export async function sendReservationAnswer(
     ),
   ];
   const message: NotificationMessage = {
-    ...answerText(after.status === "APPROVED", venueName, questTitle),
+    ...answerText(after.status === APPROVED, venueName, questTitle),
     data: { kind: "reservation", route: "quests", reservationId },
   };
 
