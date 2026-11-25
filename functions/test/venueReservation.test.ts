@@ -1,10 +1,10 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
 import { randomUUID } from "node:crypto";
-import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { NotificationMessage, PENDING, sendToUser, UNNAMED_LEADER } from "../src/notify";
 import { notifyVenueReservation, SOLO_PARTY_SIZE } from "../src/venueReservation";
+import { BLANK_NAME, initTestApp, LEADER, QUEST_TITLE, seedQuest, VENUE } from "./fixtures";
 
 // The sending itself is sendToUser's, tested in notify.test.ts; the shared helpers stay real
 jest.mock("../src/notify", () => ({
@@ -14,13 +14,8 @@ jest.mock("../src/notify", () => ({
 
 const sent = jest.mocked(sendToUser);
 
-const VENUE = "venue-1";
-const QUEST_TITLE = "Find the hidden fox";
-const LEADER = "Yusuf S.";
 const APPROVED = "APPROVED";
 const MISSING_QUEST = "missing-quest";
-/** A display name the rules allow, as they check only its length, but that names nobody. */
-const BLANK_NAME = "  ";
 /** The joinedCount of every new reservation: its creator alone. */
 const CREATOR_ONLY = 1;
 /** A quest that takes exactly this many explorers. */
@@ -28,18 +23,9 @@ const EXACT_PARTY_SIZE = 3;
 /** A quest that takes at least this many explorers. */
 const AT_LEAST_PARTY_SIZE = 2;
 
-beforeAll(() => {
-  if (getApps().length === 0) initializeApp({ projectId: process.env.GCLOUD_PROJECT });
-});
+beforeAll(initTestApp);
 
 beforeEach(() => sent.mockReset());
-
-/** A quest of its own per test, so the tests never see each other's. */
-async function questOf(fields: Record<string, unknown>): Promise<string> {
-  const questId = randomUUID();
-  await getFirestore().collection("quests").doc(questId).set(fields);
-  return questId;
-}
 
 /** Creates the reservation [fields] and runs the trigger on it, as Firestore would. */
 async function createAndNotify(fields: Record<string, unknown>): Promise<string> {
@@ -63,43 +49,52 @@ function expectSent(body: string, reservationId: string) {
 
 describe("notifyVenueReservation", () => {
   it("tells the venue the party size a new request is for", async () => {
-    const questId = await questOf({
-      title: QUEST_TITLE,
+    const questId = await seedQuest({
       minPartySize: EXACT_PARTY_SIZE,
       exactPartySize: true,
     });
 
-    const id = await createAndNotify({ questId, status: PENDING, explorerName: LEADER });
+    const id = await createAndNotify({
+      questId,
+      status: PENDING,
+      explorerName: LEADER,
+    });
 
     expectSent(`${LEADER} wants to book it for a party of ${EXACT_PARTY_SIZE}.`, id);
   });
 
   it("names the quest's size alone for one that takes at least a party", async () => {
-    const questId = await questOf({
-      title: QUEST_TITLE,
+    const questId = await seedQuest({
       minPartySize: AT_LEAST_PARTY_SIZE,
       exactPartySize: false,
     });
 
-    const id = await createAndNotify({ questId, status: PENDING, explorerName: LEADER });
+    const id = await createAndNotify({
+      questId,
+      status: PENDING,
+      explorerName: LEADER,
+    });
 
     expectSent(`${LEADER} wants to book it for a party of ${AT_LEAST_PARTY_SIZE}.`, id);
   });
 
   it("names no party for a quest explorers take alone", async () => {
-    const questId = await questOf({
-      title: QUEST_TITLE,
+    const questId = await seedQuest({
       minPartySize: SOLO_PARTY_SIZE,
       exactPartySize: false,
     });
 
-    const id = await createAndNotify({ questId, status: PENDING, explorerName: LEADER });
+    const id = await createAndNotify({
+      questId,
+      status: PENDING,
+      explorerName: LEADER,
+    });
 
     expectSent(`${LEADER} wants to book it.`, id);
   });
 
   it("calls a leader whose reservation predates stored names an explorer", async () => {
-    const questId = await questOf({ title: QUEST_TITLE, minPartySize: SOLO_PARTY_SIZE });
+    const questId = await seedQuest({ minPartySize: SOLO_PARTY_SIZE });
 
     const id = await createAndNotify({ questId, status: PENDING });
 
@@ -107,15 +102,19 @@ describe("notifyVenueReservation", () => {
   });
 
   it("calls a leader with a blank name an explorer", async () => {
-    const questId = await questOf({ title: QUEST_TITLE, minPartySize: SOLO_PARTY_SIZE });
+    const questId = await seedQuest({ minPartySize: SOLO_PARTY_SIZE });
 
-    const id = await createAndNotify({ questId, status: PENDING, explorerName: BLANK_NAME });
+    const id = await createAndNotify({
+      questId,
+      status: PENDING,
+      explorerName: BLANK_NAME,
+    });
 
     expectSent(`${UNNAMED_LEADER} wants to book it.`, id);
   });
 
   it("notifies nobody of a reservation created in another status", async () => {
-    const questId = await questOf({ title: QUEST_TITLE, minPartySize: SOLO_PARTY_SIZE });
+    const questId = await seedQuest({ minPartySize: SOLO_PARTY_SIZE });
 
     await createAndNotify({ questId, status: APPROVED, explorerName: LEADER });
 
@@ -124,7 +123,11 @@ describe("notifyVenueReservation", () => {
 
   it("rejects without sending when the quest is missing", async () => {
     await expect(
-      createAndNotify({ questId: MISSING_QUEST, status: PENDING, explorerName: LEADER }),
+      createAndNotify({
+        questId: MISSING_QUEST,
+        status: PENDING,
+        explorerName: LEADER,
+      }),
     ).rejects.toThrow(`Missing quest ${MISSING_QUEST}`);
 
     expect(sent).not.toHaveBeenCalled();
