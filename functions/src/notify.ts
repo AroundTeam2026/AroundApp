@@ -24,10 +24,17 @@ export type NotificationRoute = "quests" | "venue_dashboard";
 export type NotificationKind = "reservation" | "proof" | "cancellation";
 
 /**
- * The FCM errors that mean a token is gone for good: the app was uninstalled or its data cleared.
- * Other errors, e.g. "messaging/internal-error", may pass, so their tokens are kept.
+ * The FCM errors that mean a phone's ID is gone for good: the app was uninstalled or its data
+ * cleared. Other errors, e.g. "messaging/internal-error", may pass, so their IDs are kept.
+ *
+ * The registration-token codes stay because a phone may still save an old-style token. No FCM doc
+ * says so, but the Android SDK's code does: in firebase-messaging 25.1.2,
+ * GmsRegistrationClient.registerInternal() falls back to the token path when Play services is older
+ * than 261200000 (26.12), even through register() (#634). How FCM answers such a token sent in
+ * `fids` isn't confirmed, so these codes may never come up.
  */
 export const GONE_TOKEN_ERRORS: ReadonlySet<string> = new Set([
+  "messaging/installation-id-not-registered",
   "messaging/registration-token-not-registered",
   "messaging/invalid-registration-token",
 ]);
@@ -70,8 +77,9 @@ export interface NotificationMessage {
 }
 
 /**
- * Sends [message] to every phone of the user [uid], whose FCM tokens are the ids of the documents
- * at users/{uid}/tokens/{token} (#633). A user with no token, e.g. signed out everywhere, gets
+ * Sends [message] to every phone of the user [uid]. Each phone is saved as the id of a document at
+ * users/{uid}/tokens/{token} (#633): the ID FCM registered it under, its Firebase Installation ID
+ * (#634), sent as FCM's `fids`. A user with no phone saved, e.g. signed out everywhere, gets
  * nothing.
  *
  * The message is data-only: title, body, kind, route and reservationId all go in FCM's `data`.
@@ -88,14 +96,14 @@ export interface NotificationMessage {
  */
 export async function sendToUser(uid: string, message: NotificationMessage): Promise<void> {
   const saved = await getFirestore().collection("users").doc(uid).collection("tokens").get();
-  const tokens = saved.docs.map((doc) => doc.id);
-  if (tokens.length === 0) {
+  const fids = saved.docs.map((doc) => doc.id);
+  if (fids.length === 0) {
     logger.info("sendToUser: the user has no phone to notify", { uid });
     return;
   }
 
   const response = await getMessaging().sendEachForMulticast({
-    tokens,
+    fids,
     data: {
       title: message.title,
       body: message.body,
@@ -115,7 +123,7 @@ export async function sendToUser(uid: string, message: NotificationMessage): Pro
     });
   }
 
-  // responses[i] answers tokens[i], which is saved.docs[i].id
+  // responses[i] answers fids[i], which is saved.docs[i].id
   const gone = saved.docs.filter((_, i) => {
     const code = response.responses[i].error?.code;
     return code !== undefined && GONE_TOKEN_ERRORS.has(code);

@@ -29,14 +29,14 @@ async function userWithTokens(...tokens: string[]): Promise<string> {
 /** Answers each phone FCM is asked to reach: refused with the code in [refused], else sent. */
 function answerPerPhone(refused: Record<string, string>) {
   sendEachForMulticast.mockImplementation(async (message) => {
-    const { tokens } = message as { tokens: string[] };
-    const responses = tokens.map((token) =>
-      token in refused
-        ? { success: false, error: { code: refused[token] } }
+    const { fids } = message as { fids: string[] };
+    const responses = fids.map((fid) =>
+      fid in refused
+        ? { success: false, error: { code: refused[fid] } }
         : { success: true, messageId: "id" },
     );
     const failureCount = responses.filter((r) => !r.success).length;
-    return { responses, successCount: tokens.length - failureCount, failureCount } as BatchResponse;
+    return { responses, successCount: fids.length - failureCount, failureCount } as BatchResponse;
   });
 }
 
@@ -65,10 +65,10 @@ describe("sendToUser", () => {
     await sendToUser(uid, MESSAGE);
 
     expect(sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const sent = sendEachForMulticast.mock.calls[0][0] as { tokens: string[] };
-    expect(sent.tokens.sort()).toEqual(["phone-a", "phone-b"]);
+    const sent = sendEachForMulticast.mock.calls[0][0] as { fids: string[] };
+    expect(sent.fids.sort()).toEqual(["phone-a", "phone-b"]);
     expect(sent).toEqual({
-      tokens: expect.any(Array),
+      fids: expect.any(Array),
       data: {
         title: "Reservation accepted",
         body: "Café Lumen accepted your reservation",
@@ -123,10 +123,16 @@ describe("sendToUser", () => {
   });
 
   it("deletes the tokens FCM says are gone and keeps the user's others", async () => {
-    const uid = await userWithTokens("uninstalled-phone", "cleared-phone", "working-phone");
+    const uid = await userWithTokens(
+      "uninstalled-phone",
+      "old-play-services-phone",
+      "cleared-phone",
+      "working-phone",
+    );
     const other = await userWithTokens("uninstalled-phone");
     answerPerPhone({
-      "uninstalled-phone": "messaging/registration-token-not-registered",
+      "uninstalled-phone": "messaging/installation-id-not-registered",
+      "old-play-services-phone": "messaging/registration-token-not-registered",
       "cleared-phone": "messaging/invalid-registration-token",
     });
     jest.spyOn(logger, "warn").mockImplementation(() => undefined);
@@ -138,7 +144,7 @@ describe("sendToUser", () => {
     expect(await tokensOf(other)).toEqual(["uninstalled-phone"]);
     expect(info).toHaveBeenCalledWith("sendToUser: deleted the tokens of phones that are gone", {
       uid,
-      deleted: 2,
+      deleted: 3,
     });
   });
 

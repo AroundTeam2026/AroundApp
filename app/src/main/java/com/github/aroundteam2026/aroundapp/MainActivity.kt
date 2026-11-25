@@ -3,6 +3,7 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,6 +13,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aroundteam2026.aroundapp.model.auth.AuthRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.connectivity.ConnectivityRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.notification.NotificationPromptStoreSharedPrefs
+import com.github.aroundteam2026.aroundapp.model.notification.NotificationTokenRegistrarProvider
+import com.github.aroundteam2026.aroundapp.model.quest.RefusedQuestWritesProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWritesProvider
 import com.github.aroundteam2026.aroundapp.model.user.PendingRoleStoreSharedPrefs
@@ -33,6 +36,8 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+    // Registers the phone for notifications at each sign-in; only the first call starts it
+    NotificationTokenRegistrarProvider.registrar.start()
     setContent {
       val auth = AuthRepositoryProvider.repository
       val proofUploadQueue = remember { ProofUploadQueueProvider.queue(applicationContext) }
@@ -72,8 +77,8 @@ class MainActivity : ComponentActivity() {
                     uid,
                     auth,
                     VenueRepositoryProvider.repository,
-                    profile::signOut,
-                    venuePictures,
+                    onSignOut = { venueSignOut(applicationContext, uid, profile::signOut) },
+                    venuePictures = venuePictures,
                 )
               }
             },
@@ -81,4 +86,14 @@ class MainActivity : ComponentActivity() {
       }
     }
   }
+}
+
+/**
+ * Signs the venue [venueUid] out with [signOut], after forgetting the quest writes this phone
+ * remembers of it, so a second venue signing in on the same phone isn't told about a write that
+ * wasn't theirs.
+ */
+internal fun venueSignOut(context: Context, venueUid: String, signOut: () -> Unit) {
+  RefusedQuestWritesProvider.forget(context, venueUid)
+  signOut()
 }

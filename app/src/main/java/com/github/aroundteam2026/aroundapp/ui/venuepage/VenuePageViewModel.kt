@@ -27,6 +27,9 @@ import com.github.aroundteam2026.aroundapp.model.quest.nextExpiryAfter
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.CompletionRepositoryProvider
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepositoryProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.ProofUploadQueueProvider
 import com.github.aroundteam2026.aroundapp.model.reservation.RefusedWrites
@@ -57,6 +60,7 @@ import com.github.aroundteam2026.aroundapp.ui.quest.ProfilePictures
 import com.github.aroundteam2026.aroundapp.ui.quest.ReservationCanceller
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
 import com.github.aroundteam2026.aroundapp.ui.quest.decodeAvatar
+import com.github.aroundteam2026.aroundapp.ui.review.decodePhoto
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -91,7 +95,8 @@ import kotlinx.coroutines.launch
  * It also shows who is in each party, downloading their pictures through [pictureRepository];
  * without one, members show their initials. While [VenuePageUiState.offline] says the device is
  * offline, which it follows from [connectivityRepository], the explorer can't [cancel]. Cancelling
- * also cancels the reservation's proof waiting in [proofUploadQueue], if any.
+ * also cancels the reservation's proof waiting in [proofUploadQueue], if any. Every member sees the
+ * party's proof photo, whoever sent it, downloaded through [proofPhotoRepository] (#555).
  */
 class VenuePageViewModel(
     private val venueId: String,
@@ -110,6 +115,8 @@ class VenuePageViewModel(
     pictureRepository: UserPictureRepository? = null,
     private val refusedWrites: RefusedWrites,
     decodePicture: suspend (ByteArray) -> ImageBitmap? = { decodeAvatar(it) },
+    proofPhotoRepository: ProofPhotoRepository? = null,
+    decodeProofPhoto: suspend (ByteArray) -> ImageBitmap? = { decodePhoto(it) },
 ) : ViewModel() {
   private val hearing = refusedWrites.hearing()
   private val mutableUiState =
@@ -172,6 +179,10 @@ class VenuePageViewModel(
   /** The members' profile pictures, each downloaded once and tried again after a failure. */
   private val pictures = ProfilePictures(viewModelScope, pictureRepository, decodePicture)
 
+  /** The parties' proof photos, downloaded the same way, at full size. */
+  private val proofPhotos =
+      ProfilePictures(viewModelScope, proofPhotoRepository?.let { it::download }, decodeProofPhoto)
+
   /** What the listeners sent; [booked] or [proofs] is null once its listener failed. */
   private data class Heard<Q>(
       val venue: Venue?,
@@ -192,6 +203,30 @@ class VenuePageViewModel(
     listen()
     // The page shows itself again as each picture arrives
     viewModelScope.launch { pictures.pictures.collect { show() } }
+    viewModelScope.launch { proofPhotos.pictures.collect { show() } }
+    viewModelScope.launch {
+      proofPhotos.failed.collect { failed ->
+        mutableUiState.update { it.copy(failedProofPhotos = failed) }
+      }
+    }
+  }
+
+  /**
+   * Downloads the photo of the proof whose details are open, and only that one: they're full-size
+   * photos, so not every proof of the venue. One whose download failed waits for
+   * [onRetryProofPhoto], so that the page's many refreshes don't download it again and again.
+   */
+  private fun loadProofPhoto() {
+    val state = uiState.value
+    if (state.detailQuestId == null) return
+    val location = (state.proof?.proof as? Proof.Photo)?.location ?: return
+    if (location !in proofPhotos.failed.value) proofPhotos.load(listOf(location))
+  }
+
+  /** Downloads the photo of the picked quest's proof again, after its download failed. */
+  fun onRetryProofPhoto() {
+    val photo = uiState.value.proof?.proof as? Proof.Photo ?: return
+    proofPhotos.load(listOf(photo.location))
   }
 
   /** Called when the explorer taps the quest [questId]; see [VenuePageUiState.withQuestTapped]. */
@@ -202,6 +237,7 @@ class VenuePageViewModel(
   /** Called when the explorer opens the details of the quest [questId]. */
   fun onQuestDetailsOpened(questId: String) {
     mutableUiState.update { it.withQuestDetails(questId) }
+    loadProofPhoto()
   }
 
   /** Called once the page has scrolled to [VenuePageUiState.focusQuestId]. */
@@ -472,7 +508,11 @@ class VenuePageViewModel(
     val pictureUrl = venue?.pictureUrl
     pictureUrl?.let { pictures.load(listOf(it)) }
     val picture = pictureUrl?.let(pictures.pictures.value::get)
-    mutableUiState.update { it.showing(venue, picture, quests, view, refused, proofs) }
+    mutableUiState.update {
+      it.showing(venue, picture, quests, view, refused, proofs)
+          .copy(proofPhotos = proofPhotos.pictures.value)
+    }
+    loadProofPhoto()
     arriving?.let { questId ->
       arriving = null
       mutableUiState.update { it.arrivingAt(questId) }
@@ -523,6 +563,10 @@ class VenuePageViewModel(
                 RefusedWritesProvider.refusedWrites(
                     this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!,
                     explorerUid,
+                ),
+            proofPhotoRepository =
+                ProofPhotoRepositoryProvider.repository(
+                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
                 ),
         )
       }

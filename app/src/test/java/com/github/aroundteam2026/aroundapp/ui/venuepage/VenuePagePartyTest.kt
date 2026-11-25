@@ -3,6 +3,7 @@ package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
+import com.github.aroundteam2026.aroundapp.model.TEST_PROOF_PHOTO
 import com.github.aroundteam2026.aroundapp.model.connectivity.FakeConnectivityRepository
 import com.github.aroundteam2026.aroundapp.model.party.FakePartyRepository
 import com.github.aroundteam2026.aroundapp.model.party.PartyMember
@@ -12,6 +13,8 @@ import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeCompletionRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeProofUploadQueue
 import com.github.aroundteam2026.aroundapp.model.reservation.FakeReservationRepository
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
+import com.github.aroundteam2026.aroundapp.model.reservation.ProofPhotoRepository
 import com.github.aroundteam2026.aroundapp.model.reservation.ReservationStatus
 import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
@@ -25,6 +28,7 @@ import com.github.aroundteam2026.aroundapp.model.user.UserRepository
 import com.github.aroundteam2026.aroundapp.model.venue.FakeVenueRepository
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.review.ProofPhoto
 import io.mockk.mockk
 import java.io.File
 import java.io.IOException
@@ -125,6 +129,17 @@ class VenuePagePartyTest {
         }
       }
 
+  private val completions = FakeCompletionRepository()
+
+  /** The proof photos, downloaded like the pictures, so the same switches apply to both. */
+  private val proofPhotos =
+      object : ProofPhotoRepository {
+        override suspend fun upload(reservationId: String, photo: Uri): Result<String> =
+            Result.failure(UnsupportedOperationException("Not needed here"))
+
+        override suspend fun download(location: String) = pictures.download(location)
+      }
+
   private val viewModel by lazy {
     VenuePageViewModel(
         VENUE,
@@ -133,7 +148,7 @@ class VenuePagePartyTest {
         reservations,
         userRepository,
         partyRepository,
-        FakeCompletionRepository(),
+        completions,
         FakeConnectivityRepository(),
         uploads,
         ME,
@@ -141,6 +156,8 @@ class VenuePagePartyTest {
         refusedWrites = fakeRefusedWrites(),
         pictureRepository = pictures.takeIf { withPictures },
         decodePicture = { picture.takeUnless { notAPicture } },
+        proofPhotoRepository = proofPhotos,
+        decodeProofPhoto = { picture.takeUnless { notAPicture } },
     )
   }
 
@@ -408,6 +425,115 @@ class VenuePagePartyTest {
     val reservation = reservations.observeForExplorer(FRIEND).first().single { it.id == id }
     assertEquals(ReservationStatus.CANCELLED, reservation.status)
     assertTrue(party.observeMembers(id).first().all { it.status == PartyMemberStatus.JOINED })
+  }
+
+  /** The explorer's reservation of [QUEST] with [FRIEND], approved, with [proof] by [sender]. */
+  private suspend fun approvedWithProofBy(sender: String, proof: Proof): String {
+    val id = reservationBy(ME, FRIEND)
+    reservations.updateStatus(id, ReservationStatus.APPROVED).getOrThrow()
+    completions.submit(id, VENUE, sender, proof).getOrThrow()
+    return id
+  }
+
+  // #555: one member sends the party's proof, and every member sees it, not only its status
+  @Test
+  fun aProofPhotoAnotherMemberSentShowsToTheExplorer() = test {
+    approvedWithProofBy(FRIEND, Proof.Photo(TEST_PROOF_PHOTO))
+
+    openDetails()
+
+    assertSame(picture, (state.proofPhoto as ProofPhoto.Loaded).image)
+    assertEquals(1, downloads.count { it == TEST_PROOF_PHOTO })
+  }
+
+  @Test
+  fun theExplorersOwnProofPhotoShowsToo() = test {
+    approvedWithProofBy(ME, Proof.Photo(TEST_PROOF_PHOTO))
+
+    openDetails()
+
+    assertSame(picture, (state.proofPhoto as ProofPhoto.Loaded).image)
+  }
+
+  @Test
+  fun aWrittenProofDownloadsNoPhoto() = test {
+    approvedWithProofBy(FRIEND, Proof.Text("Behind the till"))
+
+    openDetails()
+
+    assertTrue(state.proof?.proof is Proof.Text)
+    assertNull(state.proofPhoto)
+    assertTrue(TEST_PROOF_PHOTO !in downloads)
+  }
+
+  // Offline, the failure mustn't start another download by itself, or it would never end
+  @Test
+  fun aProofPhotoThatFailedWaitsForARetry() = test {
+    approvedWithProofBy(FRIEND, Proof.Photo(TEST_PROOF_PHOTO))
+    downloadFails = true
+    openDetails()
+    assertEquals(ProofPhoto.Failed, state.proofPhoto)
+    assertEquals(1, downloads.count { it == TEST_PROOF_PHOTO })
+
+    downloadFails = false
+    viewModel.onRetryProofPhoto()
+    runCurrent()
+
+    assertSame(picture, (state.proofPhoto as ProofPhoto.Loaded).image)
+    assertEquals(2, downloads.count { it == TEST_PROOF_PHOTO })
+  }
+
+  @Test
+  fun aRefreshDoesntDownloadAFailedProofPhotoAgain() = test {
+    val id = approvedWithProofBy(FRIEND, Proof.Photo(TEST_PROOF_PHOTO))
+    downloadFails = true
+    openDetails()
+
+    downloadFails = false
+    completions.approve(id).getOrThrow()
+    runCurrent()
+
+    assertEquals(ProofPhoto.Failed, state.proofPhoto)
+    assertEquals(1, downloads.count { it == TEST_PROOF_PHOTO })
+  }
+
+  // Full-size photos: only the one of the details the explorer opens
+  @Test
+  fun theProofPhotoDownloadsOnlyOnceItsDetailsOpen() = test {
+    approvedWithProofBy(FRIEND, Proof.Photo(TEST_PROOF_PHOTO))
+    viewModel
+    runCurrent()
+    viewModel.onQuestSelected(QUEST)
+    runCurrent()
+
+    assertTrue(TEST_PROOF_PHOTO !in downloads)
+
+    viewModel.onQuestDetailsOpened(QUEST)
+    runCurrent()
+
+    assertSame(picture, (state.proofPhoto as ProofPhoto.Loaded).image)
+  }
+
+  @Test
+  fun aProofPhotoThatIsntAnImageFails() = test {
+    notAPicture = true
+    approvedWithProofBy(FRIEND, Proof.Photo(TEST_PROOF_PHOTO))
+
+    openDetails()
+
+    assertEquals(ProofPhoto.Failed, state.proofPhoto)
+  }
+
+  @Test
+  fun retryingWithoutAPhotoProofDownloadsNothing() = test {
+    approvedWithProofBy(FRIEND, Proof.Text("Behind the till"))
+    openDetails()
+    val before = downloads.size
+
+    viewModel.onRetryProofPhoto()
+    runCurrent()
+
+    assertEquals(before, downloads.size)
   }
 
   private companion object {

@@ -2,15 +2,18 @@
 // Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
+import androidx.compose.ui.graphics.ImageBitmap
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.party.MAX_PARTY_SIZE
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
 import com.github.aroundteam2026.aroundapp.model.quest.QuestLimits
 import com.github.aroundteam2026.aroundapp.model.quest.Reward
 import com.github.aroundteam2026.aroundapp.model.reservation.Completion
+import com.github.aroundteam2026.aroundapp.model.reservation.Proof
 import com.github.aroundteam2026.aroundapp.ui.proof.ProofSender
 import com.github.aroundteam2026.aroundapp.ui.quest.CancelStatus
 import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
+import com.github.aroundteam2026.aroundapp.ui.review.ProofPhoto
 
 /**
  * What a venue's page shows: its header and the quests explorers can take there.
@@ -56,6 +59,8 @@ import com.github.aroundteam2026.aroundapp.ui.quest.VenueAvatar
  *   proof the explorer sent themselves isn't in it.
  * @property proofsAvailable False once those proofs can't be read, since then the page can't tell
  *   if one was sent and so doesn't offer to send one.
+ * @property proofPhotos The downloaded photos of the photo proofs in [completions], by location.
+ * @property failedProofPhotos The locations of those photos whose download failed.
  * @property partyCodes The party codes of the reservations the explorer created and friends can
  *   still join, by reservation id.
  * @property partyMembers The joined members of the explorer's parties here, by reservation id.
@@ -90,6 +95,8 @@ data class VenuePageUiState(
     val completions: Map<String, Completion> = emptyMap(),
     val proofSenders: Map<String, ProofSender> = emptyMap(),
     val proofsAvailable: Boolean = true,
+    val proofPhotos: Map<String, ImageBitmap> = emptyMap(),
+    val failedProofPhotos: Set<String> = emptySet(),
     val partyCodes: Map<String, String> = emptyMap(),
     val partyMembers: Map<String, List<PartyMemberUi>> = emptyMap(),
     val leavesParties: Map<String, Boolean> = emptyMap(),
@@ -152,6 +159,14 @@ data class VenuePageUiState(
   /** The party's proof for the picked quest, or null when there is none. */
   val proof: Completion?
     get() = selectedQuestId?.let(reservationIds::get)?.let(completions::get)
+
+  /** Where the photo of [proof] stands, as the review screen shows it; null for a text proof. */
+  val proofPhoto: ProofPhoto?
+    get() =
+        (proof?.proof as? Proof.Photo)?.location?.let { location ->
+          proofPhotos[location]?.let(ProofPhoto::Loaded)
+              ?: if (location in failedProofPhotos) ProofPhoto.Failed else ProofPhoto.Loading
+        }
 
   /** Who sent [proof], when another member of the party did; null when the explorer did. */
   val proofSender: ProofSender?

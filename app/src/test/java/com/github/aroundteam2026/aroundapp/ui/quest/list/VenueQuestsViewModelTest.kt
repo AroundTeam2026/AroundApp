@@ -1,10 +1,16 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+// Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.quest.list
 
 import com.github.aroundteam2026.aroundapp.model.auth.FakeAuthRepository
 import com.github.aroundteam2026.aroundapp.model.quest.FakeQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.FakeRefusedQuestWritesStore
+import com.github.aroundteam2026.aroundapp.model.quest.Quest
 import com.github.aroundteam2026.aroundapp.model.quest.QuestRepository
 import com.github.aroundteam2026.aroundapp.model.quest.QuestStatus
+import com.github.aroundteam2026.aroundapp.model.quest.RefusedQuestWrites
+import com.github.aroundteam2026.aroundapp.model.quest.ScriptedQuestRepository
+import com.github.aroundteam2026.aroundapp.model.quest.fakeRefusedQuestWrites
 import com.github.aroundteam2026.aroundapp.model.quest.withUnsent
 import com.github.aroundteam2026.aroundapp.model.testQuest
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +24,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -33,9 +41,12 @@ class VenueQuestsViewModelTest {
     Dispatchers.resetMain()
   }
 
+  /** What the phone remembers of the venue's writes; it survives a [viewModel] being made again. */
+  private val remembered = FakeRefusedQuestWritesStore()
+
   /** The Quests tab of the signed-in [VENUE_ID], reading [quests]. */
   private fun viewModel(quests: QuestRepository) =
-      VenueQuestsViewModel(FakeAuthRepository(VENUE_ID), quests)
+      VenueQuestsViewModel(FakeAuthRepository(VENUE_ID), quests) { RefusedQuestWrites(remembered) }
 
   /** Keeps [viewModel]'s state collected, as the tab does: it only listens while watched. */
   private fun TestScope.watch(viewModel: VenueQuestsViewModel) = viewModel.also {
@@ -90,7 +101,7 @@ class VenueQuestsViewModelTest {
   fun aVenueThatSignsInLaterGetsItsQuests() = runTest {
     val auth = FakeAuthRepository()
     val quests = FakeQuestRepository()
-    val viewModel = watch(VenueQuestsViewModel(auth, quests))
+    val viewModel = watch(VenueQuestsViewModel(auth, quests, ::fakeRefusedQuestWrites))
     assertEquals(VenueQuestsUiState.Loading, viewModel.uiState.value)
 
     val venueId = auth.signInWithGoogle(GOOGLE_ID_TOKEN).getOrThrow()
@@ -129,6 +140,60 @@ class VenueQuestsViewModelTest {
     unsent.value = emptySet()
 
     assertEquals(listOf(newer, older), listed())
+  }
+
+  /** The venue's quests as the test lists them, with Firestore's pending writes. */
+  private val listed = MutableStateFlow<List<Quest>>(emptyList())
+
+  private fun listing() = ScriptedQuestRepository(questsByVenue = { listed })
+
+  private fun sent(updatedAt: Long = NEWER) =
+      testQuest(id = "fox", venueId = VENUE_ID, updatedAt = updatedAt).copy(pendingWrite = true)
+
+  @Test
+  fun aQuestTheServerRefusesTellsTheVenue() = runTest {
+    val viewModel = watch(viewModel(listing()))
+    listed.value = listOf(sent())
+    assertFalse(viewModel.refusalNotice.value)
+
+    listed.value = emptyList()
+
+    assertTrue(viewModel.refusalNotice.value)
+  }
+
+  @Test
+  fun aQuestTheServerConfirmsTellsNothing() = runTest {
+    val viewModel = watch(viewModel(listing()))
+    listed.value = listOf(sent(NEWER))
+
+    listed.value = listOf(sent(NEWER).copy(pendingWrite = false))
+
+    assertFalse(viewModel.refusalNotice.value)
+  }
+
+  @Test
+  fun aRefusalIsToldOnceEvenAfterARestart() = runTest {
+    val first = watch(viewModel(listing()))
+    listed.value = listOf(sent())
+    listed.value = emptyList()
+    assertTrue(first.refusalNotice.value)
+
+    first.onRefusalNoticeShown()
+
+    assertFalse(first.refusalNotice.value)
+    assertFalse(watch(viewModel(listing())).refusalNotice.value)
+  }
+
+  @Test
+  fun aRefusalFromBeforeARestartIsToldOnTheFirstList() = runTest {
+    val before = watch(viewModel(listing()))
+    listed.value = listOf(sent())
+    // The app is killed here, and the server refuses the write while it is closed
+    assertFalse(before.refusalNotice.value)
+    val after =
+        watch(viewModel(ScriptedQuestRepository(questsByVenue = { MutableStateFlow(emptyList()) })))
+
+    assertTrue(after.refusalNotice.value)
   }
 
   private companion object {

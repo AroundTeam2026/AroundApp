@@ -3,6 +3,7 @@
 package com.github.aroundteam2026.aroundapp.ui.venuepage
 
 import android.app.Application
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import com.github.aroundteam2026.aroundapp.R
+import com.github.aroundteam2026.aroundapp.model.TEST_PROOF_PHOTO
 import com.github.aroundteam2026.aroundapp.model.common.Location
 import com.github.aroundteam2026.aroundapp.model.quest.DiscountUnit
 import com.github.aroundteam2026.aroundapp.model.quest.ProofType
@@ -38,6 +40,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Tests the screen with the whole of a quest: what it shows, and how it accepts and cancels. */
 @RunWith(RobolectricTestRunner::class)
@@ -51,6 +54,7 @@ class QuestDetailsScreenTest {
   private var accepts = 0
   private var cancels = 0
   private val proofsOpened = mutableListOf<String>()
+  private var photoRetries = 0
 
   private fun quest(
       description: String = "Spot the ceramic fox hidden in the café.",
@@ -107,6 +111,7 @@ class QuestDetailsScreenTest {
             onCancel = { cancels++ },
             clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
             onSubmitProof = { proofsOpened += it },
+            onRetryProofPhoto = { photoRetries++ },
             showOfflineBanner = showOfflineBanner,
         )
       }
@@ -420,6 +425,7 @@ class QuestDetailsScreenTest {
       status: CompletionStatus,
       rejectReason: String? = null,
       pendingWrite: Boolean = false,
+      proof: Proof = Proof.Photo(TEST_PROOF_PHOTO),
   ) =
       accepted(quest)
           .copy(
@@ -432,7 +438,7 @@ class QuestDetailsScreenTest {
                               reservationId = "r",
                               venueId = "venue",
                               explorerUid = "explorer",
-                              proof = Proof.Photo("gs://proofs/fox"),
+                              proof = proof,
                               status = status,
                               rejectReason = rejectReason,
                               submittedAt = 0L,
@@ -440,6 +446,98 @@ class QuestDetailsScreenTest {
                           )
                   ),
           )
+
+  // #555: every member sees what the party sent, not only where it stands
+  @Test
+  fun aWrittenProofShowsItsAnswer() {
+    val quest = quest(proofType = ProofType.TEXT)
+    show(quest, withProof(quest, CompletionStatus.PENDING, proof = Proof.Text(ANSWER)))
+
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_ANSWER).performScrollTo().assertTextEquals(ANSWER)
+    compose
+        .onNodeWithText(app.getString(R.string.quest_detail_sent_proof).uppercase())
+        .assertIsDisplayed()
+  }
+
+  @Test
+  // Native graphics, so the photo can be a real ImageBitmap
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun aProofPhotoShowsOnceDownloaded() {
+    val quest = quest()
+    val photo = ImageBitmap(4, 3)
+    show(
+        quest,
+        withProof(quest, CompletionStatus.APPROVED)
+            .copy(proofPhotos = mapOf(TEST_PROOF_PHOTO to photo)),
+    )
+
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_PHOTO).performScrollTo().assertIsDisplayed()
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_LOADING).assertDoesNotExist()
+  }
+
+  @Test
+  // Native graphics, so the photo can be a real ImageBitmap
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun tappingTheProofPhotoOpensItFullScreen() {
+    val quest = quest()
+    show(
+        quest,
+        withProof(quest, CompletionStatus.PENDING)
+            .copy(proofPhotos = mapOf(TEST_PROOF_PHOTO to ImageBitmap(4, 3))),
+    )
+
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_PHOTO).performScrollTo().performClick()
+
+    node(C.Tag.PROOF_VIEWER_TITLE).assertTextEquals(quest.title)
+  }
+
+  @Test
+  fun aProofPhotoStillDownloadingShowsASpinner() {
+    val quest = quest()
+    show(quest, withProof(quest, CompletionStatus.PENDING))
+
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_LOADING).performScrollTo().assertIsDisplayed()
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_PHOTO).assertDoesNotExist()
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_RETRY).assertDoesNotExist()
+  }
+
+  @Test
+  fun aProofPhotoThatFailedOffersToTryAgain() {
+    val quest = quest()
+    show(
+        quest,
+        withProof(quest, CompletionStatus.PENDING)
+            .copy(failedProofPhotos = setOf(TEST_PROOF_PHOTO)),
+    )
+
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_FAILED)
+        .performScrollTo()
+        .assertTextEquals(app.getString(R.string.quest_detail_sent_proof_photo_failed))
+    // The merged tree, where the button holds its label
+    compose
+        .onNodeWithTag(C.Tag.QUEST_DETAIL_SENT_PROOF_RETRY)
+        .assertTextEquals(app.getString(R.string.quest_detail_sent_proof_photo_retry))
+        .performClick()
+
+    assertEquals(1, photoRetries)
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_LOADING).assertDoesNotExist()
+  }
+
+  // "Matches Figma in light and dark": the photo shows in the dark theme too
+  @Test
+  @Config(qualifiers = "+night")
+  // Native graphics, so the photo can be a real ImageBitmap
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun aProofPhotoShowsInTheDarkTheme() {
+    val quest = quest()
+    show(
+        quest,
+        withProof(quest, CompletionStatus.PENDING)
+            .copy(proofPhotos = mapOf(TEST_PROOF_PHOTO to ImageBitmap(4, 3))),
+    )
+
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_PHOTO).performScrollTo().assertIsDisplayed()
+  }
 
   private fun assertNoProofButtons() {
     node(C.Tag.SUBMIT_PROOF_BUTTON).assertDoesNotExist()
@@ -686,15 +784,19 @@ class QuestDetailsScreenTest {
   }
 
   @Test
+  // Native graphics, so the photo can be a real ImageBitmap
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
   fun theSentByAMemberPreviewNamesTheSender() {
     compose.setContent { QuestDetailsSentByMemberPreview() }
 
     compose
         .onNodeWithText(app.getString(R.string.quest_detail_proof_pending_title_by, "Lea"))
         .assertIsDisplayed()
+    node(C.Tag.QUEST_DETAIL_SENT_PROOF_PHOTO).performScrollTo().assertIsDisplayed()
   }
 
   private companion object {
     const val QUEST = "fox"
+    const val ANSWER = "The fox is behind the till"
   }
 }

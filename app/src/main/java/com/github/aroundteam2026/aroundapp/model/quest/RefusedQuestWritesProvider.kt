@@ -22,6 +22,15 @@ object RefusedQuestWritesProvider {
   fun refusedWrites(context: Context, venueUid: String): RefusedQuestWrites =
       perVenue.get(context, venueUid)
 
+  /**
+   * Forgets what is remembered of the venue [venueUid], as when it signs out: another account on
+   * this phone mustn't hear of its refusals, nor the venue itself after it signs in again.
+   */
+  fun forget(context: Context, venueUid: String) {
+    RefusedQuestWritesStoreSharedPrefs.forget(context.applicationContext, venueUid)
+    perVenue.forget(venueUid)
+  }
+
   /** Forgets the venue's [RefusedQuestWrites], as a new app process starts with none. */
   @VisibleForTesting
   internal fun reset() {
