@@ -2,8 +2,8 @@
 
 import { DocumentData, getFirestore } from "firebase-admin/firestore";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { APPROVED, NotificationMessage, readQuest, REJECTED, sendToUser } from "./notify";
-import { joinedMembers } from "./party";
+import { APPROVED, nonBlank, NotificationMessage, REJECTED, textOf } from "./notify";
+import { joinedMembers, sendToMembers } from "./party";
 
 /** The completion statuses that are the venue's answer to a proof. */
 const ANSWERS: ReadonlySet<string> = new Set([APPROVED, REJECTED]);
@@ -67,15 +67,12 @@ function sentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
-/**
- * Reads the document [collection]/[id], throwing if it doesn't exist, as readQuest does for a
- * quest: Cloud Functions logs the failure rather than a notification going out without a name.
- */
-async function read(collection: string, id: string): Promise<DocumentData> {
-  const doc = await getFirestore().collection(collection).doc(id).get();
-  if (!doc.exists) throw new Error(`Missing ${collection}/${id}`);
-  return doc.data()!;
-}
+/** Who answered, in a notification, when the venue's name can't be read. */
+export const UNNAMED_VENUE = "The venue";
+/** An approval's title when the quest's can't be read, e.g. the venue deleted the quest. */
+export const QUEST_COMPLETED = "Quest completed";
+/** A rejection's title when the venue's name can't be read. */
+export const PROOF_REJECTED = "Your proof was rejected";
 
 /**
  * The notification for the venue's answer [after] to the proof of the reservation
@@ -83,37 +80,45 @@ async function read(collection: string, id: string): Promise<DocumentData> {
  * - approved: "Quest completed: {quest}" / "{venue} approved your proof. Your reward: {reward}."
  * - rejected: "{venue} rejected your proof" / "“{reason}” You can send a new one from the Quests
  *   tab."
+ *
+ * A name that can't be read, e.g. once the venue deleted the quest and then approved its pending
+ * proof, is left out rather than stopping the notification, as #670 does: the party still hears
+ * it completed the quest.
  */
 export async function proofAnswerMessage(
   after: DocumentData,
   reservationId: string,
 ): Promise<NotificationMessage> {
   const data = { kind: "proof", route: "quests", reservationId } as const;
-  const venueName = (await read("venues", after.venueId)).name;
+  // The rules make every completion name its venue; a deleted venue reads as no name
+  const venueName = await textOf(`venues/${after.venueId}`, "name");
 
   if (after.status === REJECTED) {
     return {
-      title: `${venueName} rejected your proof`,
+      title: venueName ? `${venueName} rejected your proof` : PROOF_REJECTED,
       body: `“${after.rejectReason}” You can send a new one from the Quests tab.`,
       data,
     };
   }
 
-  const { questId } = await read("reservations", reservationId);
-  const quest = await readQuest(questId);
-  const reward = rewardText(quest.get("reward"));
+  const db = getFirestore();
+  const questId = (await db.collection("reservations").doc(reservationId).get()).get("questId");
+  const quest =
+    typeof questId === "string" ? await db.collection("quests").doc(questId).get() : null;
+  const questTitle = nonBlank(quest?.get("title"));
+  const reward = rewardText(quest?.get("reward"));
+  const approval = `${venueName ?? UNNAMED_VENUE} approved your proof.`;
   return {
-    title: `Quest completed: ${quest.get("title")}`,
-    body: reward
-      ? `${venueName} approved your proof. Your reward: ${sentence(reward)}`
-      : `${venueName} approved your proof.`,
+    title: questTitle ? `Quest completed: ${questTitle}` : QUEST_COMPLETED,
+    body: reward ? `${approval} Your reward: ${sentence(reward)}` : approval,
     data,
   };
 }
 
 /**
  * Tells every joined member of the party when the venue answers its proof (#640). A new proof, or
- * any other change, notifies no explorer: the venue hears of a new proof through #642.
+ * any other change, notifies no explorer: the venue hears of a new proof through #642. A member
+ * whose send fails is logged, and the others still hear the answer.
  */
 export async function sendProofAnswer(
   before: DocumentData | undefined,
@@ -124,7 +129,7 @@ export async function sendProofAnswer(
   const uids = await joinedMembers(reservationId);
   if (uids.length === 0) return;
   const message = await proofAnswerMessage(after!, reservationId);
-  await Promise.all(uids.map((uid) => sendToUser(uid, message)));
+  await sendToMembers("notifyProofAnswered", reservationId, uids, message);
 }
 
 // A completion's id is its reservation's (completionId in Completion.kt)

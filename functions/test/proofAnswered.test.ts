@@ -2,9 +2,17 @@
 
 import { randomUUID } from "node:crypto";
 import { DocumentData, DocumentReference, getFirestore, Timestamp } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 import { Change } from "firebase-functions/v2/firestore";
 import { APPROVED, NotificationMessage, PENDING, REJECTED, sendToUser } from "../src/notify";
-import { notifyProofAnswered, rewardText, sendProofAnswer } from "../src/proofAnswered";
+import {
+  notifyProofAnswered,
+  PROOF_REJECTED,
+  QUEST_COMPLETED,
+  rewardText,
+  sendProofAnswer,
+  UNNAMED_VENUE,
+} from "../src/proofAnswered";
 import {
   EXPLORER,
   FREE_CROISSANT,
@@ -20,7 +28,7 @@ import {
   WITHDRAWN,
 } from "./fixtures";
 
-// The sending itself is sendToUser's, tested in notify.test.ts; readQuest is the real one
+// The sending itself is sendToUser's, tested in notify.test.ts; the shared helpers stay real
 jest.mock("../src/notify", () => ({
   ...jest.requireActual("../src/notify"),
   sendToUser: jest.fn(),
@@ -192,23 +200,60 @@ describe("notifyProofAnswered", () => {
     expect(sent).not.toHaveBeenCalled();
   });
 
-  it("fails, sending nothing, when the venue is missing", async () => {
+  it.each(["quest", "reservation"])(
+    "still tells every member they completed the quest when its %s was deleted",
+    async (deleted) => {
+      const { ref, proof } = await fixture();
+      const reservation = getFirestore().collection("reservations").doc(ref.id);
+      const questId = (await reservation.get()).get("questId");
+      // A venue may delete a quest that still has reservations, then approve their proofs
+      await (deleted === "quest"
+        ? getFirestore().collection("quests").doc(questId).delete()
+        : reservation.delete());
+
+      await updateAndNotify(ref, { ...proof, status: APPROVED });
+
+      expect(recipients()).toEqual(JOINED_MEMBERS);
+      expect(theMessage()).toMatchObject({
+        title: QUEST_COMPLETED,
+        body: FIGMA.approvedBodyWithoutReward,
+      });
+    },
+  );
+
+  it("still tells every member when the venue's name can't be read", async () => {
     const { ref, proof } = await fixture({ venueExists: false });
 
-    await expect(updateAndNotify(ref, { ...proof, status: APPROVED })).rejects.toThrow(
-      `Missing venues/${proof.venueId}`,
-    );
-    expect(sent).not.toHaveBeenCalled();
+    await updateAndNotify(ref, { ...proof, status: APPROVED });
+    const approval = theMessage();
+    sent.mockClear();
+    await updateAndNotify(ref, { ...proof, status: REJECTED, rejectReason: REASON });
+    const rejection = theMessage();
+
+    expect(recipients()).toEqual(JOINED_MEMBERS);
+    expect(approval).toMatchObject({
+      title: FIGMA.approvedTitle,
+      body: FIGMA.approvedBody.replace(VENUE_NAME, UNNAMED_VENUE),
+    });
+    expect(rejection).toMatchObject({ title: PROOF_REJECTED, body: FIGMA.rejectedBody });
   });
 
-  it("tries every joined member even if one send fails", async () => {
+  it("still tells the others when one send fails, and logs whose failed", async () => {
     const { ref, proof } = await fixture();
-    sent.mockRejectedValueOnce(new Error("FCM unavailable"));
+    const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    sent.mockImplementation(async (uid) => {
+      if (uid === EXPLORER) throw new Error("FCM unavailable");
+    });
 
-    await expect(updateAndNotify(ref, { ...proof, status: APPROVED })).rejects.toThrow(
-      "FCM unavailable",
-    );
+    await updateAndNotify(ref, { ...proof, status: APPROVED });
+
     expect(recipients()).toEqual(JOINED_MEMBERS);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ uid: EXPLORER, reservationId: ref.id }),
+    );
+    warn.mockRestore();
   });
 
   it("ignores a missing snapshot", async () => {

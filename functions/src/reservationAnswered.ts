@@ -1,11 +1,10 @@
 // Co-authored-by: OpenAI Codex <noreply@openai.com>
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 
-import { DocumentData, getFirestore } from "firebase-admin/firestore";
-import { logger } from "firebase-functions";
+import { DocumentData } from "firebase-admin/firestore";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { APPROVED, NotificationMessage, PENDING, REJECTED, sendToUser } from "./notify";
-import { joinedMembers } from "./party";
+import { APPROVED, NotificationMessage, PENDING, REJECTED, textOf } from "./notify";
+import { joinedMembers, sendToMembers } from "./party";
 
 /**
  * The notification for a reservation [approved] or declined, with the venue's name and the
@@ -34,12 +33,6 @@ function answerText(
     : { title: "Reservation declined", body: "Your party's reservation was declined." };
 }
 
-/** The non-blank text [field] of the document at [path], or undefined if it or the field is missing. */
-async function textOf(path: string, field: string): Promise<string | undefined> {
-  const value = (await getFirestore().doc(path).get()).get(field);
-  return typeof value === "string" && value.trim() ? value : undefined;
-}
-
 /**
  * Notifies the current party when a venue answers its reservation. Membership lives in
  * `party_user`, not on the reservation; withdrawn members must not receive the answer.
@@ -65,16 +58,7 @@ export async function sendReservationAnswer(
     data: { kind: "reservation", route: "quests", reservationId },
   };
 
-  const results = await Promise.allSettled(uids.map((uid) => sendToUser(uid, message)));
-  results.forEach((result, i) => {
-    if (result.status === "rejected") {
-      logger.warn("notifyReservationAnswered: a member didn't get the answer", {
-        uid: uids[i],
-        reservationId,
-        error: String(result.reason),
-      });
-    }
-  });
+  await sendToMembers("notifyReservationAnswered", reservationId, uids, message);
 }
 
 export const notifyReservationAnswered = onDocumentUpdated(
