@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.aroundteam2026.aroundapp.R
 import com.github.aroundteam2026.aroundapp.resources.C
+import com.github.aroundteam2026.aroundapp.ui.profile.NotificationsCard
 import com.github.aroundteam2026.aroundapp.ui.profile.ProfileCard
 import com.github.aroundteam2026.aroundapp.ui.profile.SignOutCard
 import com.github.aroundteam2026.aroundapp.ui.quest.QuestAvatar
@@ -105,6 +106,7 @@ internal fun VenueProfileContent(
         EditDetailsCard(onEditDetails)
       }
     }
+    NotificationsCard()
     SignOutCard(onSignOut)
   }
 }

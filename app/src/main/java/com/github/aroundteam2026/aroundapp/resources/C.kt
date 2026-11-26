@@ -19,6 +19,7 @@ object C {
     const val PROFILE_SETUP_ERROR = "profile_setup_error"
     const val PROFILE_SETUP_CONTINUE = "profile_setup_continue"
     const val PROFILE_EDIT_ACTION = "profile_edit_action"
+    const val PROFILE_NOTIFICATIONS = "profile_notifications"
     const val PROFILE_EDIT_BACK = "profile_edit_back"
     const val ROLE_PROFILE_ERROR = "role_profile_error"
     const val RETRY_OR_SIGN_OUT_RETRY = "retry_or_sign_out_retry"

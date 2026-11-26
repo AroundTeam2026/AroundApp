@@ -2,6 +2,11 @@
 // Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 package com.github.aroundteam2026.aroundapp.ui.profile
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -140,6 +146,7 @@ private fun ExplorerProfile(
       }
       Icon(painterResource(R.drawable.ic_chevron_right), null)
     }
+    NotificationsCard()
     SignOutCard(onSignOut)
   }
   if (editing) {
@@ -151,6 +158,56 @@ private fun ExplorerProfile(
         ProfileForm(model, pictures, editing = true, onBack = model::cancelEditing)
       }
     }
+  }
+}
+
+/**
+ * "Notifications", which opens Android's notification settings for Around, on both profiles.
+ *
+ * Each kind of notification is its own Android channel, so those settings already let people turn
+ * one kind off; the icon at the end says the row leaves the app.
+ */
+@Composable
+internal fun NotificationsCard() {
+  val context = LocalContext.current
+  ProfileCard(
+      Modifier.testTag(C.Tag.PROFILE_NOTIFICATIONS).clickable(role = Role.Button) {
+        openNotificationSettings(context)
+      }
+  ) {
+    Icon(painterResource(R.drawable.ic_notifications), null, Modifier.size(ROW_ICON_SIZE))
+    Column(Modifier.weight(1f)) {
+      Text(
+          stringResource(R.string.profile_notifications_title),
+          style = MaterialTheme.typography.titleMedium,
+      )
+      Text(
+          stringResource(R.string.profile_notifications_subtitle),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    Icon(painterResource(R.drawable.ic_open_in_new), null, Modifier.size(ROW_ICON_SIZE))
+  }
+}
+
+/**
+ * Opens Android's notification settings for this app, or, on a phone without that screen, the app's
+ * details, which link to them.
+ */
+internal fun openNotificationSettings(context: Context) {
+  try {
+    context.startActivity(
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    )
+  } catch (_: ActivityNotFoundException) {
+    context.startActivity(
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", context.packageName, null),
+        )
+    )
   }
 }
 
