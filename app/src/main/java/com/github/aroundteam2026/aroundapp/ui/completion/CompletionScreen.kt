@@ -154,7 +154,7 @@ fun CompletionContent(
             CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
         CompletionFormStatus.FAILED -> {
           CompletionMessage(stringResource(R.string.completion_load_failed))
-          TextButton(onClick = onRetry) { Text(stringResource(R.string.completion_retry)) }
+          TextButton(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
         }
         CompletionFormStatus.UNAVAILABLE ->
             CompletionMessage(stringResource(R.string.completion_unavailable))
@@ -259,7 +259,7 @@ private fun submitLabel(state: CompletionUiState): Int =
       state.saveState == SaveState.Saving -> R.string.completion_sending
       state.saveState is SaveState.Saved || state.sentByTeammate -> R.string.completion_sent
       state.sendingLater -> R.string.waiting_to_send
-      state.saveState == SaveState.Failed -> R.string.completion_retry
+      state.saveState == SaveState.Failed -> R.string.try_again
       else -> R.string.completion_send
     }
 

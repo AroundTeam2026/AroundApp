@@ -274,7 +274,7 @@ private fun AcceptButton(
       }
       // Without a working button there is nothing to try again
       AcceptStatus.FAILED if enabled ->
-          Text(stringResource(R.string.accept_quest_retry), style = AroundTextStyles.Button)
+          Text(stringResource(R.string.try_again), style = AroundTextStyles.Button)
       else -> Text(stringResource(R.string.accept_quest), style = AroundTextStyles.Button)
     }
   }

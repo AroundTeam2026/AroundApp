@@ -516,7 +516,7 @@ class QuestDetailsScreenTest {
     // The merged tree, where the button holds its label
     compose
         .onNodeWithTag(C.Tag.QUEST_DETAIL_SENT_PROOF_RETRY)
-        .assertTextEquals(app.getString(R.string.quest_detail_sent_proof_photo_retry))
+        .assertTextEquals(app.getString(R.string.try_again))
         .performClick()
 
     assertEquals(1, photoRetries)

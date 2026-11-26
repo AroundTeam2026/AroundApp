@@ -189,7 +189,7 @@ private fun LoadFailed(
       enabled = !retrying,
       modifier = Modifier.testTag(retryTag),
   ) {
-    Text(stringResource(R.string.create_quest_venue_retry), style = AroundTextStyles.Button)
+    Text(stringResource(R.string.try_again), style = AroundTextStyles.Button)
   }
 }
 

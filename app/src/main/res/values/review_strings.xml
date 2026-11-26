@@ -52,5 +52,4 @@
     <string name="review_proof_approving">Approving…</string>
     <string name="review_proof_answer_failed">Couldn\'t send your answer. Check your connection and try again.</string>
     <string name="review_proof_load_failed">Couldn\'t load this proof.</string>
-    <string name="review_proof_retry">Try again</string>
 </resources>

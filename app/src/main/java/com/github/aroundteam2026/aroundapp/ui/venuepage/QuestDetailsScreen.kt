@@ -423,7 +423,7 @@ private fun ColumnScope.PhotoFailed(onRetry: () -> Unit) {
       modifier = Modifier.align(Alignment.Start).testTag(C.Tag.QUEST_DETAIL_SENT_PROOF_RETRY),
       colors = aroundTextButtonColors(),
   ) {
-    Text(stringResource(R.string.quest_detail_sent_proof_photo_retry))
+    Text(stringResource(R.string.try_again))
   }
 }
 

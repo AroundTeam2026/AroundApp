@@ -316,7 +316,7 @@ private fun Failed(onRetry: () -> Unit) {
   ) {
     Message(R.string.overview_failed)
     Button(onRetry, Modifier.testTag(C.Tag.OVERVIEW_RETRY)) {
-      Text(stringResource(R.string.overview_retry), style = AroundTextStyles.Button)
+      Text(stringResource(R.string.try_again), style = AroundTextStyles.Button)
     }
   }
 }

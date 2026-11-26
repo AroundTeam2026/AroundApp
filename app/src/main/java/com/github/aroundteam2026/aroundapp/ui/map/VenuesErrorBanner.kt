@@ -21,7 +21,7 @@ fun VenuesErrorBanner(onTryAgain: () -> Unit, retrying: Boolean, modifier: Modif
       icon = R.drawable.ic_cloud_off,
       title = stringResource(R.string.map_venues_failed),
       caption = stringResource(R.string.map_venues_failed_detail),
-      action = stringResource(R.string.map_venues_try_again),
+      action = stringResource(R.string.try_again),
       onAction = onTryAgain,
       actionTag = C.Tag.VENUES_TRY_AGAIN,
       modifier = modifier.testTag(C.Tag.VENUES_ERROR_BANNER),

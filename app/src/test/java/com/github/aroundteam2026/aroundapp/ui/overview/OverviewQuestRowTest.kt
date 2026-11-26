@@ -158,7 +158,7 @@ class OverviewQuestRowTest {
     status(app.getString(R.string.overview_status_proof_not_sent).uppercase()).assertIsDisplayed()
     part(C.Tag.OVERVIEW_SEND_NEW_PROOF).assertIsDisplayed()
     part(C.Tag.OVERVIEW_RETRY_PROOF)
-        .assert(hasAnyDescendant(hasText(app.getString(R.string.overview_retry_proof))))
+        .assert(hasAnyDescendant(hasText(app.getString(R.string.try_again))))
         .performClick()
     assertEquals(1, retries)
     part(C.Tag.OVERVIEW_RETRY_PROOF_FAILED).assertDoesNotExist()

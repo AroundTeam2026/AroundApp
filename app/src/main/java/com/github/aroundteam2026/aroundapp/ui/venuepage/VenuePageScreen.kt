@@ -411,7 +411,7 @@ private fun Failed(onRetry: () -> Unit) {
   ) {
     Message(R.string.venue_page_failed)
     Button(onRetry, Modifier.testTag(C.Tag.VENUE_PAGE_RETRY)) {
-      Text(stringResource(R.string.venue_page_retry), style = AroundTextStyles.Button)
+      Text(stringResource(R.string.try_again), style = AroundTextStyles.Button)
     }
   }
 }

@@ -11,6 +11,8 @@
     <string name="venue_area_meters">%1$d m</string>
     <string name="use_my_location">Use my location</string>
     <string name="back">Back</string>
+    <!-- The button that runs a failed action again, shared by every screen -->
+    <string name="try_again">Try again</string>
     <string name="venue_area_save">Save location</string>
     <string name="venue_area_saving">Saving…</string>
     <string name="venue_area_save_failed">Couldn\'t save your location. Check your connection and try again.</string>
@@ -80,7 +82,6 @@
     <string name="map_location_turn_on">Turn on</string>
     <string name="map_venues_failed">Couldn\'t load quests</string>
     <string name="map_venues_failed_detail">Something went wrong.</string>
-    <string name="map_venues_try_again">Try again</string>
 
     <!-- Screens that are not built yet: their title, then a note that they are coming soon -->
     <string name="coming_soon">Coming soon</string>
