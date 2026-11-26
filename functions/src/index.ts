@@ -6,6 +6,7 @@ initializeApp();
 
 // Every deployed function is exported from here, one line each.
 export { notifyVenueReservation } from "./venueReservation";
+export { notifyVenueCancellation } from "./venueCancellation";
 export { notifyVenueProof } from "./venueProof";
 export { notifyReservationAnswered } from "./reservationAnswered";
 export { notifyProofAnswered } from "./proofAnswered";

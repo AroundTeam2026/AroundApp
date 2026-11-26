@@ -3,7 +3,7 @@
 
 import { randomUUID } from "node:crypto";
 import { logger } from "firebase-functions";
-import { APPROVED, PENDING, REJECTED, sendToUser } from "../src/notify";
+import { APPROVED, CANCELLED, PENDING, REJECTED, sendToUser } from "../src/notify";
 import { notifyReservationAnswered, sendReservationAnswer } from "../src/reservationAnswered";
 import { initTestApp, membership, QUEST_TITLE, seedQuest, seedVenue, VENUE_NAME } from "./fixtures";
 
@@ -78,9 +78,9 @@ describe("sendReservationAnswer", () => {
   it.each([
     [PENDING, PENDING],
     [APPROVED, APPROVED],
-    [APPROVED, "CANCELLED"],
+    [APPROVED, CANCELLED],
     [REJECTED, REJECTED],
-    [PENDING, "CANCELLED"],
+    [PENDING, CANCELLED],
   ])("ignores a change from %s to %s", async (before, after) => {
     await sendReservationAnswer({ status: before }, { status: after }, randomUUID());
     expect(sender).not.toHaveBeenCalled();
