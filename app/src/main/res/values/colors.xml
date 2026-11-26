@@ -7,4 +7,6 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- The brand purple, AroundColors.Purple, for what Compose doesn't draw: the notifications' icon -->
+    <color name="brand_purple">#FF4D0092</color>
 </resources>
