@@ -11,7 +11,7 @@
     <string name="venue_area_meters">%1$d m</string>
     <string name="use_my_location">Use my location</string>
     <string name="back">Back</string>
-    <!-- The button that runs a failed action again, shared by every screen -->
+    <!-- The label shared by the screens' Try again buttons, which run a failed action again -->
     <string name="try_again">Try again</string>
     <string name="venue_area_save">Save location</string>
     <string name="venue_area_saving">Saving…</string>
