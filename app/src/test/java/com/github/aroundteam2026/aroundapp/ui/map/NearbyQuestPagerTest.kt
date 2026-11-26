@@ -59,6 +59,8 @@ class NearbyQuestPagerTest {
   private val accepted = mutableListOf<NearbyQuest>()
   /** The filters the list shows; a change from the list is applied, as the map does. */
   private var filters by mutableStateOf(NearbyFilters())
+  /** Where accepting stands, as the pager shows it; a change redraws it, as the map does. */
+  private var shownAcceptState by mutableStateOf<NearbyAcceptUiState?>(null)
   private val filterChanges = mutableListOf<NearbyFilters>()
 
   private fun row(
@@ -92,6 +94,7 @@ class NearbyQuestPagerTest {
       acceptState: NearbyAcceptUiState? = null,
   ) {
     quests = shown
+    shownAcceptState = acceptState
     composeTestRule.setContent {
       NearbyQuestPager(
           quests = quests,
@@ -109,7 +112,7 @@ class NearbyQuestPagerTest {
               } else {
                 null
               },
-          acceptState = acceptState,
+          acceptState = shownAcceptState,
           onAccept = { accepted += it },
       )
     }
@@ -179,7 +182,7 @@ class NearbyQuestPagerTest {
   @Test
   fun aCardFurtherDownCanBeOpenedShownOnTheMapAndAccepted() {
     val shown = rows(5)
-    show(shown, acceptState = NearbyAcceptUiState(available = true))
+    show(shown, acceptState = ACCEPTABLE)
     list().performScrollToNode(hasTestTag("${C.Tag.NEARBY_QUEST}_q4"))
 
     composeTestRule.inQuest("q4", C.Tag.NEARBY_CARD).performClick()
@@ -336,7 +339,7 @@ class NearbyQuestPagerTest {
   @Test
   fun acceptReportsItsCardsQuest() {
     val shown = rows(1)
-    show(shown, acceptState = NearbyAcceptUiState(available = true))
+    show(shown, acceptState = ACCEPTABLE)
 
     acceptButton()
         .assertTextEquals(context.getString(R.string.accept_quest))
@@ -349,7 +352,7 @@ class NearbyQuestPagerTest {
 
   @Test
   fun anAcceptedQuestSaysSoAndCantBeAcceptedAgain() {
-    show(rows(1), acceptState = NearbyAcceptUiState(setOf("q1"), available = true))
+    show(rows(1), acceptState = ACCEPTABLE.copy(acceptedQuestIds = setOf("q1")))
 
     acceptButton()
         .assertTextEquals(context.getString(R.string.accept_quest_accepted_short))
@@ -358,7 +361,7 @@ class NearbyQuestPagerTest {
 
   @Test
   fun aFailedQuestOffersToTryAgain() {
-    show(rows(1), acceptState = NearbyAcceptUiState(failedQuestIds = setOf("q1"), available = true))
+    show(rows(1), acceptState = ACCEPTABLE.copy(failedQuestIds = setOf("q1")))
 
     acceptButton()
         .assertTextEquals(context.getString(R.string.accept_quest_retry))
@@ -369,7 +372,7 @@ class NearbyQuestPagerTest {
   fun aQuestBeingAcceptedShowsAPlaceholderThatCantBeTapped() {
     show(
         rows(1),
-        acceptState = NearbyAcceptUiState(acceptingQuestIds = setOf("q1"), available = true),
+        acceptState = ACCEPTABLE.copy(acceptingQuestIds = setOf("q1")),
     )
 
     acceptButton()
@@ -384,6 +387,18 @@ class NearbyQuestPagerTest {
     show(rows(1), acceptState = NearbyAcceptUiState(available = false))
 
     acceptButton().assertIsNotEnabled()
+  }
+
+  @Test
+  fun whileOfflineTheButtonCantBeTappedAndBackOnlineItCan() {
+    show(rows(1), acceptState = ACCEPTABLE.copy(offline = true))
+
+    acceptButton().assertIsNotEnabled().performClick()
+    assertEquals(emptyList<NearbyQuest>(), accepted)
+
+    shownAcceptState = ACCEPTABLE
+    acceptButton().assertIsEnabled().performClick()
+    assertEquals(quests, accepted)
   }
 
   @Test
@@ -515,3 +530,6 @@ class NearbyQuestPagerTest {
     option(R.string.map_nearby_filter_other).assertIsSelected()
   }
 }
+
+/** Where accepting stands once the explorer's reservations are known: a quest can be accepted. */
+private val ACCEPTABLE = NearbyAcceptUiState(available = true)

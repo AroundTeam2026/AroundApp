@@ -16,6 +16,7 @@ import com.github.aroundteam2026.aroundapp.model.reservation.fakeRefusedWrites
 import com.github.aroundteam2026.aroundapp.model.reservation.newPendingReservation
 import com.github.aroundteam2026.aroundapp.model.testUsers
 import com.github.aroundteam2026.aroundapp.model.user.ScriptedUserRepository
+import com.github.aroundteam2026.aroundapp.ui.OFFLINE_HINT_DELAY_MS
 import com.github.aroundteam2026.aroundapp.ui.quest.TestAvatar
 import com.github.aroundteam2026.aroundapp.ui.venuepage.AcceptStatus
 import java.io.IOException
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -125,6 +127,28 @@ class NearbyAcceptViewModelTest {
 
     assertEquals("a", stored().single().questId)
     assertEquals(AcceptStatus.ACCEPTED, state.statusOf("a"))
+  }
+
+  // As the offline banner: a disconnect counts once it lasts, a reconnection at once
+  @Test
+  fun acceptingTurnsOffWithTheOfflineBannerAndBackOnAtOnce() = test {
+    open()
+
+    connectivity.online.value = false
+    advanceTimeBy(OFFLINE_HINT_DELAY_MS - 1)
+    runCurrent()
+    // The banner isn't shown yet: the button stays on, and accept()'s guard covers a tap
+    assertTrue(state.canAccept)
+
+    advanceTimeBy(1)
+    runCurrent()
+    assertTrue(state.offline)
+    assertFalse(state.canAccept)
+
+    connectivity.online.value = true
+    runCurrent()
+    assertFalse(state.offline)
+    assertTrue(state.canAccept)
   }
 
   @Test

@@ -136,7 +136,7 @@ fun NearbyQuestPager(
             onShowOnMap = { onShowOnMap(quest) },
             accept =
                 acceptState?.let { state ->
-                  Accept(state.statusOf(quest.questId), state.available) { onAccept(quest) }
+                  Accept(state.statusOf(quest.questId), state.canAccept) { onAccept(quest) }
                 },
         )
       }
