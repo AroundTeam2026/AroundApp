@@ -510,7 +510,7 @@ private fun ColumnScope.LoadFailed(onRetry: () -> Unit) {
       onClick = onRetry,
       modifier = Modifier.align(Alignment.Start).testTag(C.Tag.REVIEW_PROOF_RETRY),
   ) {
-    Text(stringResource(R.string.review_proof_retry))
+    Text(stringResource(R.string.try_again))
   }
 }
 

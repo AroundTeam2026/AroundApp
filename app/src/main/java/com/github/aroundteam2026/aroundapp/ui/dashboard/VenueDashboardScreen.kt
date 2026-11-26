@@ -416,7 +416,7 @@ private fun LoadFailed(onRetry: () -> Unit) {
         textAlign = TextAlign.Center,
     )
     Button(onRetry, Modifier.testTag(C.Tag.DASHBOARD_RETRY)) {
-      Text(stringResource(R.string.dashboard_retry), style = AroundTextStyles.Button)
+      Text(stringResource(R.string.try_again), style = AroundTextStyles.Button)
     }
   }
 }

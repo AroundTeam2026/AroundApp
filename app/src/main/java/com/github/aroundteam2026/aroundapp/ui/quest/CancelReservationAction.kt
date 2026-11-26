@@ -103,7 +103,7 @@ internal fun CancelReservationAction(
               when (status) {
                 CancelStatus.NONE -> texts.label
                 CancelStatus.CANCELLING -> texts.running
-                CancelStatus.FAILED -> R.string.cancel_reservation_retry
+                CancelStatus.FAILED -> R.string.try_again
               }
           ),
           style = AroundTextStyles.Button,

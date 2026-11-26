@@ -363,9 +363,7 @@ class NearbyQuestPagerTest {
   fun aFailedQuestOffersToTryAgain() {
     show(rows(1), acceptState = ACCEPTABLE.copy(failedQuestIds = setOf("q1")))
 
-    acceptButton()
-        .assertTextEquals(context.getString(R.string.accept_quest_retry))
-        .assertIsEnabled()
+    acceptButton().assertTextEquals(context.getString(R.string.try_again)).assertIsEnabled()
   }
 
   @Test

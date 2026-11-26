@@ -182,7 +182,7 @@ private fun LoadFailed(onRetry: () -> Unit) {
         color = MaterialTheme.colorScheme.onBackground,
     )
     Button(onRetry, Modifier.testTag(C.Tag.VENUE_PROFILE_RETRY)) {
-      Text(stringResource(R.string.dashboard_retry))
+      Text(stringResource(R.string.try_again))
     }
   }
 }

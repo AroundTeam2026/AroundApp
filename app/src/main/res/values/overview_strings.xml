@@ -10,7 +10,6 @@
         <item quantity="other">%1$d accepted</item>
     </plurals>
     <string name="overview_failed">Couldn\'t load your quests. Check your connection and try again.</string>
-    <string name="overview_retry">Try again</string>
     <string name="overview_empty_title">No quests yet</string>
     <string name="overview_empty_body">Accept a quest on a venue\'s page and it shows up here.</string>
     <!-- Where a reservation stands with its venue -->
@@ -28,7 +27,6 @@
     <string name="overview_status_proof_rejected">Proof rejected</string>
     <!-- A photo proof queued offline that failed for good, so the venue never got it (#624) -->
     <string name="overview_status_proof_not_sent">Proof not sent</string>
-    <string name="overview_retry_proof">Try again</string>
     <string name="overview_retrying_proof">Trying again…</string>
     <string name="overview_retry_proof_failed">Couldn\'t try again. Send a new proof instead.</string>
     <!-- A reservation's slot: the day, e.g. "Today" or "Sun 2 Nov", then the time -->

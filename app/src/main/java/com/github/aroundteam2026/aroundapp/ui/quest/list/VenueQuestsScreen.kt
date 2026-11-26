@@ -381,7 +381,7 @@ private fun LoadFailed(onRetry: () -> Unit) {
   ) {
     Message(R.string.venue_quests_failed, Modifier.testTag(C.Tag.VENUE_QUESTS_FAILED))
     Button(onRetry, Modifier.testTag(C.Tag.VENUE_QUESTS_RETRY)) {
-      Text(stringResource(R.string.venue_quests_retry), style = AroundTextStyles.Button)
+      Text(stringResource(R.string.try_again), style = AroundTextStyles.Button)
     }
   }
 }

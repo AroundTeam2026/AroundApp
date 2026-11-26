@@ -196,9 +196,7 @@ fun OverviewQuestRow(
 private fun RetryProofButton(status: ProofRetryStatus, onClick: () -> Unit) {
   val retrying = status == ProofRetryStatus.RETRYING
   ProofPill(
-      stringResource(
-          if (retrying) R.string.overview_retrying_proof else R.string.overview_retry_proof
-      ),
+      stringResource(if (retrying) R.string.overview_retrying_proof else R.string.try_again),
       C.Tag.OVERVIEW_RETRY_PROOF,
       onClick,
       // A double tap tries once; the ViewModel ignores it too

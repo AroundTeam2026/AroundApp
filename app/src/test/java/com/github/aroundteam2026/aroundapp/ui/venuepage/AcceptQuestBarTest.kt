@@ -159,7 +159,7 @@ class AcceptQuestBarTest {
     show(LOADED.copy(selectedQuestId = "a", failedQuestIds = setOf("a")))
 
     compose.onNodeWithTag(C.Tag.ACCEPT_QUEST_FAILED).assertIsDisplayed()
-    button.assertIsEnabled().assertTextContains(text(R.string.accept_quest_retry))
+    button.assertIsEnabled().assertTextContains(text(R.string.try_again))
     button.performClick()
 
     assertEquals(1, accepts)

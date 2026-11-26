@@ -7,7 +7,6 @@
     <!-- When a card on the Quests tab opens a quest the venue no longer lists, e.g. its reward expired -->
     <string name="venue_page_quest_gone">This quest is no longer available.</string>
     <string name="venue_page_failed">Couldn\'t load this venue. Check your connection and try again.</string>
-    <string name="venue_page_retry">Try again</string>
     <string name="venue_page_no_quests">No quests here right now. Check back soon.</string>
     <string name="venue_page_quests">Quests</string>
     <plurals name="venue_page_active_quests">
@@ -67,7 +66,6 @@
     <string name="quest_detail_sent_proof">Your party\'s proof</string>
     <string name="quest_detail_sent_proof_photo">The photo your party sent</string>
     <string name="quest_detail_sent_proof_photo_failed">The photo couldn\'t be loaded.</string>
-    <string name="quest_detail_sent_proof_photo_retry">Try again</string>
     <string name="quest_detail_radius">Unlock radius</string>
     <string name="quest_detail_radius_meters">%1$d m</string>
     <string name="quest_detail_radius_map">Map of the %1$d m unlock radius around %2$s</string>
@@ -81,7 +79,6 @@
     <string name="accept_quest_accepted_short">Accepted</string>
     <string name="accept_quest_failed">Couldn\'t accept this quest.</string>
     <string name="accept_quest_refused_notice">A reservation wasn\'t accepted. Open the quest to try again.</string>
-    <string name="accept_quest_retry">Try again</string>
     <string name="accept_quest_unavailable">Can\'t accept quests right now. Open this page again to try.</string>
     <!-- Once the venue approved the reservation, on the quest's details -->
     <string name="submit_proof">Submit proof</string>
