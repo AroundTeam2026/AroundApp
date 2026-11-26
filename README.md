@@ -44,7 +44,29 @@ If the venue approved the party's proof in the meantime, a late proof is dropped
 
 The app follows **MVVM**. `model/` holds the data classes and the repositories, each behind an interface; Firebase lives only there. `ui/` holds the screens and their ViewModels, which depend on the repository interfaces and never on Firebase.
 
-![Architecture diagram](docs/architecture/around-architecture-diagram.png)
+The diagram is split into one image per part. Their source is [`around-architecture-diagram-editable.drawio`](docs/architecture/around-architecture-diagram-editable.drawio), with one page per image.
+
+![Architecture overview](docs/architecture/around-architecture-diagram.png)
+
+### Explorer screens
+
+![Explorer screens, their ViewModels and the repositories they call](docs/architecture/around-architecture-explorer.png)
+
+### Venue screens
+
+![Venue screens, their ViewModels and the repositories they call](docs/architecture/around-architecture-venue.png)
+
+### Shared by both roles
+
+![Sign-in, navigation, sign-out, offline banner and notification prompt](docs/architecture/around-architecture-shared.png)
+
+### Data layer
+
+![Repositories and the services they call](docs/architecture/around-architecture-data.png)
+
+### Notifications
+
+![Registering the phone, sending notifications, and the permission prompt](docs/architecture/around-architecture-notifications.png)
 
 ## Getting started
 
