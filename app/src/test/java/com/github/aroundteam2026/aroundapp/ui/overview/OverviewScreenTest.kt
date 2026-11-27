@@ -394,7 +394,6 @@ class OverviewScreenTest {
         .assertTextEquals(testQuest(id = "fox").title)
   }
 
-  /** The cancel button is a clickable of its own, so the card's merged node leaves it out. */
   /**
    * The button tagged [tag] on the card of [reservationId]. Each is a clickable of its own, so the
    * card's merged node leaves it out.
