@@ -307,7 +307,6 @@ class CompletionRepositoryFirestoreTest {
     assertEquals(id, fetchAsVenue(id).id)
   }
 
-  /** Bug: an exception escapes submit instead of becoming a failure. */
   /**
    * Bug: the completion's listener leaves out metadata changes, or pendingWrite isn't read from
    * them, so a proof queued offline never shows as waiting to send, or still does once the server
@@ -376,6 +375,7 @@ class CompletionRepositoryFirestoreTest {
         }
       }
 
+  /** Bug: an exception escapes submit instead of becoming a failure. */
   @Test
   fun submit_returnsFailureWhenTheClientIsTerminated() = withTimeoutBlocking {
     val terminated = emulatorClient(TERMINATED_APP)
