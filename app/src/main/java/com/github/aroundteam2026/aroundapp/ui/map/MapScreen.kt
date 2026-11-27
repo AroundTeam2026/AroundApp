@@ -16,9 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
@@ -49,7 +52,8 @@ import com.google.maps.android.compose.MapUiSettings
  * them again. Each venue on screen with valid quests gets a pin that opens into a card; the card
  * opens the venue's page and tapping the map closes it. A "Nearby quests" pill opens the nearby
  * quests over the map, closed by Back or by opening a card. Tapping a quest opens its details, its
- * pin frames its venue and opens its card, and filters narrow the list, not the pins.
+ * pin frames its venue and opens its card, and filters narrow the list, not the pins. Pulled up,
+ * the nearby quests stop under the banners, so the banners never cover their header.
  *
  * @param cameraPositionState Where the camera is; tests pass their own to read it.
  * @param onFocusQuest Opens the page of the venue with this id, scrolled to the quest with this id,
@@ -102,6 +106,9 @@ fun MapScreen(
         QuestMarkerHitTest(markerStyle, density, direction)
       }
   val mapTaps = remember { MapTapPosition() }
+  // The height of the banners' column, margins included, so the pulled-up nearby sheet stops under
+  // it rather than covering its own header with two banners
+  var bannersHeight by remember { mutableIntStateOf(0) }
 
   fun openMarker(pin: VenuePin) {
     if (pin.key == state.selectedPinKey) onFocusQuest(pin.venueId, pin.featuredQuest.id)
@@ -160,6 +167,7 @@ fun MapScreen(
           onClose = viewModel::onNearbyClose,
           filters = state.filters,
           onFiltersChange = viewModel::onFiltersChange,
+          pulledUpTop = maxOf(PULLED_UP_TOP, with(density) { bannersHeight.toDp() }),
           acceptState = acceptState,
           onAccept = { acceptViewModel?.accept(it) },
       )
@@ -170,9 +178,12 @@ fun MapScreen(
       )
     }
     // The location banner comes last, under the offline or failure one, which says why pins may be
-    // missing
+    // missing. Drawn after the nearby quests, so the banners stay visible and usable over the dim
     Column(
-        Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(AroundSpacing.Large),
+        Modifier.align(Alignment.TopCenter)
+            .fillMaxWidth()
+            .onSizeChanged { bannersHeight = it.height }
+            .padding(AroundSpacing.Large),
         verticalArrangement = Arrangement.spacedBy(AroundSpacing.Medium),
     ) {
       if (showOfflineBanner) OfflineBanner()

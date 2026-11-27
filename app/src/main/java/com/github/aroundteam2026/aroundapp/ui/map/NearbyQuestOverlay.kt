@@ -58,6 +58,7 @@ import androidx.compose.ui.semantics.collapse
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.expand
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -85,7 +86,10 @@ private val BUTTON_ELEVATION = 4.dp
 private val OUTLINE_WIDTH = 1.dp
 private val OVERLAY_ELEVATION = 12.dp
 
-/** How far under the map's top the pulled-up sheet stops, from Figma (frame 5488:31562). */
+/**
+ * How far under the map's top the pulled-up sheet stops, from Figma (frame 5488:31562), when the
+ * map's banners don't reach further down.
+ */
 internal val PULLED_UP_TOP = 96.dp
 
 /** How dark the map gets behind the pulled-up sheet, from Figma, in the light and dark themes. */
@@ -131,11 +135,11 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * modal, so the map stays usable around it.
  *
  * Dragged up, from the grabber, the header or the list, the sheet grows until it spans the width,
- * sits on the bottom edge and stops [PULLED_UP_TOP] under the top, as in Figma; only then does the
- * list scroll. The map behind it dims as it grows, and a tap there takes it back to rest. Let go
- * partway, it settles where a fling heads to, or else at rest or pulled up, whichever is nearer.
- * Pulled up, Back takes it back to rest too, and it never grows past its stop, even if its content
- * does. TalkBack pulls it up and back with the grabber's expand and collapse actions. How far it is
+ * sits on the bottom edge and stops [pulledUpTop] under the top; only then does the list scroll.
+ * The map behind it dims as it grows, and a tap there takes it back to rest. Let go partway, it
+ * settles where a fling heads to, or else at rest or pulled up, whichever is nearer. Pulled up,
+ * Back takes it back to rest too, and it never grows past its stop, even if its content does.
+ * TalkBack pulls it up and back with the grabber's expand and collapse actions. How far it is
  * pulled up survives recreation.
  *
  * Dragged down, the list scrolls back to its top first, then the sheet shrinks back to rest. From
@@ -149,6 +153,9 @@ fun NearbyQuestsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * @param onClose Called when the explorer closes the overlay.
  * @param filters The filters [quests] already passed.
  * @param onFiltersChange Called with the filters the explorer picks in the pager.
+ * @param pulledUpTop How far under the top the pulled-up sheet stops: [PULLED_UP_TOP] in Figma, or
+ *   lower, so whatever the map shows above it, such as its banners, stays visible. If it changes
+ *   while the sheet is pulled up, the sheet follows it.
  * @param acceptState Where accepting each quest stands; "Accept quest" shows only when given.
  * @param onAccept Called with a card's quest when the explorer taps its "Accept quest".
  * @param modifier Places the overlay over the map's whole area; at rest the sheet keeps its own
@@ -163,6 +170,7 @@ fun NearbyQuestOverlay(
     onClose: () -> Unit,
     filters: NearbyFilters,
     onFiltersChange: (NearbyFilters) -> Unit,
+    pulledUpTop: Dp,
     modifier: Modifier = Modifier,
     acceptState: NearbyAcceptUiState? = null,
     onAccept: (NearbyQuest) -> Unit = {},
@@ -185,7 +193,7 @@ fun NearbyQuestOverlay(
     val large = with(density) { AroundSpacing.Large.toPx() }
     // How far the sheet's top travels from rest, a margin above the bottom, to pulled up
     val reach =
-        (constraints.maxHeight - with(density) { PULLED_UP_TOP.toPx() } - motion.restHeight - large)
+        (constraints.maxHeight - with(density) { pulledUpTop.toPx() } - motion.restHeight - large)
             .coerceAtLeast(0f)
     SideEffect { motion.reach = reach }
     if (motion.pulled > 0f) {
@@ -205,7 +213,7 @@ fun NearbyQuestOverlay(
         Modifier.align(Alignment.BottomCenter)
             // The list's extra height is worked out from the height at rest, so content that grows
             // while it is pulled up, such as the filters, would otherwise push it past its stop
-            .heightIn(max = maxHeight - PULLED_UP_TOP)
+            .heightIn(max = maxHeight - pulledUpTop)
             .padding(start = margin, end = margin, bottom = margin)
             .fillMaxWidth()
             .onSizeChanged { if (motion.pulled == 0f) motion.restHeight = it.height }
