@@ -58,6 +58,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 /**
  * Tests the map's nearby quests: the pill that opens them, and the overlay that holds the pager.
@@ -356,6 +357,55 @@ class MapScreenNearbyTest {
     assertOverlayClosed()
   }
 
+  /** Gives the map enough quests for the pulled-up list to fill the sheet up to its stop. */
+  private fun manyQuests() {
+    quests.value = List(MANY_QUESTS) { testQuest(id = "cafe-$it", venueId = "cafe") }
+  }
+
+  /** Drags the open overlay's grabber up slowly, well past where it stops, and lets go. */
+  private fun pullUp() {
+    node(C.Tag.NEARBY_GRABBER).performTouchInput {
+      swipe(center, center - Offset(0f, 600.dp.toPx()), durationMillis = 1_000L)
+    }
+    composeTestRule.waitForIdle()
+  }
+
+  // Offline with the location refused, the two banners reach past Figma's stop: the pulled-up sheet
+  // stops under them instead, so its header's close button is still visible and takes the tap
+  @Test
+  @Config(qualifiers = TALL_SCREEN)
+  fun withTwoBannersThePulledUpSheetStopsUnderThemAndItsCloseButtonWorks() {
+    manyQuests()
+    show(showOfflineBanner = true)
+    openNearby()
+
+    pullUp()
+
+    val bannersBottom = node(C.Tag.LOCATION_BANNER).getBoundsInRoot().bottom
+    val sheetTop = node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top
+    // Under the banners, where Figma's stop alone would have put it over them
+    assertTrue("sheet at $sheetTop, banners end at $bannersBottom", sheetTop >= bannersBottom)
+    assertTrue(bannersBottom > node(C.Tag.MAP).getBoundsInRoot().top + PULLED_UP_TOP)
+    node(C.Tag.NEARBY_SCRIM).assertIsDisplayed()
+    close().assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    assertOverlayClosed()
+  }
+
+  @Test
+  @Config(qualifiers = TALL_SCREEN)
+  fun withNoBannerThePulledUpSheetStillStopsAtFigmasStop() {
+    manyQuests()
+    show(locationOn = true)
+    openNearby()
+    node(C.Tag.LOCATION_BANNER).assertDoesNotExist()
+
+    pullUp()
+
+    val mapTop = node(C.Tag.MAP).getBoundsInRoot().top
+    assertDpEquals("top", mapTop + PULLED_UP_TOP, node(C.Tag.NEARBY_OVERLAY).getBoundsInRoot().top)
+  }
+
   @Test
   fun backClosesTheOverlayAndStaysOnTheMap() {
     show()
@@ -638,5 +688,11 @@ class MapScreenNearbyTest {
 
     /** Longer than a snackbar stays up. */
     const val SNACKBAR_LONG_ENOUGH_MS = 10_000L
+
+    /** A phone-sized screen, tall enough for the sheet to grow under two banners. */
+    const val TALL_SCREEN = "w411dp-h891dp"
+
+    /** More quests than the pulled-up sheet shows at once. */
+    const val MANY_QUESTS = 10
   }
 }

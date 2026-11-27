@@ -47,8 +47,14 @@ class NearbyQuestOverlayTest {
 
   private var closed = 0
 
-  /** Shows the overlay with [QUEST_COUNT] quests, enough for the list to scroll pulled up. */
-  private fun show(restoration: StateRestorationTester? = null) {
+  /**
+   * Shows the overlay with [QUEST_COUNT] quests, enough for the list to scroll pulled up, stopping
+   * [pulledUpTop] under the top.
+   */
+  private fun show(
+      restoration: StateRestorationTester? = null,
+      pulledUpTop: Dp = PULLED_UP_TOP,
+  ) {
     val content: @Composable () -> Unit = {
       Box(Modifier.testTag(AREA).fillMaxSize()) {
         NearbyQuestOverlay(
@@ -59,6 +65,7 @@ class NearbyQuestOverlayTest {
             onClose = { closed++ },
             filters = NearbyFilters(),
             onFiltersChange = {},
+            pulledUpTop = pulledUpTop,
         )
       }
     }
@@ -92,6 +99,16 @@ class NearbyQuestOverlayTest {
     assertDpEquals("right", area.right, sheet.right)
     assertDpEquals("bottom", area.bottom, sheet.bottom)
     node(C.Tag.NEARBY_SCRIM).assertIsDisplayed()
+  }
+
+  // The map passes a lower stop when its banners reach further down than Figma's
+  @Test
+  fun aLowerStopIsWhereThePulledUpSheetStops() {
+    show(pulledUpTop = LOWER_STOP)
+
+    pullUp()
+
+    assertDpEquals("top", LOWER_STOP, top(C.Tag.NEARBY_OVERLAY))
   }
 
   @Test
@@ -296,5 +313,7 @@ class NearbyQuestOverlayTest {
     const val STEPS = 10
     /** Faster than the overlay's fling threshold. */
     val FAST_FLING = 1_800.dp
+    /** A stop under two of the map's banners, lower than Figma's [PULLED_UP_TOP]. */
+    val LOWER_STOP = 170.dp
   }
 }
